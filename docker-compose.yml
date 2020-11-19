@@ -1,0 +1,11 @@
+version: '3'
+services:
+  web:
+    build: .
+    volumes:
+        - .:/app
+    image: duckdown:latest
+    container_name: duckdown-web
+    command: inv server
+    ports:
+      - "8080:80"

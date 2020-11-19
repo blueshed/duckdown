@@ -1,0 +1,65 @@
+@import url('reset.css');
+@import url('https://fonts.googleapis.com/css2?family=Julius+Sans+One&display=swap');
+
+.heartleap {
+    --bg-color: #000;
+    --txt-color: #E7E2CE;
+}
+
+.things {
+    --bg-color: #f6f8f5;
+    --txt-color: #7C000E;
+}
+
+.look {
+    --bg-color: #C6E3E3;
+    --txt-color: #68949f;
+}
+
+.jadd {
+    --bg-color: #6F668F;
+    --txt-color: #B0A6D1;
+}
+
+.news {
+    --bg-color: #51ABC4;
+    --txt-color: #147C99;
+}
+
+html, body {
+    font-family: 'Julius Sans One', sans-serif;
+}
+
+body {
+    background: var(--bg-color);
+    color: var(--txt-color);
+}
+
+h2 {
+    font-size: 1.5em;
+    font-weight: bolder;
+    margin-top: 2em;
+    margin-bottom: 1em;
+}
+
+p {
+    margin-bottom: 1em;
+}
+
+a {
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: none;
+}
+
+.feather {
+    width: 14px;
+    height: 14px;
+    stroke: currentColor;
+    stroke-width: 1;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    fill: none;
+}

@@ -1,0 +1,7 @@
+-r requirements.txt
+bumpversion
+black
+pylint
+pytest
+pytest-tornado
+nodeenv

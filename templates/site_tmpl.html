@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>{{ handler.one_meta_value('title', 'duckdown') }}</title>
+    <link href="{{ static_url("site.css") }}" rel="stylesheet" type="text/css" />
+    <style type="text/css">
+        html,
+        body {
+            height: 100%;
+        }
+
+        .parent {
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .center {}
+
+        img {
+            width: 240px;
+        }
+    </style>
+</head>
+
+<body class="{{ handler.one_meta_value('theme') }}">
+    <div class="parent">
+        <div class="center">{% raw content %}</div>
+    </div>
+</body>
+
+</html>

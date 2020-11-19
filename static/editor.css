@@ -1,0 +1,112 @@
+/* @import url('reset.css'); */
+html,
+body,
+#app {
+    margin: 0;
+    height: 100%;
+    font-family: "Helvetica Neue", Arial, sans-serif;
+    color: #333;
+}
+
+.menu {
+    border-bottom: 1px solid gray;
+}
+
+.table {
+    border-collapse: collapse;
+    border: 0;
+    width: 100%;
+    height: 100%;
+}
+
+.table th {
+    padding: 0.5em;
+    vertical-align: center;
+    text-align: left;
+}
+
+.table th>input {
+    width: 100%;
+    border: 0px;
+}
+
+.table th>button {
+    float: right;
+}
+
+.table td {
+    margin: 0.5em;
+    vertical-align: top;
+}
+
+.files {
+    width: 20%;
+    height: 100%;
+}
+
+.entry, .preview {
+    width: 40%;
+    height: 100%;
+}
+
+.entry {
+    padding-left: 0.5em;
+    padding-right: 0.5em;
+}
+
+.preview {
+    white-space: pre-wrap;
+    padding-left: 0.5em;
+    padding-right: 0.5em;
+    height: 100%;
+}
+
+.preview img {
+    width: 120px;
+}
+
+.preview>div {
+    height: 100%;
+    overflow-y: scroll;
+}
+
+textarea {
+    width: 100%;
+    height: 100%;
+    vertical-align: top;
+    border: none;
+    resize: none;
+    outline: none;
+    background-color: #f6f6f6;
+    font-size: 14px;
+    font-family: "Monaco", courier, monospace;
+    overflow-y: scroll;
+}
+
+code {
+    color: #f66;
+}
+
+.feather {
+    width: 14px;
+    height: 14px;
+    stroke: currentColor;
+    stroke-width: 1;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    fill: none;
+}
+
+.breadcrumbs {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.breadcrumbs li {
+    display: inline-block;
+}
+
+.breadcrumbs li a {
+    cursor: pointer;
+}

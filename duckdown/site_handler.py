@@ -1,0 +1,77 @@
+# pylint: disable=W0201, E1101
+""" handle request for markdown pages """
+import logging
+import os
+import markdown
+import tornado.web
+
+
+LOGGER = logging.getLogger(__name__)
+EMPTY_TOC = '<div class="toc">\n<ul></ul>\n</div>\n'
+IMG_PATH = "https://s3-eu-west-1.amazonaws.com/vashti.blueshed.info/images/"
+
+
+class SiteHandler(tornado.web.RequestHandler):  # pylint: disable=W0223
+    """ inline transform request for markdown pages """
+
+    def initialize(self, docs):
+        """ setup init properties """
+        self.docs = docs
+        self.meta = None
+        self.nav = None
+
+    def convert_images(self, value):
+        """ use IMG_PATH """
+        if self.application.settings.get("debug") is True:
+            return value
+        return value.replace("/static/images/", IMG_PATH)
+
+    @property
+    def has_toc(self):
+        """ determin if toc is empty """
+        return self.meta.toc != EMPTY_TOC
+
+    def meta_value(self, name, default=None):
+        """ return markdown meta value """
+        return self.meta.Meta.get(name, [default])
+
+    def one_meta_value(self, name, default=None):
+        """ return markdown meta value """
+        result = self.meta_value(name, default)
+        return result[0] if result else None
+
+    def load_nav(self, path):
+        """ load nav section if it exist """
+        folder = os.path.dirname(path)
+        if folder:
+            LOGGER.info(" -- folder: %s", folder)
+            nav = os.path.join(self.docs, folder, "-nav.md")
+            if os.path.isfile(nav):
+                LOGGER.info(" -- nav: %s", nav)
+                with open(nav, "r", encoding="utf-8") as file:
+                    content = markdown.markdown(file.read())
+                    self.nav = self.convert_images(content)
+
+    def get(self, path):
+        """ handle get """
+        path = path if path else "index.html"
+        file, ext = os.path.splitext(path)
+
+        self.load_nav(path)
+
+        doc = os.path.join(self.docs, f"{file}.md")
+        with open(doc, "r", encoding="utf-8") as file:
+            content = file.read()
+            LOGGER.info(" -- ext: %s", ext)
+            if ext == ".html":
+                self.meta = markdown.Markdown(extensions=["meta", "toc"])
+                content = self.meta.convert(content)
+                LOGGER.info(" -- meta: %s", self.meta.Meta)
+                template = self.one_meta_value("template", "site")
+                LOGGER.info(" -- tmpl: %s", template)
+                self.render(
+                    f"{template}_tmpl.html",
+                    content=self.convert_images(content),
+                )
+            else:
+                self.write(self.convert_images(content))

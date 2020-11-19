@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+
+<head>
+    <meta charset="utf-8">
+    <title>{{ app_name }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style type="text/css">
+        html,
+        body,
+        input {
+            font-family: monospace;
+        }
+
+        .login {
+            margin-top: 4em;
+            margin-left: auto;
+            margin-right: auto;
+            width: 240px;
+        }
+
+        .login input {
+            width: 100%;
+            padding: 4px;
+        }
+
+        .title {
+            margin-bottom: 1em;
+        }
+
+        .form-input {
+            margin-bottom: 0.5em;
+        }
+
+        .error {
+            color: red;
+            margin: 1em 1em 0em 1em;
+        }
+
+        .action {
+            margin-top: 1em;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="login">
+        {% if notice %}
+        <div class="notice">
+            <div class="">{{ notice }}</div>
+        </div>
+        {% end %}
+        <form class="form" method="post" role="form">
+            <div class="title">{{ app_name }}...</div>
+            <div class="form-input">
+                <input type="text" placeholder="email" name="email" value="{{ email or ''}}" required autofocus>
+                <i class="fas fa-user-circle"></i>
+            </div>
+            <div class="form-input">
+                <input type="password" placeholder="password" name="password">
+                <i class="fas fa-key"></i>
+            </div>
+            {% if error %}
+            <div class="error">{{ error }}</div>
+            {% end %}
+            <div class="action">
+                <button name="submit" type="submit" value="login">Sign In</button>
+                {% if can_register %}
+                <button name="submit" type="submit" value="register">Register</button>{% end %}
+            </div>
+            <div class="hidden">
+                <input type="hidden" name="next" value="{{ next }}" />
+            </div>
+        </form>
+    </div>
+</body>
+
+</html>
