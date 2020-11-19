@@ -16,12 +16,13 @@ def scan_path(path):
             is_file = entry.is_file()
             size = entry.stat().st_size if is_file else None
             mime = mimetypes.guess_type(entry.path) if is_file else None
-            yield {
-                "name": entry.name,
-                "file": is_file,
-                "size": size,
-                "type": mime,
-            }
+            if entry.name[0] != ".":
+                yield {
+                    "name": entry.name,
+                    "file": is_file,
+                    "size": size,
+                    "type": mime,
+                }
 
 
 class DirHandler(UserMixin, RequestHandler):  # pylint: disable=W0223
@@ -45,6 +46,10 @@ class DirHandler(UserMixin, RequestHandler):  # pylint: disable=W0223
         """ handle the setting of file to path """
         LOGGER.info("saving %s", path)
         path = os.path.join(self.directory, path) if path else self.directory
+        folder, _ = os.path.split(path)
+        if folder and not os.path.exists(folder):
+            LOGGER.info("making directory: %s", folder)
+            os.makedirs(folder)
         with open(path, "wb") as file:
             file.write(self.request.body)
         self.write("saved")
