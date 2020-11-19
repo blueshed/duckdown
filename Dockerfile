@@ -14,9 +14,6 @@ RUN pip install --upgrade pip
 # Install any needed packages
 RUN [ -f requirements.txt ] && pip install -r requirements.txt ||  echo "No requirements.txt"
 
-# Make port 80 available to the world outside this container
-EXPOSE 80
-
-# Define environment variable
 ENV PYTHONPATH ".:${PYTHONPATH}"
-ENV PORT 80
+
+CMD inv server

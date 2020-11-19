@@ -6,6 +6,9 @@ services:
         - .:/app
     image: duckdown:latest
     container_name: duckdown-web
-    command: inv server
+    environment:
+        PORT: '80'
+        DEBUG: 'true'
     ports:
       - "8080:80"
+    command: inv server

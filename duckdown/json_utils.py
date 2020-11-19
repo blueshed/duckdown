@@ -26,7 +26,9 @@ class DateTimeEncoder(json.JSONEncoder):
 
     def default(self, obj):  # pylint: disable=W0221,E0202
         """ check for our types """
-        if hasattr(obj, "to_json") and isinstance(getattr(obj, "to_json"), Callable):
+        if hasattr(obj, "to_json") and isinstance(
+            getattr(obj, "to_json"), Callable
+        ):
             return obj.to_json()
         if dataclasses.is_dataclass(obj):
             return dataclasses.asdict(obj)
@@ -71,10 +73,14 @@ def type_from_json(type_, value):
             )
         elif type_ == datetime.date:
             result = (
-                datetime.datetime.strptime(value, "%Y-%m-%d").date() if value else None
+                datetime.datetime.strptime(value, "%Y-%m-%d").date()
+                if value
+                else None
             )
         elif type_ == datetime.time:
             result = (
-                datetime.datetime.strptime(value, "%H:%M:%S").time() if value else None
+                datetime.datetime.strptime(value, "%H:%M:%S").time()
+                if value
+                else None
             )
     return result

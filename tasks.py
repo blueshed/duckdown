@@ -7,7 +7,6 @@ from dotenv import dotenv_values
 from duckdown import main
 
 PROJECT_NAME = "duckdown"
-HEROKU_APP = "duckdown"
 
 LOGGER = logging.getLogger(__name__)
 
@@ -47,10 +46,12 @@ def env(ctx):
     """ list .env """
     values = dotenv_values()
     for key in values:
-        ctx.run(f"heroku ci:config:set --app={HEROKU_APP} {key}={values[key]}")
+        cmd = f"heroku config:set {key}={values[key]}"
+        print(cmd)
+        ctx.run(cmd)
 
 
-@task(pre=[env])
+@task
 def deploy(ctx):
     """ deploy to heroku """
     ctx.run("heroku container:push web")
