@@ -4,14 +4,16 @@ import logging
 import os
 import markdown
 import tornado.web
+from .image_converter import ImageConverter
 
 
 LOGGER = logging.getLogger(__name__)
 EMPTY_TOC = '<div class="toc">\n<ul></ul>\n</div>\n'
-IMG_PATH = "https://s3-eu-west-1.amazonaws.com/vashti.blueshed.info/images/"
 
 
-class SiteHandler(tornado.web.RequestHandler):  # pylint: disable=W0223
+class SiteHandler(
+    ImageConverter, tornado.web.RequestHandler
+):  # pylint: disable=W0223
     """ inline transform request for markdown pages """
 
     def initialize(self, docs):
@@ -19,12 +21,6 @@ class SiteHandler(tornado.web.RequestHandler):  # pylint: disable=W0223
         self.docs = docs
         self.meta = None
         self.nav = None
-
-    def convert_images(self, value):
-        """ use IMG_PATH """
-        if self.application.settings.get("debug") is True:
-            return value
-        return value.replace("/static/images/", IMG_PATH)
 
     @property
     def has_toc(self):

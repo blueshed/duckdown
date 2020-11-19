@@ -46,6 +46,8 @@ def make_app():
         ),
         "login_url": "/login",
         "app_name": settings.get("app_name", "duckdown-app"),
+        "img_path": "https://s3-eu-west-1.amazonaws.com/"
+        + "vashti.blueshed.info/images/",
     }
     LOGGER.info("settings: %s", tornado_settings)
     return tornado.web.Application(routes, **tornado_settings)
