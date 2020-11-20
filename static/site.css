@@ -60,6 +60,10 @@ pre {
     border-left: 1px solid darkgray;
 }
 
+[v-cloak] {
+    display: none;
+}
+
 .centered {
     display: block;
     width: 100%;
