@@ -4,3 +4,4 @@ nenv
 client/node_modules
 .env
 static/images
+*.DS_Store

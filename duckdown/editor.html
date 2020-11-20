@@ -15,7 +15,7 @@
     <div id="app">
         <table class="table">
             <tr class="menu">
-                <th>
+                <th class="breadcrumb">
                     <a @click="back(0)">
                         <svg class="logo">
                             <use xlink:href="/static/logo.svg#duck" /></svg>
@@ -70,6 +70,34 @@
             </tr>
         </table>
     </div>
+    <script type="text/html" id="s3_browser">
+        <div class="s3browser">
+            <p class="breadcrumb">
+                <a @click="back(0)">path:</a>
+                <a v-for="(item, index) in path_items" @click="back(index+1)">/{{! item }}</a>
+            </p>
+            <ul class="listing">
+                <li v-for="item in folders" @click="path=item.Prefix">
+                    <svg class="feather">
+                        <use xlink:href="/static/feather-sprite.svg#folder" /></svg>
+                    {{! item.Prefix }}
+                </li>
+                <li v-for="item in files" @click="file=item.Key">
+                    <svg class="feather">
+                        <use xlink:href="/static/feather-sprite.svg#file" /></svg>
+                    {{! item.Key }}
+                </li>
+            </ul>
+            <div class="image-preview" v-if="filepath">
+                <button @click="copytoclipboard">
+                    <svg class="feather">
+                        <use xlink:href="/static/feather-sprite.svg#clipboard" />
+                    </svg>
+                </button>
+                <img :src="filepath" />
+            </div>
+        </div>
+    </script>
     <script src="{{ static_url('editor.js') }}" type="module"></script>
 </body>
 

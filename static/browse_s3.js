@@ -1,33 +1,5 @@
-const tmpl = `
-<div class="s3browser">
-<p>
-    <a @click="back(0)">path:</a>
-    <a v-for="(item, index) in path_items" @click="back(index+1)">/{{ item }}</a>
-</p>
-<hr/>
-<ul class="listing">
-    <li v-for="item in folders" @click="path=item.Prefix">
-        <svg class="feather"><use xlink:href="/static/feather-sprite.svg#folder"/></svg>
-        {{ item.Prefix }}
-    </li>
-    <li v-for="item in files" @click="file=item.Key">
-        <svg class="feather"><use xlink:href="/static/feather-sprite.svg#file"/></svg>
-        {{ item.Key }}
-    </li>
-</ul>
-<p v-if="filepath">
-    preview:
-    <button @click="copytoclipboard">
-        <svg class="feather"><use xlink:href="/static/feather-sprite.svg#clipboard"/></svg>
-    </button>
-    <br/>
-    <img :src="filepath"/>
-</p>
-</div>
-`
-
 export default {
-    template: tmpl,
+    template: "#s3_browser",
     data() {
         return {
             path: "",

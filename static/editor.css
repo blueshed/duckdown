@@ -163,8 +163,8 @@ code {
 }
 
 .feather {
-    width: 14px;
-    height: 14px;
+    width: 16px;
+    height: 16px;
     stroke: currentColor;
     stroke-width: 1;
     stroke-linecap: round;
@@ -180,4 +180,41 @@ code {
 
 .listing li {
     cursor: pointer;
+    padding-top: 2px;
+    padding-bottom: 2px;
+}
+
+.listing li>svg {
+    position: relative;
+    top: 2px;
+}
+
+.listing li:hover {
+    background-color: #e3f7fc;
+}
+
+.breadcrumb a {
+    cursor: pointer;
+}
+
+p.breadcrumb {
+    border-bottom: 1px solid gray;
+    padding-bottom: 1em;
+}
+
+.image-preview {
+    margin-top: 1em;
+    padding: 1em;
+    border-top: 1px solid gray;
+    border-bottom: 1px solid gray;
+}
+
+.image-preview>button {
+    float: right;
+}
+
+.image-preview>button>svg {
+    position: relative;
+    top: 2px;
+    stroke-width: 2px;
 }
