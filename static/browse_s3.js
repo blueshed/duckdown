@@ -33,8 +33,18 @@ export default {
             this.file = null
             let path = `/browse/${this.path}`
             axios.get(path).then(response => {
-                this.files = response.data.Contents ? response.data.Contents : []
-                this.folders = response.data.CommonPrefixes ? response.data.CommonPrefixes : []
+                let files = response.data.Contents ? response.data.Contents : []
+                files.map(item => {
+                    let elems = item.Key.split("/")
+                    item.name = elems[elems.length - 1]
+                })
+                this.files = files
+                let folders = response.data.CommonPrefixes ? response.data.CommonPrefixes : []
+                folders.map(item => {
+                    let elems = item.Prefix.split("/")
+                    item.name = elems[elems.length - 2]
+                })
+                this.folders = folders
             }).catch(error => {
                 console.log(error)
             })

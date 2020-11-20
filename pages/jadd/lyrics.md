@@ -54,8 +54,9 @@ Let me be alone
 
 ## Train Song
 
-<span class="lyrictitles">Train Song</span>  
-(Vashti Bunyan/Alastair Clayre&copy;MCPS)
+![Tepid - Painting by Whyn Lewis 1999](/static/images/jadd/tepid.jpg "Painting by Whyn Lewis 1999")
+
+(lyrics Vashti Bunyan/Alastair Clayre&copy;MCPS)
 
 Travelling north, travelling north to find you  
 Train wheels beating, the wind in my eyes  
@@ -77,13 +78,12 @@ Don't even know what I'll find when I get to you
 But suddenly now, I know where I belong  
 It's many hundred miles and it won't be long
 
-<img src="static/images/jadd/tepid.jpg" alt="Tepid - Painting by Whyn Lewis 1999"  credit="Painting by Whyn Lewis 1999"/>
-</page>
 
 ## Love Song
 
-<span class="lyrictitles">Love Song</span>  
-(Bunyan &copy; MCPS 1966)
+![Vashti 1966](/static/images/jadd/eyes.jpg)
+
+(lyrics Bunyan &copy; MCPS 1966)
 
 I love your eyes when you look away  
 Thinking somewhere else of what ought to be  
@@ -105,13 +105,12 @@ I can't let you know you're too far away
 But I wonder now just what did you see  
 When you looked at me in that loveless way
 
-<img src="static/images/jadd/eyes.jpg" alt="Vashti 1966" />
-</page>
 
 ## Winter is Blue
 
-<span class="lyrictitles">Winter is Blue</span>  
-(Bunyan &copy; MCPS) 1966
+![dog in chair by vb](/static/images/jadd/blue.jpg "v.b.1966")
+ 
+(lyrics Bunyan &copy; MCPS) 1966
 
 Winter is blue  
 Living is gone  
@@ -141,35 +140,36 @@ Rain comes I'm sitting here
 Watching love moving  
 Away into yesterday
 
-<img src="static/images/jadd/blue.jpg" alt="dog in chair by vb" credit="v.b.1966" />
-</page>
-
 ## Coldest Night of the Year
 
 ![waiting for me](/static/images/jadd/waiting4me.jpg "Drawing by Whyn Lewis 1999")
 
-<span class="lyrictitles">Coldest Night of the Year  </span> (Mann/Weill)</p>
-<p>Baby baby it's late and you'd better go,  
+(Coldest Night of the Year (Mann/Weill))
+
+Baby baby it's late and you'd better go,  
 it's after three  
 Honey please have a heart, just look at that snow,  
 take pity on me.  
 I can hear that north wind blowing,  
 and the fire is oh so warm  
 Well I know you should be going,  
-but how can I send you out in that storm  </p>
-<p>Baby its cold out there, and it's getting colder  
+but how can I send you out in that storm
+
+Baby its cold out there, and it's getting colder  
 Baby it's cold out there, getting colder  
 Matter of fact better cuddle up here  
-It's the coldest night of the year  </p>
-<p>Baby baby I know if you wanted to,  
+It's the coldest night of the year
+
+Baby baby I know if you wanted to,  
 you'd brave the snow  
 But I haven't been well I might catch the flu  
 or a cold in my nose  
 Lets snuggle close together  
 while the whole world turns to ice  
 Just the victims of the weather  
-Sending you home now just wouldn't be nice  </p>
-<p>Baby its cold out there, and it's getting colder  
+Sending you home now just wouldn't be nice
+
+Baby its cold out there, and it's getting colder  
 Baby it's cold out there, getting colder  
 Matter of fact better cuddle up here  
 It's the coldest night of the year  
@@ -178,7 +178,7 @@ Ok? Whynot..
 
 ## I'd Like To Walk Around In Your Mind
 
-![Lots Road, London](static/images/jadd/Lots_Road.jpg "Photograph &copy; Robert Hewison 1967")
+![Lots Road, London](/static/images/jadd/Lots_Road.jpg "Photograph &copy; Robert Hewison 1967")
 
 (Bunyan 1967 &copy; MCPS)
 
@@ -224,9 +224,9 @@ Just another love to give
 And a diamond day
 
 
-## Lily Pond
+## Lily Pond  
+![iDog Lily](/static/images/jadd/iDog_Lily.jpg "Painting by Whyn Lewis 1999" height="383", width="312") 
 
-<span class="lyrictitles">Lily Pond</span>  
 (Vashti Bunyan &copy; Warlock Music Ltd)
 
 In a lily pond I lay  
@@ -240,12 +240,11 @@ In a lily pond I lay
 And the only thing he said to me  
 Was- 'young lady I love thee'
 
-<img height="383" width="312" src="static/images/jadd/iDog_Lily.jpg" alt="iDog Lily" credit="Painting by Whyn Lewis 1999" />
-</page>
 
 ## Timothy Grub
 
-<span class="lyrictitles">Timothy Grub</span>  
+![woods](/static/images/jadd/wood.jpg)
+
 (Vashti Bunyan &copy; Warlock Music Ltd)
 
 Maurice Snail and Timothy Grub,  
@@ -280,12 +279,12 @@ Up and down all the hills of the North countryside
 With the dogs eating buttercups on the wayside  
 And they'd wave all the cities 'goodbye'
 
-<img src="static/images/jadd/wood.jpg" alt="woods" />
-</page>
+
 
 ## Where I Like To Stand
 
-<span class="lyrictitles">Where I Like To Stand</span>  
+![Drawing by John James 1968](/static/images/jadd/stand.jpg "Drawing by John James 1968")
+
 (words John James/music Vashti Bunyan &copy; Warlock Music Ltd)
 
 The hound bays the sheep graze I'm counting the boats in the bay  
@@ -299,12 +298,11 @@ Fall on the seeds and make them grow
 Fall on the rocks and make them crack into pebbles and into sand  
 Which is where I like to stand
 
-<img src="static/images/jadd/stand.jpg" alt="Drawing by John James 1968" credit="Drawing by John James 1968" />
-</page>
 
 ## Swallow Song
 
-<span class="lyrictitles">Swallow Song</span>  
+![Painting by Jenny Richardson 1973](/static/images/jadd/happy_vashti.jpg "Painting by Jenny Richardson 1973")
+
 (Vashti Bunyan &copy; Warlock Music Ltd)
 
 And there's a sunset brimming over the sky  
@@ -320,14 +318,13 @@ See how fast the winter comes around
 And there's a rain cloud passing over our heads  
 And there's a cat on the doorstep waiting to be fed  
 Milk and bread  
-Day is done and now it's time for bed  
+Day is done and now it's time for bed 
 
-<img src="static/images/jadd/happy_vashti.jpg" alt="Painting by Jenny Richardson 1973" credit="Painting by Jenny Richardson 1973" />
-</page>
 
 ## Window Over The Bay
 
-<span class="lyrictitles">Window Over The Bay</span>  
+![Painting by John James](/static/images/jadd/Window.jpg "Painting by John James" height="310" width="310")
+
 (words Robert Lewis/music Vashti Bunyan  
 &copy; Warlock Music Ltd)
 
@@ -344,15 +341,13 @@ And a big wooden table all laid out for tea
 I wish I had a window over the bay  
 And a dreamy eyed cow to fill my milking pail  
 I wish I had a cockerel to raise me at dawn  
-And a little bed to sleep in when the curtains are drawn  
+And a little bed to sleep in when the curtains are drawn
 
-
-<img height="310" width="310" src="static/images/jadd/Window.jpg" alt="Painting by John James" credit="Painting by John James" />
-</page>
 
 ## Rose Hip November
 
-<span class="lyrictitles">Rose Hip November</span>  
+![Drawing by Robert Lewis 1969](/static/images/jadd/shepherd.jpg "Drawing by Robert Lewis 1969")
+
 (Vashti Bunyan &copy; Warlock Music Ltd)  
 
 Rose hip November - autumn I'll remember  
@@ -370,13 +365,12 @@ Evermore
 evermore  
 evermore
 
-<img src="static/images/jadd/shepherd.jpg" alt="Drawing by Robert Lewis 1969" credit="Drawing by Robert Lewis 1969" />
-</page>
 
 ## Come wind Come rain
 
-<span class="lyrictitles">Come wind Come rain</span>  
 (Vashti Bunyan &copy; Warlock Music Ltd)
+
+![Drawing by Robert Lewis 1969](/static/images/jadd/wagon.jpg "Drawing by Robert Lewis 1969")
 
 Come wind come rain we're off again,  
 Our muddy boots plod down the lane  
@@ -396,12 +390,11 @@ Is another ten miles and an armful of hay
 Hey ho the wind and the rain  
 Another ten miles and a bucket of grain.
 
-<img src="static/images/jadd/wagon.jpg" credit="Drawing by Robert Lewis 1969" />
-</page>
 
 ## Hebridean Sun
 
-<span class="lyrictitles">Hebridean Sun</span>  
+![scan of lyrics](/static/images/jadd/hebsun.jpg)
+
 (words Robert Lewis/music Vashti Bunyan  
 &copy; Warlock Music Ltd)
 
@@ -417,12 +410,11 @@ Of peat and seabirds and silver sand.
 The grass knows, the hills know, we all know  
 Spring has come, the good fountain flows.
 
-<img src="static/images/jadd/hebsun.jpg" alt="scan of lyrics" />
-</page>
 
 ## Rainbow River
 
-<span class="lyrictitles">Rainbow River</span>  
+![Rainbow River](/static/images/jadd/vandlbyj.jpg "Painting by Jenny Richardson 1972")
+
 (Vashti Bunyan &copy; Warlock Music Ltd)
 
 The rainbow river is a laughing stream  
@@ -452,13 +444,12 @@ Slowly bringing truth for every child to learn
 And the magpie meadow darkens gently blue now  
 As the family sit their faces lit by ember fire
 
-<img src="static/images/jadd/vandlbyj.jpg" credit="Painting by Jenny Richardson 1972" />
-</page>
 
 ## Trawlerman's Song
 
-<span class="lyrictitles">Trawlerman's Song</span>  
-(words Robert Lewis/ music Vashti Bunyan  
+![Trawlerman's Song](/static/images/jadd/lake.jpg "Drawing by John James 1968")
+
+(words Robert Lewis / music Vashti Bunyan  
 &copy; Warlock Music Ltd)  
 
 I love coming home from far across the sea  
@@ -483,12 +474,11 @@ I love coming home from far across the sea
 I pick my little wee wifey up  
 and set her on my knee  
 
-<img src="static/images/jadd/lake.jpg" credit="Drawing by John James 1968" />
-</page>
 
 ## Jog Along Bess
 
-<img height="292" width="225" src="static/images/jadd/linds.jpg" alt="linds" title="Painting by Lindsay Cook 1972" />
+![scones](/static/images/jadd/scones.jpg "Painting by Lizzie McDougall 1995")
+![linds](/static/images/jadd/linds.jpg "Painting by Lindsay Cook 1972" height="292" width="225")
 
 (Vashti Bunyan&copy; Warlock Music Ltd)
 
@@ -536,16 +526,12 @@ We wished very hard and you gave us a house
 Jog along Bess hop along May  
 Squeak along Blue it's a walk along day  
 It's a long road and weary are we  
-Bubble on kettle and make us all some tea
+Bubble on kettle and make us all some tea 
 
-<img src="static/images/jadd/scones.jpg" alt="scones" title="Painting by Lizzie McDougall 1995"/>  
-
-
-</page>
 
 ## Iris's Song For Us
 
-![ben](static/images/jadd/ben.jpg "Drawing by Robert Lewis 1986")
+![ben](/static/images/jadd/ben.jpg "Drawing by Robert Lewis 1986")
 
 words Iris Macfarlane/music Wally Dix  
 (version 2- music Vashti Bunyan)  
@@ -570,3 +556,4 @@ I rode the dark green deep with you
 And drove our dreams like sheep with you  
 And now my love please let me cross  
 Brown boundaries of sleep with you
+Eric

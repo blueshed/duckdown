@@ -13,3 +13,5 @@ theme: jadd
 <span class="front">
 [<img src='/static/images/covers/things.png'/>](/things/years.html)
 </span>
+
+[<img src='/static/images/news/news.jpg'/>](news/news.html){class=centered}

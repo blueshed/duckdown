@@ -54,6 +54,18 @@ a:hover {
     text-decoration: none;
 }
 
+pre {
+    margin: 1em;
+    padding-left: 1em;
+    border-left: 1px solid darkgray;
+}
+
+.centered {
+    display: block;
+    width: 100%;
+    text-align: center;
+}
+
 .feather {
     width: 14px;
     height: 14px;

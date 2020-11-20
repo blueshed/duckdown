@@ -80,12 +80,12 @@
                 <li v-for="item in folders" @click="path=item.Prefix">
                     <svg class="feather">
                         <use xlink:href="/static/feather-sprite.svg#folder" /></svg>
-                    {{! item.Prefix }}
+                    {{! item.name }}
                 </li>
                 <li v-for="item in files" @click="file=item.Key">
                     <svg class="feather">
-                        <use xlink:href="/static/feather-sprite.svg#file" /></svg>
-                    {{! item.Key }}
+                        <use xlink:href="/static/feather-sprite.svg#image" /></svg>
+                    {{! item.name }}
                 </li>
             </ul>
             <div class="image-preview" v-if="filepath">
