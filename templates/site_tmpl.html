@@ -22,6 +22,12 @@
         img {
             width: 240px;
         }
+
+        .user_edit {
+            position: absolute;
+            top: 2px;
+            right: 2px;
+        }
     </style>
 </head>
 
@@ -29,6 +35,7 @@
     <div class="parent">
         <div class="center">{% raw content %}</div>
     </div>
+    {%if current_user %}<a class="user_edit" href="{{ edit_path }}"><button>edit</button></a>{% end %}
 </body>
 
 </html>

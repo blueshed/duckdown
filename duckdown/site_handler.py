@@ -5,6 +5,7 @@ import os
 import tornado.web
 import markdown
 from .converter import Converter
+from .access_control import UserMixin
 
 
 LOGGER = logging.getLogger(__name__)
@@ -12,7 +13,7 @@ EMPTY_TOC = '<div class="toc">\n<ul></ul>\n</div>\n'
 
 
 class SiteHandler(
-    Converter, tornado.web.RequestHandler
+    UserMixin, Converter, tornado.web.RequestHandler
 ):  # pylint: disable=W0223
     """ inline transform request for markdown pages """
 
@@ -56,6 +57,8 @@ class SiteHandler(
         self.load_nav(path)
 
         doc = os.path.join(self.docs, f"{file}.md")
+        # edit_path = os.path.join("/edit", f"{file}.md")
+        edit_path = "/edit"
         with open(doc, "r", encoding="utf-8") as file:
             content = file.read()
             LOGGER.info(" -- ext: %s", ext)
@@ -68,6 +71,7 @@ class SiteHandler(
                 self.render(
                     f"{template}_tmpl.html",
                     content=self.convert_images(content),
+                    edit_path=edit_path,
                 )
             else:
                 self.write(self.convert_images(content))
