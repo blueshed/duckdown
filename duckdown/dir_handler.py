@@ -53,3 +53,10 @@ class DirHandler(UserMixin, RequestHandler):  # pylint: disable=W0223
         with open(path, "wb") as file:
             file.write(self.request.body)
         self.write("saved")
+
+    def delete(self, path=None):
+        """ will remove a document """
+        path = os.path.join(self.directory, path) if path else self.directory
+        if os.path.isfile(path):
+            os.unlink(path)
+            self.write("deleted")

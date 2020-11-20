@@ -16,31 +16,47 @@
         <table class="table">
             <tr class="menu">
                 <th>
-                    <a @click="back(0)">path:</a>
+                    <a @click="back(0)">
+                        <svg class="logo">
+                            <use xlink:href="/static/logo.svg#duck" /></svg>
+                    </a>
                     <a v-for="(item, index) in path_items" @click="back(index+1)">/{{! item }}</a>
                 </th>
                 <th>
+                    <button @click="remove()" v-bind:disabled="!can_save">Remove</button>
+                    <button @click="save()" v-bind:disabled="!can_save">Save</button>
                     <input type="text" v-model="file">
                 </th>
                 <th>
-                    <button @click="save()">Save</button>
-                    <button @click="images=!images">
-                        <span v-if="images">Preview</span><span v-else>Images</span>
+                    <a href="https://www.markdownguide.org/cheat-sheet/" target="duckdown-help">
+                        <button>Help</button>
+                    </a>
+                    <button @click="reset()">Reset</button>
+                    <button @click="images=true" :class="{active:images}">
+                        Images
                     </button>
+                    <button @click="images=false" :class="{active:!images}">
+                        Preview
+                    </button>
+                    <div class="alert" v-if="message">
+                        <svg class="feather">
+                            <use xlink:href="/static/feather-sprite.svg#alert-triangle" /></svg>
+                        {{! message }}
+                    </div>
                 </th>
             </tr>
             <tr>
                 <td class="files">
-                    <ul>
+                    <ul class="listing">
                         <li v-for="item in folders" @click="path=item.path">
                             <svg class="feather">
                                 <use xlink:href="/static/feather-sprite.svg#folder" /></svg>
-                            {{! item.name }}({{! item.path }})
+                            {{! item.name }}
                         </li>
                         <li v-for="item in files" @click="load(item.path)">
                             <svg class="feather">
                                 <use xlink:href="/static/feather-sprite.svg#file" /></svg>
-                            {{! item.name }}({{! item.path }})
+                            {{! item.name }}
                         </li>
                     </ul>
                 </td>

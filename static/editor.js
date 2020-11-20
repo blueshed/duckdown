@@ -6,6 +6,7 @@ const PATH_SEP = "/"
 const app = Vue.createApp({
     data() {
         return {
+            message: null,
             path: "",
             folders: null,
             files: null,
@@ -20,7 +21,10 @@ const app = Vue.createApp({
             if (this.path && this.path.length > 0) {
                 return this.path.split("/")
             }
-        }
+        },
+        can_save() {
+            return this.file && this.file.length != 0
+        },
     },
     methods: {
         update: _.debounce(function (e) {
@@ -65,15 +69,39 @@ const app = Vue.createApp({
             })
         },
         save() {
+            this.message = "saving..."
             let path = ROOT_DIR + this.file;
             let content = this.content;
             axios.put(path, content).then(response => {
                 console.log(response)
-                this.list_path();
+                this.list();
+                this.set_message("saved.")
             }).catch(error => {
                 console.log(error)
+                this.message = error
             })
-            return false
+        },
+        remove() {
+            let path = ROOT_DIR + this.file;
+            axios.delete(path).then(response => {
+                console.log(response)
+                this.list();
+                this.set_message("removed.")
+            }).catch(error => {
+                console.log(error)
+                this.message = error
+            })
+        },
+        reset() {
+            this.file = ""
+            this.content = "# hello"
+            this.images = false
+        },
+        set_message(value) {
+            this.message = value
+            setTimeout(() => {
+                this.message = null
+            }, 2000)
         }
     },
     watch: {
@@ -86,7 +114,7 @@ const app = Vue.createApp({
     },
     created() {
         this.list()
-        this.content = "# hello"
+        this.reset()
     }
 })
 

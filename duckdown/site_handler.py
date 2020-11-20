@@ -2,9 +2,9 @@
 """ handle request for markdown pages """
 import logging
 import os
-import markdown
 import tornado.web
-from .image_converter import ImageConverter
+import markdown
+from .converter import Converter
 
 
 LOGGER = logging.getLogger(__name__)
@@ -12,7 +12,7 @@ EMPTY_TOC = '<div class="toc">\n<ul></ul>\n</div>\n'
 
 
 class SiteHandler(
-    ImageConverter, tornado.web.RequestHandler
+    Converter, tornado.web.RequestHandler
 ):  # pylint: disable=W0223
     """ inline transform request for markdown pages """
 
@@ -60,7 +60,7 @@ class SiteHandler(
             content = file.read()
             LOGGER.info(" -- ext: %s", ext)
             if ext == ".html":
-                self.meta = markdown.Markdown(extensions=["meta", "toc"])
+                self.meta = self.markdown
                 content = self.meta.convert(content)
                 LOGGER.info(" -- meta: %s", self.meta.Meta)
                 template = self.one_meta_value("template", "site")

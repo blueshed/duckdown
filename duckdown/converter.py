@@ -1,9 +1,26 @@
 # pylint: disable=E1101
 """ Mixin to convert to images to s3 """
+import markdown
 
 
-class ImageConverter:
+class Converter:
     """ convert to remote if not debug """
+
+    @property
+    def markdown(self):
+        """ returns a markdown instance """
+        return markdown.Markdown(
+            extensions=[
+                "meta",
+                "toc",
+                "footnotes",
+                "tables",
+                "fenced_code",
+                "attr_list",
+                "def_list",
+                "markdown_strikethrough.extension",
+            ]
+        )
 
     @property
     def img_path(self):

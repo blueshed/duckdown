@@ -5,7 +5,7 @@ const tmpl = `
     <a v-for="(item, index) in path_items" @click="back(index+1)">/{{ item }}</a>
 </p>
 <hr/>
-<ul>
+<ul class="listing">
     <li v-for="item in folders" @click="path=item.Prefix">
         <svg class="feather"><use xlink:href="/static/feather-sprite.svg#folder"/></svg>
         {{ item.Prefix }}
