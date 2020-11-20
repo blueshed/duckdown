@@ -22,6 +22,8 @@ TYPE_MAP = {
 THUMB_SIZE = (184, 138)
 SMALL_SIZE = (368, 276)
 
+LOGGER = logging.getLogger(__name__)
+
 
 class Bucket:
     """ Wrapper around s3 connection and bucket """
@@ -141,6 +143,26 @@ class S3Browser(UserMixin, tornado.web.RequestHandler):
         delimiter = self.get_argument("d", "/")
         self.set_header("Content-Type", "application/json")
         self.write(dumps(self.bucket.list(prefix, delimiter)))
+
+    @tornado.web.authenticated
+    def post(self, path=None):
+        """ handle the upload """
+        result = []
+        for key in self.request.files:
+            for fileinfo in self.request.files[key]:
+                fname = fileinfo["filename"]
+                _, fExt = os.path.splitext(fname)
+                fType, fMime = TYPE_MAP.get(fExt.lower(), (None, None))
+                if fType is None:
+                    raise Exception("File Type not accepted: {}".format(fType))
+                LOGGER.info("upload: %s", f"{path}{fname}")
+                s3key = self.bucket.add(
+                    fileinfo["body"],
+                    key=f"{path}{fname}",
+                    meta={"original_name": fname, "content-type": fMime},
+                )
+                result.append(s3key)
+        self.write({"result": result})
 
 
 class S3UploadHandler(UserMixin, tornado.web.RequestHandler):

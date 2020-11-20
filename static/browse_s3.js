@@ -59,6 +59,24 @@ export default {
             el.select();
             document.execCommand('copy');
             document.body.removeChild(el);
+        },
+        uploadFiles() {
+            let formData = new FormData()
+            for (var i = 0; i < this.$refs.file.files.length; i++) {
+                let file = this.$refs.file.files[i];
+                formData.append('files[' + i + ']', file);
+            }
+            axios.post(`/browse/${this.path}`, formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data'
+                }
+            }).then(response => {
+                console.log(response)
+                this.load()
+            }).catch(error => {
+                console.error(error)
+            })
+            return false;
         }
     },
     watch: {

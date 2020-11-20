@@ -9,7 +9,7 @@ from .editor_handler import EditorHandler
 from .site_handler import SiteHandler
 from .dir_handler import DirHandler
 from .mark_handler import MarkHandler
-from .s3upload_handler import S3UploadHandler, S3Browser
+from .s3upload_handler import S3Browser
 from .access_control import LoginHandler, LogoutHandler
 
 LOGGER = logging.getLogger(__name__)
@@ -29,7 +29,6 @@ def make_app():
         (r"/login", LoginHandler),
         (r"/logout", LogoutHandler),
         (r"/browse/(.*)", S3Browser, image_bucket),
-        (r"/upload/(.*)", S3UploadHandler, image_bucket),
         (r"/edit/mark/", MarkHandler),
         (r"/edit/pages/(.*)", DirHandler, {"directory": pages}),
         (r"/edit", EditorHandler),

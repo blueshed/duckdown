@@ -79,6 +79,12 @@
                 <a @click="back(0)">path:</a>
                 <a v-for="(item, index) in path_items" @click="back(index+1)">/{{! item }}</a>
             </p>
+            <p class="upload">
+                <form enctype="multipart/form-data" @submit.prevent="uploadFiles">
+                    <input type="file" ref="file" multiple="multiple">
+                    <input type="submit" value="Upload Image" name="submit">
+                </form>
+            </p>
             <ul class="listing">
                 <li v-for="item in folders" @click="path=item.Prefix">
                     <svg class="feather">

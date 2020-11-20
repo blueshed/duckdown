@@ -218,3 +218,8 @@ p.breadcrumb {
     top: 2px;
     stroke-width: 2px;
 }
+
+.upload {
+    padding-bottom: 1em;
+    border-bottom: 1px solid gray;
+}
