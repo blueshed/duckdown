@@ -5,12 +5,15 @@ import tornado.web
 import tornado.log
 import convoke
 from dotenv import load_dotenv
-from .editor_handler import EditorHandler
-from .site_handler import SiteHandler
-from .dir_handler import DirHandler
-from .mark_handler import MarkHandler
-from .s3_browser import S3Browser
-from .access_control import LoginHandler, LogoutHandler
+from pkg_resources import resource_filename
+
+from .handlers import EditorHandler
+from .handlers import SiteHandler
+from .handlers import DirHandler
+from .handlers import MarkHandler
+from .handlers import S3Browser
+from .handlers import AssetHandler
+from .handlers import LoginHandler, LogoutHandler
 
 LOGGER = logging.getLogger(__name__)
 
@@ -19,6 +22,7 @@ def make_app():
     """ make a tornado application """
     settings = convoke.get_settings("duckdown")
     pages = settings.get("pages", "pages")
+    duck_assets = resource_filename("duckdown", "assets")
     image_bucket = {
         "bucket_name": "vashti.blueshed.info",
         "aws_access_key_id": settings.get("AWS_ACCESS_KEY_ID"),
@@ -29,6 +33,7 @@ def make_app():
         (r"/login", LoginHandler),
         (r"/logout", LogoutHandler),
         (r"/browse/(.*)", S3Browser, image_bucket),
+        (r"/edit/assets/(.*)", AssetHandler, {"path": duck_assets}),
         (r"/edit/mark/", MarkHandler),
         (r"/edit/pages/(.*)", DirHandler, {"directory": pages}),
         (r"/edit", EditorHandler),
@@ -37,6 +42,8 @@ def make_app():
     tornado_settings = {
         "debug": settings.as_bool("debug", default="False"),
         "port": settings.as_int("port", default="8080"),
+        "duck_assets": duck_assets,
+        "duck_templates": resource_filename("duckdown", "templates"),
         "static_path": settings.get("static", "static"),
         "template_path": settings.get("templates", "templates"),
         "cookie_name": settings.get("cookie_name", "duckdown-cookie"),

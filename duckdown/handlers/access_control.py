@@ -5,7 +5,6 @@
 """
 import logging
 from json import dumps, loads
-from pkg_resources import resource_filename
 from tornado.web import RequestHandler, HTTPError
 
 LOGGER = logging.getLogger(__name__)
@@ -43,15 +42,17 @@ class LoginHandler(UserMixin, RequestHandler):  # pylint: disable=W0223
 
     def initialize(self, page=None, users=None):
         """ we're configured with a page """
-        self.page = (
-            page if page else resource_filename("duckdown", "login.html")
-        )
+        self.page = page if page else "login.html"
         self.register = None
         self.users = (
             users
             if users
             else [("peterb", "gwenna"), ("vashti", "blue"), ("dash", "buzz")]
         )
+
+    def get_template_path(self):
+        """ return app resource """
+        return self.application.settings["duck_templates"]
 
     def login(self, username, password):
         """ return a user """

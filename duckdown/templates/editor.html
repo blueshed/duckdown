@@ -8,7 +8,7 @@
     <script type="text/javascript" src="https://unpkg.com/marked@0.3.6"></script>
     <script type="text/javascript" src="https://unpkg.com/lodash@4.16.0"></script>
     <script type="text/javascript" src="https://unpkg.com/axios@0.21.0"></script>
-    <link rel="stylesheet" href="{{ static_url('editor.css') }}" />
+    <link rel="stylesheet" href="{{ handler.asset_url('editor.css') }}" />
 </head>
 
 <body>
@@ -18,7 +18,7 @@
                 <th class="breadcrumb">
                     <a @click="back(0)">
                         <svg class="logo">
-                            <use xlink:href="/static/logo.svg#duck" /></svg>
+                            <use xlink:href="{{ handler.asset_url('logo.svg#duck') }}" /></svg>
                     </a>
                     <a v-for="(item, index) in path_items" @click="back(index+1)">/{{! item }}</a>
                 </th>
@@ -43,7 +43,7 @@
                     </button>
                     <div class="alert" v-if="message">
                         <svg class="feather">
-                            <use xlink:href="/static/feather-sprite.svg#alert-triangle" /></svg>
+                            <use xlink:href="{{ handler.asset_url('feather-sprite.svg#alert-triangle') }}" /></svg>
                         {{! message }}
                     </div>
                 </th>
@@ -53,12 +53,12 @@
                     <ul class="listing">
                         <li v-for="item in folders" @click="path=item.path">
                             <svg class="feather">
-                                <use xlink:href="/static/feather-sprite.svg#folder" /></svg>
+                                <use xlink:href="{{ handler.asset_url('feather-sprite.svg#folder') }}" /></svg>
                             {{! item.name }}
                         </li>
                         <li v-for="item in files" @click="load(item.path)">
                             <svg class="feather">
-                                <use xlink:href="/static/feather-sprite.svg#file" /></svg>
+                                <use xlink:href="{{ handler.asset_url('feather-sprite.svg#file') }}" /></svg>
                             {{! item.name }}
                         </li>
                     </ul>
@@ -85,7 +85,7 @@
                     <input type="submit" value="Upload Image" name="submit">
                     <span class="icn-spinner" v-if="loading">
                         <svg class="feather">
-                            <use xlink:href="/static/feather-sprite.svg#loader" /></svg>
+                            <use xlink:href="{{ handler.asset_url('feather-sprite.svg#loader') }}" /></svg>
                     </span>
                 </form>
             </p>
@@ -93,26 +93,26 @@
             <ul class="listing">
                 <li v-for="item in folders" @click="path=item.Prefix">
                     <svg class="feather">
-                        <use xlink:href="/static/feather-sprite.svg#folder" /></svg>
+                        <use xlink:href="{{ handler.asset_url('feather-sprite.svg#folder') }}" /></svg>
                     {{! item.name }}
                 </li>
                 <li v-for="item in files" @click="file=item.Key">
                     <svg class="feather">
-                        <use xlink:href="/static/feather-sprite.svg#image" /></svg>
+                        <use xlink:href="{{ handler.asset_url('feather-sprite.svg#image') }}" /></svg>
                     {{! item.name }}
                 </li>
             </ul>
             <div class="image-preview" v-if="filepath">
                 <button @click="copytoclipboard">
                     <svg class="feather">
-                        <use xlink:href="/static/feather-sprite.svg#clipboard" />
+                        <use xlink:href="{{ handler.asset_url('feather-sprite.svg#clipboard') }}" />
                     </svg>
                 </button>
                 <img :src="filepath" />
             </div>
         </div>
     </script>
-    <script src="{{ static_url('editor.js') }}" type="module"></script>
+    <script src="{{ handler.asset_url('editor.js') }}" type="module"></script>
 </body>
 
 </html>
