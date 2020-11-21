@@ -1,3 +1,5 @@
+Title: Dash Page
+
 # hello 123456 {#custom-id}
 
 | Syntax | Description |
@@ -24,3 +26,4 @@ Here's a sentence with a footnote. [^1]
 [^1]: This is the footnote.
 [^2]: Another
 
+![Alt text](/static/images/covers/things.png "Optional title")

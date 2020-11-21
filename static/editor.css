@@ -223,3 +223,20 @@ p.breadcrumb {
     padding-bottom: 1em;
     border-bottom: 1px solid gray;
 }
+
+.icn-spinner {
+    width: 16px;
+    height: 16px;
+    animation: spin-animation 1s infinite linear;
+    display: inline-block;
+}
+
+@keyframes spin-animation {
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(359deg);
+    }
+}

@@ -83,8 +83,13 @@
                 <form enctype="multipart/form-data" @submit.prevent="uploadFiles">
                     <input type="file" ref="file" multiple="multiple">
                     <input type="submit" value="Upload Image" name="submit">
+                    <span class="icn-spinner" v-if="loading">
+                        <svg class="feather">
+                            <use xlink:href="/static/feather-sprite.svg#loader" /></svg>
+                    </span>
                 </form>
             </p>
+            <p class="error" v-if="error">{{! error }}</p>
             <ul class="listing">
                 <li v-for="item in folders" @click="path=item.Prefix">
                     <svg class="feather">

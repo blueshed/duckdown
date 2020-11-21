@@ -5,7 +5,9 @@ export default {
             path: "",
             folders: [],
             files: [],
-            file: null
+            file: null,
+            loading: false,
+            error: null
         }
     },
     computed: {
@@ -61,6 +63,8 @@ export default {
             document.body.removeChild(el);
         },
         uploadFiles() {
+            this.loading = true
+            this.error = null
             let formData = new FormData()
             for (var i = 0; i < this.$refs.file.files.length; i++) {
                 let file = this.$refs.file.files[i];
@@ -73,8 +77,11 @@ export default {
             }).then(response => {
                 console.log(response)
                 this.load()
+                this.loading = false
             }).catch(error => {
                 console.error(error)
+                this.error = error
+                this.loading = false
             })
             return false;
         }
