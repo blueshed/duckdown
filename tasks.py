@@ -2,6 +2,7 @@
 import logging
 import convoke
 import tornado.log
+import tornado.options
 from invoke import task
 from dotenv import dotenv_values
 from duckdown import main
@@ -20,6 +21,7 @@ def client(ctx):
 @task
 def server(_):
     """ run the server """
+    tornado.options.options.logging = "INFO"
     tornado.log.enable_pretty_logging()
     LOGGER.info("server:")
     convoke.get_settings(PROJECT_NAME, debug="True", local_images="False")

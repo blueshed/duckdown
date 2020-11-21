@@ -1,7 +1,10 @@
 # pylint: disable=W0223
 """ authenticated static files """
+import logging
 import tornado.web
 from .access_control import UserMixin
+
+LOGGER = logging.getLogger(__name__)
 
 
 class AssetHandler(UserMixin, tornado.web.StaticFileHandler):

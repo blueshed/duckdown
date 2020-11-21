@@ -22,6 +22,7 @@ def make_app():
     """ make a tornado application """
     settings = convoke.get_settings("duckdown")
     pages = settings.get("pages", "pages")
+    duck_path = "/edit/assets/"
     duck_assets = resource_filename("duckdown", "assets")
     image_bucket = {
         "bucket_name": "vashti.blueshed.info",
@@ -42,6 +43,7 @@ def make_app():
     tornado_settings = {
         "debug": settings.as_bool("debug", default="False"),
         "port": settings.as_int("port", default="8080"),
+        "duck_path": duck_path,
         "duck_assets": duck_assets,
         "duck_templates": resource_filename("duckdown", "templates"),
         "static_path": settings.get("static", "static"),
