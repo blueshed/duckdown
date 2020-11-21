@@ -5,3 +5,5 @@ client/node_modules
 .env
 static/images
 *.DS_Store
+.vscode
+.pytest_cache
