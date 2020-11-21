@@ -3,6 +3,7 @@
 
 <head>
     <title>{{ handler.one_meta_value('title', 'duckdown') }}</title>
+    <script src="https://unpkg.com/vue@3.0.2"></script>
     <link href="{{ static_url('site.css') }}" rel="stylesheet" type="text/css" />
     <style type="text/css">
         html,
@@ -33,9 +34,15 @@
 
 <body class="{{ handler.one_meta_value('theme') }}">
     <div class="parent">
-        <div class="center">{% raw content %}</div>
+        <div id="counter">
+            Counter: {{! counter }}
+        </div>
+        <div class="center">
+            {% raw content %}
+        </div>
     </div>
     {%if current_user %}<a class="user_edit" href="{{ edit_path }}"><button>edit</button></a>{% end %}
+    <script type="module" src="{{static_url('site.js')}}"></script>
 </body>
 
 </html>

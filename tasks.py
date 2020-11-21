@@ -22,7 +22,7 @@ def server(_):
     """ run the server """
     tornado.log.enable_pretty_logging()
     LOGGER.info("server:")
-    convoke.get_settings(PROJECT_NAME, debug="True", local_images="True")
+    convoke.get_settings(PROJECT_NAME, debug="True", local_images="False")
     main.main()
 
 
