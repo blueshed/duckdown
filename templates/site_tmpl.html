@@ -1,48 +1,39 @@
-<!DOCTYPE html>
-<html>
+{% extends "base_tmpl.html" %}
+{% block head %}
+<style type="text/css">
+    html,
+    body {
+        height: 100%;
+    }
 
-<head>
-    <title>{{ handler.one_meta_value('title', 'duckdown') }}</title>
-    <script src="https://unpkg.com/vue@3.0.2"></script>
-    <link href="{{ static_url('site.css') }}" rel="stylesheet" type="text/css" />
-    <style type="text/css">
-        html,
-        body {
-            height: 100%;
-        }
+    .parent {
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
 
-        .parent {
-            height: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
+    .center {}
 
-        .center {}
+    img {
+        width: 240px;
+    }
 
-        img {
-            width: 240px;
-        }
-
-        .user_edit {
-            position: absolute;
-            top: 2px;
-            right: 2px;
-        }
-    </style>
-</head>
-
-<body class="{{ handler.one_meta_value('theme') }}">
-    <div class="parent">
-        <div id="counter">
-            Counter: {{! counter }}
-        </div>
-        <div class="center">
-            {% raw content %}
-        </div>
+    .user_edit {
+        position: absolute;
+        top: 2px;
+        right: 2px;
+    }
+</style>
+{% end %}
+{% block body %}
+<div class="parent">
+    <div id="counter">
+        Counter: {{! counter }}
     </div>
-    {%if current_user %}<a class="user_edit" href="{{ edit_path }}"><button>edit</button></a>{% end %}
-    <script type="module" src="{{static_url('site.js')}}"></script>
-</body>
-
-</html>
+    <div class="center">
+        {% raw content %}
+    </div>
+</div>
+<script type="module" src="{{static_url('site.js')}}"></script>
+{% end %}
