@@ -29,6 +29,6 @@ class Converter:
 
     def convert_images(self, value):
         """ use img_path """
-        if self.application.settings.get("debug") is True:
+        if self.application.settings.get("local_images") is True:
             return value
         return value.replace("/static/images/", self.img_path)

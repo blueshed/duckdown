@@ -45,6 +45,7 @@ def make_app():
         ),
         "login_url": "/login",
         "app_name": settings.get("app_name", "duckdown-app"),
+        "local_images": settings.as_bool("local_images", default="False"),
         "img_path": "https://s3-eu-west-1.amazonaws.com/"
         + "vashti.blueshed.info/images/",
     }
