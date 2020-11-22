@@ -1,0 +1,14 @@
+.duckdown {
+    --bg-color: #51ABC4;
+    --txt-color: #147C99;
+}
+
+body {
+    background: var(--bg-color);
+    color: var(--txt-color);
+}
+
+#logo{
+    width: 200px;
+    height: 200px;
+}

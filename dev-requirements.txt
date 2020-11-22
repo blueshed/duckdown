@@ -4,4 +4,3 @@ black
 pylint
 pytest
 pytest-tornado
-nodeenv

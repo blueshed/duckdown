@@ -2,6 +2,7 @@
 venv
 nenv
 client/node_modules
+duckdown.egg-info
 .env
 static/images
 *.DS_Store
