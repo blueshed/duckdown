@@ -7,7 +7,7 @@ export default {
             files: [],
             file: null,
             loading: false,
-            error: null
+            error: null,
         }
     },
     computed: {
@@ -18,7 +18,8 @@ export default {
         },
         filepath() {
             if (this.file) {
-                return `https://s3-eu-west-1.amazonaws.com/vashti.blueshed.info/${this.file}`
+                let path = duckdown_config.imgPath ? duckdown_config.imgPath : "/static"
+                return `${path}${this.file}`
             }
         }
     },

@@ -1,5 +1,5 @@
 Title: duckdown
 
-![logo](/static/logo.svg "duckdown"){#logo}
+![logo](/static/images/logo.svg "duckdown"){#logo}
 
 #Welcome to duckdown

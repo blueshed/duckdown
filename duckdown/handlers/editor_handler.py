@@ -6,6 +6,14 @@ from .access_control import UserMixin
 class EditorHandler(UserMixin, RequestHandler):  # pylint: disable=W0223
     """ return index page """
 
+    @property
+    def img_path(self):
+        """ return application img_path """
+        if self.application.settings.get("local_images"):
+            path = self.application.settings.get("img_path", "")
+            return f"/static/{path}"
+        return self.application.settings.get("img_path")
+
     def get_template_path(self):
         """ return app resource """
         return self.application.settings["duck_templates"]

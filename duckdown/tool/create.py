@@ -18,14 +18,17 @@ def create(ctx, path, force=False):
 
     print("creating ", path)
     sources = [
+        ("", "config.ini"),
+        ("", "users.json"),
         ("pages", "index.md"),
         ("static", "site.css"),
-        ("static", "logo.svg"),
+        ("static", "favicon.ico"),
+        ("static/images", "logo.svg"),
         ("templates", "site_tmpl.html"),
     ]
 
-    for folder in {folder for folder, _ in sources}:
-        os.makedirs(os.path.join(path, folder))
+    for folder in {folder for folder, _ in sources if folder}:
+        os.makedirs(os.path.join(path, folder), exist_ok=True)
 
     for folder, file in sources:
         copyfile(

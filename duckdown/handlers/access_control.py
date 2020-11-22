@@ -44,11 +44,7 @@ class LoginHandler(UserMixin, RequestHandler):  # pylint: disable=W0223
         """ we're configured with a page """
         self.page = page if page else "login.html"
         self.register = None
-        self.users = (
-            users
-            if users
-            else [("peterb", "gwenna"), ("vashti", "blue"), ("dash", "buzz")]
-        )
+        self.users = users
 
     def get_template_path(self):
         """ return app resource """
@@ -57,12 +53,10 @@ class LoginHandler(UserMixin, RequestHandler):  # pylint: disable=W0223
     def login(self, username, password):
         """ return a user """
         user = None
-        for item in self.users:
-            LOGGER.info("%r == %r", item, (username, password))
-            if (username, password) == item:
-                user, _ = item
-                LOGGER.info("logged in: %s", user)
-                break
+        pwd = self.users.get(username)
+        if pwd == password:
+            user = username
+            LOGGER.info("logged in: %s", user)
         return user
 
     def get(self, error=None, notice=None):

@@ -27,8 +27,13 @@ class Converter:
         """ return application img_path """
         return self.application.settings.get("img_path")
 
+    @property
+    def local_images(self):
+        """ return application local_images """
+        return self.application.settings.get("local_images")
+
     def convert_images(self, value):
         """ use img_path """
-        if self.application.settings.get("local_images") is True:
+        if self.local_images is True:
             return value
-        return value.replace("/static/images/", self.img_path)
+        return value.replace("/static/", self.img_path)

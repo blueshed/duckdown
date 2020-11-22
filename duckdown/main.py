@@ -1,5 +1,7 @@
 """ application entry point """
+import json
 import logging
+import os
 import tornado.ioloop
 import tornado.web
 import tornado.log
@@ -18,25 +20,27 @@ from .handlers import LoginHandler, LogoutHandler
 LOGGER = logging.getLogger(__name__)
 
 
+def make_app_path(settings, name, default):
+    """ return path relative to app """
+    return os.path.join(
+        settings.get("app_path", ""), settings.get(name, default)
+    )
+
+
 def make_app():
     """ make a tornado application """
     settings = convoke.get_settings("duckdown")
-    image_bucket = {
-        "bucket_name": "vashti.blueshed.info",
-        "aws_access_key_id": settings.get("AWS_ACCESS_KEY_ID"),
-        "aws_secret_access_key": settings.get("AWS_SECRET_ACCESS_KEY"),
-    }
-    img_path = (
-        "https://s3-eu-west-1.amazonaws.com/vashti.blueshed.info/images/"
-    )
 
-    static_path = settings.get("static_path", "static")
-    template_path = settings.get("template_path", "templates")
-    pages_path = settings.get("pages_path", "pages")
+    static_path = make_app_path(settings, "static_path", "static")
+    template_path = make_app_path(settings, "template_path", "templates")
+    pages_path = make_app_path(settings, "pages_path", "pages")
+    users_path = make_app_path(settings, "users_path", "users.json")
+    img_path = settings.get("img_path", "")
 
     tornado_settings = {
         "debug": settings.as_bool("debug", default="False"),
         "port": settings.as_int("port", default="8080"),
+        "duck_users": users_path,
         "duck_path": "/edit/assets/",
         "duck_assets": resource_filename("duckdown", "assets"),
         "duck_templates": resource_filename("duckdown", "templates"),
@@ -46,14 +50,25 @@ def make_app():
         "cookie_secret": settings.get(
             "cookie_secret", "it was a dark and stormy duckdown"
         ),
-        "login_url": "/login",
+        "login_url": settings.get("login_url", "/login"),
         "app_name": settings.get("app_name", "duckdown-app"),
         "local_images": settings.as_bool("local_images", default="False"),
         "img_path": img_path,
     }
-    LOGGER.info("settings: %s", tornado_settings)
+
+    # load aws credentials
+    image_bucket = {
+        "bucket_name": settings.get("image_bucket", ""),
+        "aws_access_key_id": settings.get("AWS_ACCESS_KEY_ID", ""),
+        "aws_secret_access_key": settings.get("AWS_SECRET_ACCESS_KEY", ""),
+    }
+
+    LOGGER.info("settings:")
+    for key, value in tornado_settings.items():
+        LOGGER.info("\t%s: %r", key, value)
+
     routes = [
-        (r"/login", LoginHandler),
+        (r"/login", LoginHandler, {"users": json.load(open(users_path))}),
         (r"/logout", LogoutHandler),
         (r"/browse/(.*)", S3Browser, image_bucket),
         (

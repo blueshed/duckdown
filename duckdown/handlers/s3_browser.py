@@ -10,6 +10,7 @@ from .access_control import UserMixin
 LOGGER = logging.getLogger(__name__)
 
 TYPE_MAP = {
+    ".svg": ("SVG", "image/svg+xml"),
     ".jpg": ("JPEG", "image/jpeg"),
     ".jpeg": ("JPEG", "image/jpeg"),
     ".png": ("PNG", "image/png"),
@@ -25,32 +26,75 @@ class S3Browser(UserMixin, tornado.web.RequestHandler):
     ):
         """ setup s3 bucket """
         self.name = bucket_name
-        self.client = boto3.client(
+        self.aws_access_key_id = aws_access_key_id
+        self.aws_secret_access_key = aws_secret_access_key
+
+    @property
+    def bucket(self):
+        """ return boto3 client """
+        return boto3.client(
             "s3",
-            aws_access_key_id=aws_access_key_id,
-            aws_secret_access_key=aws_secret_access_key,
+            aws_access_key_id=self.aws_access_key_id,
+            aws_secret_access_key=self.aws_secret_access_key,
         )
 
-    def gen_abs_url(self, keyname):
-        """ return a url without protocol to the resource """
-        return self.client.generate_presigned_url(
-            "get_object", Params={"Bucket": self.name, "Key": keyname}
-        )
+    @property
+    def static_path(self):
+        """ return application static_path """
+        return self.application.settings.get("static_path")
+
+    @property
+    def local_images(self):
+        """ return application local_images """
+        return self.application.settings.get("local_images")
 
     def add(self, data=None, key=None, meta=None):
         """ adds data, returns path """
-        self.client.put_object(
+        if self.local_images:
+            # move to static_path
+            path = os.path.join(self.static_path, key)
+            LOGGER.info("adding %s", path)
+            with open(path, "wb") as file:
+                file.write(data)
+            return str(path)
+
+        # add to bucket
+        bucket = self.bucket.put_object(
             ACL="public-read",
             Body=data,
             Bucket=self.name,
             Key=key,
             Metadata=meta,
         )
-        return self.gen_abs_url(key)
+        return bucket.generate_presigned_url(
+            "get_object", Params={"Bucket": self.name, "Key": key}
+        )
 
     def list(self, prefix="", delimiter="/"):
         """ list the content of the bucket """
-        return self.client.list_objects(
+        if self.local_images:
+            # return to static_path
+            path = os.path.join(self.static_path, prefix)
+            folders = []
+            files = []
+            result = {
+                "CommonPrefixes": folders,
+                "Contents": files,
+            }
+            with os.scandir(path) as item:
+                for entry in item:
+                    if entry.is_file():
+                        _, ext = os.path.splitext(entry.name)
+                        if ext in TYPE_MAP:
+                            file = f"{prefix}{entry.name}"
+                            files.append({"Key": f"{file}"})
+                    else:
+                        folder = f"{prefix}{entry.name}/"
+                        folders.append({"Prefix": f"{folder}"})
+            return result
+
+        # list bucket objects
+        return self.bucket.list_objects(
             Bucket=self.name, Prefix=prefix, Delimiter=delimiter
         )
 

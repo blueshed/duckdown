@@ -7,6 +7,7 @@
     <script type="text/javascript" src="https://unpkg.com/vue@3.0.2"></script>
     <script type="text/javascript" src="https://unpkg.com/lodash@4.16.0"></script>
     <script type="text/javascript" src="https://unpkg.com/axios@0.21.0"></script>
+    <link rel="shortcut icon" href="{{ handler.asset_url('logo.svg') }}" />
     <link rel="stylesheet" href="{{ handler.asset_url('editor.css') }}" />
 </head>
 
@@ -110,6 +111,11 @@
                 <img :src="filepath" />
             </div>
         </div>
+    </script>
+    <script type="text/javascript">
+        window.duckdown_config = {
+            "imgPath": "{{ handler.img_path }}"
+        }
     </script>
     <script src="{{ handler.asset_url('editor.js') }}" type="module"></script>
 </body>
