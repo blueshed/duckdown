@@ -9,4 +9,7 @@ static/images
 .vscode
 .pytest_cache
 site
+public
 vashti
+build
+dist

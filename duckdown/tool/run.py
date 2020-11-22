@@ -5,12 +5,17 @@ from invoke import task
 from duckdown.main import main
 
 
-@task
-def run(_, path):
-    """ run app """
+def load_settings(path):
+    """ load convoke settings from config.ini """
     settings = {"app_path": path}
     config = Path(f"{path}/config.ini")
     if config.exists():
         settings["config"] = config
-    convoke.get_settings("duckdown", **settings)
+    return convoke.get_settings("duckdown", **settings)
+
+
+@task
+def run(_, path):
+    """ run app """
+    load_settings(path)
     main()

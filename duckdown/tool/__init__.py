@@ -8,6 +8,7 @@ from invoke import Program, Collection
 from duckdown import VERSION
 from .create import create
 from .run import run
+from .publish import publish
 
 sys.path.insert(0, os.getcwd())
 
@@ -17,6 +18,7 @@ _NAMESPACE_ = Collection()
 
 _NAMESPACE_.add_task(create)
 _NAMESPACE_.add_task(run)
+_NAMESPACE_.add_task(publish)
 
 tornado.log.enable_pretty_logging()
 
