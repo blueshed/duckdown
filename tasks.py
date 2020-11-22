@@ -34,28 +34,17 @@ def lint(ctx):
     ctx.run(f"black -l 79 {PROJECT_NAME}")
     ctx.run(f"pylint {PROJECT_NAME}")
 
+@task
+def clean(ctx):
+    """ tidy up """
+    ctx.run("rm -rf build")
+    ctx.run("rm -rf dist")
 
-@task(pre=[lint])
+@task(pre=[lint, clean])
 def release(ctx, message, part="patch"):
     """ release the build to git hub """
     ctx.run(f"git add . && git commit -m '{message}'")
     ctx.run(f"bumpversion {part}")
-    ctx.run("git push")
-
-
-@task
-def env(ctx):
-    """ list .env """
-    values = dotenv_values()
-    for key in values:
-        cmd = f"heroku config:set {key}={values[key]}"
-        print(cmd)
-        ctx.run(cmd)
-
-
-@task
-def deploy(ctx):
-    """ deploy to heroku """
-    ctx.run("heroku container:push web")
-    ctx.run("heroku container:release web")
-    ctx.run("heroku open")
+    ctx.run("pip install -r requirements.txt")
+    ctx.run("python setup.py sdist bdist_wheel")
+    ctx.run("twine upload dist/*")

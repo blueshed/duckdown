@@ -1,7 +1,27 @@
 # duckdown
 
-A light weight Markdown site.
+A light weight markdown site.
 
+### To use ###
+```
+python3 -m venv venv
+source venv/bin/activate
+pip install duckdown
+duckdown create site
+duckdown run site
+```
+
+You view the site on: http://localhost:8080
+
+You can edit the site at http://localhost:8080/edit
+
+the defaut username/password:
+```
+username: admin
+password: admin
+```
+
+---
 
 ### Dev ###
 
@@ -10,23 +30,4 @@ python3 -m venv venv
 source venv/bin/activate
 pip install -r dev-requirements.txt
 inv server
-```
-
-### Deploy ###
-
-To deploy with heroku you would:
-
-```
-heroku container:login
-heroku create duckdown
-heroku container:push web
-heroku container:release web
-heroku open
-```
-
-To attach to an existing heroku app
-
-```
-heroku container:login
-heroku git:remote -a duckdown
 ```

@@ -10,6 +10,7 @@
 
 <body class="{{ handler.one_meta_value('theme') }}">
     {% raw content %}
+    {%if current_user %}<a class="user_edit" href="{{ edit_path }}"><button>edit</button></a>{% end %}
 </body>
 
 </html>

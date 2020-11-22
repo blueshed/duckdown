@@ -12,3 +12,9 @@ body {
     width: 200px;
     height: 200px;
 }
+
+.user_edit {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+}

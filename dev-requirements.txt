@@ -4,3 +4,5 @@ black
 pylint
 pytest
 pytest-tornado
+wheel
+twine
