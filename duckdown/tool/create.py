@@ -24,7 +24,7 @@ def create(ctx, path, force=False):
         ("templates", "site_tmpl.html"),
     ]
 
-    for folder in {[folder for folder, _ in sources]}:
+    for folder in {folder for folder, _ in sources}:
         os.makedirs(os.path.join(path, folder))
 
     for folder, file in sources:
