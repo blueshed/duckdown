@@ -59,7 +59,8 @@ class S3Browser(UserMixin, tornado.web.RequestHandler):
             return str(path)
 
         # add to bucket
-        bucket = self.bucket.put_object(
+        bucket = self.bucket
+        bucket.put_object(
             ACL="public-read",
             Body=data,
             Bucket=self.name,
