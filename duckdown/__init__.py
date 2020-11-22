@@ -1,3 +1,3 @@
 """ duckdown app """
 
-VERSION = "0.0.24"
+VERSION = "0.0.25"

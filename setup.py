@@ -20,7 +20,7 @@ with open("README.md", "r") as fh:
 
 setup(
     name="duckdown",
-    version="0.0.24",
+    version="0.0.25",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/blueshed/duckdown/",
