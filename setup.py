@@ -20,12 +20,15 @@ with open("README.md", "r") as fh:
 
 setup(
     name="duckdown",
-    version="0.0.12",
+    version="0.0.20",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/blueshed/liteblue/",
+    url="https://github.com/blueshed/duckdown/",
     packages=find_packages(exclude=["tests.*", "tests"]),
-    package_data={"liteblue.apps": ["static/*", "simple/*"]},
+    package_data={
+        "duckdown": ["assets/*","templates/*"],
+        "duckdown.tool": ["data/*"]
+    },
     include_package_data=True,
     classifiers=[
         "Programming Language :: Python :: 3",
