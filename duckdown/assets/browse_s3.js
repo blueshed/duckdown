@@ -18,7 +18,7 @@ export default {
         },
         filepath() {
             if (this.file) {
-                let path = duckdown_config.imgPath ? duckdown_config.imgPath : "/static"
+                let path = duckdown_config.imgPath ? duckdown_config.imgPath : "/static/images/"
                 return `${path}${this.file}`
             }
         }
@@ -54,7 +54,7 @@ export default {
         },
         copytoclipboard() {
             const el = document.createElement('textarea');
-            el.value = `![Alt text](/static/${this.file} "Optional title")`;
+            el.value = `![Alt text](/static/images/${this.file} "Optional title")`;
             el.setAttribute('readonly', '');
             el.style.position = 'absolute';
             el.style.left = '-9999px';

@@ -36,4 +36,4 @@ class Converter:
         """ use img_path """
         if self.local_images is True:
             return value
-        return value.replace("/static/", self.img_path)
+        return value.replace("/static/images/", self.img_path)

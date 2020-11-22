@@ -22,12 +22,13 @@ class S3Browser(UserMixin, tornado.web.RequestHandler):
     """ list contents of bucket """
 
     def initialize(
-        self, aws_access_key_id, aws_secret_access_key, bucket_name
+        self, aws_access_key_id, aws_secret_access_key, bucket_name, folder=""
     ):
         """ setup s3 bucket """
         self.name = bucket_name
         self.aws_access_key_id = aws_access_key_id
         self.aws_secret_access_key = aws_secret_access_key
+        self.folder = folder
 
     @property
     def bucket(self):
@@ -59,6 +60,7 @@ class S3Browser(UserMixin, tornado.web.RequestHandler):
             return str(path)
 
         # add to bucket
+        key = self.folder + key if self.folder else key
         bucket = self.bucket
         bucket.put_object(
             ACL="public-read",
@@ -73,15 +75,15 @@ class S3Browser(UserMixin, tornado.web.RequestHandler):
 
     def list(self, prefix="", delimiter="/"):
         """ list the content of the bucket """
+        folders = []
+        files = []
+        result = {
+            "CommonPrefixes": folders,
+            "Contents": files,
+        }
         if self.local_images:
             # return to static_path
-            path = os.path.join(self.static_path, prefix)
-            folders = []
-            files = []
-            result = {
-                "CommonPrefixes": folders,
-                "Contents": files,
-            }
+            path = os.path.join(self.static_path, self.folder, prefix)
             with os.scandir(path) as item:
                 for entry in item:
                     if entry.is_file():
@@ -95,9 +97,16 @@ class S3Browser(UserMixin, tornado.web.RequestHandler):
             return result
 
         # list bucket objects
-        return self.bucket.list_objects(
+        prefix = self.folder + prefix if self.folder else prefix
+        items = self.bucket.list_objects(
             Bucket=self.name, Prefix=prefix, Delimiter=delimiter
         )
+        starting = len(self.folder)
+        for item in items.get("Contents", []):
+            files.append({"Key": item["Key"][starting:]})
+        for item in items.get("CommonPrefixes", []):
+            folders.append({"Prefix": item["Prefix"][starting:]})
+        return result
 
     @tornado.web.authenticated
     def get(self, prefix=None):

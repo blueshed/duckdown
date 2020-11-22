@@ -61,6 +61,7 @@ def make_app():
         "bucket_name": settings.get("image_bucket", ""),
         "aws_access_key_id": settings.get("AWS_ACCESS_KEY_ID", ""),
         "aws_secret_access_key": settings.get("AWS_SECRET_ACCESS_KEY", ""),
+        "folder": "images/",
     }
 
     LOGGER.info("settings:")
