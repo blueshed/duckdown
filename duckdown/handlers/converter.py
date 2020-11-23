@@ -1,6 +1,27 @@
 # pylint: disable=E1101
 """ Mixin to convert to images to s3 """
 import markdown
+import pymdownx.emoji
+
+EXTENSIONS = [
+    "meta",
+    "toc",
+    "footnotes",
+    "tables",
+    "fenced_code",
+    "attr_list",
+    "def_list",
+    "pymdownx.tilde",
+    "pymdownx.tasklist",
+    "pymdownx.emoji",
+]
+
+EXTENSIONS_CONFIG = {
+    "pymdownx.emoji": {
+        "emoji_index": pymdownx.emoji.twemoji,
+        "emoji_generator": pymdownx.emoji.to_svg,
+    }
+}
 
 
 class Converter:
@@ -10,18 +31,7 @@ class Converter:
     def markdown(self):
         """ returns a markdown instance """
         return markdown.Markdown(
-            extensions=[
-                "meta",
-                "toc",
-                "footnotes",
-                "tables",
-                "fenced_code",
-                "attr_list",
-                "def_list",
-                "pymdownx.tilde",
-                "pymdownx.tasklist",
-                "pymdownx.emoji",
-            ]
+            extensions=EXTENSIONS, extension_configs=EXTENSIONS_CONFIG
         )
 
     @property
