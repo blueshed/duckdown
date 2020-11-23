@@ -33,8 +33,9 @@ def make_app():
     """ make a tornado application """
     settings = convoke.get_settings("duckdown")
     debug = settings.as_bool("debug", default="False")
+    production = settings.as_bool("production", default="False")
 
-    if debug:
+    if production is False:
         manifest = None
     else:
         LOGGER.info("loading client manifest")
@@ -51,6 +52,7 @@ def make_app():
 
     tornado_settings = {
         "debug": debug,
+        "production": production,
         "port": settings.as_int("port", default="8080"),
         "duck_users": users_path,
         "duck_path": "/edit/assets/",
@@ -105,7 +107,7 @@ def make_app():
         (r"/(.*)", SiteHandler, {"docs": pages_path, "s3_loader": None}),
     ]
 
-    if debug:
+    if production is False:
         LOGGER.info("installing vue dev handler")
         routes.insert(
             0,

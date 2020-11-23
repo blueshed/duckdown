@@ -21,13 +21,13 @@ def client(ctx):
     ctx.run(". nenv/bin/activate; cd client; npm run dev")
 
 @task
-def server(_, path, debug=False):
+def server(_, folder, production=False):
     """ run the server """
     tornado.options.options.logging = "INFO"
     tornado.log.enable_pretty_logging()
     LOGGER.info("server:")
-    settings = {"app_path": path, "debug": debug}
-    config = Path(f"{path}/config.ini")
+    settings = {"app_path": folder, "production": production}
+    config = Path(f"{folder}/config.ini")
     if config.exists():
         settings["config"] = config
     convoke.get_settings(PROJECT_NAME, **settings)

@@ -1,4 +1,5 @@
 include MANIFEST.in
 include README.md
-recursive-include duckdown *.py *.html *.png *.js *.css *.gif *.jpg *.mov *.ogg *.webm *.jpeg *.otf *.eot *.svg *.ttf *.woff *.woff2 *.md *.map *.txt *.md *.mako *.tmpl README
+recursive-include duckdown *.py *.html *.png *.js *.json *.css *.gif *.jpg *.mov *.ogg *.webm *.jpeg *.otf *.eot *.svg *.ttf *.woff *.woff2 *.md *.map *.txt *.md *.mako *.tmpl README
 prune site/
+print client/
