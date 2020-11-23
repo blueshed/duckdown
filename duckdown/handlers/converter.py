@@ -18,7 +18,9 @@ class Converter:
                 "fenced_code",
                 "attr_list",
                 "def_list",
-                "markdown_strikethrough.extension",
+                "pymdownx.tilde",
+                "pymdownx.tasklist",
+                "pymdownx.emoji",
             ]
         )
 

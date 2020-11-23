@@ -17,11 +17,18 @@ class SiteHandler(
 ):  # pylint: disable=W0223
     """ inline transform request for markdown pages """
 
-    def initialize(self, docs):
+    def initialize(self, docs, s3_loader):
         """ setup init properties """
         self.docs = docs
         self.meta = None
         self.nav = None
+        self._s3_loader = s3_loader
+
+    def create_template_loader(self, template_path):
+        """ return s3 loader """
+        if self._s3_loader:
+            return self._s3_loader
+        return super().create_template_loader(template_path)
 
     @property
     def has_toc(self):

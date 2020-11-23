@@ -137,7 +137,7 @@ body,
 }
 
 .preview img {
-    width: 120px;
+    max-width: 120px;
 }
 
 .preview>div {

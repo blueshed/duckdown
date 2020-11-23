@@ -1,3 +1,4 @@
+# pylint: disable=unused-variable
 """ application entry point """
 import json
 import logging
@@ -16,6 +17,7 @@ from .handlers import MarkHandler
 from .handlers import S3Browser
 from .handlers import AssetHandler
 from .handlers import LoginHandler, LogoutHandler
+from .handlers.s3tmpl_loader import S3Loader
 
 LOGGER = logging.getLogger(__name__)
 
@@ -54,6 +56,7 @@ def make_app():
         "app_name": settings.get("app_name", "duckdown-app"),
         "local_images": settings.as_bool("local_images", default="False"),
         "img_path": img_path,
+        "compress_response": True,
     }
 
     # load aws credentials
@@ -68,6 +71,15 @@ def make_app():
     for key, value in tornado_settings.items():
         LOGGER.info("\t%s: %r", key, value)
 
+    s3_loader = S3Loader(
+        **{
+            "bucket_name": settings.get("image_bucket", ""),
+            "aws_access_key_id": settings.get("AWS_ACCESS_KEY_ID", ""),
+            "aws_secret_access_key": settings.get("AWS_SECRET_ACCESS_KEY", ""),
+            "folder": "templates",
+        }
+    )
+
     routes = [
         (r"/login", LoginHandler, {"users": json.load(open(users_path))}),
         (r"/logout", LogoutHandler),
@@ -80,7 +92,7 @@ def make_app():
         (r"/edit/mark/", MarkHandler),
         (r"/edit/pages/(.*)", DirHandler, {"directory": pages_path}),
         (r"/edit", EditorHandler),
-        (r"/(.*)", SiteHandler, {"docs": pages_path}),
+        (r"/(.*)", SiteHandler, {"docs": pages_path, "s3_loader": None}),
     ]
 
     return tornado.web.Application(routes, **tornado_settings)
