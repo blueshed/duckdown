@@ -33,7 +33,7 @@ def make_app():
     """ make a tornado application """
     settings = convoke.get_settings("duckdown")
     debug = settings.as_bool("debug", default="False")
-    production = settings.as_bool("production", default="False")
+    production = settings.as_bool("production", default="True")
 
     if production is False:
         manifest = None
