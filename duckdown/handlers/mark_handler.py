@@ -2,12 +2,11 @@
 """ convert put to markdown """
 import tornado.web
 from .access_control import UserMixin
+from .base_handler import BaseHandler
 from .converter import Converter
 
 
-class MarkHandler(
-    UserMixin, Converter, tornado.web.RequestHandler
-):  # pylint: disable=W0223
+class MarkHandler(UserMixin, Converter, BaseHandler):  # pylint: disable=W0223
     """ convert mardown put to json """
 
     @tornado.web.authenticated

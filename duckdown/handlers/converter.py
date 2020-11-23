@@ -37,7 +37,7 @@ class Converter:
     @property
     def img_path(self):
         """ return application img_path """
-        return self.application.settings.get("img_path")
+        return self.application.settings["img_path"]
 
     @property
     def local_images(self):

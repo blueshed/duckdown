@@ -1,3 +1,4 @@
+# pylint: disable=W0201
 """ Handle request for index page """
 from tornado.web import RequestHandler, StaticFileHandler, authenticated
 from .access_control import UserMixin
@@ -5,6 +6,16 @@ from .access_control import UserMixin
 
 class EditorHandler(UserMixin, RequestHandler):  # pylint: disable=W0223
     """ return index page """
+
+    def initialize(self, manifest, page):
+        """ setup production """
+        self.manifest = manifest
+        self.page = page
+
+    @property
+    def duck_path(self):
+        """ return application duck_path """
+        return self.application.settings.get("duck_path")
 
     @property
     def img_path(self):
@@ -31,4 +42,4 @@ class EditorHandler(UserMixin, RequestHandler):  # pylint: disable=W0223
     @authenticated
     def get(self):
         """ handle get request """
-        self.render("editor.html")
+        self.render(self.page)

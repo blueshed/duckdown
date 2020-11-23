@@ -20,6 +20,10 @@ class UserMixin:
 
     def get_current_user(self):
         """ return the current user from the cookie """
+        if self.application.settings.get("debug") is True:
+            token = self.request.headers.get("duck-token", None)
+            if token:
+                return token
         result = self.get_secure_cookie(self.cookie_name)
         if result:
             result = loads(result.decode("utf-8"))

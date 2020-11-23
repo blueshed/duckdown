@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>duckerdown - editor</title>
+</head>
+
+<body>
+    <div id="app"></div>
+    {% if handler.manifest %}
+    <link rel="stylesheet" href="{{ handler.duck_path }}vue/{{ handler.manifest['style.css'] }}">
+    <script type="module" src="{{ handler.duck_path }}vue/{{ handler.manifest['index.js'] }}"></script>
+    {% else %}
+    <script type="module" src="http://localhost:3001/vite/client"></script>
+    <script type="module" src="http://localhost:3001/src/main.js"></script>
+    {% end %}
+</body>
+
+</html>

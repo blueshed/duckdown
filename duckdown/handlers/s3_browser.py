@@ -4,6 +4,7 @@ import os
 import logging
 import boto3
 import tornado.web
+from .base_handler import BaseHandler
 from .json_utils import dumps
 from .access_control import UserMixin
 
@@ -18,7 +19,7 @@ TYPE_MAP = {
 }
 
 
-class S3Browser(UserMixin, tornado.web.RequestHandler):
+class S3Browser(UserMixin, BaseHandler):
     """ list contents of bucket """
 
     def initialize(
@@ -43,6 +44,11 @@ class S3Browser(UserMixin, tornado.web.RequestHandler):
     def static_path(self):
         """ return application static_path """
         return self.application.settings.get("static_path")
+
+    @property
+    def img_path(self):
+        """ return application img_path """
+        return self.application.settings.get("img_path")
 
     @property
     def local_images(self):
@@ -119,6 +125,11 @@ class S3Browser(UserMixin, tornado.web.RequestHandler):
         delimiter = self.get_argument("d", "/")
         self.set_header("Content-Type", "application/json")
         self.write(dumps(self.list(prefix, delimiter)))
+
+    @tornado.web.authenticated
+    def put(self, path=None):  # pylint: disable=W0613
+        """ return the img_path """
+        self.write({"img_path": self.img_path})
 
     @tornado.web.authenticated
     def post(self, path=None):

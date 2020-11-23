@@ -2,7 +2,7 @@
 import os
 import logging
 import mimetypes
-from tornado.web import RequestHandler
+from .base_handler import BaseHandler
 from .access_control import UserMixin
 
 LOGGER = logging.getLogger(__name__)
@@ -25,7 +25,7 @@ def scan_path(path):
                 }
 
 
-class DirHandler(UserMixin, RequestHandler):  # pylint: disable=W0223
+class DirHandler(UserMixin, BaseHandler):  # pylint: disable=W0223
     """ Manage a directory """
 
     def initialize(self, directory):

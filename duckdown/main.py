@@ -1,4 +1,4 @@
-# pylint: disable=unused-variable
+# pylint: disable=unused-variable, too-many-locals
 """ application entry point """
 import json
 import logging
@@ -32,6 +32,16 @@ def make_app_path(settings, name, default):
 def make_app():
     """ make a tornado application """
     settings = convoke.get_settings("duckdown")
+    debug = settings.as_bool("debug", default="False")
+
+    if debug:
+        manifest = None
+    else:
+        LOGGER.info("loading client manifest")
+        with open(
+            resource_filename("duckdown", "assets/vue/manifest.json")
+        ) as file:
+            manifest = json.load(file)
 
     static_path = make_app_path(settings, "static_path", "static")
     template_path = make_app_path(settings, "template_path", "templates")
@@ -40,7 +50,7 @@ def make_app():
     img_path = settings.get("img_path", "")
 
     tornado_settings = {
-        "debug": settings.as_bool("debug", default="False"),
+        "debug": debug,
         "port": settings.as_int("port", default="8080"),
         "duck_users": users_path,
         "duck_path": "/edit/assets/",
@@ -91,9 +101,31 @@ def make_app():
         ),
         (r"/edit/mark/", MarkHandler),
         (r"/edit/pages/(.*)", DirHandler, {"directory": pages_path}),
-        (r"/edit", EditorHandler),
+        (r"/edit", EditorHandler, {"manifest": manifest, "page": "vue.html"}),
         (r"/(.*)", SiteHandler, {"docs": pages_path, "s3_loader": None}),
     ]
+
+    if debug:
+        LOGGER.info("installing vue dev handler")
+        routes.insert(
+            0,
+            (
+                r"/src/(.*)",
+                tornado.web.StaticFileHandler,
+                {"path": "./client/src/"},
+            ),
+        )
+    else:
+        LOGGER.info("installing vue handler")
+        _assets = resource_filename("duckdown", "assets/vue/")
+        routes.insert(
+            0,
+            (
+                r"/_assets/(.*)",
+                tornado.web.StaticFileHandler,
+                {"path": _assets},
+            ),
+        )
 
     return tornado.web.Application(routes, **tornado_settings)
 

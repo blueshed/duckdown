@@ -1,5 +1,8 @@
 """ development tasks """
+import os
+import shutil
 import logging
+from pathlib import Path
 import convoke
 import tornado.log
 import tornado.options
@@ -17,14 +20,17 @@ def client(ctx):
     """ run the client """
     ctx.run(". nenv/bin/activate; cd client; npm run dev")
 
-
 @task
-def server(_):
+def server(_, path, debug=False):
     """ run the server """
     tornado.options.options.logging = "INFO"
     tornado.log.enable_pretty_logging()
     LOGGER.info("server:")
-    convoke.get_settings(PROJECT_NAME, debug="True", local_images="False")
+    settings = {"app_path": path, "debug": debug}
+    config = Path(f"{path}/config.ini")
+    if config.exists():
+        settings["config"] = config
+    convoke.get_settings(PROJECT_NAME, **settings)
     main.main()
 
 
@@ -37,10 +43,20 @@ def lint(ctx):
 @task
 def clean(ctx):
     """ tidy up """
+    ctx.run("rm -rf client/dist")
+    ctx.run("rm -rf duckdown/assets/vue/")
     ctx.run("rm -rf build")
     ctx.run("rm -rf dist")
 
-@task(pre=[lint, clean])
+@task
+def build(ctx):
+    """ build the client """
+    ctx.run(". nenv/bin/activate; cd client; npm run build")
+    src = "client/dist/_assets/"
+    dst = "duckdown/assets/vue/"
+    shutil.copytree(src, dst)
+
+@task(pre=[clean, lint, build])
 def release(ctx, message, part="patch"):
     """ release the build to git hub """
     ctx.run(f"git add . && git commit -m '{message}'")
