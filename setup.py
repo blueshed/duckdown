@@ -40,7 +40,7 @@ setup(
         "convoke",
         "tornado",
         "markdown",
-        "markdown-strikethrough",
+        "pymdown-extensions",
         "python-dotenv",
         "boto3"
     ],
