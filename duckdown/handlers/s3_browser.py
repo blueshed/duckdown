@@ -53,7 +53,10 @@ class S3Browser(UserMixin, tornado.web.RequestHandler):
         """ adds data, returns path """
         if self.local_images:
             # move to static_path
-            path = os.path.join(self.static_path, key)
+            folder = self.folder if self.folder else ""
+            if folder.endswith("/"):
+                folder = folder[:-1]
+            path = os.path.join(self.static_path, folder, key)
             LOGGER.info("adding %s", path)
             with open(path, "wb") as file:
                 file.write(data)
@@ -88,7 +91,7 @@ class S3Browser(UserMixin, tornado.web.RequestHandler):
                 for entry in item:
                     if entry.is_file():
                         _, ext = os.path.splitext(entry.name)
-                        if ext in TYPE_MAP:
+                        if ext.lower() in TYPE_MAP:
                             file = f"{prefix}{entry.name}"
                             files.append({"Key": f"{file}"})
                     else:
