@@ -9,6 +9,7 @@ import tornado.options
 from invoke import task
 from dotenv import dotenv_values
 from duckdown import main
+from duckdown.handlers.nav import nav as gen_nav
 
 PROJECT_NAME = "duckdown"
 
@@ -64,3 +65,11 @@ def release(ctx, message, part="patch"):
     ctx.run("pip install -r requirements.txt")
     ctx.run("python setup.py sdist bdist_wheel")
     ctx.run("twine upload dist/*")
+
+@task
+def nav(_, site, path="/"):
+    """ print out nav for path """
+    root = os.path.join(site, "pages")
+    print(f"nav for: {root} {path}")
+    for line in gen_nav(root, path):
+        print(line)

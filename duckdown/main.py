@@ -104,7 +104,7 @@ def make_app():
         (r"/edit/mark/", MarkHandler),
         (r"/edit/pages/(.*)", DirHandler, {"directory": pages_path}),
         (r"/edit", EditorHandler, {"manifest": manifest, "page": "vue.html"}),
-        (r"/(.*)", SiteHandler, {"docs": pages_path, "s3_loader": None}),
+        (r"/(.*)", SiteHandler, {"pages": pages_path, "s3_loader": None}),
     ]
 
     if production is False:

@@ -6,6 +6,7 @@ import tornado.web
 import markdown
 from .converter import Converter
 from .access_control import UserMixin
+from .nav import nav
 
 
 LOGGER = logging.getLogger(__name__)
@@ -17,11 +18,12 @@ class SiteHandler(
 ):  # pylint: disable=W0223
     """ inline transform request for markdown pages """
 
-    def initialize(self, docs, s3_loader):
+    def initialize(self, pages, s3_loader):
         """ setup init properties """
-        self.docs = docs
+        self.pages = pages
         self.meta = None
         self.nav = None
+        self.site_nav = None
         self._s3_loader = s3_loader
 
     def create_template_loader(self, template_path):
@@ -44,15 +46,21 @@ class SiteHandler(
         result = self.meta_value(name, default)
         return result[0] if result else None
 
-    def load_nav(self, path):
+    def load_site_nav(self, path):
+        """ set the handler site_nav attribute """
+        menu = nav(self.pages, path)
+        if menu:
+            self.site_nav = "\n".join(menu)
+
+    def load_dir_nav(self, path):
         """ load nav section if it exist """
         folder = os.path.dirname(path)
         if folder:
             LOGGER.info(" -- folder: %s", folder)
-            nav = os.path.join(self.docs, folder, "-nav.md")
-            if os.path.isfile(nav):
-                LOGGER.info(" -- nav: %s", nav)
-                with open(nav, "r", encoding="utf-8") as file:
+            nav_path = os.path.join(self.pages, folder, "-nav.md")
+            if os.path.isfile(nav_path):
+                LOGGER.info(" -- nav: %s", nav_path)
+                with open(nav_path, "r", encoding="utf-8") as file:
                     content = markdown.markdown(file.read())
                     self.nav = self.convert_images(content)
 
@@ -61,9 +69,10 @@ class SiteHandler(
         path = path if path else "index.html"
         file, ext = os.path.splitext(path)
 
-        self.load_nav(path)
+        self.load_dir_nav(path)
+        self.load_site_nav(path)
 
-        doc = os.path.join(self.docs, f"{file}.md")
+        doc = os.path.join(self.pages, f"{file}.md")
         # edit_path = os.path.join("/edit", f"{file}.md")
         edit_path = "/edit"
         with open(doc, "r", encoding="utf-8") as file:

@@ -1,41 +1,18 @@
 <template>
     <div class="s3browser">
-        <div>
-            <ul class="breadcrumb">
-                <li @click="back(0)">
-                    <svg class="logo">
-                        <use xlink:href="../assets/logo.svg#duck" /></svg>
-                </li>
-                <li v-for="(item, index) in path_items" :key="item" @click="back(index+1)">/{{ item }}</li>
-            </ul>
-        </div>
+        <breadcrumbs :folder="this.path" @changed="path=$event" />
         <div>
             <form enctype="multipart/form-data" @submit.prevent="uploadFiles">
                 <input type="file" ref="file" multiple="multiple">
                 <input type="submit" value="Upload Image" name="submit">
-                <span class="icn-spinner" v-if="loading">
-                    <icon name="loader"/>
-                </span>
+                <icon name="loader" :spin="loading" v-if="loading"/>
             </form>
         </div>
         <div v-if="error">{{! error }}</div>
-        <div>
-            <ul>
-                <li v-for="(item, index) in folders" :key="index"  @click="path=item.Prefix">
-                    <icon name="folder"/>
-                    {{ item.name }}
-                </li>
-                <li v-for="(item, index) in files" :key="index" @click="file=item.Key">
-                    <icon name="image"/>
-                    {{ item.name }}
-                </li>
-            </ul>
-        </div>
+        <folders-files :folders="folders" :files="files" @selected="folders_files_selected" />
         <div class="file" v-if="filepath">
             <button @click="copytoclipboard" class="float-right">
-                <svg class="feather">
-                    <use xlink:href="../assets/feather-sprite.svg#clipboard" />
-                </svg>
+                <icon name="clipboard" />
             </button>
             <img :src="filepath" />
         </div>
@@ -45,8 +22,8 @@
 <script>
 import axios from 'axios'
 
-const root_path = "/"
-const axios_config = {}
+const PATH_SEP = "/"
+const ROOT_PATH = "/"
 
 export default {
     data() {
@@ -57,15 +34,10 @@ export default {
             file: null,
             loading: false,
             error: null,
-            img_path: "//s3-eu-west-1.amazonaws.com/vashti.blueshed.info/images/"
+            img_path: "/static/images/"
         }
     },
     computed: {
-        path_items() {
-            if (this.path.length > 0) {
-                return this.path.split("/")
-            }
-        },
         filepath() {
             if (this.file) {
                 return `${this.img_path}${this.file}`
@@ -73,33 +45,27 @@ export default {
         }
     },
     methods: {
-        back(index) {
-            if (index == 0) {
-                this.path = ""
-            } else {
-                let items = this.path_items.slice(0, index);
-                this.path = items.join('/') + '/';
-            }
-        },
         load_img_path(){
-            axios.put(`${root_path}browse/`, axios_config).then(response => {
+            axios.put(`${ROOT_PATH}browse/`).then(response => {
                 this.img_path = response.data["img_path"]
             })
         },
         load() {
             this.file = null
-            let path = `${root_path}browse/${this.path}`
-            axios.get(path, axios_config).then(response => {
+            let path = `${ROOT_PATH}browse/${this.path}`
+            axios.get(path).then(response => {
                 let files = response.data.Contents ? response.data.Contents : []
                 files.map(item => {
-                    let elems = item.Key.split("/")
+                    let elems = item.Key.split(PATH_SEP)
                     item.name = elems[elems.length - 1]
+                    item.path = item.Key
                 })
                 this.files = files
                 let folders = response.data.CommonPrefixes ? response.data.CommonPrefixes : []
                 folders.map(item => {
-                    let elems = item.Prefix.split("/")
+                    let elems = item.Prefix.split(PATH_SEP)
                     item.name = elems[elems.length - 2]
+                    item.path = item.Prefix
                 })
                 this.folders = folders
             }).catch(error => {
@@ -125,7 +91,7 @@ export default {
                 let file = this.$refs.file.files[i];
                 formData.append('files[' + i + ']', file);
             }
-            axios.post(`${root_path}${this.path}`, formData, {
+            axios.post(`${ROOT_PATH}${this.path}`, formData, {
                 headers: {
                     'Content-Type': 'multipart/form-data'
                 }
@@ -139,6 +105,13 @@ export default {
                 this.loading = false
             })
             return false;
+        },
+        folders_files_selected(value){
+            if(value.file){
+                this.file = value.file
+            } else {
+                this.path = value.folder
+            }
         }
     },
     watch: {
@@ -163,19 +136,6 @@ export default {
 .s3browser>div{
     margin-bottom: 1em;
 }
-li{
-    cursor: pointer;
-}
-li:hover{
-    background-color: aliceblue;
-}
-.breadcrumb li{
-    display: inline-block;
-}
-li>svg{
-    position: relative;
-    top: 2px;
-}
 .float-right{
     float: right;
     margin-right: 1em;
@@ -189,48 +149,5 @@ li>svg{
     border-radius: 4px;
     padding: 6px;
     margin: 4px;
-}
-.feather {
-  width: 16px;
-  height: 16px;
-  stroke: currentColor;
-  stroke-width: 1;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  fill: none;
-}
-.logo {
-    height: 20px;
-    width: 20px;
-    transform: scaleX(-1);
-    vertical-align: bottom;
-    margin-right: 0.25em;
-    stroke: #ccc;
-    stroke-width: 1;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-    fill: #3979F7;
-}
-.logo:hover {
-    fill: #FF9300;
-}
-.icn-spinner {
-    position: relative;
-    top: 4px;
-    left: 4px;
-    width: 16px;
-    height: 16px;
-    animation: spin-animation 1s infinite linear;
-    display: inline-block;
-    stroke-width: 2;
-}
-@keyframes spin-animation {
-    0% {
-        transform: rotate(0deg);
-    }
-
-    100% {
-        transform: rotate(359deg);
-    }
 }
 </style>

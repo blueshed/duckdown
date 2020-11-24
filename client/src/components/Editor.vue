@@ -16,8 +16,7 @@
 <script>
 import axios from 'axios'
 
-const root_path = "/edit/pages/"
-const axios_config = {}
+const ROOT_PATH = "/edit/pages/"
 
 function debounce(func, wait, immediate) {
 	var timeout;
@@ -53,7 +52,7 @@ export default {
         }, 600),
         async load() {
             if(this.file){
-                let response = await axios.get(root_path + this.file, axios_config)
+                let response = await axios.get(ROOT_PATH + this.file)
                 this.content = response.data
             } else {
                 this.reset()
@@ -61,9 +60,9 @@ export default {
         },
         save() {
             this.message = "saving..."
-            let path = root_path + this.file;
+            let path = ROOT_PATH + this.file;
             let content = this.content;
-            axios.put(path, content, axios_config).then(response => {
+            axios.put(path, content).then(response => {
                 console.log(response)
                 this.$emit("updated", "saved.")
             }).catch(error => {
@@ -72,8 +71,8 @@ export default {
             })
         },
         remove() {
-            let path = root_path + this.file;
-            axios.delete(path, axios_config).then(response => {
+            let path = ROOT_PATH + this.file;
+            axios.delete(path).then(response => {
                 console.log(response)
                 this.$emit("updated", "removed.")
             }).catch(error => {

@@ -7,8 +7,7 @@
 <script>
 import axios from 'axios'
 
-const root_path = "/edit/mark/"
-const axios_config = {}
+const ROOT_PATH = "/edit/mark/"
 
 export default {
     props:["content"],
@@ -19,7 +18,7 @@ export default {
     },
     methods:{
         async compiledMarkdown() {
-            let response = await axios.put(root_path, this.content, axios_config)
+            let response = await axios.put(ROOT_PATH, this.content)
             this.mdown = response.data.content
         },
     },

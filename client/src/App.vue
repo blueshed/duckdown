@@ -3,7 +3,9 @@
         <div class="soap" v-if="message">{{ message }}</div>
         <div class="container">
             <div class="directory">
-                <DirBrowser :nessage="message" @selected="file=$event"/>
+                <DirBrowser :message="message" :file="file" :folder="folder" 
+                    @folder_change="set_folder($event)"
+                    @file_change="set_file($event)"/>
             </div>
             <div class="editing">
                 <Editor
@@ -17,10 +19,8 @@
                     <a href="https://www.markdownguide.org/cheat-sheet/" target="duckdown-help">
                         <button>Help</button>
                     </a>
-                    <a href="/">
-                        <button>Site</button>
-                    </a>
-                    <button @click="reset()">Reset</button>
+                    <button @click="view">View</button>
+                    <button @click="reset">Reset</button>
                     <button @click="images=true" :class="{active:images}">
                         Images
                     </button>
@@ -41,6 +41,16 @@ import S3Browser from './components/S3Browser.vue'
 import Editor from './components/Editor.vue'
 import Preview from "./components/Preview.vue"
 
+const PATH_SEP = "/"
+
+function change_ext(path, ext, to_ext){
+    // change the extension on path from ext ro to_ext
+    if(path.endsWith(ext)){
+        path = path.substring(0, path.length-ext.length) + to_ext
+    }
+    return path
+}
+
 export default {
   name: 'App',
   components: {
@@ -51,7 +61,8 @@ export default {
   },
   data(){
       return {
-          file: null,
+          file: "",
+          folder: "",
           content: null,
           message: null,
           images: false
@@ -66,8 +77,33 @@ export default {
         },
         reset(){
             this.$refs.editor.reset()
+        },
+        view(){
+            let location = PATH_SEP
+            if(this.file){
+                location = change_ext(this.file, ".md", ".html")
+            } else if(this.folder){
+                location = this.folder
+            }
+            document.location = location
+        },
+        set_file(value){
+            this.file = value
+        },
+        set_folder(value){
+            this.folder = value
         }
-  }
+    },
+    created(){
+        let urlParams = new URLSearchParams(window.location.search);
+        if(urlParams.has("path")){
+            let path = urlParams.get("path")
+            if(path.indexOf(PATH_SEP) != -1){
+                this.folder = path.substring(0, path.lastIndexOf(PATH_SEP))
+            }
+            this.file = change_ext(path, ".html", ".md")
+        }
+    }
 }
 </script>
 
