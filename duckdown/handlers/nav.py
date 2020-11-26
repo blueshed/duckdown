@@ -1,5 +1,8 @@
 """ A utility to scan a directory and generate navigation """
 import os
+import logging
+
+LOGGER = logging.getLogger(__name__)
 
 
 def parse_header(content, tag=None, alt_tag=None):
@@ -9,13 +12,17 @@ def parse_header(content, tag=None, alt_tag=None):
     if len(parts) == 2:
         header, _ = parts
         for line in header.split("\n"):
-            name, value = line.split(":")
+            try:
+                name, value = line.split(":", maxsplit=1)
+            except ValueError:
+                LOGGER.info(line)
+                raise
             values[name.strip()] = value.strip()
     result = None
     if tag:
         result = values.get(tag)
     if result is None and alt_tag is not None:
-        result = values[alt_tag]
+        result = values.get(alt_tag)
     if result is None:
         result = values
     return result

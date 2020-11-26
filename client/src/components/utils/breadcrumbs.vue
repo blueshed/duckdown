@@ -36,6 +36,11 @@ export default {
                 this.$emit('changed', path)
             }
         }
+    },
+    watch:{
+        folder(){
+            console.log(this.path_items)
+        }
     }
 }
 </script>

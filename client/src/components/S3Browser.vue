@@ -1,6 +1,6 @@
 <template>
     <div class="s3browser">
-        <breadcrumbs :folder="this.path" @changed="set_path($event)" />
+        <breadcrumbs :folder="path" @changed="set_path($event)" />
         <div class="upload menu">
             <form enctype="multipart/form-data" @submit.prevent.stop="uploadFiles">
                 <button class="add-folder" @click.prevent.stop="add_folder"><icon name="folder-plus" /></button>
