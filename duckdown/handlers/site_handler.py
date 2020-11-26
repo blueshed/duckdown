@@ -73,6 +73,8 @@ class SiteHandler(
         self.load_site_nav(path)
 
         doc = os.path.join(self.pages, f"{file}.md")
+        if not os.path.isfile(doc):
+            raise tornado.web.HTTPError(404)
         # edit_path = os.path.join("/edit", f"{file}.md")
         edit_path = "/edit"
         with open(doc, "r", encoding="utf-8") as file:
