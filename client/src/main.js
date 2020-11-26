@@ -3,12 +3,8 @@ import App from './App.vue'
 import './reset.css'
 import './index.css'
 
-import icon from './components/icon.vue'
-import folders_files from './components/folders_files.vue'
-import breadcrumbs from './components/breadcrumbs.vue'
+import utils from './components/utils/main.js'
 
 const app = createApp(App)
-app.component("icon", icon)
-app.component("folders-files", folders_files)
-app.component("breadcrumbs", breadcrumbs)
+app.use(utils)
 app.mount('#app')

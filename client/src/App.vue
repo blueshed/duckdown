@@ -1,17 +1,22 @@
 <template>
     <div class="App">
-        <div class="soap" v-if="message">{{ message }}</div>
+        <snacks ref="snacks" />
+        <sidebar :show="sidebar" @dismiss="sidebar=false">
+            <S3Browser v-show="sidebar"/>
+        </sidebar>
         <div class="container">
             <div class="directory">
-                <DirBrowser :message="message" :file="file" :folder="folder" 
+                <DirBrowser ref="dirbrowser" :file="file" :folder="folder" 
                     @folder_change="set_folder($event)"
                     @file_change="set_file($event)"/>
             </div>
             <div class="editing">
                 <Editor
                     ref="editor"
-                    :file.sync="file" 
-                    @updated="set_message($event)" 
+                    :file.sync="file"
+                    @confirm="show_modal($event.message, $event.func)"
+                    @updated="show_snack($event);$refs.dirbrowser.list()"
+                    @deleted="show_snack($event, 'warn');$refs.dirbrowser.list()" 
                     @changed="content=$event"/>
             </div>
             <div class="resource">
@@ -19,16 +24,11 @@
                     <a href="https://www.markdownguide.org/cheat-sheet/" target="duckdown-help">
                         <button>Help</button>
                     </a>
-                    <button @click="view">View</button>
-                    <button @click="reset">Reset</button>
-                    <button @click="images=true" :class="{active:images}">
+                    <button @click="sidebar=!sidebar" :class="{active:sidebar}">
                         Images
                     </button>
-                    <button @click="images=false" :class="{active:!images}">
-                        Preview
-                    </button>
+                    <button @click="view">View</button>
                 </div>
-                <S3Browser v-show="images"/>
                 <Preview :content="content" v-show="!images"/>
             </div>            
         </div>
@@ -64,19 +64,12 @@ export default {
           file: "",
           folder: "",
           content: null,
-          message: null,
-          images: false
+          sidebar: false
       }
   },
   methods:{
-        set_message(value) {
-            this.message = value
-            setTimeout(() => {
-                this.message = null
-            }, 2000)
-        },
-        reset(){
-            this.$refs.editor.reset()
+        show_snack(value, type) {
+            this.$refs.snacks.add_message(value, type)
         },
         view(){
             let location = PATH_SEP
@@ -125,8 +118,10 @@ export default {
     flex-shrink: 1;
     flex-basis: 0;
     width: 0;
+    padding: 0 6px;
 }
 .editing{
+    padding: 0 4px;
     height: 100%;
     flex-grow: 2;
     flex-shrink: 2;
@@ -139,57 +134,9 @@ export default {
     flex-shrink: 2;
     flex-basis: 0;
     width: 0;
-}
-.soap{
-    position: absolute;
-    top: 20px;
-    left: 20%;
-    right: 20%;
-    border: 1px solid gray;
-    border-radius: 6px;
-    padding: 2em;
-    font-weight: bold;
-    background-color: white;
-}
-.menu{
-    margin: 1em;
-    min-height: 21px;
+    padding: 0 6px;
 }
 .menu > button, .menu > a {
     float: right;
-    margin-left: 2px;
-}
-.menu button {
-    font-size: 14px;
-    background-color: white;
-    color: black;
-    border-radius: 3px;
-    border: 1px solid darkgray;
-    margin-left: 4px;
-    padding: 2px 6px 3px 6px;
-}
-
-.menu button.active {
-    background-color: #3979F7;
-    border-color: #3979F7;
-    color: white;
-}
-
-.menu button:disabled {
-    background-color: lightgray;
-    border-color: darkgray;
-    color: darkgray;
-}
-
-.menu button:hover {
-    background-color: #93B3F2;
-    border-color: #93B3F2;
-    color: white;
-}
-
-.menu button.active:hover {
-    background-color: #3979F7;
-    border-color: #3979F7;
-    color: white;
 }
 </style>

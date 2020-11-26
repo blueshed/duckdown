@@ -1,9 +1,9 @@
 <template>
-    <div class="breadcrumb">
+    <div class="breadcrumb menu">
         <ul>
             <li @click="back(0)">
                 <svg class="logo">
-                    <use xlink:href="../assets/logo.svg#duck" /></svg>
+                    <use xlink:href="../../assets/logo.svg#duck" /></svg>
             </li>
             <li v-for="(item, index) in path_items" :key="index" @click="back(index+1)">/{{ item }}</li>
         </ul>
@@ -18,7 +18,11 @@ export default {
     computed: {
         path_items() {
             if (this.folder && this.folder.length > 0) {
-                return this.folder.split(PATH_SEP)
+                let folder = this.folder
+                if(folder.endsWith(PATH_SEP)){
+                    folder = folder.substring(0, folder.length-1)
+                }
+                return folder.split(PATH_SEP)
             }
         }
     },
@@ -43,14 +47,14 @@ export default {
     transform: scaleX(-1);
     vertical-align: bottom;
     margin-right: 0.25em;
-    stroke: #ccc;
+    stroke: currentColor;
     stroke-width: 1;
     stroke-linecap: round;
     stroke-linejoin: round;
-    fill: #3979F7;
+    fill:var(--primary-color);;
 }
 .logo:hover {
-    fill: #FF9300;
+    fill:var(--contrast-color);;
 }
 li{
     cursor: pointer;

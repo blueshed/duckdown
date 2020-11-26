@@ -49,7 +49,7 @@ def clean(ctx):
     ctx.run("rm -rf build")
     ctx.run("rm -rf dist")
 
-@task
+@task(pre=[clean])
 def build(ctx):
     """ build the client """
     ctx.run(". nenv/bin/activate; cd client; npm run build")
@@ -57,7 +57,7 @@ def build(ctx):
     dst = "duckdown/assets/vue/"
     shutil.copytree(src, dst)
 
-@task(pre=[clean, lint, build])
+@task(pre=[lint, build])
 def release(ctx, message, part="patch"):
     """ release the build to git hub """
     ctx.run(f"git add . && git commit -m '{message}'")

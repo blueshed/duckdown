@@ -1,17 +1,17 @@
 <template>
     <div class="s3browser">
-        <breadcrumbs :folder="this.path" @changed="path=$event" />
-        <div>
-            <form enctype="multipart/form-data" @submit.prevent="uploadFiles">
+        <breadcrumbs :folder="this.path" @changed="set_path($event)" />
+        <div class="upload menu">
+            <form enctype="multipart/form-data" @submit.prevent.stop="uploadFiles">
+                <button class="add-folder" @click.prevent.stop="add_folder"><icon name="folder-plus" /></button>
                 <input type="file" ref="file" multiple="multiple">
-                <input type="submit" value="Upload Image" name="submit">
+                <button type="submit" id="submit" :disabled="disable_upload">Upload Image</button>
                 <icon name="loader" :spin="loading" v-if="loading"/>
             </form>
         </div>
-        <div v-if="error">{{! error }}</div>
         <folders-files :folders="folders" :files="files" @selected="folders_files_selected" />
         <div class="file" v-if="filepath">
-            <button @click="copytoclipboard" class="float-right">
+            <button @click="copytoclipboard" class="copytoclipboard">
                 <icon name="clipboard" />
             </button>
             <img :src="filepath" />
@@ -23,7 +23,7 @@
 import axios from 'axios'
 
 const PATH_SEP = "/"
-const ROOT_PATH = "/"
+const ROOT_PATH = "/browse/"
 
 export default {
     data() {
@@ -34,6 +34,7 @@ export default {
             file: null,
             loading: false,
             error: null,
+            ignore_path_change: false,
             img_path: "/static/images/"
         }
     },
@@ -42,17 +43,23 @@ export default {
             if (this.file) {
                 return `${this.img_path}${this.file}`
             }
+        },
+        disable_upload(){
+            return this.$refs.file && this.$refs.file.files && this.$refs.file.files.length == 0
         }
     },
     methods: {
         load_img_path(){
-            axios.put(`${ROOT_PATH}browse/`).then(response => {
+            axios.put(`${ROOT_PATH}`).then(response => {
                 this.img_path = response.data["img_path"]
             })
         },
         load() {
+            if(this.ignore_path_change === true){
+                return
+            }
             this.file = null
-            let path = `${ROOT_PATH}browse/${this.path}`
+            let path = `${ROOT_PATH}${this.path}`
             axios.get(path).then(response => {
                 let files = response.data.Contents ? response.data.Contents : []
                 files.map(item => {
@@ -110,7 +117,27 @@ export default {
             if(value.file){
                 this.file = value.file
             } else {
-                this.path = value.folder
+                let folder = value.folder
+                console.log("folders_files_selected", folder)
+                this.path = folder
+            }
+        },
+        set_path(value){
+            let folder = value
+            if(!folder.endsWith("/")){
+                folder = folder + "/"
+            }
+            if(folder.startsWith("/")){
+                folder = folder.substring(1, folder.length)
+            }
+            this.path=folder
+        },
+        add_folder(){
+            let folder = prompt("New folder path", "/foo/bar")
+            if(folder){
+                this.ignore_path_change = true
+                this.set_path(folder)
+                this.ignore_path_change = true
             }
         }
     },
@@ -128,19 +155,18 @@ export default {
 
 <style lang="css" scoped>
 .s3browser{
-    margin: 1em;
+    height: 100%;
     display: flex;
     flex-direction: column;
-    height: 100%;
 }
-.s3browser>div{
+.copytoclipboard{
+    float: right;
+}
+.upload, .file{
     margin-bottom: 1em;
 }
-.float-right{
-    float: right;
-    margin-right: 1em;
-}
 .file{
+    margin-top: 1em;
     text-align: center;
 }
 .file img{
@@ -149,5 +175,12 @@ export default {
     border-radius: 4px;
     padding: 6px;
     margin: 4px;
+}
+#submit{
+    float: right;
+}
+.add-folder{
+    float: right;
+    padding-bottom: 0;
 }
 </style>

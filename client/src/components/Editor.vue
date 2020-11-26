@@ -1,15 +1,20 @@
 <template>
-    <div class="editor">
+    <div class="Editor">
         <div class="menu">
             <form @submit.prevent="save()">
-                <input type="text" v-model="file" />
-                <button @click="save()" v-bind:disabled="!can_save">Save</button>
-                <button @click="remove()" v-bind:disabled="!can_save">Remove</button>
+                <input type="text" v-model="path" />
+                <button type="submit" v-bind:disabled="!can_save">Save</button>
+                <button @click.prevent.stop="remove()" v-bind:disabled="!can_save">Remove</button>
+                <button @click.prevent.stop="reset()">New</button>
             </form>
         </div>
         <div class="entry">
-            <textarea :value="content" @input="update"></textarea>
+            <textarea v-model="content"></textarea>
         </div>
+        <modal v-if="show_modal" 
+            :message="show_modal.message" 
+            :func="show_modal.func" 
+            @dismiss="show_modal=null" />
     </div>
 </template>
 
@@ -38,86 +43,95 @@ export default {
     data(){
         return {
             message: "",
-            content: ""
+            content: "",
+            path: "",
+            show_modal: null
         }
     },
     computed: {
         can_save() {
-            return this.file && this.file.length != 0
+            return this.path && this.path.length != 0 && !this.path.endsWith("/")
         },
     },
     methods:{
         update: debounce(function(e) {
-            this.content = e.target.value;
+            this.$emit("changed", e)
         }, 600),
-        async load() {
-            if(this.file){
-                let response = await axios.get(ROOT_PATH + this.file)
+        async load(path) {
+            this.path = path
+            if(this.path){
+                let response = await axios.get(ROOT_PATH + this.path)
                 this.content = response.data
-            } else {
-                this.reset()
             }
         },
         save() {
             this.message = "saving..."
-            let path = ROOT_PATH + this.file;
+            let path = ROOT_PATH + this.path;
             let content = this.content;
             axios.put(path, content).then(response => {
-                console.log(response)
-                this.$emit("updated", "saved.")
+                this.$emit("updated", `Saved '${this.path}'.`)
             }).catch(error => {
                 console.log(error)
                 this.message = error
             })
         },
         remove() {
-            let path = ROOT_PATH + this.file;
+            let path = ROOT_PATH + this.path;
+            this.show_modal = { 
+                message: `Delete '${this.path}'?`, 
+                func: () => {
+                    this.do_remove(path)
+                }
+            }
+        },
+        do_remove(path){
             axios.delete(path).then(response => {
-                console.log(response)
-                this.$emit("updated", "removed.")
+                this.$emit("deleted", `Deleted ${this.path}.`)
+                this.reset()
             }).catch(error => {
                 console.log(error)
                 this.message = error
             })
         },
         reset(){
+            this.path = ""
             this.content = "# hello"
-        }
+            console.log("reset")
+        },
     },
     created() {
         setTimeout(()=>{
-            this.load()
-        }, 500)
+            this.reset()
+        }, 200)
     },
     watch:{
         file(value){
-            this.load();
+            this.load(value)
         },
         content(value){
-            this.$emit("changed", value)
+            this.update(value)
         }
     }
 }
 </script>
 
 <style lang="css" scoped>
-.editor{
-    margin-top: 1em;
-    margin-bottom: 1em;
+.Editor{
     display: flex;
     flex-direction: column;
     justify-content: flex-start;
-    height: calc(100% - 21px);
+    height: calc(100% - 1em);
 }
 .editor>div{
     margin-bottom: 1em;
 }
 .entry{
-    height: calc(100% - 4em);
+    height: 100%;
 }
 textarea {
-    width: 100%;
-    height: 100%;
+    padding: 4px;
+    width: calc(100% - 8px);
+    height: calc(100% - 8px);
     vertical-align: top;
     border: none;
     resize: none;
@@ -130,38 +144,5 @@ textarea {
 form > button{
     float: right;
     margin-left: 2px;
-}
-.menu button {
-    font-size: 14px;
-    background-color: white;
-    color: black;
-    border-radius: 3px;
-    border: 1px solid darkgray;
-    margin-left: 4px;
-    padding: 2px 6px 3px 6px;
-}
-
-.menu button.active {
-    background-color: #3979F7;
-    border-color: #3979F7;
-    color: white;
-}
-
-.menu button:disabled {
-    background-color: lightgray;
-    border-color: darkgray;
-    color: darkgray;
-}
-
-.menu button:hover {
-    background-color: #93B3F2;
-    border-color: #93B3F2;
-    color: white;
-}
-
-.menu button.active:hover {
-    background-color: #3979F7;
-    border-color: #3979F7;
-    color: white;
 }
 </style>

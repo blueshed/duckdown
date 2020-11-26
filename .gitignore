@@ -8,7 +8,8 @@ static/images
 *.DS_Store
 .vscode
 .pytest_cache
-site/
+site
+site2
 public
 vashti
 build

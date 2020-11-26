@@ -5,7 +5,7 @@
                 <icon name="folder"/>
                 {{ item.name }}
             </li>
-            <li v-for="(item, index) in files" :key="index" @click="$emit('selected', {file:item.path})">
+            <li v-for="(item, index) in files" :key="index" @click="$emit('selected', {file: item.path})">
                 <icon name="file"/>
                 {{ item.name }}
             </li>

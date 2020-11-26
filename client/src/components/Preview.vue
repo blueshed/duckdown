@@ -1,6 +1,6 @@
 <template>
     <div class="Preview">
-        <div class="preview" v-html="mdown"></div>
+        <div class="_preview_" v-html="mdown"></div>
     </div>
 </template>
 
@@ -35,60 +35,61 @@ export default {
 
 <style lang="css">
 .Preview{
-    overflow: auto;
     width: 100%;
-    height: calc(100% - 21px);
+    height: calc(100% - 4em);
+    overflow-y: scroll;
+    background-color: white;
 }
-.preview{
-    margin: 1em;
+._preview_{
+    margin: 0 1em;
 }
-.preview h1{
+._preview_ h1{
     font-size: 1.5em;
     font-weight: bold;
     margin-bottom: 0.75em;
 }
-.preview h2{
+._preview_ h2{
     font-size: 1.25em;
     font-weight: bold;
     margin-bottom: 0.50em;
 }
-.preview h3{
+._preview_ h3{
     font-size: 1.125em;
     font-weight: bold;
     margin-bottom: 0.25em;
 }
-.preview img {
+._preview_ img {
     max-width: 120px;
 }
-.preview ul ul, .preview ul ol, .preview ol ol, .preview ol ul, .preview dd{
+._preview_ ul ul, ._preview_ ul ol, ._preview_ ol ol, ._preview_ ol ul, ._preview_ dd{
     margin-left: 1em;
 }
-.preview p, .preview pre, .preview dl{
+._preview_ p, ._preview_ pre, ._preview_ dl{
     margin-bottom: 0.75em;
 }
-.preview code {
+._preview_ code {
     color: #f66;
 }
-.preview table{
+._preview_ table{
     border-collapse: collapse;
     border: 1px solid lightgray;
     width:100%;
     margin: 0.5em 0;
 }
-.preview th, .preview td{
+._preview_ th, ._preview_ td{
     border: 1px solid lightgray;
     padding: 2px;
 }
-.preview th{
+._preview_ th{
     text-align: center;
     font-weight: bolder;
 }
-.preview .twemoji{
+._preview_ .twemoji{
     width: 1em;
     height: 1em;
 }
 
-.preview sub, .preview sup {
+._preview_ sub, ._preview_ sup {
   /* Specified in % so that the sup/sup is the
      right size relative to the surrounding text */
   font-size: 75%;
@@ -106,12 +107,12 @@ export default {
   vertical-align: baseline;
 }
 
-.preview sup {
+._preview_ sup {
   /* Move the superscripted text up */
   top: -0.5em;
 }
 
-.preview sub {
+._preview_ sub {
   /* Move the subscripted text down, but only
      half as far down as the superscript moved up */
   bottom: -0.25em;

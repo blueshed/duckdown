@@ -12,7 +12,7 @@ const PATH_SEP = "/"
 const ROOT_PATH = "/edit/pages/"
 
 export default {
-    props:["message", "file", "folder"],
+    props:["file", "folder"],
     data(){
         return {
             folders: null,
@@ -45,6 +45,7 @@ export default {
             if(value.file){
                 this.$emit('file_change', value.file)
             } else {
+                console.log("dirfolder", value.folder)
                 this.$emit('folder_change', value.folder)
             }
         }
@@ -52,11 +53,6 @@ export default {
     watch: {
         folder() {
             this.list()
-        },
-        message(value){
-            if(value){
-                this.list()
-            }
         }
     },
     created() {
@@ -67,12 +63,9 @@ export default {
 
 <style lang="css" scoped>
 .dirBrowser{
-    margin: 1em;
+    margin: 0 1em;
     display: flex;
     flex-direction: column;
     height: 100%;
-}
-.dirBrowser>div{
-    margin-bottom: 1em;
 }
 </style>

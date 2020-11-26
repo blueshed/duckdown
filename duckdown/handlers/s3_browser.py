@@ -64,6 +64,9 @@ class S3Browser(UserMixin, BaseHandler):
                 folder = folder[:-1]
             path = os.path.join(self.static_path, folder, key)
             LOGGER.info("adding %s", path)
+            folder, _ = os.path.split(path)
+            if not os.path.exists(folder):
+                os.makedirs(folder, exist_ok=True)
             with open(path, "wb") as file:
                 file.write(data)
             return str(path)
