@@ -7,6 +7,9 @@
     },
     "dependencies": {
         "axios": "^0.21.0",
+        "codejar": "^3.2.2",
+        "codemirror": "^5.58.3",
+        "prismjs": "^1.22.0",
         "vue": "^3.0.2"
     },
     "devDependencies": {

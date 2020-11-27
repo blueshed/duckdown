@@ -5,6 +5,7 @@
     <meta charset="utf-8">
     <title>{{ app_name }}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="shortcut icon" href="{{ handler.asset_url('logo.svg') }}" />
     <style type="text/css">
         html,
         body,
@@ -13,22 +14,32 @@
         }
 
         .login {
-            margin-top: 4em;
+            margin-top: 6em;
             margin-left: auto;
             margin-right: auto;
-            width: 240px;
+            width: 320px;
+        }
+
+        .login form {
+            padding: 1em;
+            border: 1px solid gray;
+            border-radius: 6px;
         }
 
         .login input {
-            width: 100%;
+            width: calc(100% - 8px);
             padding: 4px;
         }
 
         .title {
             margin-bottom: 1em;
+            text-align: center;
+            font-size: larger;
+            font-weight: bolder;
         }
 
         .form-input {
+            width: 100%;
             margin-bottom: 0.5em;
         }
 
@@ -37,31 +48,48 @@
             margin: 1em 1em 0em 1em;
         }
 
+        .notice {
+            margin: 1em 1em 0em 1em;
+        }
+
         .action {
             margin-top: 1em;
+            text-align: center;
+        }
+
+        .logo {
+            width: 48px;
+            height: 48px;
+            transform: scaleX(-1);
+            vertical-align: bottom;
+            stroke: currentColor;
+            stroke-width: 1;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            fill: var(--primary-color);
         }
     </style>
 </head>
 
 <body>
     <div class="login">
-        {% if notice %}
-        <div class="notice">
-            <div class="">{{ notice }}</div>
-        </div>
-        {% end %}
         <form class="form" method="post" role="form">
-            <div class="title">{{ app_name }}...</div>
+            <div class="title">
+                <svg class="logo">
+                    <use xlink:href="{{ handler.asset_url('logo.svg') }}#duck" /></svg>
+                {{ app_name }}
+            </div>
             <div class="form-input">
                 <input type="text" placeholder="email" name="email" value="{{ email or ''}}" required autofocus>
-                <i class="fas fa-user-circle"></i>
             </div>
             <div class="form-input">
                 <input type="password" placeholder="password" name="password">
-                <i class="fas fa-key"></i>
             </div>
+            {% if notice %}
+            <p class="notice">NB: {{ notice }}</p>
+            {% end %}
             {% if error %}
-            <div class="error">{{ error }}</div>
+            <p class="error">Error: {{ error }}</p>
             {% end %}
             <div class="action">
                 <button name="submit" type="submit" value="login">Sign In</button>

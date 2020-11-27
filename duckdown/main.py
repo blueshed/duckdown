@@ -15,9 +15,8 @@ from .handlers import SiteHandler
 from .handlers import DirHandler
 from .handlers import MarkHandler
 from .handlers import S3Browser
-from .handlers import AssetHandler
 from .handlers import LoginHandler, LogoutHandler
-from .handlers.s3tmpl_loader import S3Loader
+from .handlers.utils.s3tmpl_loader import S3Loader
 
 LOGGER = logging.getLogger(__name__)
 
@@ -73,9 +72,9 @@ def make_app():
 
     # load aws credentials
     image_bucket = {
-        "bucket_name": settings.get("image_bucket", ""),
-        "aws_access_key_id": settings.get("AWS_ACCESS_KEY_ID", ""),
-        "aws_secret_access_key": settings.get("AWS_SECRET_ACCESS_KEY", ""),
+        "bucket_name": settings.get("image_bucket", None),
+        "aws_access_key_id": settings.get("AWS_ACCESS_KEY_ID", None),
+        "aws_secret_access_key": settings.get("AWS_SECRET_ACCESS_KEY", None),
         "folder": "images/",
     }
 
@@ -98,7 +97,7 @@ def make_app():
         (r"/browse/(.*)", S3Browser, image_bucket),
         (
             r"/edit/assets/(.*)",
-            AssetHandler,
+            tornado.web.StaticFileHandler,
             {"path": tornado_settings["duck_assets"]},
         ),
         (r"/edit/mark/", MarkHandler),

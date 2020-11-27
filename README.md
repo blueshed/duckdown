@@ -68,3 +68,5 @@ source venv/bin/activate
 pip install -r dev-requirements.txt
 inv server
 ```
+
+Now using: https://prismjs.com

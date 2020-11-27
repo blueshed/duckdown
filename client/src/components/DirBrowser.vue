@@ -45,7 +45,6 @@ export default {
             if(value.file){
                 this.$emit('file_change', value.file)
             } else {
-                console.log("dirfolder", value.folder)
                 this.$emit('folder_change', value.folder)
             }
         }

@@ -1,15 +1,21 @@
 <template>
     <div class="Editor">
-        <div class="menu">
-            <form @submit.prevent="save()">
-                <input type="text" v-model="path" />
-                <button type="submit" v-bind:disabled="!can_save">Save</button>
-                <button @click.prevent.stop="remove()" v-bind:disabled="!can_save">Remove</button>
-                <button @click.prevent.stop="reset()">New</button>
-            </form>
-        </div>
+        <form @submit.prevent="save()" class="menu">
+            <div class="input">
+                <input type="text" v-model="path" placeholder="file path"/>
+            </div>
+            <button type="submit" v-bind:disabled="!can_save">
+                <icon name="save"  width="14px" height="14px" v-if="$root.with_icons"/> Save
+            </button>
+            <button @click.prevent.stop="remove" v-bind:disabled="!can_save">
+                <icon name="folder-minus"  width="14px" height="14px" v-if="$root.with_icons"/> Remove
+            </button>
+            <button @click.prevent.stop="reset">
+                <icon name="file-plus"  width="14px" height="14px" v-if="$root.with_icons"/> New
+            </button>
+        </form>
         <div class="entry">
-            <textarea v-model="content"></textarea>
+            <codeJar ref="editor" @changes="content=$event"></codeJar>
         </div>
         <modal v-if="show_modal" 
             :message="show_modal.message" 
@@ -20,6 +26,7 @@
 
 <script>
 import axios from 'axios'
+import codeJar from './utils/code_jar.vue'
 
 const ROOT_PATH = "/edit/pages/"
 
@@ -40,6 +47,7 @@ function debounce(func, wait, immediate) {
 
 export default {
     props:["file"],
+    
     data(){
         return {
             message: "",
@@ -48,10 +56,19 @@ export default {
             show_modal: null
         }
     },
+    components:{
+        codeJar
+    },
     computed: {
         can_save() {
             return this.path && this.path.length != 0 && !this.path.endsWith("/")
         },
+        mode(){
+            if(this.file && this.file.endsWith(".css")){
+                return "text/css"
+            }
+            return "text/x-markdown"
+        }
     },
     methods:{
         update: debounce(function(e) {
@@ -59,9 +76,11 @@ export default {
         }, 600),
         async load(path) {
             this.path = path
+            this.$emit("changed", "")
             if(this.path){
                 let response = await axios.get(ROOT_PATH + this.path)
                 this.content = response.data
+                this.update_editor()
             }
         },
         save() {
@@ -96,13 +115,13 @@ export default {
         reset(){
             this.path = ""
             this.content = "# hello"
-            console.log("reset")
+            this.update_editor();
         },
-    },
-    created() {
-        setTimeout(()=>{
-            this.reset()
-        }, 200)
+        update_editor(){
+            if(this.$refs.editor){
+                this.$refs.editor.setValue(this.content, this.mode)
+            }
+        }
     },
     watch:{
         file(value){
@@ -120,29 +139,24 @@ export default {
     display: flex;
     flex-direction: column;
     justify-content: flex-start;
-    height: calc(100% - 1em);
-}
-.editor>div{
-    margin-bottom: 1em;
-}
-.entry{
     height: 100%;
 }
-textarea {
-    padding: 4px;
-    width: calc(100% - 8px);
-    height: calc(100% - 8px);
-    vertical-align: top;
-    border: none;
-    resize: none;
-    outline: none;
-    background-color: #f6f6f6;
-    font-size: 14px;
-    font-family: "Monaco", courier, monospace;
-    overflow-y: scroll;
+.menu{
+    margin-bottom: 1em;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    justify-content: space-between;
 }
-form > button{
-    float: right;
-    margin-left: 2px;
+.entry{
+    height: calc(100% - 56px);
+}
+.input{
+    flex-grow: 1;
+    margin-right: 1em;
+}
+.input input{
+    width: 100%;
+    padding: 2px 2px 3px 2px;
 }
 </style>

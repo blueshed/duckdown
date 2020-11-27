@@ -36,11 +36,6 @@ export default {
                 this.$emit('changed', path)
             }
         }
-    },
-    watch:{
-        folder(){
-            console.log(this.path_items)
-        }
     }
 }
 </script>
@@ -56,10 +51,10 @@ export default {
     stroke-width: 1;
     stroke-linecap: round;
     stroke-linejoin: round;
-    fill:var(--primary-color);;
+    fill:var(--primary-color);
 }
 .logo:hover {
-    fill:var(--contrast-color);;
+    fill:var(--contrast-color);
 }
 li{
     cursor: pointer;

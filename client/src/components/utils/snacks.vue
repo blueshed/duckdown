@@ -45,7 +45,7 @@ export default {
             }
             this.messages.push(message)
             setTimeout(()=>{
-                // this.remove_message(message.id)
+                this.remove_message(message.id)
             }, 2000)
             return message_id;
         },

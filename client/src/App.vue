@@ -21,15 +21,24 @@
             </div>
             <div class="resource">
                 <div class="menu">
-                    <a href="https://www.markdownguide.org/cheat-sheet/" target="duckdown-help">
-                        <button>Help</button>
+                    <a href="https://www.markdownguide.org/cheat-sheet/" target="duckdown-help" title="cheat-sheet">
+                        <button>
+                            <icon name="help-circle" width="14px" height="14px" v-if="$root.with_icons"/> Help
+                        </button>
+                    </a>
+                    <a href="/logout" title="sign out of duckdown">
+                        <button>
+                            <icon name="log-out" width="14px" height="14px" v-if="$root.with_icons"/> Sign Out
+                        </button>
                     </a>
                     <button @click="sidebar=!sidebar" :class="{active:sidebar}">
-                        Images
+                        <icon name="image" width="14px" height="14px" v-if="$root.with_icons"/> Images
                     </button>
-                    <button @click="view">View</button>
+                    <button @click="view">
+                        <icon name="layout" width="14px" height="14px"  v-if="$root.with_icons"/> View
+                    </button>
                 </div>
-                <Preview :content="content" v-show="!images"/>
+                <Preview :content="content"/>
             </div>            
         </div>
     </div>
@@ -63,8 +72,9 @@ export default {
       return {
           file: "",
           folder: "",
-          content: null,
-          sidebar: false
+          content: "",
+          sidebar: false,
+          with_icons: true
       }
   },
   methods:{
@@ -87,7 +97,7 @@ export default {
             this.folder = value
         }
     },
-    created(){
+    mounted(){
         let urlParams = new URLSearchParams(window.location.search);
         if(urlParams.has("path")){
             let path = urlParams.get("path")
@@ -95,6 +105,8 @@ export default {
                 this.folder = path.substring(0, path.lastIndexOf(PATH_SEP))
             }
             this.file = change_ext(path, ".html", ".md")
+        } else {
+            this.$refs.editor.reset()
         }
     }
 }

@@ -3,10 +3,12 @@
 import tornado.web
 from .access_control import UserMixin
 from .base_handler import BaseHandler
-from .converter import Converter
+from .utils.converter_mixin import ConverterMixin
 
 
-class MarkHandler(UserMixin, Converter, BaseHandler):  # pylint: disable=W0223
+class MarkHandler(
+    UserMixin, ConverterMixin, BaseHandler
+):  # pylint: disable=W0223
     """ convert mardown put to json """
 
     @tornado.web.authenticated

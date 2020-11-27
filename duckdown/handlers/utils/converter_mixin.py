@@ -24,7 +24,7 @@ EXTENSIONS_CONFIG = {
 }
 
 
-class Converter:
+class ConverterMixin:
     """ convert to remote if not debug """
 
     @property

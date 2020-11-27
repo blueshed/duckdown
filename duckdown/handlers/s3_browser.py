@@ -5,8 +5,8 @@ import logging
 import boto3
 import tornado.web
 from .base_handler import BaseHandler
-from .json_utils import dumps
 from .access_control import UserMixin
+from .utils.json_utils import dumps
 
 LOGGER = logging.getLogger(__name__)
 
@@ -23,7 +23,11 @@ class S3Browser(UserMixin, BaseHandler):
     """ list contents of bucket """
 
     def initialize(
-        self, aws_access_key_id, aws_secret_access_key, bucket_name, folder=""
+        self,
+        aws_access_key_id=None,
+        aws_secret_access_key=None,
+        bucket_name=None,
+        folder="",
     ):
         """ setup s3 bucket """
         self.name = bucket_name

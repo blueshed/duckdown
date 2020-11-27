@@ -3,10 +3,15 @@
         <breadcrumbs :folder="path" @changed="set_path($event)" />
         <div class="upload menu">
             <form enctype="multipart/form-data" @submit.prevent.stop="uploadFiles">
-                <button class="add-folder" @click.prevent.stop="add_folder"><icon name="folder-plus" /></button>
                 <input type="file" ref="file" multiple="multiple">
-                <button type="submit" id="submit" :disabled="disable_upload">Upload Image</button>
                 <icon name="loader" :spin="loading" v-if="loading"/>
+                <button type="submit" id="submit" :disabled="disable_upload">
+                    <icon name="upload-cloud" width="14px" height="14px" v-if="$root.with_icons"/> Upload
+                </button>
+                <button @click.prevent.stop="add_folder">
+                    <span v-if="$root.with_icons"><icon name="folder-plus"  width="14px" height="14px"/> Add</span>
+                    <span v-else>Add Folder</span>
+                </button>
             </form>
         </div>
         <folders-files :folders="folders" :files="files" @selected="folders_files_selected" />
@@ -103,7 +108,6 @@ export default {
                     'Content-Type': 'multipart/form-data'
                 }
             }).then(response => {
-                console.log(response)
                 this.load()
                 this.loading = false
             }).catch(error => {
@@ -118,7 +122,6 @@ export default {
                 this.file = value.file
             } else {
                 let folder = value.folder
-                console.log("folders_files_selected", folder)
                 this.path = folder
             }
         },
@@ -176,11 +179,7 @@ export default {
     padding: 6px;
     margin: 4px;
 }
-#submit{
+.menu > button, .menu > a {
     float: right;
-}
-.add-folder{
-    float: right;
-    padding-bottom: 0;
 }
 </style>

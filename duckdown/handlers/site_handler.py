@@ -2,11 +2,12 @@
 """ handle request for markdown pages """
 import logging
 import os
-import tornado.web
 import markdown
-from .converter import Converter
+from tornado.web import RequestHandler, HTTPError
+from tornado.escape import url_escape
+from .utils.converter_mixin import ConverterMixin
 from .access_control import UserMixin
-from .nav import nav
+from .utils.nav import nav
 
 
 LOGGER = logging.getLogger(__name__)
@@ -14,7 +15,7 @@ EMPTY_TOC = '<div class="toc">\n<ul></ul>\n</div>\n'
 
 
 class SiteHandler(
-    UserMixin, Converter, tornado.web.RequestHandler
+    UserMixin, ConverterMixin, RequestHandler
 ):  # pylint: disable=W0223
     """ inline transform request for markdown pages """
 
@@ -69,14 +70,23 @@ class SiteHandler(
         path = path if path else "index.html"
         file, ext = os.path.splitext(path)
 
+        doc = os.path.join(self.pages, f"{file}.md")
+        if not os.path.isfile(doc):
+            raise HTTPError(404)
+
         self.load_dir_nav(path)
         self.load_site_nav(path)
 
-        doc = os.path.join(self.pages, f"{file}.md")
-        if not os.path.isfile(doc):
-            raise tornado.web.HTTPError(404)
-        # edit_path = os.path.join("/edit", f"{file}.md")
-        edit_path = "/edit"
+        file_path = os.path.split(file)[0]
+
+        # load theme
+        theme_file = os.path.join(self.pages, file_path, "-theme.css")
+        theme_css = None
+        if os.path.isfile(theme_file):
+            theme_css = open(theme_file).read()
+            LOGGER.info(" -- theme.css")
+
+        edit_path = f"/edit?path={ url_escape(file) }.md"
         with open(doc, "r", encoding="utf-8") as file:
             content = file.read()
             LOGGER.info(" -- ext: %s", ext)
@@ -90,6 +100,7 @@ class SiteHandler(
                     f"{template}_tmpl.html",
                     content=self.convert_images(content),
                     edit_path=edit_path,
+                    theme_css=theme_css,
                 )
             else:
                 self.write(self.convert_images(content))

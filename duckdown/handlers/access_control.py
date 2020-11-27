@@ -6,6 +6,7 @@
 import logging
 from json import dumps, loads
 from tornado.web import RequestHandler, HTTPError
+from .utils.assets_mixin import AssetsMixin
 
 LOGGER = logging.getLogger(__name__)
 
@@ -37,7 +38,9 @@ class UserMixin:
             self.clear_cookie(self.cookie_name)
 
 
-class LoginHandler(UserMixin, RequestHandler):  # pylint: disable=W0223
+class LoginHandler(
+    AssetsMixin, UserMixin, RequestHandler
+):  # pylint: disable=W0223
     """
     Can be called as ajax from the
     websocket client to get the auth cookie
