@@ -86,7 +86,9 @@ class SiteHandler(
             theme_css = open(theme_file).read()
             LOGGER.info(" -- theme.css")
 
-        edit_path = f"/edit?path={ url_escape(file) }.md"
+        edit_path = "/edit"
+        if file:
+            edit_path = f"/edit?path={ url_escape(file) }.md"
         with open(doc, "r", encoding="utf-8") as file:
             content = file.read()
             LOGGER.info(" -- ext: %s", ext)

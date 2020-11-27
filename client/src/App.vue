@@ -37,6 +37,7 @@
                     <button @click="view">
                         <icon name="layout" width="14px" height="14px"  v-if="$root.with_icons"/> View
                     </button>
+                    <icon id="box" name="box" width="14px" height="14px"  @click="with_icons=!with_icons"/>
                 </div>
                 <Preview :content="content"/>
             </div>            
@@ -150,5 +151,9 @@ export default {
 }
 .menu > button, .menu > a {
     float: right;
+}
+#box{
+    float: left;
+    top: 4px;
 }
 </style>
