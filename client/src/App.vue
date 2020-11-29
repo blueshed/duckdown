@@ -37,7 +37,7 @@
                     <button @click="view">
                         <icon name="layout" width="14px" height="14px"  v-if="$root.with_icons"/> View
                     </button>
-                    <icon id="box" name="box" width="14px" height="14px"  @click="with_icons=!with_icons"/>
+                    <!-- icon id="box" name="box" width="14px" height="14px"  @click="with_icons=!with_icons"/-->
                 </div>
                 <Preview :content="content"/>
             </div>            
@@ -86,7 +86,7 @@ export default {
             let location = PATH_SEP
             if(this.file){
                 if(this.file.endsWith(".css")){
-                    location = this.folder
+                    location = this.folder + "/index.html"
                 } else{
                     location = change_ext(this.file, ".md", ".html")
                 }

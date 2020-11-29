@@ -10,6 +10,7 @@
 - [ ] file upload - drag and drop https://www.digitalocean.com/community/tutorials/how-to-handle-file-uploads-in-vue-2
 - [ ] template editor
 - [ ] refactor tornado paths
+- [ ] enable save if dirty
 - Tools using boto3
     - [x] create a s3 bucket in admin AWS_PROFILE
     - [x] create editor IAM policy to write to bucket and add AWS_PROFILE
