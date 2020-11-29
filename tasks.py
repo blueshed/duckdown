@@ -6,10 +6,11 @@ from pathlib import Path
 import convoke
 import tornado.log
 import tornado.options
-from invoke import task
+from invoke import task, Collection
 from dotenv import dotenv_values
 from duckdown import main
 from duckdown.handlers.utils.nav import nav as gen_nav
+import duckdown.tool.provision.tasks
 
 PROJECT_NAME = "duckdown"
 
@@ -37,7 +38,7 @@ def server(_, folder, dev=False):
 
 @task
 def lint(ctx):
-    """ tidy up and check """
+    """ black and pylint """
     ctx.run(f"black -l 79 {PROJECT_NAME}")
     ctx.run(f"pylint {PROJECT_NAME}")
 
@@ -74,3 +75,12 @@ def nav(_, site, path="/"):
     print(f"nav for: {root} {path}")
     for line in gen_nav(root, path):
         print(line)
+
+ns = Collection()
+ns.add_task(client)
+ns.add_task(server)
+ns.add_task(lint)
+ns.add_task(clean)
+ns.add_task(build)
+ns.add_task(release)
+ns.add_collection(duckdown.tool.provision.tasks, "p")

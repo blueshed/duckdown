@@ -85,11 +85,15 @@ export default {
         view(){
             let location = PATH_SEP
             if(this.file){
-                location = change_ext(this.file, ".md", ".html")
+                if(this.file.endsWith(".css")){
+                    location = this.folder
+                } else{
+                    location = change_ext(this.file, ".md", ".html")
+                }
             } else if(this.folder){
                 location = this.folder
             }
-            document.location = location
+            window.open(location, "duckdown-site")
         },
         set_file(value){
             this.file = value

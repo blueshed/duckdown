@@ -3,6 +3,7 @@ import pytest
 import convoke
 from duckdown.main import make_app
 
+
 @pytest.fixture
 def app(default_db, io_loop):
     """ returns a testable app """
