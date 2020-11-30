@@ -18,7 +18,7 @@ export default {
     height:100%;
     width: 35%;
     background-color:#fff;
-    background-color:rgb(100%,100%,100%,0.8);
+    background-color:rgb(100%,100%,100%,0.85);
     position:fixed!important;
     border-left: 1px solid gray;
     right: 0;

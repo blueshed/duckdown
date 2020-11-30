@@ -31,15 +31,16 @@
                             <icon name="log-out" width="14px" height="14px" v-if="$root.with_icons"/> Sign Out
                         </button>
                     </a>
-                    <button @click="sidebar=!sidebar" :class="{active:sidebar}">
+                    <button @click.prevent.stop="sidebar=!sidebar" :class="{active:sidebar}" title="show images selector">
                         <icon name="image" width="14px" height="14px" v-if="$root.with_icons"/> Images
                     </button>
-                    <button @click="view">
+                    <button @click.prevent.stop="view" title="view page">
                         <icon name="layout" width="14px" height="14px"  v-if="$root.with_icons"/> View
                     </button>
                     <!-- icon id="box" name="box" width="14px" height="14px"  @click="with_icons=!with_icons"/-->
                 </div>
-                <Preview :content="content"/>
+                <Preview :content="content" v-if="mime=='text/markdown'"/>
+                <CssPreview :content="content" v-else/>
             </div>            
         </div>
     </div>
@@ -50,6 +51,7 @@ import DirBrowser from './components/DirBrowser.vue'
 import S3Browser from './components/S3Browser.vue'
 import Editor from './components/Editor.vue'
 import Preview from "./components/Preview.vue"
+import CssPreview from "./components/CssPreview.vue"
 
 const PATH_SEP = "/"
 
@@ -67,7 +69,8 @@ export default {
     DirBrowser,
     S3Browser,
     Editor,
-    Preview
+    Preview,
+    CssPreview
   },
   data(){
       return {
@@ -75,7 +78,12 @@ export default {
           folder: "",
           content: "",
           sidebar: false,
-          with_icons: true
+          with_icons: true,
+      }
+  },
+  computed:{
+      mime(){
+          return this.file && this.file.endsWith(".css") ? "text/css": "text/markdown"
       }
   },
   methods:{

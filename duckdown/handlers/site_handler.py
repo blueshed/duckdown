@@ -2,7 +2,6 @@
 """ handle request for markdown pages """
 import logging
 import os
-import markdown
 from tornado.web import RequestHandler, HTTPError
 from tornado.escape import url_escape
 from .utils.converter_mixin import ConverterMixin
@@ -58,11 +57,11 @@ class SiteHandler(
         folder = os.path.dirname(path)
         if folder:
             LOGGER.info(" -- folder: %s", folder)
-            nav_path = os.path.join(self.pages, folder, "-nav.md")
+            nav_path = os.path.join(folder, "-nav.md")
             if os.path.isfile(nav_path):
                 LOGGER.info(" -- nav: %s", nav_path)
                 with open(nav_path, "r", encoding="utf-8") as file:
-                    content = markdown.markdown(file.read())
+                    content = self.meta.convert(file.read())
                     self.nav = self.convert_images(content)
 
     def get(self, path):
@@ -74,7 +73,8 @@ class SiteHandler(
         if not os.path.isfile(doc):
             raise HTTPError(404)
 
-        self.load_dir_nav(path)
+        self.meta = self.markdown
+        self.load_dir_nav(doc)
         self.load_site_nav(path)
 
         file_path = os.path.split(file)[0]
@@ -93,7 +93,6 @@ class SiteHandler(
             content = file.read()
             LOGGER.info(" -- ext: %s", ext)
             if ext == ".html":
-                self.meta = self.markdown
                 content = self.meta.convert(content)
                 LOGGER.info(" -- meta: %s", self.meta.Meta)
                 template = self.one_meta_value("template", "site")

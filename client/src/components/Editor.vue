@@ -4,13 +4,13 @@
             <div class="input">
                 <input type="text" v-model="path" placeholder="file path"/>
             </div>
-            <button type="submit" v-bind:disabled="!can_save">
-                <icon name="save"  width="14px" height="14px" v-if="$root.with_icons"/> Save
+            <button type="submit" v-bind:disabled="!can_save" :class="{dirty: dirty}" title="save page">
+                <icon name="save"  width="14px" height="14px" v-if="$root.with_icons" /> Save
             </button>
-            <button @click.prevent.stop="remove" v-bind:disabled="!can_save">
+            <button @click.prevent.stop="remove" v-bind:disabled="!can_save" title="remove page">
                 <icon name="folder-minus"  width="14px" height="14px" v-if="$root.with_icons"/> Remove
             </button>
-            <button @click.prevent.stop="reset">
+            <button @click.prevent.stop="reset" title="new page">
                 <icon name="file-plus"  width="14px" height="14px" v-if="$root.with_icons"/> New
             </button>
         </form>
@@ -25,25 +25,11 @@
 </template>
 
 <script>
-import axios from 'axios'
-import codeJar from './utils/code_jar.vue'
+import axios from "axios"
+import codeJar from "./utils/code_jar.vue"
+import debounce from "./utils/debounce.js"
 
 const ROOT_PATH = "/edit/pages/"
-
-function debounce(func, wait, immediate) {
-	var timeout;
-	return function() {
-		var context = this, args = arguments;
-		var later = function() {
-			timeout = null;
-			if (!immediate) func.apply(context, args);
-		};
-		var callNow = immediate && !timeout;
-		clearTimeout(timeout);
-		timeout = setTimeout(later, wait);
-		if (callNow) func.apply(context, args);
-	};
-};
 
 export default {
     props:["file"],
@@ -52,6 +38,7 @@ export default {
         return {
             message: "",
             content: "",
+            previous: "",
             path: "",
             show_modal: null
         }
@@ -62,6 +49,9 @@ export default {
     computed: {
         can_save() {
             return this.path && this.path.length != 0 && !this.path.endsWith("/")
+        },
+        dirty(){
+            return this.content != this.previous
         },
         mode(){
             if(this.file && this.file.endsWith(".css")){
@@ -80,6 +70,7 @@ export default {
             if(this.path){
                 let response = await axios.get(ROOT_PATH + this.path)
                 this.content = response.data
+                this.previous = this.content
                 this.update_editor()
             }
         },
@@ -115,6 +106,7 @@ export default {
         reset(){
             this.path = ""
             this.content = "# hello"
+            this.previous = this.content
             this.update_editor();
         },
         update_editor(){
@@ -158,5 +150,9 @@ export default {
 .input input{
     width: 100%;
     padding: 2px 2px 3px 2px;
+}
+.dirty{
+    background-color: mediumseagreen;
+    color: white;
 }
 </style>

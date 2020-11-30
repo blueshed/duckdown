@@ -6,6 +6,7 @@
 
 <script>
 import axios from 'axios'
+import debounce from "./utils/debounce.js"
 
 const ROOT_PATH = "/edit/mark/"
 
@@ -21,14 +22,17 @@ export default {
             let response = await axios.put(ROOT_PATH, this.content)
             this.mdown = response.data.content
         },
+        update_md: debounce(function(){
+            this.compiledMarkdown()
+        })
     },
     watch:{
         content(value){
-            this.compiledMarkdown()
+            this.update_md()
         }
     },
     created() {
-        this.compiledMarkdown()
+        this.update_md()
     },
 }
 </script>

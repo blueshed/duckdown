@@ -36,8 +36,14 @@ export default {
 </script>
 
 <style lang="css" scoped>
+.folders_files{
+    height: 100%;
+    overflow-y: scroll;
+    overflow-x: hidden;
+}
 li{
     cursor: pointer;
+    white-space: nowrap;
 }
 li:hover{
     background-color: aliceblue;
