@@ -54,6 +54,7 @@ def make_app():
         "production": production,
         "port": settings.as_int("port", default="8080"),
         "duck_users": users_path,
+        "duck_cgi": make_app_path(settings, "cgi_path", "cgi-bin"),
         "duck_path": "/edit/assets/",
         "duck_assets": resource_filename("duckdown", "assets"),
         "duck_templates": resource_filename("duckdown", "templates"),

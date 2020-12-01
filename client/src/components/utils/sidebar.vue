@@ -29,6 +29,7 @@ export default {
 .content{
     margin-right: 0.5em;
     margin-left: 1em;
+    height:100%;
 }
 .close{
     position: absolute;

@@ -153,6 +153,15 @@ def upload(bucket_name, key, file_path):
     return response
 
 
+def bucket_keys(bucket_name, prefix=""):
+    """ list bucket keys """
+    # create s3 client
+    client = boto3.client("s3")
+    response = client.list_objects_v2(Bucket=bucket_name, Prefix=prefix)
+    for obj in response.get("Contents", []):
+        yield obj.get("Key")
+
+
 def make_website(bucket_name, title=None):
     """ make a website and upload index and error pages """
     # region for url

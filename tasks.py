@@ -11,7 +11,6 @@ from dotenv import dotenv_values
 from duckdown import main
 from duckdown.handlers.utils.nav import nav as gen_nav
 import duckdown.tool.provision.tasks
-import tony
 
 PROJECT_NAME = "duckdown"
 
@@ -84,6 +83,4 @@ ns.add_task(lint)
 ns.add_task(clean)
 ns.add_task(build)
 ns.add_task(release)
-ns.add_task(tony.tony)
-ns.add_task(tony.tony_paths)
 ns.add_collection(duckdown.tool.provision.tasks, "p")

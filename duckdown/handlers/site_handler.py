@@ -2,6 +2,8 @@
 """ handle request for markdown pages """
 import logging
 import os
+import sys
+import subprocess
 from tornado.web import RequestHandler, HTTPError
 from tornado.escape import url_escape
 from .utils.converter_mixin import ConverterMixin
@@ -64,7 +66,7 @@ class SiteHandler(
                     content = self.meta.convert(file.read())
                     self.nav = self.convert_images(content)
 
-    def get(self, path):
+    async def get(self, path):
         """ handle get """
         path = path if path else "index.html"
         file, ext = os.path.splitext(path)
@@ -89,19 +91,41 @@ class SiteHandler(
         edit_path = "/edit"
         if file:
             edit_path = f"/edit?path={ url_escape(file) }.md"
+
         with open(doc, "r", encoding="utf-8") as file:
             content = file.read()
-            LOGGER.info(" -- ext: %s", ext)
-            if ext == ".html":
-                content = self.meta.convert(content)
-                LOGGER.info(" -- meta: %s", self.meta.Meta)
-                template = self.one_meta_value("template", "site")
-                LOGGER.info(" -- tmpl: %s", template)
-                self.render(
-                    f"{template}_tmpl.html",
-                    content=self.convert_images(content),
-                    edit_path=edit_path,
-                    theme_css=theme_css,
-                )
-            else:
-                self.write(self.convert_images(content))
+
+        LOGGER.info(" -- ext: %s", ext)
+        if ext == ".html":
+            content = self.meta.convert(content)
+            LOGGER.info(" -- meta: %s", self.meta.Meta)
+            template = self.one_meta_value("template", "site")
+            LOGGER.info(" -- tmpl: %s", template)
+            for key in self.meta.Meta:
+                if key.startswith("x-cgi-"):
+                    LOGGER.info(" -- cgi %s", key)
+                    cgi_script = os.path.abspath(
+                        f"{self.application.settings['duck_cgi']}/{self.meta.Meta[key][0]}.py"
+                    )
+                    LOGGER.info(" -- cgi %r", cgi_script)
+                    env = {
+                        "REQUEST_URI": path,
+                        "PATH": os.getcwd(),
+                        "CONTENT_LENGTH": "-1",
+                        "SCRIPT_FILENAME": cgi_script,
+                    }
+                    outcome = subprocess.run(
+                        [sys.executable, cgi_script],
+                        env=env,
+                        capture_output=True,
+                        check=False,
+                    )
+                    self.meta.Meta[key] = [outcome]
+            self.render(
+                f"{template}_tmpl.html",
+                content=self.convert_images(content),
+                edit_path=edit_path,
+                theme_css=theme_css,
+            )
+        else:
+            self.write(self.convert_images(content))

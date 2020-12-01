@@ -14,7 +14,9 @@
                 </button>
             </form>
         </div>
-        <folders-files :folders="folders" :files="files" @selected="folders_files_selected" />
+        <div class="files">
+            <folders-files :folders="folders" :files="files" @selected="folders_files_selected" />
+        </div>
         <div class="file" v-if="filepath">
             <button @click="copytoclipboard" class="copytoclipboard">
                 <icon name="clipboard" />
@@ -181,5 +183,8 @@ export default {
 }
 .menu > button, .menu > a {
     float: right;
+}
+.files{
+    max-height: 50%;
 }
 </style>
