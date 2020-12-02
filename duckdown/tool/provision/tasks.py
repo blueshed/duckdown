@@ -1,6 +1,6 @@
 """ provision tasks """
 from invoke import task
-from duckdown.handlers.utils import json_utils
+from duckdown.utils import json_utils
 from .credentials import using_credentials
 from . import s3_tools, iam_tools, route53_tools
 

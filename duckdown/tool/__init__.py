@@ -6,9 +6,11 @@ import sys
 import tornado.log
 from invoke import Program, Collection
 from duckdown import VERSION
-from .create import create
+from .create import create, s3_create
 from .run import run
 from .publish import publish
+from .secure import secure
+from .run_s3 import s3_run
 
 sys.path.insert(0, os.getcwd())
 
@@ -19,6 +21,9 @@ _NAMESPACE_ = Collection()
 _NAMESPACE_.add_task(create)
 _NAMESPACE_.add_task(run)
 _NAMESPACE_.add_task(publish)
+_NAMESPACE_.add_task(secure)
+_NAMESPACE_.add_task(s3_create)
+_NAMESPACE_.add_task(s3_run)
 
 tornado.log.enable_pretty_logging()
 

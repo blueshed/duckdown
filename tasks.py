@@ -1,5 +1,6 @@
 """ development tasks """
 import os
+import sys
 import shutil
 import logging
 from pathlib import Path
@@ -9,7 +10,7 @@ import tornado.options
 from invoke import task, Collection
 from dotenv import dotenv_values
 from duckdown import main
-from duckdown.handlers.utils.nav import nav as gen_nav
+from duckdown.utils.nav import nav as gen_nav
 import duckdown.tool.provision.tasks
 
 PROJECT_NAME = "duckdown"
@@ -32,7 +33,9 @@ def server(_, folder, dev=False):
     config = Path(f"{folder}/config.ini")
     if config.exists():
         settings["config"] = config
-    convoke.get_settings(PROJECT_NAME, **settings)
+    result = convoke.get_settings(PROJECT_NAME, **settings)
+    if result.get("scripts", None) != None:
+        sys.path.append(os.getcwd())
     main.main()
 
 
@@ -76,6 +79,11 @@ def nav(_, site, path="/"):
     for line in gen_nav(root, path):
         print(line)
 
+@task
+def test(ctx):
+    """ run out tests """
+    ctx.run("pytest tests/test_s3_app.py")
+
 ns = Collection()
 ns.add_task(client)
 ns.add_task(server)
@@ -83,4 +91,5 @@ ns.add_task(lint)
 ns.add_task(clean)
 ns.add_task(build)
 ns.add_task(release)
+ns.add_task(test)
 ns.add_collection(duckdown.tool.provision.tasks, "p")

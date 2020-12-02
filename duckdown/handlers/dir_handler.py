@@ -1,7 +1,9 @@
+# pylint: disable=W0201, W0223
 """ We want to manage a directory of files """
 import os
 import logging
 import mimetypes
+from ..utils.folder import Folder
 from .base_handler import BaseHandler
 from .access_control import UserMixin
 
@@ -9,54 +11,69 @@ LOGGER = logging.getLogger(__name__)
 mimetypes.add_type("text/markdown", ".md")
 
 
-def scan_path(path):
-    """ return the contents of a path """
-    with os.scandir(path) as item:
-        for entry in item:
-            is_file = entry.is_file()
-            size = entry.stat().st_size if is_file else None
-            mime = mimetypes.guess_type(entry.path) if is_file else None
-            if entry.name[0] != ".":
-                yield {
-                    "name": entry.name,
-                    "file": is_file,
-                    "size": size,
-                    "type": mime,
-                }
-
-
-class DirHandler(UserMixin, BaseHandler):  # pylint: disable=W0223
+class DirHandler(UserMixin, BaseHandler):
     """ Manage a directory """
 
-    def initialize(self, directory):
+    def initialize(self, directory=None, s3_key=None):
         """ setup directory """
-        self.directory = directory  # pylint: disable=W0201
+        self.directory = Folder(directory)
+        self.s3_key = s3_key
+
+    @classmethod
+    def clean_files_folders(cls, prefix, items):
+        """ remove prefix from paths """
+        start = len(prefix)
+        for item in items.get("folders"):
+            item["path"] = item["path"][start:]
+        for item in items.get("files"):
+            item["path"] = item["path"][start:]
 
     def get(self, path=None):
         """ return the files and directories in path """
-        path = os.path.join(self.directory, path) if path else self.directory
-        if os.path.isfile(path):
-            content_type, _ = mimetypes.guess_type(path)
-            self.set_header("Content-Type", content_type)
-            self.write(open(path, "r").read())
+        if self.s3_key:
+            key = self.s3_key + path
+            if self.application.is_file(key):
+                LOGGER.info("loading file: %s", key)
+                content_type, data = self.application.get_file(key)
+                LOGGER.info(data)
+                self.set_header("Content-Type", content_type)
+                self.write(data)
+            else:
+                LOGGER.info("listing folder: %s", key)
+                items = self.application.list_folder(key)
+                self.clean_files_folders(self.s3_key, items)
+                LOGGER.info(items)
+                self.write({"items": items})
         else:
-            self.write({"items": list(scan_path(path))})
+            path = (
+                os.path.join(self.directory, path) if path else self.directory
+            )
+            if self.directory.is_file(path):
+                LOGGER.info("loading file: %s", key)
+                content_type, body = self.directory.get_file(path)
+                self.set_header("Content-Type", content_type)
+                self.write(body)
+            else:
+                LOGGER.info("listing directory: %s", path)
+                self.write(self.directory.list_folder(path))
 
-    def put(self, path=None):
+    def put(self, path):
         """ handle the setting of file to path """
         LOGGER.info("saving %s", path)
-        path = os.path.join(self.directory, path) if path else self.directory
-        folder, _ = os.path.split(path)
-        if folder and not os.path.exists(folder):
-            LOGGER.info("making directory: %s", folder)
-            os.makedirs(folder)
-        with open(path, "wb") as file:
-            file.write(self.request.body)
+        if self.s3_key:
+            key = self.s3_key + path
+            mime, _ = mimetypes.guess_type(path)
+            self.application.put_file(
+                body=self.request.body, key=key, mime=mime
+            )
+        else:
+            self.directory.put_file(self.request.body, path)
         self.write("saved")
 
-    def delete(self, path=None):
+    def delete(self, path):
         """ will remove a document """
-        path = os.path.join(self.directory, path) if path else self.directory
-        if os.path.isfile(path):
-            os.unlink(path)
-            self.write("deleted")
+        if self.s3_key:
+            self.application.delete_file(path)
+        else:
+            self.directory.delete_file(path)
+        self.write("deleted")

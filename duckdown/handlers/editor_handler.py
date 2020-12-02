@@ -2,7 +2,7 @@
 """ Handle request for index page """
 from tornado.web import RequestHandler, authenticated
 from .access_control import UserMixin
-from .utils.assets_mixin import AssetsMixin
+from ..utils.assets_mixin import AssetsMixin
 
 
 class EditorHandler(

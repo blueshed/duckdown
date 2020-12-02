@@ -1,7 +1,7 @@
 """ provision store """
 import os
 import logging
-from duckdown.handlers.utils.json_utils import dumps
+from duckdown.utils.json_utils import dumps
 
 LOGGER = logging.getLogger(__name__)
 

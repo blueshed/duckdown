@@ -27,16 +27,21 @@ export default {
                 stub = this.folder + PATH_SEP
             }
             axios.get(path).then(response => {
-                let items = response.data.items.map(item => {
-                    item.path = `${stub}${item.name}`
-                    return item
-                })
-                this.folders = items.filter(item => {
-                    return !item.file
-                })
-                this.files = items.filter(item => {
-                    return item.file
-                })
+                if(response.data.items["folders"])  {
+                    this.folders = response.data.items.folders
+                    this.files = response.data.items.files
+                } else {
+                    let items = response.data.items.map(item => {
+                        item.path = `${stub}${item.name}`
+                        return item
+                    })
+                    this.folders = items.filter(item => {
+                        return !item.file
+                    })
+                    this.files = items.filter(item => {
+                        return item.file
+                    })
+                }
             }).catch(error => {
                 console.log(error)
             })

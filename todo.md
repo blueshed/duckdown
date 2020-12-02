@@ -1,20 +1,24 @@
 # duckdown
 
-- [x] css variables
-- [x] height 100%
-- [x] css theme editor
-    - [ ] css sample html
-- [x] logo on login page
 - [x] refactor tornado handlers
-- [ ] flex layout menus
 - [ ] file upload - drag and drop https://www.digitalocean.com/community/tutorials/how-to-handle-file-uploads-in-vue-2
 - [ ] template editor
 - [ ] refactor tornado paths
-- [ ] enable save if dirty
+- [ ] remove cgi-bin
+- Client
+    - [x] logo on login page
+    - [x] css variables
+    - [x] height 100%
+    - [x] css theme editor
+    - [ ] flex layout menus
+    - [ ] css sample html
+    - [x] enable save if dirty
+    - [ ] save button state after save
 - Tools using boto3
     - [x] create a s3 bucket in admin AWS_PROFILE
     - [x] create editor IAM policy to write to bucket and add AWS_PROFILE
     - [x] create s3 website bucket
+    - [ ] site directory as bucket
     - [ ] create cname
     - [ ] ssl certificate for bucket name
     - [ ] create Route53 domain name

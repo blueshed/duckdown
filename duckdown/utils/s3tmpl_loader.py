@@ -1,9 +1,7 @@
 """ an s3 template loader """
-import io
 import os
 import logging
 from typing import Any
-import boto3
 from tornado.template import BaseLoader, Template
 
 LOGGER = logging.getLogger(__name__)
@@ -12,21 +10,9 @@ LOGGER = logging.getLogger(__name__)
 class S3Loader(BaseLoader):
     """A template loader that loads from a single root directory."""
 
-    def __init__(
-        self,
-        aws_access_key_id: str,
-        aws_secret_access_key: str,
-        bucket_name: str,
-        folder="",
-        **kwargs: Any
-    ) -> None:
+    def __init__(self, application, folder, **kwargs: Any) -> None:
         super().__init__(**kwargs)
-        s3resource = boto3.resource(
-            "s3",
-            aws_access_key_id=aws_access_key_id,
-            aws_secret_access_key=aws_secret_access_key,
-        )
-        self.bucket = s3resource.Bucket(bucket_name)
+        self.application = application
         self.folder = folder
 
     def resolve_path(self, name, parent_path=None):
@@ -46,11 +32,8 @@ class S3Loader(BaseLoader):
 
     def _create_template(self, name: str) -> Template:
         """ create a template from bucket/folder/name """
-        key = "/".join([self.folder, name]) if self.folder else name
+        key = f"{self.folder}{name}"
         LOGGER.info("template: %s", key)
-        data = io.BytesIO()
-        self.bucket.download_fileobj(key, data)
-        template = Template(
-            data.getvalue().decode("utf-8"), name=name, loader=self
-        )
+        _, data = self.application.get_file(key)
+        template = Template(data.decode("utf-8"), name=name, loader=self)
         return template

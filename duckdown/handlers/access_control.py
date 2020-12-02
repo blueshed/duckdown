@@ -3,10 +3,12 @@
     Simple mixin to provide utility methods
     to support User
 """
+import os
 import logging
 from json import dumps, loads
 from tornado.web import RequestHandler, HTTPError
-from .utils.assets_mixin import AssetsMixin
+from ..utils.assets_mixin import AssetsMixin
+from ..utils import encrypt
 
 LOGGER = logging.getLogger(__name__)
 
@@ -60,6 +62,8 @@ class LoginHandler(
     def login(self, username, password):
         """ return a user """
         user = None
+        if os.getenv("DKDN_KEY"):
+            password = encrypt.decrypt(password)
         pwd = self.users.get(username)
         if pwd == password:
             user = username

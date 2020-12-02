@@ -1,8 +1,11 @@
 invoke
-convoke
+git+https://github.com/eykd/convoke.git
 tornado
 markdown
 pymdown-extensions
 python-dotenv
+aiobotocore
 boto3
 tld
+cryptography
+qrcode

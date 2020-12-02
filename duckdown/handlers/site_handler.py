@@ -2,13 +2,12 @@
 """ handle request for markdown pages """
 import logging
 import os
-import sys
-import subprocess
+import importlib
 from tornado.web import RequestHandler, HTTPError
 from tornado.escape import url_escape
-from .utils.converter_mixin import ConverterMixin
+from ..utils.converter_mixin import ConverterMixin
 from .access_control import UserMixin
-from .utils.nav import nav
+from ..utils.nav import nav
 
 
 LOGGER = logging.getLogger(__name__)
@@ -20,12 +19,13 @@ class SiteHandler(
 ):  # pylint: disable=W0223
     """ inline transform request for markdown pages """
 
-    def initialize(self, pages, s3_loader):
+    def initialize(self, pages, s3_loader=None, is_s3=False):
         """ setup init properties """
         self.pages = pages
         self.meta = None
         self.nav = None
         self.site_nav = None
+        self._is_s3_ = is_s3
         self._s3_loader = s3_loader
 
     def create_template_loader(self, template_path):
@@ -33,6 +33,14 @@ class SiteHandler(
         if self._s3_loader:
             return self._s3_loader
         return super().create_template_loader(template_path)
+
+    def get_file_content(self, path, mode="r", encoding="utf-8"):
+        """ return file content if exists else None"""
+        result = None
+        _, result = self.application.get_file(path)
+        if result and mode == "r":
+            result = result.decode(encoding)
+        return result
 
     @property
     def has_toc(self):
@@ -60,19 +68,28 @@ class SiteHandler(
         if folder:
             LOGGER.info(" -- folder: %s", folder)
             nav_path = os.path.join(folder, "-nav.md")
-            if os.path.isfile(nav_path):
+            content = self.get_file_content(nav_path, "r", encoding="utf-8")
+            if content:
                 LOGGER.info(" -- nav: %s", nav_path)
-                with open(nav_path, "r", encoding="utf-8") as file:
-                    content = self.meta.convert(file.read())
-                    self.nav = self.convert_images(content)
+                content = self.meta.convert(content)
+                self.nav = self.convert_images(content)
+
+    def run_script(self, script_name, path):
+        """ load a module and call module.main """
+        name = f"{self.application.settings['duck_scripts']}.{script_name}"
+        script_module = importlib.import_module(name)
+
+        return script_module.main(path)
 
     async def get(self, path):
         """ handle get """
         path = path if path else "index.html"
+
         file, ext = os.path.splitext(path)
 
         doc = os.path.join(self.pages, f"{file}.md")
-        if not os.path.isfile(doc):
+        content = self.get_file_content(doc, "r", encoding="utf-8")
+        if content is None:
             raise HTTPError(404)
 
         self.meta = self.markdown
@@ -83,17 +100,13 @@ class SiteHandler(
 
         # load theme
         theme_file = os.path.join(self.pages, file_path, "-theme.css")
-        theme_css = None
-        if os.path.isfile(theme_file):
-            theme_css = open(theme_file).read()
+        theme_css = self.get_file_content(theme_file)
+        if theme_css:
             LOGGER.info(" -- theme.css")
 
         edit_path = "/edit"
         if file:
             edit_path = f"/edit?path={ url_escape(file) }.md"
-
-        with open(doc, "r", encoding="utf-8") as file:
-            content = file.read()
 
         LOGGER.info(" -- ext: %s", ext)
         if ext == ".html":
@@ -102,24 +115,8 @@ class SiteHandler(
             template = self.one_meta_value("template", "site")
             LOGGER.info(" -- tmpl: %s", template)
             for key in self.meta.Meta:
-                if key.startswith("x-cgi-"):
-                    LOGGER.info(" -- cgi %s", key)
-                    cgi_script = os.path.abspath(
-                        f"{self.application.settings['duck_cgi']}/{self.meta.Meta[key][0]}.py"
-                    )
-                    LOGGER.info(" -- cgi %r", cgi_script)
-                    env = {
-                        "REQUEST_URI": path,
-                        "PATH": os.getcwd(),
-                        "CONTENT_LENGTH": "-1",
-                        "SCRIPT_FILENAME": cgi_script,
-                    }
-                    outcome = subprocess.run(
-                        [sys.executable, cgi_script],
-                        env=env,
-                        capture_output=True,
-                        check=False,
-                    )
+                if key.startswith("x-script-"):
+                    outcome = self.run_script(self.meta.Meta[key][0], path)
                     self.meta.Meta[key] = [outcome]
             self.render(
                 f"{template}_tmpl.html",
