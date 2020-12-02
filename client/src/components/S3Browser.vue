@@ -68,20 +68,9 @@ export default {
             this.file = null
             let path = `${ROOT_PATH}${this.path}`
             axios.get(path).then(response => {
-                let files = response.data.Contents ? response.data.Contents : []
-                files.map(item => {
-                    let elems = item.Key.split(PATH_SEP)
-                    item.name = elems[elems.length - 1]
-                    item.path = item.Key
-                })
-                this.files = files
-                let folders = response.data.CommonPrefixes ? response.data.CommonPrefixes : []
-                folders.map(item => {
-                    let elems = item.Prefix.split(PATH_SEP)
-                    item.name = elems[elems.length - 2]
-                    item.path = item.Prefix
-                })
-                this.folders = folders
+                console.log(response)
+                this.files = response.data.files
+                this.folders = response.data.folders
             }).catch(error => {
                 console.log(error)
             })
@@ -123,8 +112,7 @@ export default {
             if(value.file){
                 this.file = value.file
             } else {
-                let folder = value.folder
-                this.path = folder
+                this.path = value.folder
             }
         },
         set_path(value){

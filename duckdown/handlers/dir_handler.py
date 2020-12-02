@@ -19,15 +19,6 @@ class DirHandler(UserMixin, BaseHandler):
         self.directory = directory
         self.s3_key = s3_key
 
-    @classmethod
-    def clean_files_folders(cls, prefix, items):
-        """ remove prefix from paths """
-        start = len(prefix)
-        for item in items.get("folders"):
-            item["path"] = item["path"][start:]
-        for item in items.get("files"):
-            item["path"] = item["path"][start:]
-
     def get(self, path=None):
         """ return the files and directories in path """
         if self.s3_key:
@@ -43,7 +34,6 @@ class DirHandler(UserMixin, BaseHandler):
             else:
                 LOGGER.info("listing folder: %s", key)
                 items = self.application.list_folder(key)
-                self.clean_files_folders(self.s3_key, items)
                 LOGGER.info(items)
                 self.write(items)
         else:

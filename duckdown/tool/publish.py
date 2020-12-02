@@ -5,24 +5,21 @@ import logging
 import shutil
 from tornado import httpclient
 from invoke import task
-from .run import load_settings
 
 LOGGER = logging.getLogger(__name__)
 
 
 @task
-def publish(_, src, dst="public"):
+def publish(_, src, dst="public", port="8080"):
     """ generate public site """
-    settings = load_settings(src)
-
-    port = settings.as_int("port", default="8080")
+    port = int(port)
     http_client = httpclient.HTTPClient()
 
     public_path = dst
     if os.path.isdir(public_path):
         shutil.rmtree(public_path)
 
-    pages = os.path.join(src, settings.get("pages_path", "pages"))
+    pages = os.path.join(src, "pages")
     for dirpath, _, filenames in os.walk(pages):
         for filename in filenames:
             if filename[0] not in ["-"]:
@@ -44,7 +41,7 @@ def publish(_, src, dst="public"):
                     with open(public_page, "wb") as file:
                         file.write(response.body)
 
-    static = os.path.join(src, settings.get("static_path", "static"))
+    static = os.path.join(src, "static")
     public_static = os.path.join(public_path, "static")
     for dirpath, _, filenames in os.walk(static):
         if dirpath.endswith("/images"):

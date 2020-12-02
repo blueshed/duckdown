@@ -32,17 +32,18 @@ class S3Folder:
         """ is this a file """
         return path[-1] != "/"
 
-    def list_folder(self, prefix="", delimiter="/"):
-        """ list the contents of bucket folder """
-        response = self.s3client.list_objects_v2(
-            Bucket=self.s3bucket, Prefix=prefix, Delimiter=delimiter
+    @classmethod
+    def scan_path(cls, client, bucket, prefix, delimiter="/"):
+        """ return custom format of listing """
+        response = client.list_objects_v2(
+            Bucket=bucket, Prefix=prefix, Delimiter=delimiter
         )
         LOGGER.debug(response)
         result = {
             "files": [
                 {
                     "path": item["Key"],
-                    "name": self._last_item_(item["Key"]),
+                    "name": cls._last_item_(item["Key"]),
                     "size": item["Size"],
                     "type": mimetypes.guess_type(item["Key"])[0],
                     "file": True,
@@ -52,13 +53,18 @@ class S3Folder:
             "folders": [
                 {
                     "path": item["Prefix"],
-                    "name": self._last_item_(item["Prefix"]),
+                    "name": cls._last_item_(item["Prefix"]),
                     "file": False,
                 }
                 for item in response.get("CommonPrefixes", [])
             ],
         }
         return result
+
+
+    def list_folder(self, prefix="", delimiter="/"):
+        """ list the contents of bucket folder """
+        return self.scan_path(self.s3client, self.s3bucket, prefix, delimiter)
 
     def get_head(self, key):
         """ return meta data on key """

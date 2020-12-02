@@ -4,13 +4,13 @@ import sys
 import shutil
 import logging
 from pathlib import Path
-import convoke
 import tornado.log
 import tornado.options
 from invoke import task, Collection
 from dotenv import dotenv_values
 from duckdown import main
 from duckdown.utils.nav import nav as gen_nav
+from duckdown.tool import run
 import duckdown.tool.provision.tasks
 
 PROJECT_NAME = "duckdown"
@@ -23,20 +23,13 @@ def client(ctx):
     """ run the client """
     ctx.run(". nenv/bin/activate; cd client; npm run dev")
 
+
 @task
-def server(_, folder, dev=False):
+def server(ctx, folder, debug=False):
     """ run the server """
     tornado.options.options.logging = "INFO"
     tornado.log.enable_pretty_logging()
-    LOGGER.info("server:")
-    settings = {"app_path": folder, "production": not dev}
-    config = Path(f"{folder}/config.ini")
-    if config.exists():
-        settings["config"] = config
-    result = convoke.get_settings(PROJECT_NAME, **settings)
-    if result.get("scripts", None) != None:
-        sys.path.append(os.getcwd())
-    main.main()
+    run(ctx, folder, debug)
 
 
 @task

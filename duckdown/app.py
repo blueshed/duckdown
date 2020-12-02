@@ -26,6 +26,7 @@ class App(Folder, tornado.web.Application):
         routes = [] if routes is None else routes
         app_utils.setup_routes(self, routes, settings)
         settings.setdefault("local_images", True)
+        settings.setdefault("img_path", "/static/images/")
 
         static_path = os.path.join(settings["app_path"], "static")
         settings.setdefault("static_path", static_path)

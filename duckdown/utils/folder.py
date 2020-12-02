@@ -22,10 +22,7 @@ class Folder:
     def list_folder(self, prefix="", delimiter="/"):
         """ list the contents of folder """
         path = os.path.join(self.directory, prefix)
-        items = list(self.scan_path(path, self.directory))
-        files = [item for item in items if item["file"]]
-        folders = [item for item in items if not item["file"]]
-        return {"files": files, "folder": folders}
+        return self.scan_path(path, self.directory)
 
     def get_head(self, key):
         """ return Head on key """
@@ -64,6 +61,9 @@ class Folder:
     @classmethod
     def scan_path(cls, path, prefix):
         """ return the contents of a path """
+        files = []
+        folders = []
+
         starts = len(prefix)+1
         with os.scandir(path) as item:
             for entry in item:
@@ -71,10 +71,16 @@ class Folder:
                 size = entry.stat().st_size if is_file else None
                 mime = mimetypes.guess_type(entry.path) if is_file else None
                 if entry.name[0] != ".":
-                    yield {
+                    item = {
                         "name": entry.name,
                         "path": entry.path[starts:],
                         "file": is_file,
                         "size": size,
                         "type": mime,
                     }
+                    if is_file:
+                        files.append(item)
+                    else:
+                        folders.append(item)
+        return {"files": files, "folders": folders}
+

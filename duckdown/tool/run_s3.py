@@ -14,6 +14,7 @@ def s3_run(
     port=8080,
 ):
     """ run app """
+    LOGGER.info("duckdown s3: %s", bucket)
     app = S3App(
         bucket,
         debug=debug,

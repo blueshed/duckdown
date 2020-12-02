@@ -24,9 +24,8 @@ def setup_routes(app, routes, settings, s3_pages_key=None):
     LOGGER.info(users)
 
     debug = settings.get("debug", False)
-    manifest = vue_utils.load_manifest(debug)
-    vue_utils.install_vue_handlers(routes, debug)
     bucket_name = settings.get("image_bucket", None)
+    manifest = vue_utils.load_manifest(debug)
     routes.extend(
         [
             (r"/login", handlers.LoginHandler, {"users": users}),
@@ -54,3 +53,4 @@ def setup_routes(app, routes, settings, s3_pages_key=None):
             ),
         ]
     )
+    vue_utils.install_vue_handlers(routes, debug)

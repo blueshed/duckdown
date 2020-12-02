@@ -8,12 +8,11 @@ LOGGER = logging.getLogger(__name__)
 
 def run(app):
     """ make an app and run it """
+    if app.settings["debug"] is True:
+        LOGGER.info("running in debug mode")
 
     app.listen(app.settings["port"])
     LOGGER.info("listening on port: %s", app.settings["port"])
-
-    if app.settings["debug"] is True:
-        LOGGER.info("running in debug mode")
 
     ioloop = tornado.ioloop.IOLoop.current()
     try:

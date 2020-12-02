@@ -1,30 +1,26 @@
 """ run duckdown app """
-import os
-import sys
 import logging
-from pathlib import Path
-import convoke
 from invoke import task
-from duckdown.main import main
+from duckdown.app import App
+from duckdown.utils import run_tornado
 
 LOGGER = logging.getLogger(__name__)
 
 
-def load_settings(path):
-    """ load convoke settings from config.ini """
-    settings = {"app_path": path}
-    config = Path(f"{path}/config.ini")
-    if config.exists():
-        settings["config"] = config
-    result = convoke.get_settings("duckdown", **settings)
-    LOGGER.info(result)
-    if result.get("scripts", None) is not None:
-        sys.path.append(os.getcwd())
-    return result
-
-
 @task
-def run(_, path):
+def run(_, 
+    path,
+    debug=False,
+    cookie="duckdown-cookie",
+    secret="it was a dark and stormy duckdown",
+    port=8080):
     """ run app """
-    load_settings(path)
-    main()
+    LOGGER.info("duckdown local: %s", path)
+    app = App(
+        app_path=path,
+        debug=debug,
+        cookie_name=cookie,
+        cookie_secret=secret,
+        port=port,
+    )
+    run_tornado.run(app)

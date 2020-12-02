@@ -7,10 +7,10 @@ from . import json_utils
 LOGGER = logging.getLogger(__name__)
 
 
-def load_manifest(production):
+def load_manifest(debug):
     """ loading manifest for vue dev environment """
     manifest = None
-    if production is True:
+    if debug is False:
         LOGGER.info("loading client manifest")
         with open(
             resource_filename("duckdown", "assets/vue/manifest.json")
@@ -19,10 +19,10 @@ def load_manifest(production):
     return manifest
 
 
-def install_vue_handlers(routes, production):
+def install_vue_handlers(routes, debug):
     """ add view handler to routes """
 
-    if production is False:
+    if debug is True:
         LOGGER.info("installing vue dev handler")
         routes.insert(
             0,

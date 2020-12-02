@@ -9,7 +9,15 @@
 import axios from 'axios'
 
 const PATH_SEP = "/"
-const ROOT_PATH = "/edit/pages/"
+const FOLDER_PATH = "pages/"
+const ROOT_PATH = "/edit/" + FOLDER_PATH
+
+function clean_file_folder(path, root){
+    if(path.startsWith(root)){
+        path = path.substring(root.length)
+    }
+    return path
+}
 
 export default {
     props:["file", "folder"],
@@ -27,21 +35,14 @@ export default {
                 stub = this.folder + PATH_SEP
             }
             axios.get(path).then(response => {
-                if(response.data.items["folders"])  {
-                    this.folders = response.data.items.folders
-                    this.files = response.data.items.files
-                } else {
-                    let items = response.data.items.map(item => {
-                        item.path = `${stub}${item.name}`
-                        return item
-                    })
-                    this.folders = items.filter(item => {
-                        return !item.file
-                    })
-                    this.files = items.filter(item => {
-                        return item.file
-                    })
-                }
+                this.folders = response.data.folders.map(item =>{
+                    item.path = clean_file_folder(item.path, FOLDER_PATH)
+                    return item
+                })
+                this.files = response.data.files.map(item =>{
+                    item.path = clean_file_folder(item.path, FOLDER_PATH)
+                    return item
+                })
             }).catch(error => {
                 console.log(error)
             })
