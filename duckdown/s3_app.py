@@ -17,7 +17,7 @@ class S3App(S3Folder, tornado.web.Application):
         """ send it on and do the right thing """
         S3Folder.__init__(self, bucket_name)
         routes = [] if routes is None else routes
-        app_utils.setup_routes(self, routes, settings)
+        app_utils.setup_routes(self, routes, settings, s3_pages_key="pages/")
         settings.setdefault(
             "img_path",
             f"//s3-{self.s3region}.amazonaws.com/{bucket_name}/static/images/",

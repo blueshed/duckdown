@@ -9,7 +9,7 @@ from . import vue_utils
 LOGGER = logging.getLogger(__name__)
 
 
-def setup_routes(app, routes, settings):
+def setup_routes(app, routes, settings, s3_pages_key=None):
     """ do the thing """
 
     settings.setdefault("app_name", "duckdown-app")
@@ -45,6 +45,7 @@ def setup_routes(app, routes, settings):
             (
                 r"/edit/pages/(.*)",
                 handlers.DirHandler,
+                {"directory": "pages/", "s3_key": s3_pages_key}
             ),
             (
                 r"/edit",

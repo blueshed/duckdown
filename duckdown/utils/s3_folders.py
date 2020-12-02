@@ -30,7 +30,7 @@ class S3Folder:
     @classmethod
     def is_file(cls, path):
         """ is this a file """
-        return path[-1] == "/"
+        return path[-1] != "/"
 
     def list_folder(self, prefix="", delimiter="/"):
         """ list the contents of bucket folder """

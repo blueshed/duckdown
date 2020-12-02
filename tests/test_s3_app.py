@@ -2,6 +2,8 @@
 import logging
 import pytest
 from duckdown.s3_app import S3App
+from duckdown.utils import json_utils
+from .utils import using_cookie
 
 logging.getLogger().setLevel(logging.INFO)
 
@@ -78,3 +80,79 @@ def test_static(http_client, base_url):
         base_url + "/happy.html", raise_error=False
     )
     assert response.code == 404
+
+
+@pytest.mark.gen_test
+async def test_login(http_client, base_url):
+    """ can we login """
+    response = await http_client.fetch(base_url + "/login")
+    assert response.code == 200
+
+    async with using_cookie(http_client, base_url) as cookie:
+        response = await http_client.fetch(
+            base_url + "/edit",
+            follow_redirects=False,
+            raise_error=False,
+            headers={"Cookie": cookie},
+        )
+        assert response.code == 200
+
+
+@pytest.mark.gen_test
+async def test_assets(http_client, base_url):
+    """ can we list pages """
+
+    async with using_cookie(http_client, base_url) as cookie:
+        response = await http_client.fetch(
+            base_url + "/edit/assets/logo.svg",
+            follow_redirects=False,
+            raise_error=False,
+            headers={"Cookie": cookie},
+        )
+        assert response.code == 200
+
+
+
+@pytest.mark.gen_test
+async def test_edit_pages(http_client, base_url):
+    """ can we list pages """
+
+    async with using_cookie(http_client, base_url) as cookie:
+        response = await http_client.fetch(
+            base_url + "/edit/pages/",
+            follow_redirects=False,
+            raise_error=False,
+            headers={"Cookie": cookie},
+        )
+        assert response.code == 200
+        print(response.body)
+        result = json_utils.loads(response.body)
+        assert result["files"][0]["name"] == "index.md"
+
+        response = await http_client.fetch(
+            base_url + "/edit/pages/test.md",
+            method="PUT",
+            body=SAMPLE,
+            follow_redirects=False,
+            raise_error=False,
+            headers={"Cookie": cookie},
+        )
+        assert response.code == 200
+
+        response = await http_client.fetch(
+            base_url + "/edit/pages/test.md",
+            follow_redirects=False,
+            raise_error=False,
+            headers={"Cookie": cookie},
+        )
+        assert response.code == 200
+        assert response.body == SAMPLE
+
+        response = await http_client.fetch(
+            base_url + "/edit/pages/test.md",
+            method="DELETE",
+            follow_redirects=False,
+            raise_error=False,
+            headers={"Cookie": cookie},
+        )
+        assert response.code == 200

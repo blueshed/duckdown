@@ -1,9 +1,10 @@
 """ test s3 functionality """
 import logging
 import contextlib
-import urllib.parse
 import pytest
 from duckdown.app import App
+from duckdown.utils import json_utils
+from .utils import using_cookie
 
 logging.getLogger().setLevel(logging.INFO)
 
@@ -20,26 +21,6 @@ def app():
         cookie_name=COOKIE_NAME,
         cookie_secret="secret",
     )
-
-
-@contextlib.asynccontextmanager
-async def using_cookie(http_client, base_url):
-    """ get a cookie """
-    form = {"email": "admin", "password": "admin"}
-    body = urllib.parse.urlencode(form)
-    response = await http_client.fetch(
-        base_url + "/login",
-        method="POST",
-        body=body,
-        follow_redirects=False,
-        raise_error=False,
-    )
-    assert response.code == 302
-
-    value = response.headers["set-cookie"]
-    print("cookie:", value)
-    assert value
-    yield value
 
 
 def test_put(app):
@@ -117,18 +98,61 @@ async def test_login(http_client, base_url):
         )
         assert response.code == 200
 
-# @pytest.mark.gen_test
-# async def test_edit_pages(http_client, base_url):
-#     """ can we list pages """
 
-#     async with using_cookie(http_client, base_url) as cookie:
-#         response = await http_client.fetch(
-#             base_url + "/edit/pages/",
-#             follow_redirects=False,
-#             raise_error=False,
-#             headers={"Cookie": cookie},
-#         )
-#         assert response.code == 200
-#         print(response.body)
+@pytest.mark.gen_test
+async def test_assets(http_client, base_url):
+    """ can we list pages """
 
-#         assert False
+    async with using_cookie(http_client, base_url) as cookie:
+        response = await http_client.fetch(
+            base_url + "/edit/assets/logo.svg",
+            follow_redirects=False,
+            raise_error=False,
+            headers={"Cookie": cookie},
+        )
+        assert response.code == 200
+
+
+@pytest.mark.gen_test
+async def test_edit_pages(http_client, base_url):
+    """ can we list pages """
+
+    async with using_cookie(http_client, base_url) as cookie:
+        response = await http_client.fetch(
+            base_url + "/edit/pages/",
+            follow_redirects=False,
+            raise_error=False,
+            headers={"Cookie": cookie},
+        )
+        assert response.code == 200
+        print(response.body)
+        result = json_utils.loads(response.body)
+        assert result["files"][0]["name"] == "index.md"
+
+        response = await http_client.fetch(
+            base_url + "/edit/pages/test.md",
+            method="PUT",
+            body=SAMPLE,
+            follow_redirects=False,
+            raise_error=False,
+            headers={"Cookie": cookie},
+        )
+        assert response.code == 200
+
+        response = await http_client.fetch(
+            base_url + "/edit/pages/test.md",
+            follow_redirects=False,
+            raise_error=False,
+            headers={"Cookie": cookie},
+        )
+        assert response.code == 200
+        assert response.body == SAMPLE
+
+        response = await http_client.fetch(
+            base_url + "/edit/pages/test.md",
+            method="DELETE",
+            follow_redirects=False,
+            raise_error=False,
+            headers={"Cookie": cookie},
+        )
+        assert response.code == 200
