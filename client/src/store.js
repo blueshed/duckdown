@@ -24,7 +24,7 @@ const store = createStore({
             folders: [],
             file_path: null,
             file_content: null,
-            previous_content: null,
+            editor_content: null,
             image_path: "",
             image_files: [],
             image_folders: [],
@@ -42,30 +42,29 @@ const store = createStore({
             state.folder_path = value.path
             state.files = value.files
             state.folders = value.folders
-            console.log("files", value)
+            console.debug("files", value)
         },
         set_file(state, value) {
             state.file_path = value.path
             state.file_content = value.content
         },
         set_file_content(state, value) {
-            state.file_content = value
-        },
-        set_previous_content(state, value) {
             state.file_path = value.path
             state.file_content = value.content
-            state.previous_content = value.content
+        },
+        set_editor_content(state, value) {
+            state.editor_content = value
         },
         set_images(state, value) {
             state.image_path = value.path
             state.image_files = value.files
             state.image_folders = value.folders
             state.image_url = null
-            console.log("images", value)
+            console.debug("images", value)
         },
         set_image_url(state, image) {
             state.image_url = `${state.img_path}${image}`
-            console.log("image_url", state.image_url)
+            console.debug("image_url", state.image_url)
         },
         set_img_path(state, value) {
             state.img_path = value
@@ -79,7 +78,6 @@ const store = createStore({
         reset_content(state) {
             state.file_path = "";
             state.file_content = "# hello";
-            state.previous_content = "# hello";
         }
     },
     getters: {
@@ -101,8 +99,8 @@ const store = createStore({
         file_content(state) {
             return state.file_content
         },
-        previous_content(state) {
-            return state.previous_content
+        editor_content(state) {
+            return state.editor_content
         },
         image_files(state) {
             return state.image_files
@@ -141,7 +139,7 @@ const store = createStore({
                 })
                 commit("set_files_folder", { path: value, files: files, folders: folders })
                 commit("loading_files", false)
-                return [files, folders]
+                return response
             }).catch(error => {
                 commit("set_error", error)
                 commit("loading_files", false)
@@ -150,19 +148,21 @@ const store = createStore({
         },
         load_file({ commit }, path) {
             let key = FILE_ROOT + path;
-            console.log("file: ", key)
+            console.debug("file: ", key)
             return axios.get(key).then(response => {
-                commit("set_previous_content", { path: path, content: response.data })
-                return response.data
+                commit("set_file_content", { path: path, content: response.data })
+                return response
             }).catch(error => {
                 commit("set_error", error)
                 return error
             })
         },
-        save_file({ commit }, path, content) {
-            let key = FILE_ROOT + path;
-            return axios.put(key, content).then(response => {
-                return path
+        save_file({ commit }, value) {
+            let key = FILE_ROOT + value.path;
+            console.debug("save_file", value)
+            return axios.put(key, value.content).then(response => {
+                commit("set_file_content", value)
+                return response
             }).catch(error => {
                 commit("set_error", error)
                 return error
@@ -174,7 +174,7 @@ const store = createStore({
                 commit("reset_content")
                 return response
             }).catch(error => {
-                console.log(error)
+                console.debug(error)
                 this.message = error
             })
         },
@@ -199,7 +199,7 @@ const store = createStore({
             }).catch(error => {
                 commit("set_error", error)
                 commit("loading_images", false)
-                console.log(error)
+                console.debug(error)
                 return error
             })
         },
@@ -213,15 +213,16 @@ const store = createStore({
                 return error
             })
         },
-        upload_images({ state, commit, dispatch }, formData, path) {
+        upload_images({ state, commit, dispatch }, value) {
             commit("loading_images", true)
-            axios.post(`${IMAGES_ROOT_PATH}${path}`, formData, {
+            let key = `${IMAGES_ROOT_PATH}${value.path}`
+            axios.post(key, value.formData, {
                 headers: {
                     "Content-Type": "multipart/form-data",
                 },
             }).then((response) => {
                 commit("loading_images", false)
-                dispatch("load_images", state.image_path)
+                dispatch("load_image_files_folders", value.path)
             }).catch((error) => {
                 console.error(error);
                 commit("loading_images", false)

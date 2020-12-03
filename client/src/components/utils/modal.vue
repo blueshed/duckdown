@@ -17,49 +17,49 @@
 
 <script>
 export default {
-    props:["message", "func"],
-    methods:{
-        close_modal(perform){
-            if(perform && this.func){
-                this.func()
+    props: ["message", "func"],
+    methods: {
+        close_modal(perform) {
+            if (perform && this.func) {
+                this.func();
             }
-            this.$emit("dismiss")
-        }
-    }
-}
+            this.$emit("dismiss");
+        },
+    },
+};
 </script>
 
 <style lang="css" scoped>
-.btns{
+.btns {
     border-top: 1px solid var(--txt-color);
     text-align: right;
     padding: 1em;
 }
-.w3-modal{
-    z-index:3;
-    padding-top:100px;
-    position:fixed;
-    left:0;
-    top:0;
-    width:100%;
-    height:100%;
-    overflow:auto;
-    background-color:rgb(0,0,0);
-    background-color:rgba(0,0,0,0.4)
+.w3-modal {
+    z-index: 3;
+    padding-top: 100px;
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgb(0, 0, 0);
+    background-color: rgba(0, 0, 0, 0.4);
 }
-.w3-modal-content{
+.w3-modal-content {
     border-radius: 4px;
-    margin:auto;
+    margin: auto;
     background-color: var(--bg-color);
-    position:relative;
+    position: relative;
     padding: 0;
-    outline:0;
-    width:600px
+    outline: 0;
+    width: 600px;
 }
-.w3-container{
+.w3-container {
     padding: 2em;
 }
-.icn{
+.icn {
     position: relative;
     top: 4px;
     transform: rotateX(-180deg);

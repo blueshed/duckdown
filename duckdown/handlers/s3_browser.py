@@ -69,7 +69,7 @@ class S3Browser(UserMixin, BaseHandler):
         """ adds data, returns path """
         if self.local_images:
             # write file
-            path = self.make_app_path(key)
+            path, _ = self.make_app_path(key)
             LOGGER.info("adding %s", path)
             folder, _ = os.path.split(path)
             if not os.path.exists(folder):

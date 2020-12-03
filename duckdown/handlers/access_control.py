@@ -62,9 +62,11 @@ class LoginHandler(
     def login(self, username, password):
         """ return a user """
         user = None
-        if os.getenv("DKDN_KEY"):
-            password = encrypt.decrypt(password)
         pwd = self.users.get(username)
+        if pwd and os.getenv("DKDN_KEY"):
+            LOGGER.info("pwd>: %r", pwd)
+            pwd = encrypt.decrypt(pwd)
+            LOGGER.info("pwd<: %r", pwd)
         if pwd == password:
             user = username
             LOGGER.info("logged in: %s", user)

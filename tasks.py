@@ -6,6 +6,7 @@ import logging
 from pathlib import Path
 import tornado.log
 import tornado.options
+from dotenv import load_dotenv
 from invoke import task, Collection
 from dotenv import dotenv_values
 from duckdown import main
@@ -27,6 +28,7 @@ def client(ctx):
 @task
 def server(ctx, folder, debug=False):
     """ run the server """
+    load_dotenv(verbose=True)
     tornado.options.options.logging = "INFO"
     tornado.log.enable_pretty_logging()
     run(ctx, folder, debug)

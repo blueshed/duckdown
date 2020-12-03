@@ -1,12 +1,14 @@
 """ test s3 functionality """
-import logging
 import contextlib
+import logging
 import pytest
+from dotenv import load_dotenv
 from duckdown.app import App
 from duckdown.utils import json_utils
 from .utils import using_cookie
 
 logging.getLogger().setLevel(logging.INFO)
+load_dotenv(verbose=True)
 
 SAMPLE = b"""Hello World! I'm a sample file."""
 SAMPLE_KEY = "test/test.txt"
@@ -97,6 +99,7 @@ async def test_login(http_client, base_url):
             headers={"Cookie": cookie},
         )
         assert response.code == 200
+        assert False
 
 
 @pytest.mark.gen_test
