@@ -6,18 +6,11 @@
     </sidebar>
     <div class="container">
       <div class="directory">
-        <DirBrowser
-          ref="dirbrowser"
-          :file="file"
-          :folder="folder"
-          @folder_change="set_folder($event)"
-          @file_change="set_file($event)"
-        />
+        <DirBrowser ref="dirbrowser" />
       </div>
       <div class="editing">
         <Editor
           ref="editor"
-          :file.sync="file"
           @confirm="show_modal($event.message, $event.func)"
           @updated="
             show_snack($event);
@@ -27,12 +20,10 @@
             show_snack($event, 'warn');
             $refs.dirbrowser.list();
           "
-          @changed="content = $event"
         />
       </div>
       <div class="resource">
         <div class="menu">
-          <button @click="increment">{{ count }}</button>
           <a
             href="https://www.markdownguide.org/cheat-sheet/"
             target="duckdown-help"
@@ -83,8 +74,8 @@
           </button>
           <!-- icon id="box" name="box" width="14px" height="14px"  @click="with_icons=!with_icons"/-->
         </div>
-        <Preview :content="content" v-if="mime == 'text/markdown'" />
-        <CssPreview :content="content" v-else />
+        <Preview v-if="mime == 'text/markdown'" />
+        <CssPreview v-else />
       </div>
     </div>
   </div>
@@ -118,27 +109,22 @@ export default {
   },
   data() {
     return {
-      file: "",
       folder: "",
-      content: "",
       sidebar: false,
       with_icons: true,
     };
   },
   computed: {
+    file() {
+      return this.$store.getters.file_path;
+    },
     mime() {
       return this.file && this.file.endsWith(".css")
         ? "text/css"
         : "text/markdown";
     },
-    count() {
-      return this.$store.state.count;
-    },
   },
   methods: {
-    increment() {
-      this.$store.commit("increment");
-    },
     show_snack(value, type) {
       this.$refs.snacks.add_message(value, type);
     },
@@ -155,12 +141,6 @@ export default {
       }
       window.open(location, "duckdown-site");
     },
-    set_file(value) {
-      this.file = value;
-    },
-    set_folder(value) {
-      this.folder = value;
-    },
   },
   mounted() {
     let urlParams = new URLSearchParams(window.location.search);
@@ -169,9 +149,9 @@ export default {
       if (path.indexOf(PATH_SEP) != -1) {
         this.folder = path.substring(0, path.lastIndexOf(PATH_SEP));
       }
-      this.file = change_ext(path, ".html", ".md");
+      this.$store.dispatch("load_file", change_ext(path, ".html", ".md"));
     } else {
-      this.$refs.editor.reset();
+      this.$store.commit("reset_content");
     }
   },
 };

@@ -1,178 +1,162 @@
 <template>
-    <div class="s3browser">
-        <breadcrumbs :folder="path" @changed="set_path($event)" />
-        <div class="upload menu">
-            <form enctype="multipart/form-data" @submit.prevent.stop="uploadFiles">
-                <input type="file" ref="file" multiple="multiple">
-                <icon name="loader" :spin="loading" v-if="loading"/>
-                <button type="submit" id="submit" :disabled="disable_upload">
-                    <icon name="upload-cloud" width="14px" height="14px" v-if="$root.with_icons"/> Upload
-                </button>
-                <button @click.prevent.stop="add_folder">
-                    <span v-if="$root.with_icons"><icon name="folder-plus"  width="14px" height="14px"/> Add</span>
-                    <span v-else>Add Folder</span>
-                </button>
-            </form>
-        </div>
-        <div class="files">
-            <folders-files :folders="folders" :files="files" @selected="folders_files_selected" />
-        </div>
-        <div class="file" v-if="filepath">
-            <button @click="copytoclipboard" class="copytoclipboard">
-                <icon name="clipboard" />
-            </button>
-            <img :src="filepath" />
-        </div>
+  <div class="s3browser">
+    <breadcrumbs :folder="path" @selected="breadcrumb_selected($event)" />
+    <div class="upload menu">
+      <form enctype="multipart/form-data" @submit.prevent.stop="uploadFiles">
+        <input type="file" ref="file" multiple="multiple" />
+        <icon name="loader" :spin="loading" v-if="loading" />
+        <button type="submit" id="submit" :disabled="disable_upload">
+          <icon
+            name="upload-cloud"
+            width="14px"
+            height="14px"
+            v-if="$root.with_icons"
+          />
+          Upload
+        </button>
+        <button @click.prevent.stop="add_folder">
+          <span v-if="$root.with_icons"
+            ><icon name="folder-plus" width="14px" height="14px" /> Add</span
+          >
+          <span v-else>Add Folder</span>
+        </button>
+      </form>
     </div>
+    <div class="files">
+      <folders-files
+        :folders="folders"
+        :files="files"
+        @selected="folders_files_selected($event)"
+      />
+    </div>
+    <div class="file" v-if="image_url">
+      <button @click="copytoclipboard" class="copytoclipboard">
+        <icon name="clipboard" />
+      </button>
+      <img :src="image_url" />
+    </div>
+  </div>
 </template>
 
 <script>
-import axios from 'axios'
-
-const PATH_SEP = "/"
-const ROOT_PATH = "/browse/"
-
 export default {
-    data() {
-        return {
-            path: "",
-            folders: [],
-            files: [],
-            file: null,
-            loading: false,
-            error: null,
-            ignore_path_change: false,
-            img_path: "/static/images/"
-        }
+  data() {
+    return {
+      local_path: null,
+    };
+  },
+  computed: {
+    disable_upload() {
+      return (
+        this.$refs.file &&
+        this.$refs.file.files &&
+        this.$refs.file.files.length == 0
+      );
     },
-    computed: {
-        filepath() {
-            if (this.file) {
-                return `${this.img_path}${this.file}`
-            }
-        },
-        disable_upload(){
-            return this.$refs.file && this.$refs.file.files && this.$refs.file.files.length == 0
-        }
+    path() {
+      return this.local_path != null ? this.local_path : this.image_path;
     },
-    methods: {
-        load_img_path(){
-            axios.put(`${ROOT_PATH}`).then(response => {
-                this.img_path = response.data["img_path"]
-            })
-        },
-        load() {
-            if(this.ignore_path_change === true){
-                return
-            }
-            this.file = null
-            let path = `${ROOT_PATH}${this.path}`
-            axios.get(path).then(response => {
-                console.log(response)
-                this.files = response.data.files
-                this.folders = response.data.folders
-            }).catch(error => {
-                console.log(error)
-            })
-        },
-        copytoclipboard() {
-            const el = document.createElement('textarea');
-            el.value = `![Alt text](/static/images/${this.file} "Optional title")`;
-            el.setAttribute('readonly', '');
-            el.style.position = 'absolute';
-            el.style.left = '-9999px';
-            document.body.appendChild(el);
-            el.select();
-            document.execCommand('copy');
-            document.body.removeChild(el);
-        },
-        uploadFiles() {
-            this.loading = true
-            this.error = null
-            let formData = new FormData()
-            for (var i = 0; i < this.$refs.file.files.length; i++) {
-                let file = this.$refs.file.files[i];
-                formData.append('files[' + i + ']', file);
-            }
-            axios.post(`${ROOT_PATH}${this.path}`, formData, {
-                headers: {
-                    'Content-Type': 'multipart/form-data'
-                }
-            }).then(response => {
-                this.load()
-                this.loading = false
-            }).catch(error => {
-                console.error(error)
-                this.error = error
-                this.loading = false
-            })
-            return false;
-        },
-        folders_files_selected(value){
-            if(value.file){
-                this.file = value.file
-            } else {
-                this.path = value.folder
-            }
-        },
-        set_path(value){
-            let folder = value
-            if(!folder.endsWith("/")){
-                folder = folder + "/"
-            }
-            if(folder.startsWith("/")){
-                folder = folder.substring(1, folder.length)
-            }
-            this.path=folder
-        },
-        add_folder(){
-            let folder = prompt("New folder path", "/foo/bar")
-            if(folder){
-                this.ignore_path_change = true
-                this.set_path(folder)
-                this.ignore_path_change = true
-            }
-        }
+    image_path() {
+      return this.$store.getters.image_path;
     },
-    watch: {
-        path() {
-            this.load()
-        }
+    files() {
+      return this.$store.getters.image_files;
     },
-    created() {
-        this.load_img_path()
-        this.load()
-    }
-}
+    folders() {
+      return this.$store.getters.image_folders;
+    },
+    image_url() {
+      return this.$store.getters.image_url;
+    },
+    img_path() {
+      return this.$store.getters.img_path;
+    },
+    loading() {
+      return this.$store.getters.loading_images;
+    },
+  },
+  methods: {
+    copytoclipboard() {
+      const el = document.createElement("textarea");
+      el.value = `![Alt text](/static/images/${this.file} "Optional title")`;
+      el.setAttribute("readonly", "");
+      el.style.position = "absolute";
+      el.style.left = "-9999px";
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand("copy");
+      document.body.removeChild(el);
+    },
+    uploadFiles() {
+      let formData = new FormData();
+      for (var i = 0; i < this.$refs.file.files.length; i++) {
+        let file = this.$refs.file.files[i];
+        formData.append("files[" + i + "]", file);
+      }
+      this.$store.dispatch("upload_images", formData, this.path);
+      return false;
+    },
+    folders_files_selected(value) {
+      if (value.file) {
+        this.$store.commit("set_image_url", value.file);
+      } else {
+        this.$store.dispatch("load_image_files_folders", value.folder);
+      }
+    },
+    breadcrumb_selected(value) {
+      let folder = value;
+      if (!folder.endsWith("/")) {
+        folder = folder + "/";
+      }
+      if (folder.startsWith("/")) {
+        folder = folder.substring(1, folder.length);
+      }
+      this.$store.dispatch("load_image_files_folders", folder);
+    },
+    add_folder() {
+      let folder = prompt("New folder path", "/foo/bar");
+      if (folder) {
+        this.local_path = folder;
+      }
+    },
+  },
+  watch: {
+    image_path() {
+      this.local_path = null;
+    },
+  },
+};
 </script>
 
 <style lang="css" scoped>
-.s3browser{
-    height: 100%;
-    display: flex;
-    flex-direction: column;
+.s3browser {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
-.copytoclipboard{
-    float: right;
+.copytoclipboard {
+  float: right;
 }
-.upload, .file{
-    margin-bottom: 1em;
+.upload,
+.file {
+  margin-bottom: 1em;
 }
-.file{
-    margin-top: 1em;
-    text-align: center;
+.file {
+  margin-top: 1em;
+  text-align: center;
 }
-.file img{
-    max-width: 120px;
-    border: 1px solid gray;
-    border-radius: 4px;
-    padding: 6px;
-    margin: 4px;
+.file img {
+  max-width: 120px;
+  border: 1px solid gray;
+  border-radius: 4px;
+  padding: 6px;
+  margin: 4px;
 }
-.menu > button, .menu > a {
-    float: right;
+.menu > button,
+.menu > a {
+  float: right;
 }
-.files{
-    max-height: 50%;
+.files {
+  max-height: 50%;
 }
 </style>
