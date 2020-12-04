@@ -10,7 +10,7 @@ logging.getLogger().setLevel(logging.INFO)
 load_dotenv(verbose=True)
 
 SAMPLE = b"""Hello World! I'm a sample file."""
-SAMPLE_KEY = "test/test.txt"
+SAMPLE_KEY = "test/duck_tests/test.txt"
 SAMPLE_FOLDER, SAMPLE_FILE = SAMPLE_KEY.split("/")
 
 
@@ -112,7 +112,6 @@ async def test_assets(http_client, base_url):
             headers={"Cookie": cookie},
         )
         assert response.code == 200
-
 
 
 @pytest.mark.gen_test

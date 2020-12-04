@@ -10,11 +10,13 @@ from liteblue import handlers
 from liteblue.worker import Channel
 from duckdown.app import App
 from . import tables
+from .utils import User
+
 
 LOGGER = logging.getLogger(__name__)
 
 
-class Authenticator:
+class SqlAuthenticator:
     """ trick duck to quack blue """
 
     @classmethod
@@ -22,11 +24,17 @@ class Authenticator:
         """ get a user from the db """
         with ConnectionMgr.session() as session:
             row = session.execute(
-                sql.select([tables.user.c.password]).where(
+                sql.select([tables.user]).where(
                     tables.user.c.email == username
                 )
             ).fetchone()
-            return row["password"] if row else None
+            return (
+                row["password"],
+                User(row["id"], row["email"], row["preferences"])
+                if row
+                else None,
+                None,
+            )
 
 
 class BlueApp(App):
@@ -53,10 +61,12 @@ class BlueApp(App):
 
     async def perform(self, user, proc, *args, **kwargs):
         """ runs a proc in threadpool or ioloop """
+        if user and isinstance(user, (dict)):
+            user = User(**user)
         if self.channel:
             return await self.channel.perform(user, proc, *args, **kwargs)
         proc = getattr(self.settings["procedures"], proc)
         return await handlers.context.perform(user, proc, *args, **kwargs)
 
     def load_users(self):
-        return Authenticator()
+        return SqlAuthenticator()

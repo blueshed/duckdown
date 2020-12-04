@@ -5,12 +5,24 @@
 """
 import os
 import logging
-from json import dumps, loads
 from tornado.web import RequestHandler, HTTPError
 from ..utils.assets_mixin import AssetsMixin
+from ..utils.json_utils import dumps, loads
 from ..utils import encrypt
 
 LOGGER = logging.getLogger(__name__)
+
+
+class DictAuthenticator:
+    """ hold a dictionary and return value, key on get """
+
+    def __init__(self, users):
+        self.users = users
+
+    def get(self, key):
+        """ simple """
+        result = self.users.get(key)
+        return result, key if result else None
 
 
 class UserMixin:
@@ -61,16 +73,16 @@ class LoginHandler(
 
     def login(self, username, password):
         """ return a user """
-        user = None
-        pwd = self.users.get(username)
+        result = None
+        pwd, user = self.users.get(username)
         if pwd and os.getenv("DKDN_KEY"):
             LOGGER.info("pwd>: %r", pwd)
             pwd = encrypt.decrypt(pwd)
             LOGGER.info("pwd<: %r", pwd)
         if pwd == password:
-            user = username
-            LOGGER.info("logged in: %s", user)
-        return user
+            result = user
+            LOGGER.info("logged in: %s", username)
+        return result
 
     def get(self, error=None, notice=None):
         """ render the form """

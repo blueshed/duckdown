@@ -8,6 +8,7 @@ import tornado.log
 from .utils import json_utils
 from .utils import app_utils
 from .utils.folder import Folder
+from .handlers.access_control import DictAuthenticator
 from . import handlers
 
 LOGGER = logging.getLogger(__name__)
@@ -38,4 +39,6 @@ class App(Folder, tornado.web.Application):
 
     def load_users(self):
         """ load users from local users.json """
-        return json_utils.loads(self.get_file("users.json")[-1])
+        return DictAuthenticator(
+            json_utils.loads(self.get_file("users.json")[-1])
+        )

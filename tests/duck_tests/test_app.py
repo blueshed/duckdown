@@ -11,7 +11,7 @@ logging.getLogger().setLevel(logging.INFO)
 load_dotenv(verbose=True)
 
 SAMPLE = b"""Hello World! I'm a sample file."""
-SAMPLE_KEY = "test/test.txt"
+SAMPLE_KEY = "test/duck_tests/test.txt"
 SAMPLE_FOLDER, SAMPLE_FILE = SAMPLE_KEY.split("/")
 COOKIE_NAME = "tets_duck"
 
