@@ -5,6 +5,7 @@ import tornado.ioloop
 from .utils import app_utils
 from .utils.s3_folders import S3Folder
 from .utils.s3tmpl_loader import S3Loader
+from .utils import json_utils
 from . import handlers
 
 LOGGER = logging.getLogger(__name__)
@@ -44,6 +45,10 @@ class S3App(S3Folder, tornado.web.Application):
             static_path="static",
             **settings,
         )
+
+    def load_users(self):
+        """ load users from s3 users.json """
+        return json_utils.loads(self.get_file("users.json")[-1])
 
     def list_templates(self, prefix=""):
         """ return a directory list of templates """

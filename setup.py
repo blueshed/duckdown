@@ -37,7 +37,6 @@ setup(
     ],
     install_requires=[
         "invoke",
-        "convoke",
         "tornado",
         "markdown",
         "pymdown-extensions",

@@ -13,14 +13,12 @@
 </template>
 
 <script>
-import { mapState } from "vuex";
+import { mapGetters } from "vuex";
 
 export default {
-    computed: mapState({
-        files: (state) => state.files,
-        folders: (state) => state.folders,
-        folder_path: (state) => state.folder_path,
-    }),
+    computed: {
+        ...mapGetters(["files", "folders", "folder_path"]),
+    },
     methods: {
         breadcrumb_selected(event) {
             this.$store.dispatch("load_files_folders", event);

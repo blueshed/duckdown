@@ -8,7 +8,6 @@ from .provision import s3_tools
 
 LOGGER = logging.getLogger(__name__)
 SOURCES = [
-    ("", "config.ini"),
     ("", "users.json"),
     ("pages", "index.md"),
     ("static", "site.css"),

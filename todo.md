@@ -6,7 +6,7 @@
 - [x] refactor for s3 same as dir
 - [ ] refactor tornado paths
 - [ ] remove cgi-bin
-- [ ] remove convoke
+- [x] remove convoke
 - Client
     - [x] logo on login page
     - [x] css variables

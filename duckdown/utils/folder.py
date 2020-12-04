@@ -64,7 +64,7 @@ class Folder:
         files = []
         folders = []
 
-        starts = len(prefix)+1
+        starts = len(prefix) + 1
         with os.scandir(path) as item:
             for entry in item:
                 is_file = entry.is_file()
@@ -83,4 +83,3 @@ class Folder:
                     else:
                         folders.append(item)
         return {"files": files, "folders": folders}
-

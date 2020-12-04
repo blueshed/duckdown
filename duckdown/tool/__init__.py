@@ -10,7 +10,6 @@ from .create import create, s3_create
 from .run import run
 from .publish import publish
 from .secure import secure, unsecure
-from .run_s3 import s3_run
 
 sys.path.insert(0, os.getcwd())
 
@@ -24,7 +23,6 @@ _NAMESPACE_.add_task(publish)
 _NAMESPACE_.add_task(secure)
 _NAMESPACE_.add_task(unsecure)
 _NAMESPACE_.add_task(s3_create)
-_NAMESPACE_.add_task(s3_run)
 
 tornado.log.enable_pretty_logging()
 

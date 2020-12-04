@@ -3,7 +3,6 @@ import logging
 import tornado.web
 from pkg_resources import resource_filename
 from .. import handlers
-from . import json_utils
 from . import vue_utils
 
 LOGGER = logging.getLogger(__name__)
@@ -20,11 +19,12 @@ def setup_routes(app, routes, settings, s3_pages_key=None):
     )
     settings.setdefault("login_url", "/login")
 
-    users = json_utils.loads(app.get_file("users.json")[-1])
+    users = app.load_users()
     LOGGER.info(users)
 
     debug = settings.get("debug", False)
     bucket_name = settings.get("image_bucket", None)
+    vue_page = settings.get("vue_page", "vue.html")
     manifest = vue_utils.load_manifest(debug)
     routes.extend(
         [
@@ -44,12 +44,12 @@ def setup_routes(app, routes, settings, s3_pages_key=None):
             (
                 r"/edit/pages/(.*)",
                 handlers.DirHandler,
-                {"directory": "pages/", "s3_key": s3_pages_key}
+                {"directory": "pages/", "s3_key": s3_pages_key},
             ),
             (
                 r"/edit",
                 handlers.EditorHandler,
-                {"page": "vue.html", "manifest": manifest},
+                {"page": vue_page, "manifest": manifest},
             ),
         ]
     )

@@ -7,6 +7,7 @@
 <script>
 import axios from "axios";
 import debounce from "./utils/debounce.js";
+import { mapGetters } from "vuex";
 
 function sample_html(style) {
     return (
@@ -27,9 +28,7 @@ function sample_html(style) {
 
 export default {
     computed: {
-        editor_content() {
-            return this.$store.getters.editor_content;
-        },
+        ...mapGetters(["editor_content"]),
     },
     methods: {
         update_css: debounce(function (value) {

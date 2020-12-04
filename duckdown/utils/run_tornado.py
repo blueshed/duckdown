@@ -1,4 +1,5 @@
 """ application entry point """
+import os
 import logging
 import tornado.ioloop
 import tornado.log
@@ -11,8 +12,9 @@ def run(app):
     if app.settings["debug"] is True:
         LOGGER.info("running in debug mode")
 
-    app.listen(app.settings["port"])
-    LOGGER.info("listening on port: %s", app.settings["port"])
+    port = os.getenv("PORT", app.settings.get("port", "8080"))
+    app.listen(port)
+    LOGGER.info("listening on port: %s", port)
 
     ioloop = tornado.ioloop.IOLoop.current()
     try:

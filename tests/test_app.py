@@ -99,7 +99,6 @@ async def test_login(http_client, base_url):
             headers={"Cookie": cookie},
         )
         assert response.code == 200
-        assert False
 
 
 @pytest.mark.gen_test

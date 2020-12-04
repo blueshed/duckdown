@@ -21,7 +21,25 @@
                     :sidebar="sidebar"
                     @toggle-sidebar="sidebar = !sidebar"
                     @view-page="view"
-                />
+                >
+                    <slot name="tool">
+                        <a
+                            id="logout"
+                            href="/logout"
+                            title="sign out of duckdown"
+                        >
+                            <button>
+                                <icon
+                                    name="log-out"
+                                    width="14px"
+                                    height="14px"
+                                    v-if="$root.with_icons"
+                                />
+                                Sign Out
+                            </button>
+                        </a>
+                    </slot>
+                </AppMenu>
                 <Preview v-if="mime == 'text/markdown'" />
                 <CssPreview v-else />
             </div>
@@ -30,6 +48,7 @@
 </template>
 
 <script>
+import { mapGetters } from "vuex";
 import DirBrowser from "./components/DirBrowser.vue";
 import S3Browser from "./components/S3Browser.vue";
 import Editor from "./components/Editor.vue";
@@ -61,13 +80,10 @@ export default {
         return {
             folder: "",
             sidebar: false,
-            with_icons: true,
         };
     },
     computed: {
-        file_path() {
-            return this.$store.getters.file_path;
-        },
+        ...mapGetters(["file_path", "folder_path", "with_icons"]),
         mime() {
             return this.file_path && this.file_path.endsWith(".css")
                 ? "text/css"
@@ -93,13 +109,11 @@ export default {
         },
         editor_updated(event) {
             this.show_snack(event);
-            let path = this.$store.state.folder_path;
-            this.$store.dispatch("load_files_folders", path);
+            this.$store.dispatch("load_files_folders", this.folder_path);
         },
         editor_deleted(event) {
             this.show_snack(event, "warn");
-            let path = this.$store.state.folder_path;
-            this.$store.dispatch("load_files_folders", path);
+            this.$store.dispatch("load_files_folders", this.folder_path);
         },
     },
     mounted() {
@@ -135,10 +149,10 @@ export default {
     flex-shrink: 1;
     flex-basis: 0;
     width: 0;
-    padding: 0 6px;
+    padding: 0;
 }
 .editing {
-    padding: 0 4px;
+    padding: 0;
     height: 100%;
     flex-grow: 2;
     flex-shrink: 2;
@@ -151,14 +165,13 @@ export default {
     flex-shrink: 2;
     flex-basis: 0;
     width: 0;
-    padding: 0 6px;
-}
-.menu > button,
-.menu > a {
-    float: right;
+    padding: 0;
 }
 #box {
     float: left;
     top: 4px;
+}
+#logout {
+    float: right;
 }
 </style>

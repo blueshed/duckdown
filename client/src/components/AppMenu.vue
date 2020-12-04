@@ -1,54 +1,46 @@
 <template>
-    <div class="AppMenu menu">
-        <a
-            href="https://www.markdownguide.org/cheat-sheet/"
-            target="duckdown-help"
-            title="cheat-sheet"
-        >
-            <button>
+    <div class="AppMenu">
+        <div class="menu">
+            <a
+                href="https://www.markdownguide.org/cheat-sheet/"
+                target="duckdown-help"
+                title="cheat-sheet"
+            >
+                <button>
+                    <icon
+                        name="help-circle"
+                        width="14px"
+                        height="14px"
+                        v-if="$root.with_icons"
+                    />
+                    Help
+                </button>
+            </a>
+            <slot></slot>
+            <button
+                @click.prevent.stop="$emit('toggle-sidebar')"
+                :class="{ active: sidebar }"
+                title="show images selector"
+            >
                 <icon
-                    name="help-circle"
+                    name="image"
                     width="14px"
                     height="14px"
                     v-if="$root.with_icons"
                 />
-                Help
+                Images
             </button>
-        </a>
-        <a href="/logout" title="sign out of duckdown">
-            <button>
+            <button @click.prevent.stop="$emit('view-page')" title="view page">
                 <icon
-                    name="log-out"
+                    name="external-link"
                     width="14px"
                     height="14px"
                     v-if="$root.with_icons"
                 />
-                Sign Out
+                View
             </button>
-        </a>
-        <button
-            @click.prevent.stop="$emit('toggle-sidebar')"
-            :class="{ active: sidebar }"
-            title="show images selector"
-        >
-            <icon
-                name="image"
-                width="14px"
-                height="14px"
-                v-if="$root.with_icons"
-            />
-            Images
-        </button>
-        <button @click.prevent.stop="$emit('view-page')" title="view page">
-            <icon
-                name="external-link"
-                width="14px"
-                height="14px"
-                v-if="$root.with_icons"
-            />
-            View
-        </button>
-        <!-- icon id="box" name="box" width="14px" height="14px"  @click="with_icons=!with_icons"/-->
+            <!-- icon id="box" name="box" width="14px" height="14px"  @click="with_icons=!with_icons"/-->
+        </div>
     </div>
 </template>
 
@@ -61,6 +53,9 @@ export default {
 <style lang="css" scoped>
 .AppMenu {
     width: 100%;
+}
+.menu {
+    margin-right: 0.5em;
 }
 .menu > button,
 .menu > a {

@@ -54,7 +54,7 @@
 </template>
 
 <script>
-import axios from "axios";
+import { mapGetters } from "vuex";
 import codeJar from "./utils/code_jar.vue";
 import debounce from "./utils/debounce.js";
 
@@ -67,13 +67,11 @@ export default {
             show_modal: null,
         };
     },
-    created() {
-        this.path = this.file_path;
-    },
     components: {
         codeJar,
     },
     computed: {
+        ...mapGetters(["file_path", "file_content", "editor_content"]),
         can_save() {
             return (
                 this.path && this.path.length != 0 && !this.path.endsWith("/")
@@ -88,15 +86,6 @@ export default {
             }
             return "text/x-markdown";
         },
-        file_path() {
-            return this.$store.getters.file_path;
-        },
-        file_content() {
-            return this.$store.getters.file_content;
-        },
-        editor_content() {
-            return this.$store.getters.editor_content;
-        },
     },
     methods: {
         update_codejar() {
@@ -108,14 +97,13 @@ export default {
             this.$store.commit("set_editor_content", value);
         },
         save() {
-            this.$store
-                .dispatch("save_file", {
-                    path: this.path,
-                    content: this.editor_content,
-                })
-                .then((path) => {
-                    this.$emit("updated", `Saved '${this.path}'.`);
-                });
+            let value = {
+                path: this.path,
+                content: this.editor_content,
+            };
+            this.$store.dispatch("save_file", value).then(() => {
+                this.$emit("updated", `Saved '${value.path}'.`);
+            });
         },
         remove() {
             this.show_modal = {
@@ -170,7 +158,6 @@ export default {
 }
 .input input {
     width: 100%;
-    padding: 2px 2px 3px 2px;
 }
 .dirty {
     background-color: mediumseagreen;

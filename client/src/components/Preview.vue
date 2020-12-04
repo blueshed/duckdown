@@ -5,6 +5,7 @@
 </template>
 
 <script>
+import { mapGetters } from "vuex";
 import axios from "axios";
 import debounce from "./utils/debounce.js";
 
@@ -17,9 +18,7 @@ export default {
         };
     },
     computed: {
-        editor_content() {
-            return this.$store.getters.editor_content;
-        },
+        ...mapGetters(["editor_content"]),
     },
     methods: {
         async compiledMarkdown() {

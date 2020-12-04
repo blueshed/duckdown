@@ -1,4 +1,3 @@
-import { createStore } from 'vuex'
 import axios from 'axios'
 
 const PATH_SEP = "/"
@@ -15,7 +14,7 @@ function clean_file_folder(path, root) {
 }
 
 // Create a new store instance.
-const store = createStore({
+export default {
     state() {
         return {
             error: null,
@@ -31,7 +30,8 @@ const store = createStore({
             image_url: null,
             img_path: "/static/images/",
             loading_images: false,
-            loading_files: false
+            loading_files: false,
+            with_icons: true
         }
     },
     mutations: {
@@ -78,6 +78,9 @@ const store = createStore({
         reset_content(state) {
             state.file_path = "";
             state.file_content = "# hello";
+        },
+        with_icons(state, value) {
+            state.with_icons = value;
         }
     },
     getters: {
@@ -122,6 +125,9 @@ const store = createStore({
         },
         loading_folders(state) {
             return state.loading_folders
+        },
+        with_icons(state) {
+            return state.with_icons
         }
     },
     actions: {
@@ -230,6 +236,4 @@ const store = createStore({
             });
         }
     }
-})
-
-export default store
+}

@@ -1,5 +1,4 @@
 invoke
-git+https://github.com/eykd/convoke.git
 tornado
 markdown
 pymdown-extensions
@@ -9,3 +8,4 @@ boto3
 tld
 cryptography
 qrcode
+liteblue

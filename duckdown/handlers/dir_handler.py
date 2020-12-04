@@ -3,7 +3,6 @@
 import os
 import logging
 import mimetypes
-from ..utils.folder import Folder
 from .base_handler import BaseHandler
 from .access_control import UserMixin
 

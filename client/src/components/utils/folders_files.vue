@@ -54,7 +54,7 @@ li {
     white-space: nowrap;
 }
 li:hover {
-    background-color: aliceblue;
+    background-color: var(--menu-hover);
 }
 li .icn {
     position: relative;

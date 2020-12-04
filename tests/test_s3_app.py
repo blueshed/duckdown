@@ -1,11 +1,13 @@
 """ test s3 functionality """
 import logging
 import pytest
+from dotenv import load_dotenv
 from duckdown.s3_app import S3App
 from duckdown.utils import json_utils
 from .utils import using_cookie
 
 logging.getLogger().setLevel(logging.INFO)
+load_dotenv(verbose=True)
 
 SAMPLE = b"""Hello World! I'm a sample file."""
 SAMPLE_KEY = "test/test.txt"

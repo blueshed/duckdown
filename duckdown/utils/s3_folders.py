@@ -61,7 +61,6 @@ class S3Folder:
         }
         return result
 
-
     def list_folder(self, prefix="", delimiter="/"):
         """ list the contents of bucket folder """
         return self.scan_path(self.s3client, self.s3bucket, prefix, delimiter)

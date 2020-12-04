@@ -47,8 +47,8 @@
         </div>
         <div class="files">
             <folders-files
-                :folders="folders"
-                :files="files"
+                :folders="image_folders"
+                :files="image_files"
                 @selected="folders_files_selected($event)"
             />
         </div>
@@ -62,6 +62,8 @@
 </template>
 
 <script>
+import { mapGetters } from "vuex";
+
 function clean_path(folder) {
     if (folder == null || folder == undefined) {
         folder = "";
@@ -83,24 +85,16 @@ export default {
         };
     },
     computed: {
+        ...mapGetters([
+            "image_path",
+            "image_files",
+            "image_folders",
+            "image_url",
+            "img_path",
+        ]),
         folder() {
             let folder = clean_path(this.local_path);
             return folder;
-        },
-        image_path() {
-            return this.$store.getters.image_path;
-        },
-        files() {
-            return this.$store.getters.image_files;
-        },
-        folders() {
-            return this.$store.getters.image_folders;
-        },
-        image_url() {
-            return this.$store.getters.image_url;
-        },
-        img_path() {
-            return this.$store.getters.img_path;
         },
         loading() {
             return this.$store.getters.loading_images;
@@ -193,6 +187,7 @@ export default {
     float: right;
 }
 .files {
+    margin: 4px 0;
     max-height: 50%;
     background-color: rgb(100%, 100%, 100%, 0.88);
 }

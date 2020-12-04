@@ -92,7 +92,7 @@ class S3Browser(UserMixin, BaseHandler):
             "get_object", Params={"Bucket": self.s3bucket, "Key": key}
         )
 
-    def scan_dir(self, prefix="", delimiter="/"):
+    def scan_dir(self, prefix="", delimiter="/"):  # pylint: disable=W0613
         """ list the content of the bucket """
         if self.local_images:
             file, folder = self.make_app_path(prefix)
@@ -101,7 +101,6 @@ class S3Browser(UserMixin, BaseHandler):
         # list bucket objects
         prefix = self.folder + prefix if self.folder else prefix
         return S3Folder.scan_path(self.s3client, self.s3bucket, prefix)
-
 
     @tornado.web.authenticated
     def get(self, prefix=None):
