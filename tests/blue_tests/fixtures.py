@@ -3,6 +3,7 @@ import os
 import logging
 import pytest
 import sqlalchemy as sa
+from sqlalchemy.exc import IntegrityError
 from alembic import command
 from alembic.config import Config
 from liteblue.connection import ConnectionMgr
@@ -34,8 +35,11 @@ def sqlite_db():
         json_serializer=json_serializer,
     )
     with ConnectionMgr.session() as session:
-        session.execute(
-            "INSERT INTO user (email, password) VALUES ('admin', 'gAAAAABfyLo5TeGnv0ZWjbpjeDXmQELq9-mChiWi0bTeVbT84Y5bJYjKy2uHrP4Hanu3pDOXq-zZ7nk2xF8T3PCkt5dTiGdI1Q==')"
-        )
-        session.commit()
+        try:
+            session.execute(
+                "INSERT INTO user (email, password) VALUES ('admin', 'gAAAAABfyLo5TeGnv0ZWjbpjeDXmQELq9-mChiWi0bTeVbT84Y5bJYjKy2uHrP4Hanu3pDOXq-zZ7nk2xF8T3PCkt5dTiGdI1Q==')"
+            )
+            session.commit()
+        except IntegrityError:
+            pass
     return "default"

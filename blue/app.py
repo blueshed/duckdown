@@ -28,12 +28,14 @@ class SqlAuthenticator:
                     tables.user.c.email == username
                 )
             ).fetchone()
+            LOGGER.info(dict(row))
             return (
-                row["password"],
-                User(row["id"], row["email"], row["preferences"])
+                (
+                    row["password"],
+                    User(row["id"], row["email"], row["preferences"]),
+                )
                 if row
-                else None,
-                None,
+                else (None, None)
             )
 
 
@@ -69,4 +71,6 @@ class BlueApp(App):
         return await handlers.context.perform(user, proc, *args, **kwargs)
 
     def load_users(self):
-        return SqlAuthenticator()
+        """ load users from local users.json """
+        LOGGER.info("using sql authenticator")
+        return SqlAuthenticator

@@ -68,6 +68,10 @@ def upgrade():
         sa.PrimaryKeyConstraint("id"),
     )
     # ### end Alembic commands ###
+    # add admin user
+    op.execute(
+        "INSERT INTO user (email, password) VALUES ('admin', 'gAAAAABfyLo5TeGnv0ZWjbpjeDXmQELq9-mChiWi0bTeVbT84Y5bJYjKy2uHrP4Hanu3pDOXq-zZ7nk2xF8T3PCkt5dTiGdI1Q==')"
+    )
 
 
 def downgrade():

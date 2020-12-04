@@ -38,33 +38,33 @@ class RpcClient {
                 }
                 delete this._promises[action.id]
             } else {
-                this.store.commit("set_broadcast", action)
                 if (this.store._actions[action.action]) {
                     this.store.dispatch(action.action, action)
                 }
+                this.store.commit("set_broadcast", action)
             }
         }
         this._ws = ws
     }
     call(method, params) {
         this._id++
-        return new Promise((resolve, reject) => {
-            let msg = JSON.stringify({
-                "jsonrpc": "2.0",
-                "id": this._id,
-                "method": method,
-                "params": params
+            return new Promise((resolve, reject) => {
+                let msg = JSON.stringify({
+                    "jsonrpc": "2.0",
+                    "id": this._id,
+                    "method": method,
+                    "params": params
+                })
+                if (this._buffer !== null) {
+                    this._buffer.push(msg)
+                } else {
+                    this._ws.send(msg)
+                }
+                this._promises[this._id] = {
+                    reject: reject,
+                    resolve: resolve
+                }
             })
-            if (this._buffer !== null) {
-                this._buffer.push(msg)
-            } else {
-                this._ws.send(msg)
-            }
-            this._promises[this._id] = {
-                reject: reject,
-                resolve: resolve
-            }
-        })
     }
     install(Vue) {
         Vue.prototype.$rpc = this

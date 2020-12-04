@@ -17,6 +17,7 @@ class Config(config.Config):
     tornado_cookie_secret = f"it was dark and stormy night for {name}"
 
     db_url = os.getenv("DB_URL", "sqlite:///blue.db")
+    db_url = os.getenv("DB_URL", "sqlite:///tests/blue_tests/test.db")
     alembic_script_location = resource_filename("blue", "scripts")
 
     redis_topic = f"{name}-broadcast"  # topic for all broadcasts

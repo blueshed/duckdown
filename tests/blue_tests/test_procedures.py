@@ -75,7 +75,7 @@ def test_add_site(sqlite_db):
         procedures.grant_permission(site_name, other.email)
         assert len(broadcast.BROADCAST_ON_SUCCESS.get()) == 3
         message, _ = broadcast.BROADCAST_ON_SUCCESS.get()[-1]
-        assert message["signal"] == "removed-permission"
+        assert message["action"] == "removed_permission"
 
     with ConnectionMgr.session() as session:
         rows = session.execute(tables.permission.select().count()).scalar()
@@ -85,7 +85,7 @@ def test_add_site(sqlite_db):
         assert len(broadcast.BROADCAST_ON_SUCCESS.get()) == 0
         sites = procedures.list_sites()
         site_id = sites[-1]["id"]
-        accl = procedures.site_accl(site_id)
+        accl = procedures.get_site(site_id)
         assert len(broadcast.BROADCAST_ON_SUCCESS.get()) == 0
 
         assert len(accl) == 1
