@@ -4,39 +4,14 @@ import logging
 from importlib import import_module
 from concurrent.futures import ThreadPoolExecutor
 from tornado import ioloop
-from sqlalchemy import sql
-from liteblue.connection import ConnectionMgr
 from liteblue import handlers
 from liteblue.worker import Channel
 from duckdown.app import App
-from . import tables
+from .auth import SqlAuthenticator
 from .utils import User
 
 
 LOGGER = logging.getLogger(__name__)
-
-
-class SqlAuthenticator:
-    """ trick duck to quack blue """
-
-    @classmethod
-    def get(cls, username):
-        """ get a user from the db """
-        with ConnectionMgr.session() as session:
-            row = session.execute(
-                sql.select([tables.user]).where(
-                    tables.user.c.email == username
-                )
-            ).fetchone()
-            LOGGER.info(dict(row))
-            return (
-                (
-                    row["password"],
-                    User(row["id"], row["email"], row["preferences"]),
-                )
-                if row
-                else (None, None)
-            )
 
 
 class BlueApp(App):

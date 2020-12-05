@@ -21,6 +21,6 @@ store.dispatch("load_img_path").then(() => {
     app.mount('#app')
     store.dispatch("load_files_folders", "").then(() => {
         store.dispatch("load_image_files_folders", "")
-        store.dispatch("list_sites")
+            // store.dispatch("list_sites")
     })
 })

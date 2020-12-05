@@ -35,6 +35,7 @@ user = Table(
     Column("email", String(128), nullable=False, unique=True, doc="required"),
     Column("password", String(64), doc="and no longer"),
     Column("preferences", JSON),
+    Column("cognito", JSON),
 )
 
 

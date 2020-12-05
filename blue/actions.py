@@ -7,9 +7,7 @@ from .broadcast import broadcast_on_success
 
 def added_site(site, accl=None):
     """ dispatch added_site """
-    broadcast_on_success(
-        {"action": "added_site", "message": site}, accl
-    )
+    broadcast_on_success({"action": "added_site", "message": site}, accl)
     return site
 
 
@@ -23,7 +21,7 @@ def saved_preferences(preferences, accl=None):
 
 def added_permission(site_id, email, permission, accl=None):
     """ dispatch saved_preferences """
-    message = {"site_id":site_id, "email": email, "permission":permission}
+    message = {"site_id": site_id, "email": email, "permission": permission}
     broadcast_on_success(
         {"action": "added_permission", "message": message}, accl
     )
@@ -32,9 +30,8 @@ def added_permission(site_id, email, permission, accl=None):
 
 def removed_permission(site_id, email, accl=None):
     """ dispatch saved_preferences """
-    message = {"site_id":site_id, "email": email}
+    message = {"site_id": site_id, "email": email}
     broadcast_on_success(
         {"action": "removed_permission", "message": message}, accl
     )
     return message
-

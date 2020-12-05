@@ -14,7 +14,14 @@ from . import actions
 
 LOGGER = logging.getLogger(__name__)
 
-__all__ = ["profile", "list_sites", "get_site", "add_site", "save_preferences", "grant_permission"]
+__all__ = [
+    "profile",
+    "list_sites",
+    "get_site",
+    "add_site",
+    "save_preferences",
+    "grant_permission",
+]
 
 
 class UserException(Exception):
@@ -44,7 +51,16 @@ def list_users() -> list:
 
 def profile():
     """ returns the current user """
-    return context.current_user()
+    profile = context.current_user()
+
+    with ConnectionMgr.session() as session:
+        row = session.execute(
+            sql.select([tables.user.c.preferences]).where(
+                tables.user.c.id == profile.id
+            )
+        ).scalar()
+        profile.prefernces = row
+    return profile
 
 
 def list_sites():
@@ -202,7 +218,7 @@ def grant_permission(site, email, permission=None):
                     )
                 )
             )
-            actions.removed_permission(site_id, email,[user_id, other_id])
+            actions.removed_permission(site_id, email, [user_id, other_id])
         else:
             try:
                 role = getattr(tables.PERMISSIONS_VALUES, permission)
@@ -233,5 +249,7 @@ def grant_permission(site, email, permission=None):
                     tables.permission.insert().values(
                         user_id=other_id, site_id=site_id, permission=role
                     )
-                ).rowcount
-            actions.added_permission(site_id, email, permission, [user_id, other_id])
+                )
+            actions.added_permission(
+                site_id, email, permission, [user_id, other_id]
+            )

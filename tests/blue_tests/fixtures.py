@@ -12,7 +12,7 @@ from liteblue.handlers import json_utils
 
 def json_serializer(obj):
     result = json_utils.dumps(obj)
-    logging.info(result)
+    logging.debug(result)
     return result
 
 

@@ -19,8 +19,11 @@ def setup_routes(app, routes, settings, s3_pages_key=None):
     )
     settings.setdefault("login_url", "/login")
 
-    users = app.load_users()
-    LOGGER.info(users)
+    login_handler = settings.get("login_handler")
+    if login_handler is None:
+        login_handler = (handlers.LoginHandler, {"users": users})
+        users = app.load_users()
+        LOGGER.info(users)
 
     debug = settings.get("debug", False)
     bucket_name = settings.get("image_bucket", None)
@@ -28,7 +31,7 @@ def setup_routes(app, routes, settings, s3_pages_key=None):
     manifest = vue_utils.load_manifest(debug)
     routes.extend(
         [
-            (r"/login", handlers.LoginHandler, {"users": users}),
+            (r"/login", *login_handler),
             (r"/logout", handlers.LogoutHandler),
             (
                 r"/browse/(.*)",
