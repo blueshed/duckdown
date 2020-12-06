@@ -1,25 +1,25 @@
 # pylint: disable=R0914
 """ make public folder of site """
 import os
+import logging
 import shutil
 from tornado import httpclient
 from invoke import task
-from .run import load_settings
+
+LOGGER = logging.getLogger(__name__)
 
 
 @task
-def publish(_, src, dst="public"):
+def publish(_, src, dst="public", port="8080"):
     """ generate public site """
-    settings = load_settings(src)
-
-    port = settings.as_int("port", default="8080")
+    port = int(port)
     http_client = httpclient.HTTPClient()
 
     public_path = dst
     if os.path.isdir(public_path):
         shutil.rmtree(public_path)
 
-    pages = os.path.join(src, settings.get("pages_path", "pages"))
+    pages = os.path.join(src, "pages")
     for dirpath, _, filenames in os.walk(pages):
         for filename in filenames:
             if filename[0] not in ["-"]:
@@ -27,13 +27,13 @@ def publish(_, src, dst="public"):
                 if ext == ".md":
                     web_page = os.path.relpath(page, pages)
                     web_page = f"{os.path.splitext(web_page)[0]}.html"
-                    # print("page: ", f"{page}{ext}")
-                    # print("\tweb: ",web_page)
+                    LOGGER.debug("page: %s%s", page, ext)
+                    LOGGER.debug("\tweb: %s", web_page)
 
                     public_page = os.path.join(public_path, web_page)
-                    # print("\tpub: ", public_page)
+                    LOGGER.debug("\tpub: %s", public_page)
                     url = f"http://localhost:{port}/{web_page}"
-                    # print(url)
+                    LOGGER.debug(url)
                     response = http_client.fetch(url)
                     folder = os.path.split(public_page)[0]
                     if folder and not os.path.exists(folder):
@@ -41,7 +41,7 @@ def publish(_, src, dst="public"):
                     with open(public_page, "wb") as file:
                         file.write(response.body)
 
-    static = os.path.join(src, settings.get("static_path", "static"))
+    static = os.path.join(src, "static")
     public_static = os.path.join(public_path, "static")
     for dirpath, _, filenames in os.walk(static):
         if dirpath.endswith("/images"):
@@ -51,7 +51,8 @@ def publish(_, src, dst="public"):
             fdst = os.path.join(
                 os.path.relpath(os.path.split(fsrc)[0], static), public_static
             )
-            # print(fsrc, fdst)
+            LOGGER.debug("%s %s", fsrc, fdst)
             if fdst != ".":
                 os.makedirs(fdst, exist_ok=True)
             shutil.copy(fsrc, fdst)
+    LOGGER.info("done!")

@@ -1,21 +1,34 @@
+# pylint: disable=R0913
 """ run duckdown app """
-from pathlib import Path
-import convoke
+import logging
 from invoke import task
-from duckdown.main import main
+from duckdown.app import App
+from duckdown.utils import run_tornado
 
-
-def load_settings(path):
-    """ load convoke settings from config.ini """
-    settings = {"app_path": path}
-    config = Path(f"{path}/config.ini")
-    if config.exists():
-        settings["config"] = config
-    return convoke.get_settings("duckdown", **settings)
+LOGGER = logging.getLogger(__name__)
 
 
 @task
-def run(_, path):
+def run(
+    _,
+    app_path="",
+    bucket="",
+    debug=False,
+    port=8080,
+):
     """ run app """
-    load_settings(path)
-    main()
+    settings = {
+        "app_path": app_path,
+        "bucket": bucket,
+        "debug": debug,
+        "port": port,
+    }
+    args = dict(app_path=app_path, bucket=bucket, debug=debug, port=port)
+    LOGGER.info("run: %s", args)
+    if not app_path and not bucket:
+        print("either a path or bucket are required!")
+    else:
+        app = App(**args)
+
+    app = App([], **settings)
+    run_tornado.run(app)

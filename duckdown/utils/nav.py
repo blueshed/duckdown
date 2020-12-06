@@ -28,7 +28,7 @@ def parse_header(content, tag=None, alt_tag=None):
     return result
 
 
-def nav(root: str, path: str) -> str:  # pylint: disable=W0613
+def nav(site, root, path):  # pylint: disable=W0613, R0914
     """
     walk from root and discover index.md
     grab the title and generate <ul class="nav>

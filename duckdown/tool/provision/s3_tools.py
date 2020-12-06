@@ -1,11 +1,12 @@
 """ tools for us with s3 """
+import io
 import logging
 import mimetypes
 import boto3
 from botocore.exceptions import ClientError
 from pkg_resources import resource_filename
 from tornado.template import Loader
-from duckdown.handlers.utils.json_utils import loads
+from duckdown.utils.json_utils import loads
 from .store import store
 from .utils import get_resource, get_aws_region_account, get_bucket_arn
 
@@ -119,18 +120,24 @@ def create_bucket(bucket_name, public=False, region=None):
     return get_bucket(bucket_name)
 
 
+def empty_bucket(bucket_name, client=None):
+    """ remove the conents of a bucket """
+    # create s3 client
+    client = client if client else boto3.client("s3")
+
+    # get contents
+    for key in _bucket_keys_(client, bucket_name):
+        # remove contents
+        _remove_keys_(client, bucket_name, [key])
+
+
 def delete_bucket(bucket_name):
     """ delete a bucket """
     # create s3 client
     client = boto3.client("s3")
 
-    # get contents
-    response = client.list_objects(Bucket=bucket_name)
-    LOGGER.debug(response)
-
-    # remove contents
-    for doc in response.get("Contents", []):
-        client.delete_object(Bucket=bucket_name, Key=doc["Key"])
+    # required to be empty
+    empty_bucket(bucket_name, client)
 
     # delete bucket
     response = client.delete_bucket(Bucket=bucket_name)
@@ -143,7 +150,11 @@ def upload(bucket_name, key, file_path):
     """ upload object to bucket """
     # create s3 client
     client = boto3.client("s3")
-    mime, _ = mimetypes.guess_type(file_path)
+
+    # guess ContentType
+    mime, _ = mimetypes.guess_type(file_path, strict=False)
+    mime = "text/plain" if mime is None else mime
+
     with open(file_path, "rb") as file:
         response = client.put_object(
             Body=file, Bucket=bucket_name, Key=key, ContentType=mime
@@ -153,13 +164,41 @@ def upload(bucket_name, key, file_path):
     return response
 
 
-def bucket_keys(bucket_name, prefix=""):
-    """ list bucket keys """
+def download(bucket_name, key):
+    """ return the content of key in bucket """
     # create s3 client
     client = boto3.client("s3")
-    response = client.list_objects_v2(Bucket=bucket_name, Prefix=prefix)
+
+    content_type, content = None, None
+    try:
+        LOGGER.debug("getting: %s %s", bucket_name, key)
+        data = io.BytesIO()
+        client.download_fileobj(Bucket=bucket_name, Key=key, Fileobj=data)
+        content_type, _ = mimetypes.guess_type(key)
+        content = data.getvalue()
+    except ClientError as err:
+        if err.response["ResponseMetadata"]["HTTPStatusCode"] != 404:
+            LOGGER.info(err)
+            raise
+    return content_type, content
+
+
+def _bucket_keys_(client, bucket_name, prefix="", delimiter=""):
+    """ list bucket keys """
+    response = client.list_objects_v2(
+        Bucket=bucket_name, Prefix=prefix, Delimiter=delimiter
+    )
+    LOGGER.debug(response)
     for obj in response.get("Contents", []):
         yield obj.get("Key")
+
+
+def _remove_keys_(client, bucket_name, keys):
+    """ remove bucket keys """
+    for key in keys:
+        response = client.delete_object(Bucket=bucket_name, Key=key)
+        LOGGER.debug(response)
+        return response["ResponseMetadata"]["HTTPStatusCode"], key
 
 
 def make_website(bucket_name, title=None):

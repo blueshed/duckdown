@@ -3,41 +3,49 @@
         <ul>
             <li @click="back(0)">
                 <svg class="logo">
-                    <use xlink:href="../../assets/logo.svg#duck" /></svg>
+                    <use xlink:href="../../assets/logo.svg#duck" />
+                </svg>
             </li>
-            <li v-for="(item, index) in path_items" :key="index" @click="back(index+1)">/{{ item }}</li>
+            <li
+                v-for="(item, index) in path_items"
+                :key="index"
+                @click="back(index + 1)"
+            >
+                /{{ item }}
+            </li>
         </ul>
     </div>
 </template>
 
 <script>
-const PATH_SEP = "/"
+const PATH_SEP = "/";
+const SELECTED_EVENT = "selected";
 
 export default {
-    props:["folder"],
+    props: ["folder"],
     computed: {
         path_items() {
             if (this.folder && this.folder.length > 0) {
-                let folder = this.folder
-                if(folder.endsWith(PATH_SEP)){
-                    folder = folder.substring(0, folder.length-1)
+                let folder = this.folder;
+                if (folder.endsWith(PATH_SEP)) {
+                    folder = folder.substring(0, folder.length - 1);
                 }
-                return folder.split(PATH_SEP)
+                return folder.split(PATH_SEP);
             }
-        }
+        },
     },
-    methods:{
+    methods: {
         back(index) {
             if (index == 0) {
-                this.$emit('changed', "")
+                this.$emit(SELECTED_EVENT, "");
             } else {
                 let items = this.path_items.slice(0, index);
-                let path = items.join('/')
-                this.$emit('changed', path)
+                let path = items.join(PATH_SEP);
+                this.$emit(SELECTED_EVENT, path);
             }
-        }
-    }
-}
+        },
+    },
+};
 </script>
 
 <style lang="css" scoped>
@@ -51,12 +59,12 @@ export default {
     stroke-width: 1;
     stroke-linecap: round;
     stroke-linejoin: round;
-    fill:var(--primary-color);
+    fill: var(--primary-color);
 }
 .logo:hover {
-    fill:var(--contrast-color);
+    fill: var(--contrast-color);
 }
-li{
+li {
     cursor: pointer;
     display: inline-block;
 }

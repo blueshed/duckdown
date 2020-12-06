@@ -1,8 +1,10 @@
 invoke
-convoke
 tornado
 markdown
 pymdown-extensions
 python-dotenv
+aiobotocore
 boto3
 tld
+cryptography
+qrcode

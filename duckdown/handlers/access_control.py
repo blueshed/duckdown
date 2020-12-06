@@ -3,12 +3,26 @@
     Simple mixin to provide utility methods
     to support User
 """
+import os
 import logging
-from json import dumps, loads
 from tornado.web import RequestHandler, HTTPError
-from .utils.assets_mixin import AssetsMixin
+from ..utils.assets_mixin import AssetsMixin
+from ..utils.json_utils import dumps, loads
+from ..utils import encrypt
 
 LOGGER = logging.getLogger(__name__)
+
+
+class DictAuthenticator:  # pylint: disable=R0903
+    """ hold a dictionary and return value, key on get """
+
+    def __init__(self, users):
+        self.users = users
+
+    def get(self, key):
+        """ simple """
+        result = self.users.get(key)
+        return (result, key) if result else (None, None)
 
 
 class UserMixin:
@@ -19,9 +33,21 @@ class UserMixin:
         """ return the cookie_name declared in application settings"""
         return self.settings.get("cookie_name")
 
+    @property
+    def debug(self):
+        """ app setting access """
+        return self.application.settings.get("debug") is True
+
+    def get_site(self, path):
+        """ get the current user site """
+        current_user = None
+        if hasattr(self, "_current_user"):
+            current_user = self._current_user
+        return self.application.get_site(current_user, path)
+
     def get_current_user(self):
         """ return the current user from the cookie """
-        if self.application.settings.get("debug") is True:
+        if self.debug:
             token = self.request.headers.get("duck-token", None)
             if token:
                 return token
@@ -59,12 +85,16 @@ class LoginHandler(
 
     def login(self, username, password):
         """ return a user """
-        user = None
-        pwd = self.users.get(username)
+        result = None
+        pwd, user = self.users.get(username)
+        if pwd and os.getenv("DKDN_KEY"):
+            LOGGER.info("pwd>: %r", pwd)
+            pwd = encrypt.decrypt(pwd)
+            LOGGER.info("pwd<: %r", pwd)
         if pwd == password:
-            user = username
-            LOGGER.info("logged in: %s", user)
-        return user
+            result = user
+            LOGGER.info("logged in: %s", username)
+        return result
 
     def get(self, error=None, notice=None):
         """ render the form """

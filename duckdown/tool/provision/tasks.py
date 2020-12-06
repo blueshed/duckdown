@@ -1,6 +1,6 @@
 """ provision tasks """
 from invoke import task
-from duckdown.handlers.utils import json_utils
+from duckdown.utils import json_utils
 from .credentials import using_credentials
 from . import s3_tools, iam_tools, route53_tools
 
@@ -52,6 +52,14 @@ def upload(_, creds, bucket_name, key, filepath):
     with using_credentials(creds):
         response = s3_tools.upload(bucket_name, key, filepath)
         print(json_utils.dumps(response, indent=4))
+
+
+@task
+def download(_, creds, bucket_name, key):
+    """ upload file to bucket """
+    with using_credentials(creds):
+        response = s3_tools.download(bucket_name, key)
+        print(response)
 
 
 @task

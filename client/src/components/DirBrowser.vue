@@ -1,67 +1,41 @@
 <template>
     <div class="dirBrowser">
-        <breadcrumbs :folder="folder" @changed="$emit('folder_change', $event)" />
-        <folders-files :folders="folders" :files="files" @selected="folders_files_selected" />
+        <breadcrumbs
+            :folder="folder_path"
+            @selected="breadcrumb_selected($event)"
+        />
+        <folders-files
+            :folders="folders"
+            :files="files"
+            @selected="folder_files_selected($event)"
+        />
     </div>
 </template>
 
 <script>
-import axios from 'axios'
-
-const PATH_SEP = "/"
-const ROOT_PATH = "/edit/pages/"
+import { mapGetters } from "vuex";
 
 export default {
-    props:["file", "folder"],
-    data(){
-        return {
-            folders: null,
-            files: null
-        }
+    computed: {
+        ...mapGetters(["files", "folders", "folder_path"]),
     },
-    methods:{
-        list() {
-            let path = `${ROOT_PATH}${this.folder}`
-            let stub = ""
-            if (this.folder && this.folder.length > 0) {
-                stub = this.folder + PATH_SEP
-            }
-            axios.get(path).then(response => {
-                let items = response.data.items.map(item => {
-                    item.path = `${stub}${item.name}`
-                    return item
-                })
-                this.folders = items.filter(item => {
-                    return !item.file
-                })
-                this.files = items.filter(item => {
-                    return item.file
-                })
-            }).catch(error => {
-                console.log(error)
-            })
+    methods: {
+        breadcrumb_selected(event) {
+            this.$store.dispatch("load_files_folders", event);
         },
-        folders_files_selected(value){
-            if(value.file){
-                this.$emit('file_change', value.file)
+        folder_files_selected(event) {
+            if (event.file) {
+                this.$store.dispatch("load_file", event.file);
             } else {
-                this.$emit('folder_change', value.folder)
+                this.$store.dispatch("load_files_folders", event.folder);
             }
-        }
+        },
     },
-    watch: {
-        folder() {
-            this.list()
-        }
-    },
-    created() {
-        this.list()
-    }
-}
+};
 </script>
 
 <style lang="css" scoped>
-.dirBrowser{
+.dirBrowser {
     margin: 0 1em;
     display: flex;
     flex-direction: column;

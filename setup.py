@@ -20,7 +20,7 @@ with open("README.md", "r") as fh:
 
 setup(
     name="duckdown",
-    version="0.0.44",
+    version="0.0.46",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/blueshed/duckdown/",
@@ -37,12 +37,14 @@ setup(
     ],
     install_requires=[
         "invoke",
-        "convoke",
         "tornado",
         "markdown",
         "pymdown-extensions",
         "python-dotenv",
-        "boto3"
+        "boto3",
+        "cryptography",
+        "tld",
+        "qrcode"
     ],
     entry_points={"console_scripts": ["duckdown=duckdown.tool:program.run"]},
 )

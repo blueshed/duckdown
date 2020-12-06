@@ -43,9 +43,20 @@ class DateTimeEncoder(json.JSONEncoder):
         return super().default(obj)
 
 
+def load(*args, **kwargs):
+    """ calls json.load """
+    return json.load(*args, **kwargs)
+
+
 def loads(*args, **kwargs):
     """ calls json.loads """
     return json.loads(*args, **kwargs)
+
+
+def dump(*args, **kwargs):
+    """ calls json.load """
+    kwargs["cls"] = DateTimeEncoder
+    return json.dump(*args, **kwargs)
 
 
 def dumps(obj, **kwargs):

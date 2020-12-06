@@ -1,15 +1,17 @@
 """ development tasks """
 import os
+import sys
 import shutil
 import logging
 from pathlib import Path
-import convoke
 import tornado.log
 import tornado.options
+from dotenv import load_dotenv
 from invoke import task, Collection
 from dotenv import dotenv_values
-from duckdown import main
-from duckdown.handlers.utils.nav import nav as gen_nav
+from duckdown.utils.nav import nav as gen_nav
+from duckdown.utils import run_tornado
+from duckdown.tool import run
 import duckdown.tool.provision.tasks
 
 PROJECT_NAME = "duckdown"
@@ -22,18 +24,15 @@ def client(ctx):
     """ run the client """
     ctx.run(". nenv/bin/activate; cd client; npm run dev")
 
+
 @task
-def server(_, folder, dev=False):
+def server(ctx, app_path="", bucket="", debug=False):
     """ run the server """
+    load_dotenv(verbose=True)
     tornado.options.options.logging = "INFO"
     tornado.log.enable_pretty_logging()
-    LOGGER.info("server:")
-    settings = {"app_path": folder, "production": not dev}
-    config = Path(f"{folder}/config.ini")
-    if config.exists():
-        settings["config"] = config
-    convoke.get_settings(PROJECT_NAME, **settings)
-    main.main()
+    LOGGER.info("loaded .env")
+    run(ctx, app_path, bucket, debug=debug)
 
 
 @task
@@ -58,14 +57,15 @@ def build(ctx):
     dst = "duckdown/assets/vue/"
     shutil.copytree(src, dst)
 
-@task(pre=[lint, build])
+@task(pre=[clean, lint])
 def release(ctx, message, part="patch"):
     """ release the build to git hub """
-    ctx.run(f"git add . && git commit -m '{message}'")
-    ctx.run(f"bumpversion {part}")
+    ctx.run(f"bumpversion {part} --allow-dirty")
+    build(ctx)
     ctx.run("pip install -r requirements.txt")
     ctx.run("python setup.py sdist bdist_wheel")
     ctx.run("twine upload dist/*")
+    ctx.run(f"git add . && git commit -m '{message}'")
     ctx.run("git push")
 
 @task
@@ -73,8 +73,14 @@ def nav(_, site, path="/"):
     """ print out nav for path """
     root = os.path.join(site, "pages")
     print(f"nav for: {root} {path}")
-    for line in gen_nav(root, path):
+    for line in gen_nav(None, root, path):
         print(line)
+
+@task
+def test(ctx):
+    """ run out tests """
+    ctx.run("pytest tests")
+
 
 ns = Collection()
 ns.add_task(client)
@@ -83,4 +89,5 @@ ns.add_task(lint)
 ns.add_task(clean)
 ns.add_task(build)
 ns.add_task(release)
+ns.add_task(test)
 ns.add_collection(duckdown.tool.provision.tasks, "p")

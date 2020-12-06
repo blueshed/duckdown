@@ -1,29 +1,27 @@
 <template>
-    <span :class="['icn',{icnSpinner:spin}]" v-html="iconSvg"></span>
+    <span :class="['icn', { icnSpinner: spin }]" v-html="iconSvg"></span>
 </template>
 
 <script>
-import feather from "../../assets/feather-sprite.svg"
+import feather from "../../assets/feather-sprite.svg";
 
-export default
-{
+export default {
     props: ["name", "spin", "width", "height", "color"],
-    computed:
-    {
-        get_width(){
-            return this.width ? this.width : "16px"
+    computed: {
+        get_width() {
+            return this.width ? this.width : "16px";
         },
-        get_height(){
-            return this.height ? this.height : "16px"
+        get_height() {
+            return this.height ? this.height : "16px";
         },
-        get_color(){
-            return this.color ? this.color : "currentColor"
+        get_color() {
+            return this.color ? this.color : "currentColor";
         },
-        iconSvg(){
-            return `<svg class="feather" width="${this.get_width}" height="${this.get_height}" stroke="${this.get_color}"><use href="${feather}#${this.name}"/></svg>`
-        }
-    }
-}
+        iconSvg() {
+            return `<svg class="feather" width="${this.get_width}" height="${this.get_height}" stroke="${this.get_color}"><use href="${feather}#${this.name}"/></svg>`;
+        },
+    },
+};
 </script>
 
 <style lang="css">

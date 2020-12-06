@@ -1,6 +1,5 @@
 @import url('./../node_modules/prismjs/themes/prism.css');
-
-.CodeMirror{
+.CodeMirror {
     height: calc(100% - 56px)
 }
 
@@ -11,16 +10,18 @@
     --disabled-color: #d9d9d9;
     --hover-color: #3979F7;
     --contrast-color: #FF9300;
+    --menu-selected: #eee;
+    --menu-hover: #ddd;
     --menu-height: 1.5em;
 }
 
-
 html,
-body{
+body {
     height: 100%;
     background: var(--bg-color);
     color: var(--txt-color);
 }
+
 #app {
     font-family: sans-serif;
     font-weight: 400;
@@ -29,7 +30,7 @@ body{
     height: 100%;
 }
 
-.menu{
+.menu {
     margin: 1em 0;
     min-height: var(--menu-height);
     max-height: var(--menu-height);
@@ -72,7 +73,7 @@ body{
     color: var(--bg-color);
 }
 
-.menu .icn{
+.menu .icn {
     position: relative;
     top: 2px;
 }

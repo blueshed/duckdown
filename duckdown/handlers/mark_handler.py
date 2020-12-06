@@ -3,7 +3,7 @@
 import tornado.web
 from .access_control import UserMixin
 from .base_handler import BaseHandler
-from .utils.converter_mixin import ConverterMixin
+from ..utils.converter_mixin import ConverterMixin
 
 
 class MarkHandler(
