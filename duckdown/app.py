@@ -11,7 +11,6 @@ from .utils import json_utils
 from .utils.folder import Folder
 from .utils.s3_folders import S3Folder
 from .utils.s3tmpl_loader import S3Loader
-from .utils import vue_utils
 from .handlers.access_control import DictAuthenticator
 from . import handlers
 
@@ -31,11 +30,11 @@ class App(tornado.web.Application):
 
     def __init__(self, routes=None, **settings):
         """ set up """
+        debug = settings.setdefault("debug", False)
         bucket_name = settings.get("bucket")
         app_path = settings.setdefault("app_path", "")
         app_name = settings.setdefault("app_name", "duckdown-app")
         add_default_paths(settings)
-
 
         if bucket_name:
             LOGGER.info("duckdown s3: %s", bucket_name)
@@ -55,9 +54,11 @@ class App(tornado.web.Application):
             self.folder = Folder(directory=app_path)
             settings.setdefault("local_images", True)
             settings.setdefault("img_path", IMG_PATH)
-        
+
         if settings.get("image_bucket"):
-            self.folder.set_image_bucket(S3Folder(settings.get("image_bucket")))
+            self.folder.set_image_bucket(
+                S3Folder(settings.get("image_bucket"))
+            )
 
         routes = [] if routes is None else routes
         setup_routes(self, routes, settings)
@@ -117,7 +118,7 @@ def add_default_paths(settings):
     )
 
 
-def setup_routes(app, routes, settings, s3_pages_key=None):
+def setup_routes(app, routes, settings):
     """ do the thing """
     app_name = settings["app_name"]
 
@@ -126,7 +127,7 @@ def setup_routes(app, routes, settings, s3_pages_key=None):
     if settings.get("debug") is True:
         settings.setdefault(
             "cookie_secret", f"it was a dark and stormy duckdown"
-        )    
+        )
     else:
         settings.setdefault(
             "cookie_secret", f"it was a dark and stormy duckdown {time.time()}"
@@ -139,10 +140,9 @@ def setup_routes(app, routes, settings, s3_pages_key=None):
         login_handler = (handlers.LoginHandler, {"users": users})
 
     # vue setup
-    debug = settings.get("debug", False)
     image_bucket = settings.get("image_bucket", None)
     vue_page = settings.get("vue_page", "vue.html")
-    manifest = vue_utils.load_manifest(debug)
+    manifest = load_manifest(settings)
     routes.extend(
         [
             (r"/login", *login_handler),
@@ -152,7 +152,7 @@ def setup_routes(app, routes, settings, s3_pages_key=None):
                 handlers.S3Browser,
                 {
                     "bucket_name": image_bucket,
-                    "folder": settings["image_path"]
+                    "folder": settings["image_path"],
                 },
             ),
             (
@@ -173,4 +173,47 @@ def setup_routes(app, routes, settings, s3_pages_key=None):
             ),
         ]
     )
-    vue_utils.install_vue_handlers(routes, debug)
+    install_vue_handlers(routes, settings)
+
+
+def install_vue_handlers(routes, settings):
+    """ add view handler to routes """
+
+    if settings["debug"] is True:
+        vue_path = settings.setdefault("vue_src", "./client/src/")
+        LOGGER.info("vue dev handler: %s", vue_path)
+        routes.insert(
+            0,
+            (
+                r"/src/(.*)",
+                tornado.web.StaticFileHandler,
+                {"path": vue_path},
+            ),
+        )
+    else:
+        LOGGER.info("installing vue handler")
+        _assets = settings.setdefault(
+            "vue_assets", resource_filename("duckdown", "assets/vue/")
+        )
+        routes.insert(
+            0,
+            (
+                r"/_assets/(.*)",
+                tornado.web.StaticFileHandler,
+                {"path": _assets},
+            ),
+        )
+
+
+def load_manifest(settings):
+    """ loading manifest for vue dev environment """
+    manifest = None
+    if settings["debug"] is False:
+        path = settings.setdefault(
+            "vue_manifest",
+            resource_filename("duckdown", "assets/vue/manifest.json"),
+        )
+        LOGGER.info("loading vue manifest: %s", path)
+        with open(path) as file:
+            manifest = json_utils.load(file)
+    return manifest
