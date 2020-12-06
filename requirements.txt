@@ -8,4 +8,3 @@ boto3
 tld
 cryptography
 qrcode
-liteblue

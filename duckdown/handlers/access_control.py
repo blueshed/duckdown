@@ -13,7 +13,7 @@ from ..utils import encrypt
 LOGGER = logging.getLogger(__name__)
 
 
-class DictAuthenticator:
+class DictAuthenticator:  # pylint: disable=R0903
     """ hold a dictionary and return value, key on get """
 
     def __init__(self, users):

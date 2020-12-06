@@ -90,7 +90,9 @@ class App(tornado.web.Application):
             json_utils.loads(self.folder.get_file(USERS_PATH)[-1])
         )
 
-    def get_site(self, user=None, site=None):
+    def get_site(
+        self, user=None, site=None
+    ):  # pylint: disable=unused-argument
         """ return current site """
         return self.folder
 
@@ -126,7 +128,7 @@ def setup_routes(app, routes, settings):
     settings.setdefault("cookie_name", f"{app_name}-user")
     if settings.get("debug") is True:
         settings.setdefault(
-            "cookie_secret", f"it was a dark and stormy duckdown"
+            "cookie_secret", "it was a dark and stormy duckdown"
         )
     else:
         settings.setdefault(

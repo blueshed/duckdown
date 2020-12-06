@@ -5,8 +5,8 @@
 <script>
 import { CodeJar } from "codejar";
 import Prism from "prismjs";
-import "./../../../node_modules/prismjs/components/prism-markdown.js";
-import "./../../../node_modules/prismjs/components/prism-css.js";
+import "/node_modules/prismjs/components/prism-markdown.js";
+import "/node_modules/prismjs/components/prism-css.js";
 
 export default {
     data: () => ({

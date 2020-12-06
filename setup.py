@@ -41,7 +41,10 @@ setup(
         "markdown",
         "pymdown-extensions",
         "python-dotenv",
-        "boto3"
+        "boto3",
+        "cryptography",
+        "tld",
+        "qrcode"
     ],
     entry_points={"console_scripts": ["duckdown=duckdown.tool:program.run"]},
 )

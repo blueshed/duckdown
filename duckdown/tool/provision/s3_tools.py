@@ -173,9 +173,7 @@ def download(bucket_name, key):
     try:
         LOGGER.debug("getting: %s %s", bucket_name, key)
         data = io.BytesIO()
-        client.download_fileobj(
-            Bucket=bucket_name, Key=key, Fileobj=data
-        )
+        client.download_fileobj(Bucket=bucket_name, Key=key, Fileobj=data)
         content_type, _ = mimetypes.guess_type(key)
         content = data.getvalue()
     except ClientError as err:

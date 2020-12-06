@@ -66,7 +66,9 @@ class SiteHandler(
                 content = self.meta.convert(content)
                 self.nav = self.convert_images(content)
 
-    def run_script(self, site, script_name, path):
+    def run_script(
+        self, site, script_name, path
+    ):  # pylint: disable=unused-argument
         """ load a module and call module.main """
         name = f"{self.application.settings['script_path']}.{script_name}"
         script_module = importlib.import_module(name)

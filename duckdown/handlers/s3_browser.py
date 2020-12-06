@@ -2,13 +2,10 @@
 """ browser and upload to bucket """
 import os
 import logging
-import boto3
 import tornado.web
 from .base_handler import BaseHandler
 from .access_control import UserMixin
 from ..utils.json_utils import dumps
-from ..utils.folder import Folder
-from ..utils.s3_folders import S3Folder
 
 LOGGER = logging.getLogger(__name__)
 
@@ -61,7 +58,7 @@ class S3Browser(UserMixin, BaseHandler):
         prefix = self.folder + prefix if self.folder else prefix
         LOGGER.info("prefix: %s", prefix)
         site = self.get_site(prefix)
-        result = site.list_folder(prefix, self.folder)        
+        result = site.list_folder(prefix, self.folder)
         self.write(dumps(result))
 
     @tornado.web.authenticated
