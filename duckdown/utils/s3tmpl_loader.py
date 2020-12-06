@@ -10,9 +10,9 @@ LOGGER = logging.getLogger(__name__)
 class S3Loader(BaseLoader):
     """A template loader that loads from a single root directory."""
 
-    def __init__(self, application, folder, **kwargs: Any) -> None:
+    def __init__(self, site, folder, **kwargs: Any) -> None:
         super().__init__(**kwargs)
-        self.application = application
+        self.site = site
         self.folder = folder
 
     def resolve_path(self, name, parent_path=None):
@@ -34,6 +34,6 @@ class S3Loader(BaseLoader):
         """ create a template from bucket/folder/name """
         key = f"{self.folder}{name}"
         LOGGER.info("template: %s", key)
-        _, data = self.application.get_file(key)
+        _, data = self.site.get_file(key)
         template = Template(data.decode("utf-8"), name=name, loader=self)
         return template

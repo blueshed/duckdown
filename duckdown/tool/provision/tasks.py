@@ -55,6 +55,14 @@ def upload(_, creds, bucket_name, key, filepath):
 
 
 @task
+def download(_, creds, bucket_name, key):
+    """ upload file to bucket """
+    with using_credentials(creds):
+        response = s3_tools.download(bucket_name, key)
+        print(response)
+
+
+@task
 def get_user(_, name):
     """ get iam user """
     response = iam_tools.get_user(name)

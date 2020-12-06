@@ -25,6 +25,7 @@ STATIC_PATH = "static/"
 USERS_PATH = "users.json"
 IMG_PATH = "/static/images/"
 
+
 class App(tornado.web.Application):
     """ an app served up out of a directory """
 
@@ -35,43 +36,47 @@ class App(tornado.web.Application):
         app_name = settings.setdefault("app_name", "duckdown-app")
         add_default_paths(settings)
 
+
         if bucket_name:
             LOGGER.info("duckdown s3: %s", bucket_name)
 
             self.folder = S3Folder(bucket_name)
             settings.setdefault("local_images", False)
+            settings.setdefault("image_path", False)
+            settings.setdefault("image_bucket", bucket_name)
             settings.setdefault(
                 "img_path",
                 f"{self.folder.s3bucket_url}/{IMAGES_PATH}",
             )
-            settings['static_handler_class']= handlers.S3StaticFiles
-            handlers.S3StaticFiles.s3_app = self
+            settings["static_handler_class"] = handlers.S3StaticFiles
         else:
             LOGGER.info("duckdown local: %s", app_path)
 
             self.folder = Folder(directory=app_path)
             settings.setdefault("local_images", True)
             settings.setdefault("img_path", IMG_PATH)
+        
+        if settings.get("image_bucket"):
+            self.folder.set_image_bucket(S3Folder(settings.get("image_bucket")))
 
         routes = [] if routes is None else routes
         setup_routes(self, routes, settings)
 
         if settings.get("bucket"):
+            self.folder.template_loader = S3Loader(self.folder, TEMPLATE_PATH)
             routes.extend(
                 [
                     (
                         r"/(.*)",
                         handlers.SiteHandler,
-                        {
-                            "pages": PAGE_PATH,
-                            "s3_loader": S3Loader(self, TEMPLATE_PATH),
-                            "is_s3": True,
-                        },
+                        {"pages": PAGE_PATH},
                     ),
                 ]
             )
         else:
-            routes.extend([(r"/(.*)", handlers.SiteHandler, {"pages": PAGE_PATH})])
+            routes.extend(
+                [(r"/(.*)", handlers.SiteHandler, {"pages": PAGE_PATH})]
+            )
         tornado.web.Application.__init__(
             self,
             routes,
@@ -81,47 +86,12 @@ class App(tornado.web.Application):
     def load_users(self):
         """ load users from users.json """
         return DictAuthenticator(
-            json_utils.loads(self.get_file(USERS_PATH)[-1])
+            json_utils.loads(self.folder.get_file(USERS_PATH)[-1])
         )
 
-    def list_templates(self, prefix=""):
-        """ return a directory list of templates """
-        template_path = self.settings["template_path"]
-        return self.list_folder(template_path, prefix)
-
-    def list_pages(self, prefix=""):
-        """ return a directory list of templates """
-        page_path = self.settings["page_path"]
-        return self.list_folder(page_path, prefix)
-
-    def list_statics(self, prefix=""):
-        """ return a directory list of templates """
-        static_path = self.settings["static_path"]
-        return self.list_folder(static_path, prefix)
-
-    def list_folder(self, prefix="", delimiter="/"):
-        """ list the contents of folder """
-        return self.folder.list_folder(prefix, delimiter)
-    
-    def is_file(self, path):
-        """ is this a file """
-        return self.folder.is_file(path)
-
-    def get_head(self, key):
-        """ return Head on key """
-        return self.folder.get_head(key)
-
-    def get_file(self, key):
-        """ returns file key in directory """
-        return self.folder.get_file(key)
-
-    def put_file(self, body, key, **kwargs):
-        """ put file into directory """
-        return self.folder.put_file(body, key, **kwargs)
-    
-    def delete_file(self, key):
-        """ will remove file from directory """
-        return self.folder.delete_file(key)
+    def get_site(self, user=None, site=None):
+        """ return current site """
+        return self.folder
 
 
 def add_default_paths(settings):
@@ -137,6 +107,7 @@ def add_default_paths(settings):
     settings.setdefault("script_path", script_path)
     page_path = os.path.join(settings["app_path"], PAGE_PATH)
     page_path = settings.setdefault("page_path", page_path)
+    image_path = settings.setdefault("image_path", IMAGES_PATH)
 
     # editor setup
     settings.setdefault("duck_path", "/edit/assets/")
@@ -145,13 +116,21 @@ def add_default_paths(settings):
         "duck_templates", resource_filename("duckdown", "templates")
     )
 
+
 def setup_routes(app, routes, settings, s3_pages_key=None):
     """ do the thing """
     app_name = settings["app_name"]
 
     # access control
-    settings.setdefault("cookie", f"{app_name}-user")
-    settings.setdefault("cookie_secret", f"it was a dark and stormy duckdown {time.time()}")
+    settings.setdefault("cookie_name", f"{app_name}-user")
+    if settings.get("debug") is True:
+        settings.setdefault(
+            "cookie_secret", f"it was a dark and stormy duckdown"
+        )    
+    else:
+        settings.setdefault(
+            "cookie_secret", f"it was a dark and stormy duckdown {time.time()}"
+        )
     settings.setdefault("login_url", "/login")
     login_handler = settings.get("login_handler")
     if login_handler is None:
@@ -171,7 +150,10 @@ def setup_routes(app, routes, settings, s3_pages_key=None):
             (
                 r"/edit/browse/(.*)",
                 handlers.S3Browser,
-                {"bucket_name": image_bucket, "folder": "static/images/"},
+                {
+                    "bucket_name": image_bucket,
+                    "folder": settings["image_path"]
+                },
             ),
             (
                 r"/edit/assets/(.*)",

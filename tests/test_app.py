@@ -19,16 +19,14 @@ COOKIE_NAME = "tets_duck"
 
 @pytest.fixture(scope="session")
 def app():
-    app = App(
-        app_path="tests/test_site",
-        cookie_name=COOKIE_NAME
-    )
+    app = App(app_path="tests/test_site", cookie_name=COOKIE_NAME)
     return app
 
 
 def test_put(app):
     """ does it work """
-    url = app.put_file(body=SAMPLE, key=SAMPLE_KEY, mime="text/plain")
+    site = app.get_site()
+    url = site.put_file(body=SAMPLE, key=SAMPLE_KEY, mime="text/plain")
     LOGGER.info("url: %s", url)
 
 
@@ -36,27 +34,31 @@ def test_list(app):
     """ test list folder """
     LOGGER.info(json_utils.dumps(app.settings, indent=4))
     LOGGER.debug("sample: %r, %r", SAMPLE_FOLDER, SAMPLE_FILE)
-    file = app.list_folder(f"{SAMPLE_FOLDER}/")["files"][0]
+    site = app.get_site()
+    file = site.list_folder(f"{SAMPLE_FOLDER}/")["files"][0]
     assert file["path"] == SAMPLE_KEY
     assert file["name"] == SAMPLE_FILE
 
 
 def test_head(app):
     """ test head file """
-    head = app.get_head(SAMPLE_KEY)
+    site = app.get_site()
+    head = site.get_head(SAMPLE_KEY)
     assert head.st_size == len(SAMPLE)
 
 
 def test_get(app):
     """ test get file """
-    head = app.get_head(SAMPLE_KEY)
-    _, data = app.get_file(SAMPLE_KEY)
+    site = app.get_site()
+    head = site.get_head(SAMPLE_KEY)
+    _, data = site.get_file(SAMPLE_KEY)
     assert len(data) == head.st_size
 
 
 def test_delete(app):
     """ test delete file """
-    app.delete_file(SAMPLE_KEY)
+    site = app.get_site()
+    site.delete_file(SAMPLE_KEY)
 
 
 @pytest.mark.gen_test

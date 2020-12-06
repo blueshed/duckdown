@@ -120,14 +120,19 @@ export default {
         },
         uploadFiles() {
             let formData = new FormData();
-            for (var i = 0; i < this.$refs.file.files.length; i++) {
+            let count = this.$refs.file.files.length;
+            for (var i = 0; i < count; i++) {
                 let file = this.$refs.file.files[i];
                 formData.append("files[" + i + "]", file);
             }
-            this.$store.dispatch("upload_images", {
-                path: this.folder,
-                formData: formData,
-            });
+            this.$store
+                .dispatch("upload_images", {
+                    path: this.folder,
+                    formData: formData,
+                })
+                .then(() => {
+                    this.$emit("uploaded", `Uploaded ${count} file(s).`);
+                });
             return false;
         },
         folders_files_selected(value) {

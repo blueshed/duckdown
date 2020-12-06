@@ -19,6 +19,12 @@ class S3Folder:
         self.s3client = session.client("s3")
         self.s3bucket = bucket_name
         self.s3bucket_url = f"//s3-{self.s3region}.amazonaws.com/{bucket_name}"
+        self.template_loader = None
+        self.image_bucket = self
+
+    def set_image_bucket(self, value):
+        """ set the image bucket """
+        self.image_bucket = value
 
     @classmethod
     def _last_item_(cls, value, sep="/"):
@@ -36,15 +42,19 @@ class S3Folder:
     @classmethod
     def scan_path(cls, client, bucket, prefix, delimiter="/"):
         """ return custom format of listing """
-        response = client.list_objects_v2(
-            Bucket=bucket, Prefix=prefix, Delimiter=delimiter
+
+    def list_folder(self, prefix="", root="", delimiter="/"):
+        """ list the contents of bucket folder """
+        response = self.s3client.list_objects_v2(
+            Bucket=self.s3bucket, Prefix=prefix, Delimiter=delimiter
         )
+        starts = len(root)
         LOGGER.debug(response)
         result = {
             "files": [
                 {
-                    "path": item["Key"],
-                    "name": cls._last_item_(item["Key"]),
+                    "path": item["Key"][starts:],
+                    "name": self._last_item_(item["Key"]),
                     "size": item["Size"],
                     "type": mimetypes.guess_type(item["Key"])[0],
                     "file": True,
@@ -53,18 +63,14 @@ class S3Folder:
             ],
             "folders": [
                 {
-                    "path": item["Prefix"],
-                    "name": cls._last_item_(item["Prefix"]),
+                    "path": item["Prefix"][starts:],
+                    "name": self._last_item_(item["Prefix"]),
                     "file": False,
                 }
                 for item in response.get("CommonPrefixes", [])
             ],
         }
         return result
-
-    def list_folder(self, prefix="", delimiter="/"):
-        """ list the contents of bucket folder """
-        return self.scan_path(self.s3client, self.s3bucket, prefix, delimiter)
 
     def get_head(self, key):
         """ return meta data on key """
@@ -111,7 +117,7 @@ class S3Folder:
             "ContentType": content_type,
         }
         if meta:
-            kwargs["Meta"] = meta
+            kwargs["Metadata"] = meta
         if content_encoding:
             kwargs["ContentEncoding"] = content_encoding
 

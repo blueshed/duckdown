@@ -1,6 +1,7 @@
 """ test loading setting from settings.cfg """
 import configparser
 
+
 def dump(settings):
     """ print it out """
     print(settings)
@@ -11,6 +12,7 @@ def dump(settings):
         print(f"{section}")
         for key, value in settings.items(section):
             print(f"    {key}: {value}")
+
 
 def test_settings():
     """ can we load the test file settings? """

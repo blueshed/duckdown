@@ -34,16 +34,6 @@ class S3Browser(UserMixin, BaseHandler):
         self.folder = folder
 
     @property
-    def s3client(self):
-        """ return boto3 client """
-        return boto3.client("s3")
-
-    @property
-    def app_path(self):
-        """ return application app_path """
-        return self.application.settings.get("app_path")
-
-    @property
     def img_path(self):
         """ return application img_path """
         return self.application.settings.get("img_path")
@@ -53,63 +43,26 @@ class S3Browser(UserMixin, BaseHandler):
         """ return application local_images """
         return self.application.settings.get("local_images")
 
-    def make_app_path(self, key):
-        """ return a path inside app path """
-        folder = self.folder if self.folder else ""
-        if folder.endswith("/"):
-            folder = folder[:-1]
-        folder_path = os.path.join(self.app_path, folder)
-        if key:
-            path = os.path.join(self.app_path, folder, key)
-        else:
-            path = folder_path
-        return path, folder_path
-
-    def add(self, data=None, key=None, meta=None):
-        """ adds data, returns path """
-        if self.local_images:
-            # write file
-            path, _ = self.make_app_path(key)
-            LOGGER.info("adding %s", path)
-            folder, _ = os.path.split(path)
-            if not os.path.exists(folder):
-                os.makedirs(folder)
-            with open(path, "wb") as file:
-                file.write(data)
-            return str(path)
-
-        # add to bucket
-        key = self.folder + key if self.folder else key
-        client = self.s3client
-        client.put_object(
-            ACL="public-read",
-            Body=data,
-            Bucket=self.s3bucket,
-            Key=key,
-            Metadata=meta,
-        )
-        return client.generate_presigned_url(
-            "get_object", Params={"Bucket": self.s3bucket, "Key": key}
-        )
-
-    def scan_dir(self, prefix="", delimiter="/"):  # pylint: disable=W0613
-        """ list the content of the bucket """
-        if self.local_images:
-            file, folder = self.make_app_path(prefix)
-            return Folder.scan_path(file, folder)
-
-        # list bucket objects
-        prefix = self.folder + prefix if self.folder else prefix
-        return S3Folder.scan_path(self.s3client, self.s3bucket, prefix)
+    def add(self, body, path, meta=None):
+        """ adds body, returns path """
+        key = self.folder + path
+        LOGGER.info("adding %s", key)
+        site = self.get_site(key)
+        return site.put_file(body=body, key=key, meta=meta)
 
     @tornado.web.authenticated
     def get(self, prefix=None):
         """ returns the contents of bucket """
+        result = None
         if prefix is None:
             prefix = ""
-        delimiter = self.get_argument("d", "/")
+        LOGGER.info("browse: %s", prefix)
         self.set_header("Content-Type", "application/json")
-        self.write(dumps(self.scan_dir(prefix, delimiter)))
+        prefix = self.folder + prefix if self.folder else prefix
+        LOGGER.info("prefix: %s", prefix)
+        site = self.get_site(prefix)
+        result = site.list_folder(prefix, self.folder)        
+        self.write(dumps(result))
 
     @tornado.web.authenticated
     def put(self, path=None):  # pylint: disable=W0613
@@ -130,7 +83,7 @@ class S3Browser(UserMixin, BaseHandler):
                 LOGGER.info("upload: %s", f"{path}{fname}")
                 s3key = self.add(
                     fileinfo["body"],
-                    key=f"{path}{fname}",
+                    path=f"{path}{fname}",
                     meta={"original_name": fname, "content-type": fmime},
                 )
                 result.append(s3key)

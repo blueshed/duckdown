@@ -19,30 +19,31 @@ class DirHandler(UserMixin, BaseHandler):
 
     def get(self, path=None):
         """ return the files and directories in path """
-        path = (
-            os.path.join(self.directory, path) if path else self.directory
-        )
+        path = os.path.join(self.directory, path) if path else self.directory
+        site = self.get_site(path)
         LOGGER.info("dir get path: %s", path)
-        if self.application.is_file(path):
+        if site.is_file(path):
             LOGGER.info("loading file: %s", path)
-            content_type, body = self.application.get_file(path)
+            content_type, body = site.get_file(path)
             if content_type:
                 self.set_header("Content-Type", content_type)
             self.write(body)
         else:
             LOGGER.info("listing folder: %s", path)
-            self.write(self.application.list_folder(path))
+            self.write(site.list_folder(path))
 
     def put(self, path):
         """ handle the setting of file to path """
         LOGGER.info("saving %s", path)
         mime, _ = mimetypes.guess_type(path)
         path = os.path.join(self.directory, path)
-        self.application.put_file(self.request.body, path, mime=mime)
+        site = self.get_site(path)
+        site.put_file(self.request.body, path, mime=mime)
         self.write("saved")
 
     def delete(self, path):
         """ will remove a document """
         path = os.path.join(self.directory, path)
-        self.application.delete_file(path)
+        site = self.get_site(path)
+        site.delete_file(path)
         self.write("deleted")

@@ -5,6 +5,7 @@ import urllib.parse
 
 LOGGER = logging.getLogger(__name__)
 
+
 @contextlib.asynccontextmanager
 async def using_cookie(http_client, base_url):
     """ get a cookie """

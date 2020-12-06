@@ -1,4 +1,5 @@
 """ tools for us with s3 """
+import io
 import logging
 import mimetypes
 import boto3
@@ -161,6 +162,27 @@ def upload(bucket_name, key, file_path):
     LOGGER.debug(response)
 
     return response
+
+
+def download(bucket_name, key):
+    """ return the content of key in bucket """
+    # create s3 client
+    client = boto3.client("s3")
+
+    content_type, content = None, None
+    try:
+        LOGGER.debug("getting: %s %s", bucket_name, key)
+        data = io.BytesIO()
+        client.download_fileobj(
+            Bucket=bucket_name, Key=key, Fileobj=data
+        )
+        content_type, _ = mimetypes.guess_type(key)
+        content = data.getvalue()
+    except ClientError as err:
+        if err.response["ResponseMetadata"]["HTTPStatusCode"] != 404:
+            LOGGER.info(err)
+            raise
+    return content_type, content
 
 
 def _bucket_keys_(client, bucket_name, prefix="", delimiter=""):

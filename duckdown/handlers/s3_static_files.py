@@ -8,19 +8,21 @@ LOGGER = logging.getLogger(__name__)
 class S3StaticFiles(StaticFileHandler):  # pylint: disable=W0223
     """ S3 Procy """
 
-    s3_app = None
+    sites = {}
 
     @classmethod
     def get_content(cls, abspath, start=None, end=None):
         """ return content """
-        _, data = cls.s3_app.get_file(abspath)
+        site = cls.sites[abspath]
+        _, data = site.get_file(abspath)
         return data
 
     def _stat(self):
         assert self.absolute_path is not None
         LOGGER.debug("static abs: %s", self.absolute_path)
+        site = self.sites[self.absolute_path]
         if not hasattr(self, "_stat_result"):
-            result = self.application.get_head(self.absolute_path)
+            result = site.get_head(self.absolute_path)
             self._stat_result = result  # pylint: disable=W0201
         return self._stat_result
 
@@ -32,5 +34,18 @@ class S3StaticFiles(StaticFileHandler):  # pylint: disable=W0223
         return f"{root}/{path}"
 
     def validate_absolute_path(self, root, absolute_path):
-        """ is it valid? """
+        """ is it valid? and cache site for abspath """
+        LOGGER.info("validate: %s", absolute_path)
+        current_user = None
+        if hasattr(self, "_current_user"):
+            current_user = self._current_user
+        site = self.application.get_site(current_user, absolute_path)
+        self.sites[absolute_path] = site
         return absolute_path
+
+    def finish(self, chunk=None):
+        """ tidy up sites """
+        result = super().finish(chunk)
+        # if self.absolute_path:
+        #     del self.sites[self.absolute_path]
+        return result

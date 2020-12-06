@@ -2,7 +2,10 @@
     <div class="App">
         <snacks ref="snacks" />
         <sidebar :show="sidebar" @dismiss="sidebar = false">
-            <S3Browser v-show="sidebar" />
+            <S3Browser
+                v-show="sidebar"
+                @uploaded="s3browser_uploaded($event)"
+            />
         </sidebar>
         <div class="container">
             <div class="directory">
@@ -114,6 +117,9 @@ export default {
         editor_deleted(event) {
             this.show_snack(event, "warn");
             this.$store.dispatch("load_files_folders", this.folder_path);
+        },
+        s3browser_uploaded(event) {
+            this.show_snack(event);
         },
     },
     mounted() {

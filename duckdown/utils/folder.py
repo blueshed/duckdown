@@ -13,17 +13,17 @@ class Folder:
 
     def __init__(self, directory):
         self.directory = directory
+        self.template_loader = None
+        self.image_bucket = self
+
+    def set_image_bucket(self, value):
+        """ set the image bucket """
+        self.image_bucket = value
 
     def is_file(self, path):
         """ is this a file """
         path = os.path.join(self.directory, path)
         return os.path.isfile(path)
-
-    def list_folder(self, prefix="", delimiter="/"):
-        """ list the contents of folder """
-        path = os.path.join(self.directory, prefix)
-        LOGGER.info("listing: %s", path)
-        return self.scan_path(path, self.directory)
 
     def get_head(self, key):
         """ return Head on key """
@@ -50,6 +50,7 @@ class Folder:
             os.makedirs(folder)
         with open(path, "wb") as file:
             file.write(body)
+        return path
 
     def delete_file(self, key):
         """ will remove file from directory """
@@ -59,14 +60,16 @@ class Folder:
         else:
             raise ValueError(f"No such file: {key}")
 
-    @classmethod
-    def scan_path(cls, path, prefix):
-        """ return the contents of a path """
+    def list_folder(self, prefix="", root="", delimiter="/"):
+        """ list the contents of folder """
+        LOGGER.info("listing: (%s, %s)", root, prefix)
+        abspath = os.path.join(self.directory, prefix)
+        LOGGER.info("listing abs: %s", abspath)
+        absroot = os.path.join(self.directory, root)
+        starts = len(absroot)
         files = []
         folders = []
-
-        starts = len(prefix) + 1
-        with os.scandir(path) as item:
+        with os.scandir(abspath) as item:
             for entry in item:
                 is_file = entry.is_file()
                 size = entry.stat().st_size if is_file else None

@@ -26,12 +26,13 @@ def client(ctx):
 
 
 @task
-def server(ctx, folder, debug=False):
+def server(ctx, app_path="", bucket="", debug=False):
     """ run the server """
     load_dotenv(verbose=True)
     tornado.options.options.logging = "INFO"
     tornado.log.enable_pretty_logging()
-    run(ctx, folder, debug)
+    LOGGER.info("loaded .env")
+    run(ctx, app_path, bucket, debug=debug)
 
 
 @task
