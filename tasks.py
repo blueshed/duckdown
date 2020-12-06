@@ -60,9 +60,8 @@ def build(ctx):
 @task(pre=[clean, lint])
 def release(ctx, message, part="patch"):
     """ release the build to git hub """
-    ctx.run(f"bumpversion {part}")
+    ctx.run(f"bumpversion {part} --allow-dirty")
     build(ctx)
-    ctx.run(f"git add . && git commit -m '{message}'")
     ctx.run("pip install -r requirements.txt")
     ctx.run("python setup.py sdist bdist_wheel")
     ctx.run("twine upload dist/*")
