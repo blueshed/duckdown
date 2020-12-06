@@ -57,14 +57,16 @@ def build(ctx):
     dst = "duckdown/assets/vue/"
     shutil.copytree(src, dst)
 
-@task(pre=[lint, build])
+@task(pre=[clean, lint])
 def release(ctx, message, part="patch"):
     """ release the build to git hub """
-    ctx.run(f"git add . && git commit -m '{message}'")
     ctx.run(f"bumpversion {part}")
+    build(ctx)
+    ctx.run(f"git add . && git commit -m '{message}'")
     ctx.run("pip install -r requirements.txt")
     ctx.run("python setup.py sdist bdist_wheel")
     ctx.run("twine upload dist/*")
+    ctx.run(f"git add . && git commit -m '{message}'")
     ctx.run("git push")
 
 @task
@@ -72,7 +74,7 @@ def nav(_, site, path="/"):
     """ print out nav for path """
     root = os.path.join(site, "pages")
     print(f"nav for: {root} {path}")
-    for line in gen_nav(root, path):
+    for line in gen_nav(None, root, path):
         print(line)
 
 @task
