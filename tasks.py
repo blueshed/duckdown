@@ -12,9 +12,6 @@ from dotenv import dotenv_values
 from duckdown.utils.nav import nav as gen_nav
 from duckdown.utils import run_tornado
 from duckdown.tool import run
-from blue.main import make_app
-from blue.config import Config
-import blue.utils
 import duckdown.tool.provision.tasks
 
 PROJECT_NAME = "duckdown"
@@ -80,21 +77,8 @@ def nav(_, site, path="/"):
 @task
 def test(ctx):
     """ run out tests """
-    ctx.run("pytest tests/test_s3_app.py")
+    ctx.run("pytest tests")
 
-@task
-def ngrok(_):
-    """ get the ngrok endpoint """
-    url = blue.utils.get_ngrok_url()
-    assert url == "https://e2aae37ce4b8.ngrok.io"
-
-@task
-def run_blue(ctx):
-    """ run blue """
-    load_dotenv(verbose=True)
-    run_tornado.run(make_app(Config))
-
-    
 
 ns = Collection()
 ns.add_task(client)
@@ -104,6 +88,4 @@ ns.add_task(clean)
 ns.add_task(build)
 ns.add_task(release)
 ns.add_task(test)
-ns.add_task(run_blue)
-ns.add_task(ngrok)
 ns.add_collection(duckdown.tool.provision.tasks, "p")

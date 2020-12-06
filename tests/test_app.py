@@ -8,32 +8,34 @@ from duckdown.utils import json_utils
 from .utils import using_cookie
 
 logging.getLogger().setLevel(logging.INFO)
+LOGGER = logging.getLogger(__name__)
 load_dotenv(verbose=True)
 
 SAMPLE = b"""Hello World! I'm a sample file."""
-SAMPLE_KEY = "test/duck_tests/test.txt"
+SAMPLE_KEY = "test/test.txt"
 SAMPLE_FOLDER, SAMPLE_FILE = SAMPLE_KEY.split("/")
 COOKIE_NAME = "tets_duck"
 
 
 @pytest.fixture(scope="session")
 def app():
-    return App(
+    app = App(
         app_path="tests/test_site",
-        cookie_name=COOKIE_NAME,
-        cookie_secret="secret",
+        cookie_name=COOKIE_NAME
     )
+    return app
 
 
 def test_put(app):
     """ does it work """
     url = app.put_file(body=SAMPLE, key=SAMPLE_KEY, mime="text/plain")
-    print(url)
+    LOGGER.info("url: %s", url)
 
 
 def test_list(app):
     """ test list folder """
-    print(SAMPLE_FOLDER, SAMPLE_FILE)
+    LOGGER.info(json_utils.dumps(app.settings, indent=4))
+    LOGGER.debug("sample: %r, %r", SAMPLE_FOLDER, SAMPLE_FILE)
     file = app.list_folder(f"{SAMPLE_FOLDER}/")["files"][0]
     assert file["path"] == SAMPLE_KEY
     assert file["name"] == SAMPLE_FILE
@@ -129,7 +131,8 @@ async def test_edit_pages(http_client, base_url):
         assert response.code == 200
         print(response.body)
         result = json_utils.loads(response.body)
-        assert result["files"][0]["name"] == "index.md"
+        files = [file["name"] for file in result["files"]]
+        assert "index.md" in files
 
         response = await http_client.fetch(
             base_url + "/edit/pages/test.md",

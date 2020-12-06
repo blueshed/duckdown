@@ -22,7 +22,7 @@ class DictAuthenticator:
     def get(self, key):
         """ simple """
         result = self.users.get(key)
-        return result, key if result else None
+        return (result, key) if result else (None, None)
 
 
 class UserMixin:

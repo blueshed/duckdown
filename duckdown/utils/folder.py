@@ -22,6 +22,7 @@ class Folder:
     def list_folder(self, prefix="", delimiter="/"):
         """ list the contents of folder """
         path = os.path.join(self.directory, prefix)
+        LOGGER.info("listing: %s", path)
         return self.scan_path(path, self.directory)
 
     def get_head(self, key):

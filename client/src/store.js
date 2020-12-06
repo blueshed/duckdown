@@ -3,7 +3,7 @@ import axios from 'axios'
 const PATH_SEP = "/"
 const FOLDERS_PATH = "pages/"
 const FOLDERS_ROOT_PATH = "/edit/" + FOLDERS_PATH
-const IMAGES_ROOT_PATH = "/browse/"
+const IMAGES_ROOT_PATH = "/edit/browse/"
 const FILE_ROOT = "/edit/pages/"
 
 function clean_file_folder(path, root) {

@@ -18,6 +18,7 @@ class S3Folder:
         self.s3region = session.region_name
         self.s3client = session.client("s3")
         self.s3bucket = bucket_name
+        self.s3bucket_url = f"//s3-{self.s3region}.amazonaws.com/{bucket_name}"
 
     @classmethod
     def _last_item_(cls, value, sep="/"):

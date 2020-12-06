@@ -1,7 +1,9 @@
 """ common functions """
+import logging
 import contextlib
 import urllib.parse
 
+LOGGER = logging.getLogger(__name__)
 
 @contextlib.asynccontextmanager
 async def using_cookie(http_client, base_url):
@@ -18,6 +20,6 @@ async def using_cookie(http_client, base_url):
     assert response.code == 302
 
     value = response.headers["set-cookie"]
-    print("cookie:", value)
+    LOGGER.debug("cookie: %s", value)
     assert value
     yield value
