@@ -7,10 +7,10 @@ from tornado.template import BaseLoader, Template
 LOGGER = logging.getLogger(__name__)
 
 
-class S3Loader(BaseLoader):
+class TmplLoader(BaseLoader):
     """A template loader that loads from a single root directory."""
 
-    def __init__(self, site, folder, **kwargs: Any) -> None:
+    def __init__(self, site, folder="templates/", **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self.site = site
         self.folder = folder

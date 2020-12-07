@@ -86,6 +86,18 @@ def test_static(http_client, base_url):
     )
     assert response.code == 404
 
+        
+@pytest.mark.gen_test
+async def test_home(http_client, base_url):
+    """ can we see home page """
+
+    response = await http_client.fetch(
+        base_url,
+        follow_redirects=False,
+        raise_error=False
+    )
+    assert response.code == 200
+
 
 @pytest.mark.gen_test
 async def test_login(http_client, base_url):

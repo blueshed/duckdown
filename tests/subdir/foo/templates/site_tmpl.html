@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ handler.one_meta_value('title', 'duckdown') }}</title>
+    <link href="{{ static_url('site.css') }}" rel="stylesheet" type="text/css" />
+</head>
+
+<body class="{{ handler.one_meta_value('theme') }}">
+    {% raw content %}
+    {%if current_user %}<a class="user_edit" href="{{ edit_path }}"><button>edit</button></a>{% end %}
+</body>
+
+</html>

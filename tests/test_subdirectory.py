@@ -16,10 +16,17 @@ SAMPLE_KEY = "test/test.txt"
 SAMPLE_FOLDER, SAMPLE_FILE = SAMPLE_KEY.split("/")
 COOKIE_NAME = "tets_duck"
 
+class SubApp(App):
+    """ An app that can serve sub directories """
+
+    def get_site(self, user=None, path=None, request=None):
+        """ return subdirectory """
+        return self.folder.for_subfolder("foo")
+
 
 @pytest.fixture(scope="session")
 def app():
-    app = App(app_path="tests/test_site", cookie_name=COOKIE_NAME)
+    app = SubApp(app_path="tests/subdir", cookie_name=COOKIE_NAME)
     return app
 
 

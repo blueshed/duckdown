@@ -6,11 +6,13 @@ import time
 import tornado.ioloop
 import tornado.web
 import tornado.log
+import boto3
+import botocore
 from pkg_resources import resource_filename
 from .utils import json_utils
 from .utils.folder import Folder
 from .utils.s3_folders import S3Folder
-from .utils.s3tmpl_loader import S3Loader
+from .handlers.static_files import StaticFiles
 from .handlers.access_control import DictAuthenticator
 from . import handlers
 
@@ -23,6 +25,7 @@ SCRIPT_PATH = "scripts/"
 STATIC_PATH = "static/"
 USERS_PATH = "users.json"
 IMG_PATH = "/static/images/"
+ASSETS_PREFIX = "/edit/assets/"
 
 
 class App(tornado.web.Application):
@@ -35,11 +38,14 @@ class App(tornado.web.Application):
         app_path = settings.setdefault("app_path", "")
         app_name = settings.setdefault("app_name", "duckdown-app")
         add_default_paths(settings)
+        s3client = None
+        s3region = None
 
         if bucket_name:
             LOGGER.info("duckdown s3: %s", bucket_name)
-            aws_region = os.getenv("AWS_REGION")
-            self.folder = S3Folder(bucket_name, region=aws_region)
+            s3client, s3region = make_s3client()
+
+            self.folder = S3Folder(bucket_name, client=s3client, region=s3region)
             settings.setdefault("local_images", False)
             settings.setdefault("image_path", False)
             settings.setdefault("image_bucket", bucket_name)
@@ -47,24 +53,25 @@ class App(tornado.web.Application):
                 "img_path",
                 f"{self.folder.s3bucket_url}/{IMAGES_PATH}",
             )
-            settings["static_handler_class"] = handlers.S3StaticFiles
         else:
             LOGGER.info("duckdown local: %s", app_path)
 
             self.folder = Folder(directory=app_path)
             settings.setdefault("local_images", True)
             settings.setdefault("img_path", IMG_PATH)
+        
+        settings["static_handler_class"] = handlers.StaticFiles
 
         if settings.get("image_bucket"):
+            if s3client is None:
+                s3client, s3region = make_s3client()
             self.folder.set_image_bucket(
-                S3Folder(settings.get("image_bucket"))
+                S3Folder(settings.get("image_bucket"), client=s3client, region=s3region)
             )
 
         routes = [] if routes is None else routes
         setup_routes(self, routes, settings)
-
         if settings.get("bucket"):
-            self.folder.template_loader = S3Loader(self.folder, TEMPLATE_PATH)
             routes.extend(
                 [
                     (
@@ -84,14 +91,15 @@ class App(tornado.web.Application):
             **settings,
         )
 
-    def load_users(self):
-        """ load users from users.json """
+    def load_users(self, request):
+        """ return the user and password """
+        site = self.get_site(None, None, request)
         return DictAuthenticator(
-            json_utils.loads(self.folder.get_file(USERS_PATH)[-1])
+            json_utils.loads(site.get_file(USERS_PATH)[-1])
         )
 
     def get_site(
-        self, user=None, site=None
+        self, user=None, path=None, request=None
     ):  # pylint: disable=unused-argument
         """ return current site """
         return self.folder
@@ -103,7 +111,8 @@ def add_default_paths(settings):
 
     # site paths
     static_path = os.path.join(settings["app_path"], STATIC_PATH)
-    settings.setdefault("static_path", static_path)
+    settings.setdefault("static_path", static_path) 
+    settings.setdefault("static_prefix", STATIC_PATH) 
     template_path = os.path.join(settings["app_path"], TEMPLATE_PATH)
     settings.setdefault("template_path", template_path)
     script_path = os.path.join(settings["app_path"], SCRIPT_PATH)
@@ -113,7 +122,7 @@ def add_default_paths(settings):
     image_path = settings.setdefault("image_path", IMAGES_PATH)
 
     # editor setup
-    settings.setdefault("duck_path", "/edit/assets/")
+    settings.setdefault("duck_assets_prefix", ASSETS_PREFIX)
     settings.setdefault("duck_assets", resource_filename("duckdown", "assets"))
     settings.setdefault(
         "duck_templates", resource_filename("duckdown", "templates")
@@ -137,9 +146,7 @@ def setup_routes(app, routes, settings):
     settings.setdefault("login_url", "/login")
     login_handler = settings.get("login_handler")
     if login_handler is None:
-        users = app.load_users()
-        LOGGER.info(users)
-        login_handler = (handlers.LoginHandler, {"users": users})
+        login_handler = (handlers.LoginHandler,)
 
     # vue setup
     image_bucket = settings.get("image_bucket", None)
@@ -172,7 +179,7 @@ def setup_routes(app, routes, settings):
                 r"/edit",
                 handlers.EditorHandler,
                 {"page": vue_page, "manifest": manifest},
-            ),
+            )
         ]
     )
     install_vue_handlers(routes, settings)
@@ -219,3 +226,11 @@ def load_manifest(settings):
         with open(path) as file:
             manifest = json_utils.load(file)
     return manifest
+
+
+def make_s3client():
+    """ determine region or get from env """
+    session = boto3.Session()
+    s3region = session.region_name if session.region_name else os.environ["AWS_REGION"]
+    s3client = session.client("s3")
+    return s3client, s3region
