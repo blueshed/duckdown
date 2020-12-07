@@ -38,8 +38,8 @@ class App(tornado.web.Application):
 
         if bucket_name:
             LOGGER.info("duckdown s3: %s", bucket_name)
-
-            self.folder = S3Folder(bucket_name)
+            aws_region = os.getenv("AWS_REGION")
+            self.folder = S3Folder(bucket_name, region=aws_region)
             settings.setdefault("local_images", False)
             settings.setdefault("image_path", False)
             settings.setdefault("image_bucket", bucket_name)

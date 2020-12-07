@@ -13,9 +13,9 @@ LOGGER = logging.getLogger(__name__)
 class S3Folder:
     """ files and folders """
 
-    def __init__(self, bucket_name):
+    def __init__(self, bucket_name, region=None):
         session = boto3.Session()
-        self.s3region = session.region_name
+        self.s3region = region if region else session.region_name
         self.s3client = session.client("s3")
         self.s3bucket = bucket_name
         self.s3bucket_url = f"//s3-{self.s3region}.amazonaws.com/{bucket_name}"
