@@ -9,7 +9,7 @@ from duckdown import VERSION
 from .create import create, s3_create
 from .run import run
 from .publish import publish
-from .secure import secure, unsecure
+from .secure import secure, unsecure, gen_key
 
 sys.path.insert(0, os.getcwd())
 
@@ -22,6 +22,7 @@ _NAMESPACE_.add_task(run)
 _NAMESPACE_.add_task(publish)
 _NAMESPACE_.add_task(secure)
 _NAMESPACE_.add_task(unsecure)
+_NAMESPACE_.add_task(gen_key)
 _NAMESPACE_.add_task(s3_create)
 
 tornado.log.enable_pretty_logging()

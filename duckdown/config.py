@@ -1,3 +1,4 @@
+# pylint: disable=too-many-instance-attributes, too-few-public-methods
 """ Duckdown configuration """
 import os
 import time

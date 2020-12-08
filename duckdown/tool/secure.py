@@ -1,6 +1,7 @@
 """ secure a users file """
 from invoke import task
 from dotenv import load_dotenv
+from cryptography.fernet import Fernet
 from duckdown.utils.encrypt import encrypt, decrypt
 from duckdown.utils import json_utils
 
@@ -25,3 +26,9 @@ def unsecure(_, data):
     """ return to normal """
     load_dotenv(verbose=True)
     print(decrypt(data))
+
+
+@task
+def gen_key(_):
+    """ generates a secret key  for use as DKDN_KEY envar"""
+    return Fernet.generate_key()

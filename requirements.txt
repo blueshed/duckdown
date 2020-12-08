@@ -7,4 +7,3 @@ aiobotocore
 boto3
 tld
 cryptography
-qrcode

@@ -69,6 +69,11 @@ def test_delete(app):
     """ test delete file """
     site = app.get_site()
     site.delete_file(SAMPLE_KEY)
+    try:
+        site.delete_file(SAMPLE_KEY)
+        assert False, "already deleted"
+    except ValueError:
+        pass
 
 
 @pytest.mark.gen_test
@@ -205,6 +210,66 @@ async def test_edit_pages(http_client, base_url):
             headers={"Cookie": cookie},
         )
         assert response.code == 200
+
+
+@pytest.mark.gen_test
+async def test_folders(app, http_client, base_url):
+    """ can we list pages deep """
+
+    async with using_cookie(http_client, base_url) as cookie:
+        response = await http_client.fetch(
+            base_url + "/edit/pages/deep/",
+            follow_redirects=False,
+            raise_error=False,
+            headers={"Cookie": cookie},
+        )
+        assert response.code == 200
+        print(response.body)
+        result = json_utils.loads(response.body)
+        assert len(result["files"]) == 0
+        assert len(result["folders"]) == 0
+
+        response = await http_client.fetch(
+            base_url + "/edit/pages/deep/deep.md",
+            method="PUT",
+            body=SAMPLE,
+            follow_redirects=False,
+            raise_error=False,
+            headers={"Cookie": cookie},
+        )
+        assert response.code == 200
+
+        response = await http_client.fetch(
+            base_url + "/edit/pages/deep/",
+            follow_redirects=False,
+            raise_error=False,
+            headers={"Cookie": cookie},
+        )
+        assert response.code == 200
+        result = json_utils.loads(response.body)
+        files = [file["name"] for file in result["files"]]
+        assert "deep.md" in files
+        assert len(result["folders"]) == 0
+
+        response = await http_client.fetch(
+            base_url + "/edit/pages/deep/deep.md",
+            method="DELETE",
+            follow_redirects=False,
+            raise_error=False,
+            headers={"Cookie": cookie},
+        )
+        assert response.code == 200
+
+        response = await http_client.fetch(
+            base_url + "/edit/pages/",
+            follow_redirects=False,
+            raise_error=False,
+            headers={"Cookie": cookie},
+        )
+        assert response.code == 200
+        print(response.body)
+        result = json_utils.loads(response.body)
+        assert len(result["folders"]) == 1
 
 
 @pytest.mark.gen_test

@@ -2,17 +2,13 @@
 """ application entry point """
 import logging
 import os
-import time
 import tornado.ioloop
 import tornado.web
 import tornado.log
 import boto3
-import botocore
-from pkg_resources import resource_filename
 from .utils import json_utils
 from .utils.folder import Folder
 from .utils.s3_folders import S3Folder
-from .handlers.static_files import StaticFiles
 from .handlers.access_control import DictAuthenticator
 from . import handlers
 

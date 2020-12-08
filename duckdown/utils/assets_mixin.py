@@ -7,6 +7,7 @@ class AssetsMixin:  # pylint: disable=too-few-public-methods
 
     @property
     def duck_assets_prefix(self):
+        """ return the prefix for duck assets """
         return self.settings["duck_assets_prefix"]
 
     def asset_url(self, path):

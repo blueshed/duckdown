@@ -1,3 +1,4 @@
+# pylint: disable=attribute-defined-outside-init
 """ Proxy S3 as static file handler """
 import logging
 from tornado.web import StaticFileHandler

@@ -3,7 +3,6 @@
     We want our own DateTimeEncoder
 """
 import dataclasses
-import datetime
 import enum
 import json
 from collections.abc import Callable
@@ -62,36 +61,3 @@ def dump(*args, **kwargs):
 def dumps(obj, **kwargs):
     """ calls json.dumps using DateTimeEncoder """
     return json.dumps(obj, cls=DateTimeEncoder, **kwargs)
-
-
-def type_from_json(type_, value):
-    """provided with a string and type return the value as type"""
-    result = value
-    if value:
-        if type_ == int:
-            result = int(value)
-        elif type_ == float:
-            result = float(value)
-        elif type_ == bool:
-            result = str(value).lower() in ("yes", "true", "t", "1")
-        elif type_ == Decimal:
-            result = Decimal(value)
-        elif type_ == datetime.datetime:
-            result = (
-                datetime.datetime.strptime(value, "%Y-%m-%d %H:%M:%S")
-                if value
-                else None
-            )
-        elif type_ == datetime.date:
-            result = (
-                datetime.datetime.strptime(value, "%Y-%m-%d").date()
-                if value
-                else None
-            )
-        elif type_ == datetime.time:
-            result = (
-                datetime.datetime.strptime(value, "%H:%M:%S").time()
-                if value
-                else None
-            )
-    return result

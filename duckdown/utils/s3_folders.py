@@ -3,7 +3,6 @@ import io
 import logging
 import mimetypes
 import time
-import boto3
 import botocore
 from .head import Head
 from .tmpl_loader import TmplLoader

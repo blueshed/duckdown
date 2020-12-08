@@ -59,7 +59,7 @@ def populate_bucket(bucket, force=False):
 
 
 @task
-def create(ctx, path, force=False):
+def create(_, path, force=False):
     """ create a duckdown app at path """
     return populate_folder(path, force)
 

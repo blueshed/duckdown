@@ -22,7 +22,7 @@ def fkey(envar="DKDN_KEY", passcode=None):
         kdf = PBKDF2HMAC(
             algorithm=hashes.SHA256(),
             length=32,
-            salt=key,
+            salt=key.encode(),
             iterations=100000,
             backend=default_backend(),
         )

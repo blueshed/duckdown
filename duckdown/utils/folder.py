@@ -79,21 +79,24 @@ class Folder:
         starts = len(absroot)
         files = []
         folders = []
-        with os.scandir(abspath) as item:
-            for entry in item:
-                is_file = entry.is_file()
-                size = entry.stat().st_size if is_file else None
-                mime = mimetypes.guess_type(entry.path) if is_file else None
-                if entry.name[0] != ".":
-                    item = {
-                        "name": entry.name,
-                        "path": entry.path[starts:],
-                        "file": is_file,
-                        "size": size,
-                        "type": mime,
-                    }
-                    if is_file:
-                        files.append(item)
-                    else:
-                        folders.append(item)
+        if os.path.isdir(abspath):
+            with os.scandir(abspath) as item:
+                for entry in item:
+                    is_file = entry.is_file()
+                    size = entry.stat().st_size if is_file else None
+                    mime = (
+                        mimetypes.guess_type(entry.path) if is_file else None
+                    )
+                    if entry.name[0] != ".":
+                        item = {
+                            "name": entry.name,
+                            "path": entry.path[starts:],
+                            "file": is_file,
+                            "size": size,
+                            "type": mime,
+                        }
+                        if is_file:
+                            files.append(item)
+                        else:
+                            folders.append(item)
         return {"files": files, "folders": folders}
