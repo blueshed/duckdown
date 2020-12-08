@@ -36,14 +36,14 @@ class UserMixin:
     @property
     def debug(self):
         """ app setting access """
-        return self.application.settings.get("debug") is True
+        return self.settings.get("debug") is True
 
     def get_site(self, path):
         """ get the current user site """
         current_user = None
         if hasattr(self, "_current_user"):
             current_user = self._current_user
-        return self.application.get_site(current_user, path)
+        return self.application.get_site(current_user, path, self.request)
 
     def get_current_user(self):
         """ return the current user from the cookie """
@@ -73,20 +73,16 @@ class LoginHandler(
     into the headers.
     """
 
-    def initialize(self, page=None, users=None):
+    def initialize(self, page=None):
         """ we're configured with a page """
         self.page = page if page else "login.html"
         self.register = None
-        self.users = users
-
-    def get_template_path(self):
-        """ return app resource """
-        return self.application.settings["duck_templates"]
 
     def login(self, username, password):
         """ return a user """
         result = None
-        pwd, user = self.users.get(username)
+        users = self.application.load_users(self.request)
+        pwd, user = users.get(username)
         if pwd and os.getenv("DKDN_KEY"):
             LOGGER.info("pwd>: %r", pwd)
             pwd = encrypt.decrypt(pwd)

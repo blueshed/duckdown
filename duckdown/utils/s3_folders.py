@@ -6,6 +6,8 @@ import time
 import boto3
 import botocore
 from .head import Head
+from .tmpl_loader import TmplLoader
+
 
 LOGGER = logging.getLogger(__name__)
 
@@ -13,14 +15,25 @@ LOGGER = logging.getLogger(__name__)
 class S3Folder:
     """ files and folders """
 
-    def __init__(self, bucket_name):
-        session = boto3.Session()
-        self.s3region = session.region_name
-        self.s3client = session.client("s3")
+    def __init__(self, bucket_name, client, region, subfolder=""):
+        self.s3region = region
+        self.s3client = client
         self.s3bucket = bucket_name
-        self.s3bucket_url = f"//s3-{self.s3region}.amazonaws.com/{bucket_name}"
-        self.template_loader = None
+        self.subfolder = subfolder
+        self.s3bucket_url = (
+            f"//s3-{self.s3region}.amazonaws.com/{bucket_name}{subfolder}"
+        )
+        self.template_loader = TmplLoader(self)
         self.image_bucket = self
+
+    def for_subfolder(self, value):
+        """ return a clone for a subfolder """
+        return S3Folder(
+            self.s3bucket,
+            client=self.s3client,
+            region=self.s3region,
+            subfolder=value,
+        )
 
     def set_image_bucket(self, value):
         """ set the image bucket """

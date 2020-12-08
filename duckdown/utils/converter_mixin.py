@@ -34,18 +34,9 @@ class ConverterMixin:
             extensions=EXTENSIONS, extension_configs=EXTENSIONS_CONFIG
         )
 
-    @property
-    def img_path(self):
-        """ return application img_path """
-        return self.application.settings["img_path"]
-
-    @property
-    def local_images(self):
-        """ return application local_images """
-        return self.application.settings.get("local_images")
-
     def convert_images(self, value):
         """ use img_path """
-        if self.local_images is True:
+        if self.settings.get("convert_image_paths") is True:
             return value
-        return value.replace("/static/images/", self.img_path)
+        img_path = self.settings["img_path"]
+        return value.replace("/static/images/", img_path)

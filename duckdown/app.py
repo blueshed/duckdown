@@ -6,145 +6,88 @@ import time
 import tornado.ioloop
 import tornado.web
 import tornado.log
+import boto3
+import botocore
 from pkg_resources import resource_filename
 from .utils import json_utils
 from .utils.folder import Folder
 from .utils.s3_folders import S3Folder
-from .utils.s3tmpl_loader import S3Loader
+from .handlers.static_files import StaticFiles
 from .handlers.access_control import DictAuthenticator
 from . import handlers
 
 LOGGER = logging.getLogger(__name__)
 
-PAGE_PATH = "pages/"
-TEMPLATE_PATH = "templates/"
-IMAGES_PATH = "static/images/"
-SCRIPT_PATH = "scripts/"
-STATIC_PATH = "static/"
-USERS_PATH = "users.json"
-IMG_PATH = "/static/images/"
-
 
 class App(tornado.web.Application):
     """ an app served up out of a directory """
 
-    def __init__(self, routes=None, **settings):
+    def __init__(self, cfg, routes=None, **settings):
         """ set up """
-        debug = settings.setdefault("debug", False)
-        bucket_name = settings.get("bucket")
-        app_path = settings.setdefault("app_path", "")
-        app_name = settings.setdefault("app_name", "duckdown-app")
-        add_default_paths(settings)
+        self.cfg = cfg
 
-        if bucket_name:
-            LOGGER.info("duckdown s3: %s", bucket_name)
+        s3client = None
+        s3region = None
 
-            self.folder = S3Folder(bucket_name)
-            settings.setdefault("local_images", False)
-            settings.setdefault("image_path", False)
-            settings.setdefault("image_bucket", bucket_name)
-            settings.setdefault(
-                "img_path",
-                f"{self.folder.s3bucket_url}/{IMAGES_PATH}",
+        if cfg.bucket_name:
+            LOGGER.info("duckdown s3: %s", cfg.bucket_name)
+            s3client, s3region = make_s3client(**cfg.credentials)
+
+            self.folder = S3Folder(
+                cfg.bucket_name, client=s3client, region=s3region
             )
-            settings["static_handler_class"] = handlers.S3StaticFiles
+            cfg.convert_image_paths = False
+            cfg.image_path = False
+            cfg.image_bucket = (
+                cfg.image_bucket if cfg.image_bucket else cfg.bucket_name
+            )
+            cfg.img_path = f"{self.folder.s3bucket_url}/{cfg.IMAGES_PATH}"
+        elif cfg.app_path:
+            LOGGER.info("duckdown local: %s", cfg.app_path)
+            self.folder = Folder(directory=cfg.app_path)
         else:
-            LOGGER.info("duckdown local: %s", app_path)
+            raise Exception("app_path or bucket required")
 
-            self.folder = Folder(directory=app_path)
-            settings.setdefault("local_images", True)
-            settings.setdefault("img_path", IMG_PATH)
-
-        if settings.get("image_bucket"):
-            self.folder.set_image_bucket(
-                S3Folder(settings.get("image_bucket"))
+        if cfg.image_bucket:
+            cfg.convert_image_paths = False
+            cfg.image_path = False
+            if s3client is None:
+                s3client, s3region = make_s3client(**cfg.image_credentials)
+            image_folder = S3Folder(
+                cfg.image_bucket, client=s3client, region=s3region
             )
+            cfg.img_path = f"{image_folder.s3bucket_url}/{cfg.IMAGES_PATH}"
+            self.folder.set_image_bucket(image_folder)
 
-        routes = [] if routes is None else routes
-        setup_routes(self, routes, settings)
-
-        if settings.get("bucket"):
-            self.folder.template_loader = S3Loader(self.folder, TEMPLATE_PATH)
-            routes.extend(
-                [
-                    (
-                        r"/(.*)",
-                        handlers.SiteHandler,
-                        {"pages": PAGE_PATH},
-                    ),
-                ]
-            )
-        else:
-            routes.extend(
-                [(r"/(.*)", handlers.SiteHandler, {"pages": PAGE_PATH})]
-            )
-        tornado.web.Application.__init__(
-            self,
+        settings = cfg.tornado_settings(settings or {})
+        settings.setdefault("static_handler_class", handlers.StaticFiles)
+        routes = setup_routes(cfg, routes)
+        super().__init__(
             routes,
             **settings,
         )
 
-    def load_users(self):
-        """ load users from users.json """
+    def load_users(self, request):
+        """ return the user and password """
+        site = self.get_site(None, None, request)
+        users_path = self.settings["users_path"]
+        LOGGER.info("loading users: %s", users_path)
         return DictAuthenticator(
-            json_utils.loads(self.folder.get_file(USERS_PATH)[-1])
+            json_utils.loads(site.get_file(users_path)[-1])
         )
 
     def get_site(
-        self, user=None, site=None
+        self, user=None, path=None, request=None
     ):  # pylint: disable=unused-argument
         """ return current site """
         return self.folder
 
 
-def add_default_paths(settings):
-    """ we expect some folders """
-    app_name = settings["app_name"]
-
-    # site paths
-    static_path = os.path.join(settings["app_path"], STATIC_PATH)
-    settings.setdefault("static_path", static_path)
-    template_path = os.path.join(settings["app_path"], TEMPLATE_PATH)
-    settings.setdefault("template_path", template_path)
-    script_path = os.path.join(settings["app_path"], SCRIPT_PATH)
-    settings.setdefault("script_path", script_path)
-    page_path = os.path.join(settings["app_path"], PAGE_PATH)
-    page_path = settings.setdefault("page_path", page_path)
-    image_path = settings.setdefault("image_path", IMAGES_PATH)
-
-    # editor setup
-    settings.setdefault("duck_path", "/edit/assets/")
-    settings.setdefault("duck_assets", resource_filename("duckdown", "assets"))
-    settings.setdefault(
-        "duck_templates", resource_filename("duckdown", "templates")
-    )
-
-
-def setup_routes(app, routes, settings):
+def setup_routes(cfg, routes):
     """ do the thing """
-    app_name = settings["app_name"]
+    routes = routes or []
 
-    # access control
-    settings.setdefault("cookie_name", f"{app_name}-user")
-    if settings.get("debug") is True:
-        settings.setdefault(
-            "cookie_secret", "it was a dark and stormy duckdown"
-        )
-    else:
-        settings.setdefault(
-            "cookie_secret", f"it was a dark and stormy duckdown {time.time()}"
-        )
-    settings.setdefault("login_url", "/login")
-    login_handler = settings.get("login_handler")
-    if login_handler is None:
-        users = app.load_users()
-        LOGGER.info(users)
-        login_handler = (handlers.LoginHandler, {"users": users})
-
-    # vue setup
-    image_bucket = settings.get("image_bucket", None)
-    vue_page = settings.get("vue_page", "vue.html")
-    manifest = load_manifest(settings)
+    login_handler = cfg.login_handler or (handlers.LoginHandler,)
     routes.extend(
         [
             (r"/login", *login_handler),
@@ -153,69 +96,77 @@ def setup_routes(app, routes, settings):
                 r"/edit/browse/(.*)",
                 handlers.S3Browser,
                 {
-                    "bucket_name": image_bucket,
-                    "folder": settings["image_path"],
+                    "bucket_name": cfg.image_bucket,
+                    "folder": cfg.image_path,
                 },
             ),
             (
                 r"/edit/assets/(.*)",
                 tornado.web.StaticFileHandler,
-                {"path": settings["duck_assets"]},
+                {"path": cfg.duck_assets},
             ),
             (r"/edit/mark/", handlers.MarkHandler),
             (
                 r"/edit/pages/(.*)",
                 handlers.DirHandler,
-                {"directory": PAGE_PATH},
+                {"directory": cfg.PAGE_PATH},
             ),
             (
                 r"/edit",
                 handlers.EditorHandler,
-                {"page": vue_page, "manifest": manifest},
+                {"page": cfg.vue_page, "manifest": load_manifest(cfg)},
             ),
         ]
     )
-    install_vue_handlers(routes, settings)
 
-
-def install_vue_handlers(routes, settings):
-    """ add view handler to routes """
-
-    if settings["debug"] is True:
-        vue_path = settings.setdefault("vue_src", "./client/src/")
-        LOGGER.info("vue dev handler: %s", vue_path)
+    if cfg.debug is True:
+        LOGGER.info("vue dev handler: %s", cfg.vue_src)
         routes.insert(
             0,
             (
                 r"/src/(.*)",
                 tornado.web.StaticFileHandler,
-                {"path": vue_path},
+                {"path": cfg.vue_src},
             ),
         )
     else:
-        LOGGER.info("installing vue handler")
-        _assets = settings.setdefault(
-            "vue_assets", resource_filename("duckdown", "assets/vue/")
-        )
+        LOGGER.debug("vue manifest handler")
         routes.insert(
             0,
             (
                 r"/_assets/(.*)",
                 tornado.web.StaticFileHandler,
-                {"path": _assets},
+                {"path": cfg.vue_assets},
             ),
         )
 
+    routes.append(
+        (
+            r"/(.*)",
+            handlers.SiteHandler,
+            {"pages": cfg.PAGE_PATH},
+        )
+    )
+    return routes
 
-def load_manifest(settings):
+
+def load_manifest(cfg):
     """ loading manifest for vue dev environment """
     manifest = None
-    if settings["debug"] is False:
-        path = settings.setdefault(
-            "vue_manifest",
-            resource_filename("duckdown", "assets/vue/manifest.json"),
-        )
+    if cfg.debug is False:
+        path = cfg.vue_manifest
         LOGGER.info("loading vue manifest: %s", path)
         with open(path) as file:
             manifest = json_utils.load(file)
     return manifest
+
+
+def make_s3client(**credentials):
+    """ determine region or get from env """
+    s3region = (
+        credentials["region_name"]
+        if "region_name" in credentials
+        else os.environ["AWS_REGION"]
+    )
+    s3client = boto3.client("s3", **credentials)
+    return s3client, s3region

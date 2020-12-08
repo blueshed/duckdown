@@ -1,4 +1,5 @@
 """ test s3 functionality """
+import os
 import contextlib
 import logging
 import pytest
@@ -17,21 +18,30 @@ SAMPLE = b"""Hello World! I'm a sample file."""
 SAMPLE_KEY = "test/test.txt"
 SAMPLE_FOLDER, SAMPLE_FILE = SAMPLE_KEY.split("/")
 COOKIE_NAME = "tets_duck"
-APP_PATH = "tests/data/test_site"
+APP_PATH = "tests/data/test_subdir"
+SUB_DIR = "foo"
+
+
+class AppConfig(Config):
+    """ config override for tests """
+
+    app_path = APP_PATH
+    cookie_name = COOKIE_NAME
+
+
+class SubApp(App):
+    """ An app that can serve sub directories """
+
+    def get_site(self, user=None, path=None, request=None):
+        """ return subdirectory """
+        return self.folder.for_subfolder(SUB_DIR)
 
 
 @pytest.fixture(scope="session")
 def app():
-    populate_folder(APP_PATH, force=True)
-
-    class AppConfig(Config):
-        """ config override for tests """
-
-        app_path = APP_PATH
-        cookie_name = COOKIE_NAME
-
-    duck_app = App(AppConfig())
-    return duck_app
+    populate_folder(os.path.join(APP_PATH, SUB_DIR))
+    app = SubApp(AppConfig())
+    return app
 
 
 def test_put(app):
@@ -72,8 +82,7 @@ def test_delete(app):
 
 
 @pytest.mark.gen_test
-async def test_hello_world(app, http_client, base_url):
-    LOGGER.info("settings: %s", app.settings)
+async def test_hello_world(http_client, base_url):
     response = await http_client.fetch(base_url)
     assert response.code == 200
     print(response.body)
@@ -168,19 +177,6 @@ async def test_edit_pages(http_client, base_url):
         assert response.code == 200
 
         response = await http_client.fetch(
-            base_url + "/edit/mark/",
-            method="PUT",
-            body=b"#Hi there",
-            follow_redirects=False,
-            raise_error=False,
-            headers={"Cookie": cookie},
-        )
-        assert response.code == 200
-        LOGGER.debug("body %s", response.body)
-        body = json_utils.loads(response.body)
-        assert '<h1 id="hi-there">Hi there</h1>' == body["content"]
-
-        response = await http_client.fetch(
             base_url + "/edit/pages/test.md",
             follow_redirects=False,
             raise_error=False,
@@ -197,36 +193,3 @@ async def test_edit_pages(http_client, base_url):
             headers={"Cookie": cookie},
         )
         assert response.code == 200
-
-        response = await http_client.fetch(
-            base_url + "/static/site.css",
-            follow_redirects=False,
-            raise_error=False,
-            headers={"Cookie": cookie},
-        )
-        assert response.code == 200
-
-
-@pytest.mark.gen_test
-async def test_options(app, http_client, base_url):
-    """ can we list pages """
-
-    async with using_cookie(http_client, base_url) as cookie:
-        response = await http_client.fetch(
-            base_url + "/edit/pages/",
-            method="OPTIONS",
-            follow_redirects=False,
-            raise_error=False,
-            headers={"Cookie": cookie},
-        )
-        assert response.code == 405
-
-        app.settings["debug"] = True
-        response = await http_client.fetch(
-            base_url + "/edit/pages/",
-            method="OPTIONS",
-            follow_redirects=False,
-            raise_error=False,
-            headers={"Cookie": cookie},
-        )
-        assert response.code == 204

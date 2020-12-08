@@ -15,23 +15,6 @@ class EditorHandler(
         self.manifest = manifest
         self.page = page
 
-    @property
-    def duck_path(self):
-        """ return application duck_path """
-        return self.application.settings.get("duck_path")
-
-    @property
-    def img_path(self):
-        """ return application img_path """
-        if self.application.settings.get("local_images"):
-            path = self.application.settings.get("img_path", "")
-            return f"/static/{path}"
-        return self.application.settings.get("img_path")
-
-    def get_template_path(self):
-        """ return app resource """
-        return self.application.settings["duck_templates"]
-
     @authenticated
     def get(self):
         """ handle get request """

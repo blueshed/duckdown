@@ -82,7 +82,7 @@ def get_user(user_name):
     user["policies"] = _get_attached_policies_(client, user_name)
     user["access_keys"] = _get_access_keys_(client, user_name)
 
-    store(f"user-{user_name}.json", user)
+    store(f"user-{user_name}", user)
 
     return user
 

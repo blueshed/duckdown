@@ -41,6 +41,7 @@ def lint(ctx):
     ctx.run(f"black -l 79 {PROJECT_NAME}")
     ctx.run(f"pylint {PROJECT_NAME}")
 
+
 @task
 def clean(ctx):
     """ tidy up """
@@ -49,6 +50,7 @@ def clean(ctx):
     ctx.run("rm -rf build")
     ctx.run("rm -rf dist")
 
+
 @task(pre=[clean])
 def build(ctx):
     """ build the client """
@@ -56,6 +58,7 @@ def build(ctx):
     src = "client/dist/_assets/"
     dst = "duckdown/assets/vue/"
     shutil.copytree(src, dst)
+
 
 @task(pre=[clean, lint])
 def release(ctx, message, part="patch"):
@@ -68,6 +71,7 @@ def release(ctx, message, part="patch"):
     ctx.run(f"git add . && git commit -m '{message}'")
     ctx.run("git push")
 
+
 @task
 def nav(_, site, path="/"):
     """ print out nav for path """
@@ -76,10 +80,11 @@ def nav(_, site, path="/"):
     for line in gen_nav(None, root, path):
         print(line)
 
+
 @task
 def test(ctx):
     """ run out tests """
-    ctx.run("pytest tests")
+    ctx.run("py.test --cov duckdown --cov-report term-missing tests")
 
 
 ns = Collection()

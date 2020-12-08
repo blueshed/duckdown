@@ -8,6 +8,8 @@ static/images
 *.DS_Store
 .vscode
 .pytest_cache
+.coverage
+tests/data
 site
 site2
 public

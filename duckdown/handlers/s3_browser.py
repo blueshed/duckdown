@@ -33,12 +33,12 @@ class S3Browser(UserMixin, BaseHandler):
     @property
     def img_path(self):
         """ return application img_path """
-        return self.application.settings.get("img_path")
+        return self.settings.get("img_path")
 
     @property
     def local_images(self):
         """ return application local_images """
-        return self.application.settings.get("local_images")
+        return self.settings.get("local_images")
 
     def add(self, body, path, meta=None):
         """ adds body, returns path """

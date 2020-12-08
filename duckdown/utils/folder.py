@@ -4,6 +4,7 @@ import os
 import logging
 import mimetypes
 from .head import Head
+from .tmpl_loader import TmplLoader
 
 LOGGER = logging.getLogger(__name__)
 
@@ -11,10 +12,19 @@ LOGGER = logging.getLogger(__name__)
 class Folder:
     """ files and folders """
 
-    def __init__(self, directory):
+    def __init__(self, directory, subdirectory=""):
         self.directory = directory
-        self.template_loader = None
+        self.subdirectory = subdirectory
+        self.template_loader = TmplLoader(self)
         self.image_bucket = self
+
+    def for_subfolder(self, value):
+        """ return a clone for a subfolder """
+        return Folder(self.directory, subdirectory=value)
+
+    def make_path(self, path):
+        """ return path """
+        return os.path.join(self.directory, self.subdirectory, path)
 
     def set_image_bucket(self, value):
         """ set the image bucket """
@@ -22,19 +32,19 @@ class Folder:
 
     def is_file(self, path):
         """ is this a file """
-        path = os.path.join(self.directory, path)
+        path = self.make_path(path)
         return os.path.isfile(path)
 
     def get_head(self, key):
         """ return Head on key """
-        path = os.path.join(self.directory, key)
+        path = os.path.join(self.directory, self.subdirectory, key)
         stat = os.stat(path)
         return Head(path=path, st_size=stat.st_size, st_mtime=stat.st_mtime)
 
     def get_file(self, key):
         """ returns file key in directory """
         result = (None, None)
-        path = os.path.join(self.directory, key)
+        path = os.path.join(self.directory, self.subdirectory, key)
         if os.path.isfile(path):
             content_type, _ = mimetypes.guess_type(path)
             with open(path, "rb") as file:
@@ -43,7 +53,7 @@ class Folder:
 
     def put_file(self, body, key, **kwargs):
         """ put file into directory """
-        path = os.path.join(self.directory, key)
+        path = os.path.join(self.directory, self.subdirectory, key)
         folder, _ = os.path.split(path)
         if folder and not os.path.exists(folder):
             LOGGER.info("making directory: %s", folder)
@@ -54,7 +64,7 @@ class Folder:
 
     def delete_file(self, key):
         """ will remove file from directory """
-        path = os.path.join(self.directory, key)
+        path = os.path.join(self.directory, self.subdirectory, key)
         if os.path.isfile(path):
             os.unlink(path)
         else:
@@ -63,9 +73,9 @@ class Folder:
     def list_folder(self, prefix="", root="", delimiter="/"):
         """ list the contents of folder """
         LOGGER.info("listing: (%s, %s)", root, prefix)
-        abspath = os.path.join(self.directory, prefix)
+        abspath = self.make_path(prefix)
         LOGGER.info("listing abs: %s", abspath)
-        absroot = os.path.join(self.directory, root)
+        absroot = self.make_path(root)
         starts = len(absroot)
         files = []
         folders = []

@@ -1,5 +1,6 @@
 """ task to create app template """
 import os
+import shutil
 import logging
 from shutil import copyfile
 from pkg_resources import resource_filename
@@ -18,8 +19,7 @@ SOURCES = [
 ]
 
 
-@task
-def create(ctx, path, force=False):
+def populate_folder(path, force=False):
     """ create a duckdown app at path """
     if os.path.exists(path):
         if force is False:
@@ -27,7 +27,7 @@ def create(ctx, path, force=False):
             return
 
         LOGGER.info("removing %s", path)
-        ctx.run(f"rm -rf {path}")
+        shutil.rmtree(path)
 
     LOGGER.info("creating %s", path)
     for folder in {folder for folder, _ in SOURCES if folder}:
@@ -40,8 +40,7 @@ def create(ctx, path, force=False):
         )
 
 
-@task
-def s3_create(_, bucket, force=False):
+def populate_bucket(bucket, force=False):
     """ create a duckdown app in bucket """
 
     if force is True:
@@ -57,3 +56,15 @@ def s3_create(_, bucket, force=False):
         s3_tools.upload(bucket, key, path)
 
     LOGGER.info("done!")
+
+
+@task
+def create(ctx, path, force=False):
+    """ create a duckdown app at path """
+    return populate_folder(path, force)
+
+
+@task
+def s3_create(_, bucket, force=False):
+    """ create a duckdown app in bucket """
+    return populate_bucket(bucket, force)
