@@ -3,6 +3,7 @@
 import logging
 from invoke import task
 from duckdown.app import App
+from duckdown.config import Config
 from duckdown.utils import run_tornado
 
 LOGGER = logging.getLogger(__name__)
@@ -23,12 +24,9 @@ def run(
         "debug": debug,
         "port": port,
     }
-    args = dict(app_path=app_path, bucket=bucket, debug=debug, port=port)
-    LOGGER.info("run: %s", args)
     if not app_path and not bucket:
+        LOGGER.info("run: %s", settings)
         print("either a path or bucket are required!")
     else:
-        app = App(**args)
-
-    app = App([], **settings)
-    run_tornado.run(app)
+        app = App(Config(**settings))
+        run_tornado.run(app)

@@ -130,7 +130,7 @@ def setup_routes(cfg, routes):
             ),
         )
     else:
-        LOGGER.info("installing vue handler")
+        LOGGER.debug("vue manifest handler")
         routes.insert(
             0,
             (

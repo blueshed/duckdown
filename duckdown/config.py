@@ -22,6 +22,7 @@ class Config:
 
     # variables
     debug = False
+    port = int(os.getenv("PORT", "8080"))
     bucket_name = ""
     credentials = {}
     app_path = ""
@@ -49,9 +50,20 @@ class Config:
     vue_assets = resource_filename("duckdown", "assets/vue/")
     vue_manifest = resource_filename("duckdown", "assets/vue/manifest.json")
 
-    def __init__(self):
+    def __init__(self, app_path=None, bucket=None, debug=None, port=None):
         """ init derived data members """
-        LOGGER.info("init app_path: %s", self.app_path)
+
+        # allow for command line override
+        if app_path is not None:
+            self.app_path = app_path
+        if bucket is not None:
+            self.bucket_name = bucket
+        if debug is not None:
+            self.debug = debug
+        if port is not None:
+            self.port = port
+
+        LOGGER.debug("init app_path: %s", self.app_path)
 
         self.static_path = os.path.join(self.app_path, self.STATIC_PATH)
         self.template_path = os.path.join(self.app_path, self.TEMPLATE_PATH)
@@ -63,6 +75,7 @@ class Config:
         """ setup tornado settings dict """
 
         settings.setdefault("debug", self.debug)
+        settings.setdefault("port", self.port)
         settings.setdefault("app_name", self.app_name)
         settings.setdefault("app_path", self.app_path)
 
