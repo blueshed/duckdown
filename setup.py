@@ -20,7 +20,7 @@ with open("README.md", "r") as fh:
 
 setup(
     name="duckdown",
-    version="0.0.48",
+    version="0.0.49",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/blueshed/duckdown/",
@@ -43,8 +43,7 @@ setup(
         "python-dotenv",
         "boto3",
         "cryptography",
-        "tld",
-        "qrcode"
+        "tld"
     ],
     entry_points={"console_scripts": ["duckdown=duckdown.tool:program.run"]},
 )

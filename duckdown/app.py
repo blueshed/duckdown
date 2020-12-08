@@ -27,7 +27,7 @@ class App(tornado.web.Application):
 
         if cfg.bucket_name:
             LOGGER.info("duckdown s3: %s", cfg.bucket_name)
-            s3client, s3region = make_s3client(**cfg.credentials)
+            s3client, s3region = self.make_duck_s3client(**cfg.credentials)
 
             self.folder = S3Folder(
                 cfg.bucket_name, client=s3client, region=s3region
@@ -48,7 +48,9 @@ class App(tornado.web.Application):
             cfg.convert_image_paths = False
             cfg.image_path = False
             if s3client is None:
-                s3client, s3region = make_s3client(**cfg.image_credentials)
+                s3client, s3region = self.make_duck_s3client(
+                    **cfg.image_credentials
+                )
             image_folder = S3Folder(
                 cfg.image_bucket, client=s3client, region=s3region
             )
@@ -57,7 +59,7 @@ class App(tornado.web.Application):
 
         settings = cfg.tornado_settings(settings or {})
         settings.setdefault("static_handler_class", handlers.StaticFiles)
-        routes = setup_routes(cfg, routes)
+        routes = self.setup_duck_routes(cfg, routes)
         super().__init__(
             routes,
             **settings,
@@ -78,91 +80,94 @@ class App(tornado.web.Application):
         """ return current site """
         return self.folder
 
+    def setup_duck_routes(self, cfg, routes):
+        """ do the thing """
+        routes = routes or []
 
-def setup_routes(cfg, routes):
-    """ do the thing """
-    routes = routes or []
-
-    login_handler = cfg.login_handler or (handlers.LoginHandler,)
-    routes.extend(
-        [
-            (r"/login", *login_handler),
-            (r"/logout", handlers.LogoutHandler),
-            (
-                r"/edit/browse/(.*)",
-                handlers.S3Browser,
-                {
-                    "bucket_name": cfg.image_bucket,
-                    "folder": cfg.image_path,
-                },
-            ),
-            (
-                r"/edit/assets/(.*)",
-                tornado.web.StaticFileHandler,
-                {"path": cfg.duck_assets},
-            ),
-            (r"/edit/mark/", handlers.MarkHandler),
-            (
-                r"/edit/pages/(.*)",
-                handlers.DirHandler,
-                {"directory": cfg.PAGE_PATH},
-            ),
-            (
-                r"/edit",
-                handlers.EditorHandler,
-                {"page": cfg.vue_page, "manifest": load_manifest(cfg)},
-            ),
-        ]
-    )
-
-    if cfg.debug is True:
-        LOGGER.info("vue dev handler: %s", cfg.vue_src)
-        routes.insert(
-            0,
-            (
-                r"/src/(.*)",
-                tornado.web.StaticFileHandler,
-                {"path": cfg.vue_src},
-            ),
-        )
-    else:
-        LOGGER.debug("vue manifest handler")
-        routes.insert(
-            0,
-            (
-                r"/_assets/(.*)",
-                tornado.web.StaticFileHandler,
-                {"path": cfg.vue_assets},
-            ),
+        login_handler = cfg.login_handler or (handlers.LoginHandler,)
+        routes.extend(
+            [
+                (r"/login", *login_handler),
+                (r"/logout", handlers.LogoutHandler),
+                (
+                    r"/edit/browse/(.*)",
+                    handlers.S3Browser,
+                    {
+                        "bucket_name": cfg.image_bucket,
+                        "folder": cfg.image_path,
+                    },
+                ),
+                (
+                    r"/edit/assets/(.*)",
+                    tornado.web.StaticFileHandler,
+                    {"path": cfg.duck_assets},
+                ),
+                (r"/edit/mark/", handlers.MarkHandler),
+                (
+                    r"/edit/pages/(.*)",
+                    handlers.DirHandler,
+                    {"directory": cfg.PAGE_PATH},
+                ),
+                (
+                    r"/edit",
+                    handlers.EditorHandler,
+                    {
+                        "page": cfg.vue_page,
+                        "manifest": self.load_vue_manifest(
+                            cfg.vue_manifest, cfg.debug
+                        ),
+                    },
+                ),
+            ]
         )
 
-    routes.append(
-        (
-            r"/(.*)",
-            handlers.SiteHandler,
-            {"pages": cfg.PAGE_PATH},
+        if cfg.debug is True:
+            LOGGER.info("vue dev handler: %s", cfg.vue_src)
+            routes.insert(
+                0,
+                (
+                    r"/src/(.*)",
+                    tornado.web.StaticFileHandler,
+                    {"path": cfg.vue_src},
+                ),
+            )
+        else:
+            LOGGER.debug("vue manifest handler")
+            routes.insert(
+                0,
+                (
+                    r"/_assets/(.*)",
+                    tornado.web.StaticFileHandler,
+                    {"path": cfg.vue_assets},
+                ),
+            )
+
+        routes.append(
+            (
+                r"/(.*)",
+                handlers.SiteHandler,
+                {"pages": cfg.PAGE_PATH},
+            )
         )
-    )
-    return routes
+        return routes
 
+    @classmethod
+    def load_vue_manifest(cls, path, debug):
+        """ loading manifest for vue dev environment """
+        manifest = None
+        if debug is False:
+            LOGGER.info("loading vue manifest: %s", path)
+            with open(path) as file:
+                manifest = json_utils.load(file)
+        return manifest
 
-def load_manifest(cfg):
-    """ loading manifest for vue dev environment """
-    manifest = None
-    if cfg.debug is False:
-        path = cfg.vue_manifest
-        LOGGER.info("loading vue manifest: %s", path)
-        with open(path) as file:
-            manifest = json_utils.load(file)
-    return manifest
-
-
-def make_s3client(**credentials):
-    """ determine region or get from env """
-    s3region = (
-        credentials["region_name"]
-        if "region_name" in credentials
-        else os.environ["AWS_REGION"]
-    )
-    s3client = boto3.client("s3", **credentials)
-    return s3client, s3region
+    @classmethod
+    def make_duck_s3client(cls, **credentials):
+        """ determine region or get from env """
+        s3region = (
+            credentials["region_name"]
+            if "region_name" in credentials
+            else os.environ["AWS_REGION"]
+        )
+        s3client = boto3.client("s3", **credentials)
+        return s3client, s3region

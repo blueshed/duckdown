@@ -29,6 +29,7 @@ def app():
 
         app_path = APP_PATH
         cookie_name = COOKIE_NAME
+        debug = True
 
     duck_app = App(AppConfig())
     return duck_app
