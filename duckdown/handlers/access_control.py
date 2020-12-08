@@ -78,10 +78,6 @@ class LoginHandler(
         self.page = page if page else "login.html"
         self.register = None
 
-    def get_template_path(self):
-        """ return app resource """
-        return self.settings["duck_templates"]
-
     def login(self, username, password):
         """ return a user """
         result = None

@@ -3,6 +3,7 @@ import logging
 import pytest
 from dotenv import load_dotenv
 from duckdown.app import App
+from duckdown.config import Config
 from duckdown.utils import json_utils
 from .utils import using_cookie
 
@@ -15,8 +16,17 @@ SAMPLE_FOLDER, SAMPLE_FILE = SAMPLE_KEY.split("/")
 
 
 @pytest.fixture
-def app():
-    return App(bucket="dkdn.blueshed.info", cookie_name="tets_duck")
+def app(test_site):
+    site_bucket, _, _, site_credentials = test_site
+
+    class AppConfig(Config):
+        """ config override for tests """
+
+        bucket_name = site_bucket
+        credentials = site_credentials
+        cookie_name = "tets_duck"
+
+    return App(AppConfig())
 
 
 def test_put(app):
@@ -62,7 +72,7 @@ def test_hello_world(http_client, base_url):
     assert response.code == 200
     print(response.body)
     assert (
-        b"//s3-eu-west-1.amazonaws.com/dkdn.blueshed.info/static/images/logo.svg"
+        b"//s3-us-east-1.amazonaws.com/test.duckdown.tech/static/images/logo.svg"
         in response.body
     )
 
@@ -86,15 +96,13 @@ def test_static(http_client, base_url):
     )
     assert response.code == 404
 
-        
+
 @pytest.mark.gen_test
 async def test_home(http_client, base_url):
     """ can we see home page """
 
     response = await http_client.fetch(
-        base_url,
-        follow_redirects=False,
-        raise_error=False
+        base_url, follow_redirects=False, raise_error=False
     )
     assert response.code == 200
 

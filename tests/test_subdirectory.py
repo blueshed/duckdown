@@ -1,10 +1,13 @@
 """ test s3 functionality """
+import os
 import contextlib
 import logging
 import pytest
 from dotenv import load_dotenv
 from duckdown.app import App
+from duckdown.config import Config
 from duckdown.utils import json_utils
+from duckdown.tool.create import populate_folder
 from .utils import using_cookie
 
 logging.getLogger().setLevel(logging.INFO)
@@ -15,18 +18,29 @@ SAMPLE = b"""Hello World! I'm a sample file."""
 SAMPLE_KEY = "test/test.txt"
 SAMPLE_FOLDER, SAMPLE_FILE = SAMPLE_KEY.split("/")
 COOKIE_NAME = "tets_duck"
+APP_PATH = "tests/data/test_subdir"
+SUB_DIR = "foo"
+
+
+class AppConfig(Config):
+    """ config override for tests """
+
+    app_path = APP_PATH
+    cookie_name = COOKIE_NAME
+
 
 class SubApp(App):
     """ An app that can serve sub directories """
 
     def get_site(self, user=None, path=None, request=None):
         """ return subdirectory """
-        return self.folder.for_subfolder("foo")
+        return self.folder.for_subfolder(SUB_DIR)
 
 
 @pytest.fixture(scope="session")
 def app():
-    app = SubApp(app_path="tests/subdir", cookie_name=COOKIE_NAME)
+    populate_folder(os.path.join(APP_PATH, SUB_DIR))
+    app = SubApp(AppConfig())
     return app
 
 
@@ -100,12 +114,10 @@ async def test_home(http_client, base_url):
     """ can we see home page """
 
     response = await http_client.fetch(
-        base_url,
-        follow_redirects=False,
-        raise_error=False
+        base_url, follow_redirects=False, raise_error=False
     )
     assert response.code == 200
-    
+
 
 @pytest.mark.gen_test
 async def test_login(http_client, base_url):

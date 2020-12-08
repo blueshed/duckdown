@@ -15,10 +15,6 @@ class EditorHandler(
         self.manifest = manifest
         self.page = page
 
-    def get_template_path(self):
-        """ return app resource """
-        return self.application.settings["duck_templates"]
-
     @authenticated
     def get(self):
         """ handle get request """

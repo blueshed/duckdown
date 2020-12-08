@@ -4,6 +4,8 @@ black
 pylint
 pytest
 pytest-tornado
+pytest-docker
+pytest-cov
 wheel
 twine
 nodeenv

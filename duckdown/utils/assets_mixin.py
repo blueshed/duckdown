@@ -18,3 +18,7 @@ class AssetsMixin:  # pylint: disable=too-few-public-methods
             },
             path,
         )
+
+    def get_template_path(self):
+        """ return app resource """
+        return self.settings["duck_templates"]

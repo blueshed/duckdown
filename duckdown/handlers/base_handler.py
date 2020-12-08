@@ -8,7 +8,7 @@ class BaseHandler(tornado.web.RequestHandler):
 
     def set_default_headers(self):
         """ allow access for development """
-        if self.application.settings.get("debug") is True:
+        if self.settings.get("debug") is True:
             self.set_header("Access-Control-Allow-Origin", "*")
             self.set_header("Access-Control-Allow-Headers", "duck-token")
             self.set_header(
@@ -18,7 +18,7 @@ class BaseHandler(tornado.web.RequestHandler):
 
     def options(self, *args, **kwargs):
         """ allow dev request """
-        if self.application.settings.get("debug") is True:
+        if self.settings.get("debug") is True:
             self.set_status(204)
             self.finish()
         else:

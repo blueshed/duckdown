@@ -84,7 +84,7 @@ def nav(_, site, path="/"):
 @task
 def test(ctx):
     """ run out tests """
-    ctx.run("pytest tests")
+    ctx.run("py.test --cov duckdown --cov-report term-missing tests")
 
 
 ns = Collection()

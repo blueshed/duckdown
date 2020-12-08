@@ -70,7 +70,7 @@ class SiteHandler(
         self, site, script_name, path
     ):  # pylint: disable=unused-argument
         """ load a module and call module.main """
-        name = f"{self.application.settings['script_path']}.{script_name}"
+        name = f"{self.settings['script_path']}.{script_name}"
         script_module = importlib.import_module(name)
 
         return script_module.main(path)
