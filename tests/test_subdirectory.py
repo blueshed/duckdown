@@ -39,7 +39,7 @@ class SubApp(App):
 
 @pytest.fixture(scope="session")
 def app():
-    populate_folder(os.path.join(APP_PATH, SUB_DIR))
+    populate_folder(os.path.join(APP_PATH, SUB_DIR), force=True)
     app = SubApp(AppConfig())
     return app
 
