@@ -1,0 +1,12 @@
+{
+  "name": "duckdown-bun",
+  "version": "0.1.0",
+  "description": "Duckdown CMS powered by Bun",
+  "scripts": {
+    "dev": "bun run --hot server.ts",
+    "start": "bun run server.ts"
+  },
+  "dependencies": {
+    "marked": "^15.0.0"
+  }
+}
