@@ -1,8 +1,7 @@
 import { resolve, join, extname, dirname, relative } from "path";
 import { readdir, stat, readFile, writeFile, unlink, mkdir } from "fs/promises";
-import { existsSync } from "fs";
+import { existsSync, statSync } from "fs";
 import { Marked } from "marked";
-import editor from "./editor.html";
 
 // --- Config ---
 
@@ -12,21 +11,21 @@ const STATIC_PATH = join(APP_PATH, "static");
 const TEMPLATES_PATH = join(APP_PATH, "templates");
 const IMAGES_PATH = "static/images/";
 const PORT = parseInt(process.env.PORT || "8080");
-const COOKIE_SECRET = process.env.COOKIE_SECRET || "duckdown-bun-secret";
+const DEBUG = process.env.DEBUG === "1";
+
+// Vue assets: built by `cd client && npm run build`
+const VUE_DIST = resolve("..", "client", "dist");
+const VITE_DEV_ORIGIN = "http://localhost:3000";
 
 // --- Markdown ---
 
-const marked = new Marked({
-  gfm: true,
-  breaks: false,
-});
+const marked = new Marked({ gfm: true, breaks: false });
 
 function parseMarkdownMeta(source: string): { meta: Record<string, string[]>; body: string } {
   const meta: Record<string, string[]> = {};
   const lines = source.split("\n");
   let i = 0;
 
-  // Parse YAML-like front matter (key: value lines before first blank line)
   while (i < lines.length && lines[i].trim() !== "") {
     const match = lines[i].match(/^(\w[\w-]*)\s*:\s*(.*)$/);
     if (match) {
@@ -39,9 +38,7 @@ function parseMarkdownMeta(source: string): { meta: Record<string, string[]>; bo
     }
   }
 
-  // Skip blank line after meta
   if (i < lines.length && lines[i].trim() === "") i++;
-
   const body = Object.keys(meta).length > 0 ? lines.slice(i).join("\n") : source;
   return { meta, body };
 }
@@ -55,17 +52,12 @@ async function convertMarkdown(source: string) {
 // --- File utilities ---
 
 const MIME_TYPES: Record<string, string> = {
-  ".md": "text/markdown",
-  ".html": "text/html",
-  ".css": "text/css",
-  ".js": "application/javascript",
-  ".json": "application/json",
-  ".svg": "image/svg+xml",
-  ".png": "image/png",
-  ".jpg": "image/jpeg",
-  ".jpeg": "image/jpeg",
-  ".gif": "image/gif",
-  ".ico": "image/x-icon",
+  ".md": "text/markdown", ".html": "text/html", ".css": "text/css",
+  ".js": "application/javascript", ".mjs": "application/javascript",
+  ".json": "application/json", ".svg": "image/svg+xml",
+  ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+  ".gif": "image/gif", ".ico": "image/x-icon", ".woff": "font/woff",
+  ".woff2": "font/woff2", ".ttf": "font/ttf",
 };
 
 function guessMime(path: string): string {
@@ -94,24 +86,18 @@ async function listFolder(dirPath: string, root: string) {
     const relPath = fullPath.substring(rootLen);
     if (entry.isFile()) {
       const s = await stat(fullPath);
-      files.push({
-        name: entry.name,
-        path: relPath,
-        file: true,
-        size: s.size,
-        type: guessMime(entry.name),
-      });
+      files.push({ name: entry.name, path: relPath, file: true, size: s.size, type: guessMime(entry.name) });
     } else if (entry.isDirectory()) {
-      folders.push({
-        name: entry.name,
-        path: relPath,
-        file: false,
-        size: null,
-        type: null,
-      });
+      folders.push({ name: entry.name, path: relPath, file: false, size: null, type: null });
     }
   }
   return { files, folders };
+}
+
+function serveFile(fullPath: string): Response {
+  return new Response(Bun.file(fullPath), {
+    headers: { "Content-Type": guessMime(fullPath) },
+  });
 }
 
 // --- Navigation builder ---
@@ -138,10 +124,7 @@ async function buildNav(pagesRoot: string): Promise<string> {
         dirs.push(join(dir, entry.name));
       }
     }
-
-    for (const d of dirs.sort()) {
-      await walk(d);
-    }
+    for (const d of dirs.sort()) await walk(d);
   }
 
   await walk(pagesRoot);
@@ -164,30 +147,15 @@ async function renderSitePage(path: string): Promise<Response> {
   const title = meta.title?.[0] || "duckdown";
   const theme = meta.theme?.[0] || "";
 
-  // Load theme CSS
   const themeFile = join(PAGES_PATH, dirname(file), "-theme.css");
   let themeCss = "";
   if (existsSync(themeFile)) {
     themeCss = await readFile(themeFile, "utf-8");
   }
 
-  // Load nav
   const siteNav = await buildNav(PAGES_PATH);
 
-  // Load site template or use default
-  const tmplPath = join(TEMPLATES_PATH, "site_tmpl.html");
-  let html: string;
-  if (existsSync(tmplPath)) {
-    const tmpl = await readFile(tmplPath, "utf-8");
-    // Simple template substitution (replaces Tornado template tags)
-    html = tmpl
-      .replace(/\{\{\s*handler\.one_meta_value\('title',\s*'duckdown'\)\s*\}\}/g, title)
-      .replace(/\{\{\s*handler\.one_meta_value\('theme'\)\s*\}\}/g, theme)
-      .replace(/\{\{\s*static_url\('site\.css'\)\s*\}\}/g, "/static/site.css")
-      .replace(/\{%\s*if theme_css\s*%\}(.*?)\{%\s*end\s*%\}/gs, themeCss ? `<style type="text/css">${themeCss}</style>` : "")
-      .replace(/\{%\s*raw content\s*%\}/g, content);
-  } else {
-    html = `<!DOCTYPE html>
+  const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -201,11 +169,67 @@ async function renderSitePage(path: string): Promise<Response> {
   ${content}
 </body>
 </html>`;
-  }
 
   return new Response(html, {
     headers: { "Content-Type": "text/html; charset=utf-8" },
   });
+}
+
+// --- Editor page ---
+
+function editorHtml(): string {
+  if (DEBUG) {
+    // Dev: proxy to Vite dev server for HMR
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>duckdown - editor</title>
+</head>
+<body class="duckdown">
+  <div id="app"></div>
+  <script type="module" src="${VITE_DEV_ORIGIN}/@vite/client"></script>
+  <script type="module" src="${VITE_DEV_ORIGIN}/src/main.js"></script>
+</body>
+</html>`;
+  }
+
+  // Production: serve Vite-built assets
+  // Read the manifest to find hashed filenames
+  const manifestPath = join(VUE_DIST, "manifest.json");
+  let scriptTag = "";
+  let styleTag = "";
+
+  if (existsSync(manifestPath)) {
+    const manifest = JSON.parse(Bun.file(manifestPath).toString());
+    const entry = manifest["src/main.js"] || manifest["index.js"] || Object.values(manifest)[0] as any;
+    if (entry?.file) scriptTag = `<script type="module" src="/edit/assets/${entry.file}"></script>`;
+    if (entry?.css) {
+      for (const css of entry.css) {
+        styleTag += `<link rel="stylesheet" href="/edit/assets/${css}">`;
+      }
+    }
+  } else if (existsSync(join(VUE_DIST, "index.html"))) {
+    // Newer Vite outputs index.html directly — just serve it
+    return Bun.file(join(VUE_DIST, "index.html")).toString();
+  } else {
+    scriptTag = "<!-- Vue dist not found. Run: cd client && npm run build -->";
+  }
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>duckdown - editor</title>
+  ${styleTag}
+</head>
+<body class="duckdown">
+  <div id="app"></div>
+  ${scriptTag}
+</body>
+</html>`;
 }
 
 // --- Bun Server ---
@@ -214,8 +238,19 @@ const server = Bun.serve({
   port: PORT,
 
   routes: {
-    // Editor — Bun HTML import (bundled, transpiled, cached)
-    "/edit": editor,
+    // Editor page (serves the Vue app)
+    "/edit": () => new Response(editorHtml(), {
+      headers: { "Content-Type": "text/html; charset=utf-8" },
+    }),
+
+    // Editor built assets (Vite output)
+    "/edit/assets/*": (req) => {
+      const url = new URL(req.url);
+      const path = url.pathname.replace("/edit/assets/", "");
+      const fullPath = safePath(VUE_DIST, path);
+      if (!existsSync(fullPath)) return new Response("Not Found", { status: 404 });
+      return serveFile(fullPath);
+    },
 
     // API: file/folder CRUD
     "/edit/pages/*": async (req) => {
@@ -224,32 +259,23 @@ const server = Bun.serve({
 
       if (req.method === "GET") {
         const fullPath = safePath(PAGES_PATH, path);
-
-        if (existsSync(fullPath) && (await stat(fullPath)).isFile()) {
-          const body = await readFile(fullPath);
-          return new Response(body, {
-            headers: { "Content-Type": guessMime(fullPath) },
-          });
+        if (existsSync(fullPath) && statSync(fullPath).isFile()) {
+          return serveFile(fullPath);
         }
-        // Directory listing
-        const listing = await listFolder(fullPath, PAGES_PATH);
-        return Response.json(listing);
+        return Response.json(await listFolder(fullPath, PAGES_PATH));
       }
 
       if (req.method === "PUT") {
         const fullPath = safePath(PAGES_PATH, path);
         const dir = dirname(fullPath);
         if (!existsSync(dir)) await mkdir(dir, { recursive: true });
-        const body = Buffer.from(await req.arrayBuffer());
-        await writeFile(fullPath, body);
+        await writeFile(fullPath, Buffer.from(await req.arrayBuffer()));
         return new Response("saved");
       }
 
       if (req.method === "DELETE") {
         const fullPath = safePath(PAGES_PATH, path);
-        if (!existsSync(fullPath)) {
-          return new Response("Not Found", { status: 404 });
-        }
+        if (!existsSync(fullPath)) return new Response("Not Found", { status: 404 });
         await unlink(fullPath);
         return new Response("deleted");
       }
@@ -257,26 +283,22 @@ const server = Bun.serve({
       return new Response("Method Not Allowed", { status: 405 });
     },
 
-    // API: markdown preview
+    // API: markdown to HTML preview
     "/edit/mark/": async (req) => {
-      if (req.method !== "PUT") {
-        return new Response("Method Not Allowed", { status: 405 });
-      }
+      if (req.method !== "PUT") return new Response("Method Not Allowed", { status: 405 });
       const raw = await req.text();
       const { content, meta } = await convertMarkdown(raw);
       return Response.json({ content, meta, toc: "" });
     },
 
-    // API: image browsing (local filesystem)
+    // API: image browser + upload
     "/edit/browse/*": async (req) => {
       const url = new URL(req.url);
       const path = url.pathname.replace("/edit/browse/", "");
       const imagesDir = join(APP_PATH, IMAGES_PATH);
 
       if (req.method === "GET") {
-        const fullPath = safePath(imagesDir, path);
-        const listing = await listFolder(fullPath, imagesDir);
-        return Response.json(listing);
+        return Response.json(await listFolder(safePath(imagesDir, path), imagesDir));
       }
 
       if (req.method === "PUT") {
@@ -301,20 +323,13 @@ const server = Bun.serve({
       return new Response("Method Not Allowed", { status: 405 });
     },
 
-    // Static files
-    "/static/*": async (req) => {
+    // Static files from the site
+    "/static/*": (req) => {
       const url = new URL(req.url);
       const path = url.pathname.replace("/static/", "");
       const fullPath = safePath(STATIC_PATH, path);
-
-      if (!existsSync(fullPath)) {
-        return new Response("Not Found", { status: 404 });
-      }
-
-      const body = await readFile(fullPath);
-      return new Response(body, {
-        headers: { "Content-Type": guessMime(fullPath) },
-      });
+      if (!existsSync(fullPath)) return new Response("Not Found", { status: 404 });
+      return serveFile(fullPath);
     },
   },
 
@@ -327,3 +342,5 @@ const server = Bun.serve({
 });
 
 console.log(`duckdown bun running on http://localhost:${server.port}`);
+console.log(`  site:   ${APP_PATH}`);
+console.log(`  editor: ${DEBUG ? "dev (Vite at " + VITE_DEV_ORIGIN + ")" : VUE_DIST}`);

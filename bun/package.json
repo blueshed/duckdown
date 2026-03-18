@@ -1,10 +1,11 @@
 {
   "name": "duckdown-bun",
   "version": "0.1.0",
-  "description": "Duckdown CMS powered by Bun",
+  "description": "Duckdown CMS — Bun backend serving Vite-built Vue editor",
   "scripts": {
-    "dev": "bun run --hot server.ts",
-    "start": "bun run server.ts"
+    "dev": "DEBUG=1 bun run --hot server.ts",
+    "start": "bun run server.ts",
+    "build:client": "cd ../client && npm install && npm run build"
   },
   "dependencies": {
     "marked": "^15.0.0"
