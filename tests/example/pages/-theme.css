@@ -1,0 +1,14 @@
+/* Wobbling duck */
+@keyframes wobble {
+  0%, 100% { transform: rotate(-2deg); }
+  50% { transform: rotate(2deg); }
+}
+
+img[alt="duckdown"] {
+  animation: wobble 3s ease-in-out infinite;
+  transform-origin: bottom center;
+}
+
+#logo{
+  max-width: 320px;
+}

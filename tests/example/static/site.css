@@ -1,0 +1,132 @@
+*,
+*::before,
+*::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 16px;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  font-family: system-ui, -apple-system, sans-serif;
+  line-height: 1.6;
+  color: #222;
+  background: #fff;
+  padding: 2rem;
+  max-width: 48rem;
+  margin: 0 auto;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  line-height: 1.2;
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+}
+
+p, blockquote, pre, table {
+  margin-bottom: 1em;
+}
+
+ul, ol {
+  margin-bottom: 1em;
+  padding-left: 1.5em;
+  list-style-position: inside;
+}
+
+ul { list-style-type: disc; }
+ol { list-style-type: decimal; }
+
+li {
+  margin-bottom: 0.25em;
+}
+
+li:has(> input[type="checkbox"]) {
+  list-style: none;
+  margin-left: -1.5em;
+}
+
+li > input[type="checkbox"] {
+  margin-right: 0.4em;
+  vertical-align: middle;
+}
+
+li > ul, li > ol {
+  margin-bottom: 0;
+  margin-top: 0.25em;
+}
+
+a {
+  color: inherit;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+pre {
+  padding: 1em;
+  overflow-x: auto;
+  background: #f5f5f5;
+  border-radius: 4px;
+  font-size: 0.875em;
+}
+
+code {
+  font-family: ui-monospace, "SF Mono", monospace;
+  font-size: 0.875em;
+}
+
+p code {
+  padding: 0.15em 0.4em;
+  background: #f5f5f5;
+  border-radius: 3px;
+}
+
+blockquote {
+  padding-left: 1em;
+  border-left: 3px solid #ddd;
+  color: #555;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th, td {
+  padding: 0.5em 0.75em;
+  border: 1px solid #ddd;
+  text-align: left;
+}
+
+th {
+  background: #f9f9f9;
+  font-weight: 600;
+}
+
+nav ul {
+  list-style: none;
+  display: flex;
+  gap: 1.5em;
+  margin-bottom: 2em;
+}
+
+nav a {
+  text-decoration: none;
+  font-weight: 500;
+}
+
+nav a:hover {
+  text-decoration: underline;
+}
+
+.user_edit {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+}

@@ -1,0 +1,32 @@
+services:
+  minio:
+    image: minio/minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: minio123
+    command: server /data --console-address ":9001"
+
+  createbucket:
+    image: minio/mc
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      sleep 2;
+      mc alias set local http://minio:9000 minio minio123;
+      mc mb local/duckdown --ignore-existing;
+      mc anonymous set download local/duckdown;
+      mc cp /seed/pages/index.md local/duckdown/pages/index.md;
+      mc cp /seed/static/site.css local/duckdown/static/site.css;
+      mc cp /seed/static/favicon.ico local/duckdown/static/favicon.ico;
+      mc cp /seed/static/robots.txt local/duckdown/static/robots.txt;
+      mc cp /seed/static/images/logo.svg local/duckdown/static/images/logo.svg;
+      mc cp /seed/templates/site_tmpl.html local/duckdown/templates/site_tmpl.html;
+      mc cp /seed/users.json local/duckdown/users.json;
+      echo 'Bucket seeded.';
+      "
+    volumes:
+      - ./tests/example:/seed:ro
