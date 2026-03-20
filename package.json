@@ -1,0 +1,36 @@
+{
+  "name": "duckdown",
+  "version": "0.0.1",
+  "description": "A markdown CMS built with Bun and Railroad",
+  "author": "Peter Bunyan <peter@blueshed.co.uk> (https://blueshed.co.uk)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/blueshed/duckdown"
+  },
+  "homepage": "https://github.com/blueshed/duckdown",
+  "keywords": ["cms", "markdown", "bun", "railroad", "signals", "jsx"],
+  "scripts": {
+    "dev": "bun run --hot server/main.ts",
+    "dev:s3": "docker compose -f tests/compose.yml up -d && bun run --env-file=.env.s3 --hot server/main.ts",
+    "s3:up": "docker compose -f tests/compose.yml up -d",
+    "s3:down": "docker compose -f tests/compose.yml down",
+    "s3:logs": "docker compose -f tests/compose.yml logs -f",
+    "start": "bun run server/main.ts",
+    "check": "bunx tsc --noEmit",
+    "test": "bun test tests/",
+    "setup": "bun run create/setup.ts"
+  },
+  "bun-create": {
+    "postinstall": "bun run create/setup.ts"
+  },
+  "dependencies": {
+    "@blueshed/railroad": "github:blueshed/railroad",
+    "feather-icons": "^4.29.2"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.11",
+    "@types/feather-icons": "^4.29.4",
+    "typescript": "^5.9.3"
+  }
+}

@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>duckie — login</title>
+  <link rel="stylesheet" href="./styles.css">
+  <style>
+    .login { margin: 6em auto; width: 320px; }
+    .login form { padding: 1.5em; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+    .title { margin-bottom: 1.5em; text-align: center; font-size: 1.2em; font-weight: 600; }
+    .form-input { width: 100%; margin-bottom: 0.75em; }
+    .form-input input { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 4px; box-sizing: border-box; background: var(--bg); color: var(--text); }
+    .error { color: #c00; margin-bottom: 1em; font-size: 0.9em; }
+    .action { text-align: center; }
+    .action button { padding: 8px 24px; border: none; border-radius: 4px; background: var(--accent); color: #fff; cursor: pointer; }
+    .action button:hover { background: var(--accent-hover); }
+  </style>
+</head>
+<body>
+  <div class="login">
+    <form method="post">
+      <div class="title">duckie</div>
+      <div id="error"></div>
+      <div class="form-input">
+        <input type="text" name="email" placeholder="email" required autofocus>
+      </div>
+      <div class="form-input">
+        <input type="password" name="password" placeholder="password" required>
+      </div>
+      <input type="hidden" name="next" value="/">
+      <div class="action">
+        <button type="submit">Sign In</button>
+      </div>
+    </form>
+  </div>
+</body>
+</html>

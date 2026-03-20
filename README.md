@@ -1,72 +1,74 @@
-# duckdown
+# Duckdown
 
-Duckdown is a [tornado](https://tornadoweb.org) application.
-It uses python-markdown to convert pages to html dynamically and then
-presents those pages though tornado templates. This provides an easy syntax for users to
-edit their content and developers the ability to style the presentation.
+A markdown CMS built with [Bun](https://bun.sh) and [Railroad](https://github.com/blueshed/railroad).
 
-The templates, static files and pages can be hosted on Amazon S3. The
-published site is static and can make use of CDN resources.  The
-cost of hosting a site in this way would ¢ ranther than $ per month.
+Write markdown, see it live, publish your site.
 
-In order to make the site secure you would still need to host the site
-in Route53 and provide Amazon hosted certificate and we're writing a
-tool to automate that. The editing service can be provided by heroku
-on a hobby server - the one I'm looking at now uses 38mb of the memory and 
-idles at 0 load!
+## Quick Start
 
-## Tools:
-
-Duckdown installed is an invoke tool that you call from the command line.
-```
-% duckdown -l
-Subcommands:
-
-  create    create a duckdown app at path
-  publish   generate public site
-  run       run app
+```sh
+bun create blueshed/duckdown my-site
+cd my-site
+bun run dev
 ```
 
-### create
-```
-% duckdown create site
-```
-This will create a folder in the current directory called site which
-contains three folders: templates, static, pages.
+Open [http://localhost:8080](http://localhost:8080) to see your site.
+Login at [http://localhost:8080/login](http://localhost:8080/login) with `admin` / `admin`.
 
-- tempates: contains the site_tmpl.html used to render markdown pages
-- static: contains resouces used by templates
-- pages: contains markdown pages stating with index.md
+## Features
 
+- Markdown editor with live preview
+- Front-matter metadata (title, theme, nav)
+- Theme CSS per folder
+- Image browser with upload
+- Navigation generated from `index.md` files
+- JWT authentication
+- Local filesystem or S3 storage
+- Zero build step — Bun serves everything
 
-### To use ###
-```
-python3 -m venv venv
-source venv/bin/activate
-pip install duckdown
-duckdown create site
-duckdown run site
-```
-
-You view the site on: http://localhost:8080
-
-You can edit the site at http://localhost:8080/edit
-
-the defaut username/password:
-```
-username: admin
-password: admin
-```
-
----
-
-### Dev ###
+## Project Structure
 
 ```
-python3 -m venv venv
-source venv/bin/activate
-pip install -r dev-requirements.txt
-inv server
+├── server/
+│   ├── main.ts          # Resources and routes
+│   ├── config.ts        # Environment config
+│   ├── storage.ts       # Local / S3 storage
+│   ├── auth.ts          # JWT auth
+│   ├── markdown.ts      # Front-matter + Bun.markdown
+│   ├── routes/          # Route handlers
+│   └── edit/            # Editor UI (Railroad + JSX)
+├── tests/
+│   ├── example/         # Sample site content
+│   └── *.test.ts        # Integration tests
+├── create/              # bun create scaffolder
+└── package.json
 ```
 
-Now using: https://prismjs.com
+## Scripts
+
+```sh
+bun run dev        # Development with HMR
+bun run start      # Production
+bun run test       # Run tests
+bun run check      # TypeScript check
+bun run dev:s3     # Start MinIO + run with S3 storage
+```
+
+## Storage
+
+Set `DUCKDOWN_BUCKET` to use S3, otherwise local filesystem.
+
+```sh
+# Local (default)
+DUCKDOWN_PATH=./tests/example
+
+# S3 / MinIO
+DUCKDOWN_BUCKET=my-bucket
+DUCKDOWN_ENDPOINT=http://localhost:9000
+S3_ACCESS_KEY_ID=minio
+S3_SECRET_ACCESS_KEY=minio123
+```
+
+## License
+
+MIT
