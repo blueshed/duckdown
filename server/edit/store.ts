@@ -8,10 +8,32 @@ export const editorContent = signal("");
 export const browserRevision = signal(0);
 export const showImages = signal(false);
 
+// Which folder of the site the editor is working in. pages/ is the writing;
+// templates/ wraps every page; static/ is site.css and the rest. They are
+// separate routes on the server, each rooted in its own folder, so nothing
+// here can reach across them or at users.json.
+export const SECTIONS = ["pages", "templates", "static"] as const;
+export type Section = (typeof SECTIONS)[number];
+export const section = signal<Section>("pages");
+
+const at = (path: string) => `/edit/${section.peek()}/${urlPath(path)}`;
+
+// Changing section puts down whatever was open: a file belongs to the folder
+// it was opened from, and saving it into another would be a surprise.
+export function goToSection(next: Section) {
+  batch(() => {
+    section.set(next);
+    filePath.set(null);
+    fileContent.set("");
+    editorContent.set("");
+  });
+  reloadBrowser();
+}
+
 // Actions. Each says whether it worked; api() has already spoken if not.
 export async function loadFile(path: string): Promise<boolean> {
   const fp = path.replace(/^\//, "");
-  const res = await api(`open ${fp}`, `/edit/pages/${urlPath(fp)}`);
+  const res = await api(`open ${fp}`, at(fp));
   if (!res.ok) return false;
   const content = await res.text();
   batch(() => {
@@ -29,7 +51,7 @@ export async function createFile(path: string, name: string): Promise<string | v
   const body = name === "-theme.css"
     ? `/* Theme CSS for this folder */\n/* Set theme: mytheme in your page front-matter */\n/* Then target body.mytheme here */\n\nbody.mytheme {\n  \n}\n`
     : `title: ${name.replace(/\.md$/, "")}\n\n`;
-  const res = await api(`create ${fp}`, `/edit/pages/${urlPath(fp)}`, { method: "PUT", headers: { "If-None-Match": "*" }, body }, [412]);
+  const res = await api(`create ${fp}`, at(fp), { method: "PUT", headers: { "If-None-Match": "*" }, body }, [412]);
   if (res.status === 412) return `${fp} already exists`;
   if (!res.ok) return `Couldn't create ${fp}`;
   await loadFile(fp);
@@ -39,7 +61,7 @@ export async function createFile(path: string, name: string): Promise<string | v
 export async function saveFile(): Promise<boolean> {
   const fp = filePath.peek();
   if (!fp) return false;
-  const res = await api(`save ${fp}`, `/edit/pages/${urlPath(fp)}`, { method: "PUT", body: editorContent.peek() });
+  const res = await api(`save ${fp}`, at(fp), { method: "PUT", body: editorContent.peek() });
   if (!res.ok) return false;
   fileContent.set(editorContent.peek());
   reloadBrowser();
@@ -49,7 +71,7 @@ export async function saveFile(): Promise<boolean> {
 export async function deleteFile(): Promise<boolean> {
   const fp = filePath.peek();
   if (!fp) return false;
-  const res = await api(`delete ${fp}`, `/edit/pages/${urlPath(fp)}`, { method: "DELETE" });
+  const res = await api(`delete ${fp}`, at(fp), { method: "DELETE" });
   if (!res.ok) return false;
   batch(() => {
     filePath.set(null);

@@ -272,6 +272,12 @@ A page's theme cascades (`loadThemeCss`): the root's `-theme.css`, then each fol
 
 What the site knows about itself lives in `nav.ts`: the nav, and each folder's `{{pages}}` listing. In production both are built once and dropped by `pagesChanged()` whenever the pages route writes or deletes, because every write goes through the server — a new write path to pages must call it too. With `DEBUG=1` they're built per request instead, so pages written straight to disk (by hand, or by a session using the authoring skill) show up at once.
 
+The editor edits three folders, each its own route built by `fileRoutes()`
+(`routes/files.ts`): `pages/`, `templates/` and `static/`. Each is rooted in its
+own folder, so none can reach across them — and `users.json` sits at the site
+root, in none of them, which is why the hashes stay out of the editor. Keep it
+that way when adding a section.
+
 Front matter takes only the keys duckdown reads (`KEYS` in `markdown.ts`) or an `x-` extension, unless the block is fenced with `---`, which takes anything: a page opening "Update: closed Monday" keeps its first line. Add a key there and in the skill's reference together.
 
 `routes/site.ts` turns a page into a response: a folder is served by its `index.md` (`/blog`, `/blog/`, `/blog/index.html`), `draft: true` is 404 unless the reader is signed in, `layout:` picks the template, and the values it puts into the template are escaped.

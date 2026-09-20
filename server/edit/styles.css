@@ -474,3 +474,31 @@ button.danger-subtle:hover {
   color: var(--text-dim);
   font-style: italic;
 }
+
+/* Which folder of the site the browser is showing: pages, templates, static. */
+.browser-sections {
+  display: flex;
+  gap: 2px;
+  padding: 6px 8px 0;
+}
+
+.browser-sections .section {
+  flex: 1;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 4px 4px 0 0;
+  background: transparent;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.browser-sections .section:hover {
+  color: var(--text);
+}
+
+.browser-sections .section.on {
+  background: var(--panel-alt, rgba(127, 127, 127, 0.12));
+  color: var(--text);
+}

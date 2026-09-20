@@ -21,6 +21,9 @@ New sites get all of this already.
 - **`GET /health`** — a static `OK`, so a platform's healthcheck proves the process is listening without reading storage, and a content mistake never reads as a dead service.
 - **The pid file can't strand a container.** `claimPidFile()` refused to start whenever the pid file named a *live* process. In a container the app is a low pid, and on a mounted volume the file outlives a hard kill: "pid 1 is alive" is always true, so a hard restart could refuse to start for good — a crash loop with no bad input. It now refuses only a live *duckdown*, using the `ps` check `bun run stop` already had. (`DUCKDOWN_PID=` still turns the file off entirely, which is the right setting on an ephemeral filesystem.)
 
+- **The editor reaches the whole site, not just its pages.** `templates/site.html` decides what every page is wrapped in and `static/site.css` decides how it looks; both were editable only from a terminal, which on a bucket-backed deployment meant not at all. The browser now has **pages · templates · static**, each its own route rooted in its own folder — so nothing can reach across them, and `users.json` (password hashes, at the site root) is in none of them and stays out of the editor. Switching section puts down whatever was open, so a file can't be saved into the wrong folder, and a template gets no preview rather than having its placeholders run through the markdown renderer.
+- **`css:` gives one page its own stylesheet.** `css: print` links `/static/print.css` after the theme cascade, so a single page can look however it likes without needing a `layout:` of its own. The name is guarded like `layout`, so a page can't reach out of `static/`.
+
 ### Security
 
 - **Passwords are hashed.** `users.json` now stores `Bun.password.hash()` output instead of plaintext; login verifies via `Bun.password.verify()`. **Breaking:** existing `users.json` files must be regenerated — plaintext entries will no longer authenticate.

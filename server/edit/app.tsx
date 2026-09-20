@@ -24,6 +24,7 @@ if (urlPath) loadFile(urlPath);
 
 const hasFile = computed(() => filePath.get() !== null);
 const isCss = computed(() => filePath.get()?.endsWith(".css") ?? false);
+const isMarkdown = computed(() => filePath.get()?.endsWith(".md") ?? false);
 
 const app = document.getElementById("app")!;
 
@@ -52,7 +53,12 @@ app.appendChild(editorPanel);
 app.appendChild(
   when(
     hasFile,
-    () => when(isCss, () => <CssPreview />, () => <Preview />),
+    // Markdown gets the rendered preview and CSS gets the sample page. A
+    // template is neither: running site.html through the markdown renderer
+    // showed a soup of its own placeholders, which helped nobody.
+    () => when(isCss, () => <CssPreview />,
+      () => when(isMarkdown, () => <Preview />,
+        () => <div class="panel panel-preview"><div class="placeholder">no preview for this kind of file</div></div>)),
     () => <div class="panel panel-preview"><div class="placeholder">preview</div></div>,
   ),
 );

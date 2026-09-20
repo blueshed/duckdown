@@ -8,6 +8,7 @@ import { notice, speak, hush } from "../server/edit/notice";
 import {
   filePath, fileContent, editorContent, showImages, browserRevision,
   loadFile, createFile, saveFile, deleteFile, reloadBrowser, toggleImages, closeImages,
+  section, goToSection,
 } from "../server/edit/store";
 import { Icon } from "../server/edit/components/Icon";
 import { Notice } from "../server/edit/components/Notice";
@@ -339,6 +340,50 @@ describe("NewDialog", () => {
   test("offers no Theme where the folder has one", async () => {
     const { host, dispose } = render(() => <NewDialog hasTheme={true} oncreate={async () => {}} oncancel={() => {}} />);
     expect(button(host, "Theme")).toBeUndefined();
+    dispose();
+  });
+});
+
+describe("sections", () => {
+  afterEach(() => goToSection("pages"));
+
+  test("goToSection puts down whatever was open, so nothing is saved to the wrong folder", async () => {
+    expect(await loadFile("index.md")).toBe(true);
+    expect(filePath.peek()).toBe("index.md");
+
+    goToSection("templates");
+    expect(section.peek()).toBe("templates");
+    expect(filePath.peek()).toBeNull();
+    expect(editorContent.peek()).toBe("");
+  });
+
+  test("the editor reads and writes in the section it is in", async () => {
+    goToSection("templates");
+    expect(await loadFile("site.html")).toBe(true);
+    expect(fileContent.peek()).toContain("{{content}}");
+
+    editorContent.set(fileContent.peek() + "\n<!-- edited in the editor -->");
+    expect(await saveFile()).toBe(true);
+
+    const fresh = await (await fetch(`${BASE}/edit/templates/site.html`, { headers: { Accept: "text/plain" } })).text();
+    expect(fresh).toContain("edited in the editor");
+  });
+
+  test("the browser lists the section you pick", async () => {
+    const { host, dispose } = render(() => <Browser />);
+    await waitFor(() => rows(host).includes("index.md"));
+
+    const button = (name: string) =>
+      [...host.querySelectorAll(".browser-sections button")].find((b) => b.textContent === name) as HTMLElement;
+    expect(button("pages").className).toContain("on");
+
+    click(button("templates"));
+    await waitFor(() => rows(host).includes("site.html"));
+    expect(rows(host)).not.toContain("index.md");
+    expect(button("templates").className).toContain("on");
+
+    click(button("static"));
+    await waitFor(() => rows(host).includes("site.css"));
     dispose();
   });
 });
@@ -678,6 +723,14 @@ describe("the app", () => {
 
     await loadFile("-theme.css");
     await waitFor(() => previewFrame()?.srcdoc.includes("Wobbling duck"));
+
+    // A template is neither markdown nor CSS: say so rather than run its
+    // placeholders through the markdown renderer.
+    goToSection("templates");
+    await loadFile("site.html");
+    await waitFor(() => app.querySelector(".panel-preview .placeholder") !== null);
+    expect(app.querySelector(".panel-preview .placeholder")!.textContent).toBe("no preview for this kind of file");
+    goToSection("pages");
 
     filePath.set(null);
     expect(app.querySelector(".panel-editor .placeholder")!.textContent).toBe("select a file");

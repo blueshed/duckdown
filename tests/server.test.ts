@@ -540,6 +540,55 @@ describe("folders, the edit link, layouts, drafts and listings", () => {
   });
 });
 
+describe("editing the site's other folders", () => {
+  test("templates and static are listed, read, written and deleted", async () => {
+    for (const [section, name, body] of [
+      ["templates", "post.html", "<html><body>{{content}}</body></html>"],
+      ["static", "print.css", "body { color: black }"],
+    ] as const) {
+      const at = `${BASE}/edit/${section}/${name}`;
+      expect((await fetch(at, authed({ method: "PUT", body }))).status).toBe(200);
+      expect(await (await fetch(at, authed())).text()).toBe(body);
+
+      const listing = await (await fetch(`${BASE}/edit/${section}/`, authed())).json();
+      expect(listing.files.some((f: any) => f.name === name)).toBe(true);
+
+      expect((await fetch(at, authed({ method: "PUT", headers: { "If-None-Match": "*" }, body }))).status).toBe(412);
+      expect((await fetch(at, authed({ method: "DELETE" }))).status).toBe(200);
+      expect((await fetch(at, authed({ method: "DELETE" }))).status).toBe(404);
+      expect((await fetch(at, authed())).status).toBe(404);
+    }
+  });
+
+  test("they need signing in, like pages do", async () => {
+    expect((await fetch(`${BASE}/edit/templates/`)).status).toBe(401);
+    expect((await fetch(`${BASE}/edit/static/`)).status).toBe(401);
+  });
+
+  test("users.json is in none of them, so the hashes stay out of the editor", async () => {
+    for (const path of ["/edit/pages/users.json", "/edit/templates/users.json", "/edit/static/users.json"]) {
+      expect((await fetch(`${BASE}${path}`, authed())).status).toBe(404);
+    }
+  });
+});
+
+describe("a page's own stylesheet", () => {
+  const put = (path: string, body: string) => fetch(`${BASE}/edit/pages/${path}`, authed({ method: "PUT", body }));
+
+  test("css: links that sheet from static, after the theme", async () => {
+    await put("styled.md", "title: Styled\ncss: print\n\n# Styled");
+    const html = await (await fetch(`${BASE}/styled.html`)).text();
+    expect(html).toContain('<link rel="stylesheet" href="/static/print.css">');
+  });
+
+  test("a name that could climb out of static is ignored", async () => {
+    await put("sneaky.md", "title: Sneaky\ncss: ../../etc/passwd\n\n# Sneaky");
+    const html = await (await fetch(`${BASE}/sneaky.html`)).text();
+    expect(html).not.toContain("passwd");
+    expect(html).not.toContain('<link rel="stylesheet" href="/static/');
+  });
+});
+
 describe("path traversal", () => {
   test("blocks traversal in pages, even encoded", async () => {
     const error = hush("error");

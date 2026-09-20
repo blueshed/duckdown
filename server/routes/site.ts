@@ -90,7 +90,15 @@ const renderPage = async (req: Request) => {
       ? `<meta name="description" content="${escapeHtml(description)}">\n  <meta property="og:description" content="${escapeHtml(description)}">`
       : ""],
     ["nav", () => nav ? `<nav><ul class="nav">${nav}</ul></nav>` : ""],
-    ["theme_css", () => themeCss ? `<style>${themeCss}</style>` : ""],
+    // The theme cascade, then a stylesheet this page asked for by name:
+    // `css: print` links /static/print.css after it, so one page can look
+    // however it likes without needing a template of its own. Guarded like
+    // `layout`, so a page can't reach out of static/.
+    ["theme_css", () => {
+      const sheet = meta.css?.[0] ?? "";
+      return (themeCss ? `<style>${themeCss}</style>` : "")
+        + (/^[\w-]+$/.test(sheet) ? `\n  <link rel="stylesheet" href="/static/${sheet}.css">` : "");
+    }],
     ["edit", () => user ? `<a class="user-edit" href="/edit?path=${encodeURIComponent(key)}">Edit this page</a>` : ""],
     // Last, so a placeholder written in a page's own text is never filled in.
     ["content", () => body],

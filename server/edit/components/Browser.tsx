@@ -3,7 +3,7 @@ import type { FileEntry, FolderEntry, Listing } from "../../storage";
 import { Icon } from "./Icon";
 import { NewDialog } from "./NewDialog";
 import { apiJson, urlPath } from "../api";
-import { loadFile, createFile, browserRevision } from "../store";
+import { loadFile, createFile, browserRevision, section, goToSection, SECTIONS } from "../store";
 
 export const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name);
 
@@ -16,7 +16,7 @@ export function Browser() {
 
   const load = async (folder: string) => {
     path.set(folder);
-    const data = await apiJson<Listing>(`list /${folder}`, `/edit/pages/${urlPath(folder)}`);
+    const data = await apiJson<Listing>(`list /${folder}`, `/edit/${section.peek()}/${urlPath(folder)}`);
     if (!data) return;
     files.set(data.files.sort(byName));
     folders.set(data.folders.sort(byName));
@@ -37,11 +37,20 @@ export function Browser() {
   // Reload when browserRevision changes
   effect(() => {
     browserRevision.get();
+    section.get(); // a new section lists from its own root, at the top
     load(path.peek());
   });
 
   return (
     <div class="panel panel-browser">
+      <div class="browser-sections">
+        {SECTIONS.map((name) => (
+          <button
+            class={section.map((s) => (s === name ? "section on" : "section"))}
+            onclick={() => { path.set(""); goToSection(name); }}
+          >{name}</button>
+        ))}
+      </div>
       <div class="browser-header">
         <span style="flex:1; font-size: 12px; color: var(--text-dim);">/{path}</span>
         <button onclick={() => showNew.set(true)}>

@@ -4,7 +4,7 @@ import { existsSync, cpSync } from "fs";
 import { S3Client } from "bun";
 import {
   IS_S3, APP_PATH, SEED_PATH, BUCKET, BUCKET_PREFIX, BUCKET_ENDPOINT, BUCKET_REGION,
-  PAGE_PATH, STATIC_PATH, IMAGES_PATH,
+  PAGE_PATH, STATIC_PATH, IMAGES_PATH, TEMPLATES_PATH,
 } from "./config";
 
 // --- Types ---
@@ -259,4 +259,5 @@ export function storageAt(sub = "", s3 = IS_S3): Storage {
 export const createStorage = () => storageAt();
 export const createPageStorage = () => storageAt(PAGE_PATH);
 export const createStaticStorage = () => storageAt(STATIC_PATH);
+export const createTemplateStorage = () => storageAt(TEMPLATES_PATH);
 export const createImageStorage = () => storageAt(IMAGES_PATH);

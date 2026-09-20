@@ -5,6 +5,7 @@ import { seedLocalSite, seedBucketSite } from "./storage";
 import { scaffoldNotice } from "./scaffold";
 import { handleLoginGet, handleLoginPost, handleLogout, ensureAdmin } from "./auth";
 import { handlePages } from "./routes/pages";
+import { handleTemplateFiles, handleStaticFiles } from "./routes/site-files";
 import { handleMark } from "./routes/mark";
 import { handleBrowse } from "./routes/browse";
 import { handleStatic } from "./routes/static";
@@ -35,6 +36,8 @@ export const server = Bun.serve({
     "/login": { GET: handleLoginGet, POST: handleLoginPost },
     "/logout": { POST: handleLogout },
     "/edit/pages/*": handlePages,
+    "/edit/templates/*": handleTemplateFiles,
+    "/edit/static/*": handleStaticFiles,
     "/edit/mark/": handleMark,
     "/edit/browse/*": handleBrowse,
     "/static/*": handleStatic,
