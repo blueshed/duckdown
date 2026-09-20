@@ -2,6 +2,7 @@ import homepage from "./edit/index.html";
 import { PORT, DEBUG, printConfig } from "./config";
 import { claimPidFile } from "./pid";
 import { seedLocalSite, seedBucketSite } from "./storage";
+import { scaffoldNotice } from "./scaffold";
 import { handleLoginGet, handleLoginPost, handleLogout, ensureAdmin } from "./auth";
 import { handlePages } from "./routes/pages";
 import { handleMark } from "./routes/mark";
@@ -47,3 +48,5 @@ printConfig();
 console.log(`  site: ${server.url}`);
 console.log(`  edit: ${server.url}edit`);
 console.log(`  login: ${server.url}login`);
+// Said last, so it is the thing left on screen.
+if (scaffoldNotice()) console.log(scaffoldNotice());

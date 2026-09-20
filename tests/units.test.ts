@@ -8,6 +8,7 @@ import { LocalStorage, S3Storage, storageAt, seedLocalSite } from "../server/sto
 import { loadSecret, signJwt, verifyJwt, ensureAdmin } from "../server/auth";
 import { handleError } from "../server/routes/error";
 import { fromSite, viewLine, logView } from "../server/log";
+import { scaffoldNotice } from "../server/scaffold";
 
 const scratch = (name: string) => join(RUN, `units-${name}`);
 
@@ -40,14 +41,21 @@ describe("pid", () => {
     expect(readPid(file)).toBe(process.ppid);
   });
 
-  test("claimPidFile: takes over a live pid that isn't a duckdown", () => {
+  test("claimPidFile: takes over a live pid that isn't a duckdown", async () => {
     // The container case: the file outlives a hard kill on a volume and the
-    // pid it names now belongs to something else. Here that's this test
-    // runner — alive, and `ps` says it's `bun test`, not a server.
+    // pid it names now belongs to something else. A spawned sleep is alive and
+    // `ps` plainly says "sleep", which is the point — this must not depend on
+    // what the command line of whatever launched the test happens to contain.
+    const other = Bun.spawn(["sleep", "30"]);
     const file = scratch("recycled.pid");
-    writeFileSync(file, `${process.ppid}\n`);
-    expect(() => claimPidFile(file)).not.toThrow();
-    expect(readPid(file)).toBe(process.pid);
+    writeFileSync(file, `${other.pid}\n`);
+    try {
+      expect(() => claimPidFile(file)).not.toThrow();
+      expect(readPid(file)).toBe(process.pid);
+    } finally {
+      other.kill("SIGKILL");
+      await other.exited;
+    }
   });
 
   test("claimPidFile: takes over a stale file, and releasePidFile removes it", async () => {
@@ -253,6 +261,8 @@ describe("auth", () => {
       warn.mockRestore();
     }
     expect(() => loadSecret("", false)).toThrow("COOKIE_SECRET must be set");
+    // In duckdown's own checkout there is nothing to scaffold, so the message stays plain.
+    expect(() => loadSecret("", false)).not.toThrow("bun run setup");
   });
 
   test("verifyJwt accepts our tokens and nothing else", async () => {
@@ -344,5 +354,38 @@ describe("view log", () => {
     } finally {
       log.mockRestore();
     }
+  });
+});
+
+describe("scaffold notice", () => {
+  const make = (files: Record<string, string>) => {
+    const root = scratch(`scaffold-${Math.random().toString(36).slice(2)}`);
+    mkdirSync(root, { recursive: true });
+    for (const [path, body] of Object.entries(files)) {
+      const full = join(root, path);
+      mkdirSync(join(full, ".."), { recursive: true });
+      writeFileSync(full, body);
+    }
+    return root;
+  };
+  const scaffolded = { "package.json": '{"name":"my-site"}', "create/setup.ts": "" };
+
+  test("says so when bun create copied the repo and never ran setup", () => {
+    const notice = scaffoldNotice(make(scaffolded));
+    expect(notice).toContain("bun run setup");
+    expect(notice).toContain("hasn't been set up yet");
+  });
+
+  test("silent in duckdown's own checkout, where bun-create is still in the manifest", () => {
+    expect(scaffoldNotice(make({ ...scaffolded, "package.json": '{"bun-create":{"postinstall":"x"}}' }))).toBe("");
+  });
+
+  test("silent once there is a site, or no scaffolder, or no manifest to read", () => {
+    const done = make(scaffolded);
+    mkdirSync(join(done, "site"));
+    expect(scaffoldNotice(done)).toBe("");                                  // already set up
+    expect(scaffoldNotice(make({ "package.json": "{}" }))).toBe("");        // setup already removed itself
+    expect(scaffoldNotice(make({ "create/setup.ts": "" }))).toBe("");       // not a bun project at all
+    expect(scaffoldNotice(make({ ...scaffolded, "package.json": "{ not json" }))).toBe("");
   });
 });

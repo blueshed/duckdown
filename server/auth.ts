@@ -1,6 +1,7 @@
 import type { BunRequest } from "bun";
 import { createStorage } from "./storage";
 import { USERS_PATH, DEBUG } from "./config";
+import { scaffoldNotice } from "./scaffold";
 
 const site = createStorage();
 
@@ -10,7 +11,10 @@ export function loadSecret(secret = process.env.COOKIE_SECRET, debug = DEBUG): s
     console.warn("COOKIE_SECRET not set — using an insecure development default. Set COOKIE_SECRET before deploying.");
     return "duckie-dev-secret";
   }
-  throw new Error("COOKIE_SECRET must be set outside development mode (set DEBUG=1 for local dev instead).");
+  // This is the first thing a new site walks into when `bun create` didn't run
+  // setup: no .env means no DEBUG=1, so we refuse to start — over a secret,
+  // which is nothing to do with what actually went wrong. Say what did.
+  throw new Error("COOKIE_SECRET must be set outside development mode (set DEBUG=1 for local dev instead)." + scaffoldNotice());
 }
 
 const SECRET = loadSecret();

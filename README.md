@@ -9,8 +9,14 @@ Write markdown, see it live, publish your site.
 ```sh
 bun create blueshed/duckdown my-site
 cd my-site
+bun run setup     # bun should do this for you; as of Bun 1.4.2 it doesn't
 bun run dev
 ```
+
+`bun create` prints `$ bun run create/setup.ts` and, on Bun 1.4.2, doesn't run
+it. Until that's fixed upstream, run it yourself — it makes `site/`, writes
+`.env`, and clears away what belongs to developing duckdown. Skip it and the
+server won't start, and will tell you why.
 
 Open [http://localhost:8080](http://localhost:8080) to see your site.
 Login at [http://localhost:8080/login](http://localhost:8080/login) with `admin` / `admin`.
