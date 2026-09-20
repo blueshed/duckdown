@@ -1,5 +1,6 @@
 title: Themes
 theme: duckdown
+toc: true
 
 # Themes
 
@@ -7,55 +8,84 @@ Themes let you style your site with CSS. No build tools, no config — just a CS
 
 ## How it works
 
-1. Create a file called `-theme.css` in your pages folder
-2. Set `theme: mytheme` in your page's front-matter
-3. Your CSS targets `body.mytheme`
+1. Create a file called `-theme.css` in your pages folder (in the editor: **New → Theme**)
+2. Set `theme: mytheme` in a page's front-matter
+3. In `-theme.css`, set a few variables on `body.mytheme`
 
 That's it.
 
-## Example
+## Set variables, not styles
 
-Here's the theme you're looking at right now:
+The site's stylesheet, `static/site.css`, draws everything — text, links, code, tables, callouts, the navigation — from a handful of CSS variables. A theme only changes the ones it cares about:
 
 ```css
-body.duckdown {
-  background: #51ABC4;
-  color: #147C99;
-  font-family: 'Georgia', serif;
-}
-
-body.duckdown h1 {
-  text-transform: uppercase;
-  letter-spacing: 2px;
+body.mytheme {
+  --accent: #b5179e;
+  --font-body: Georgia, serif;
+  --measure: 40rem;
 }
 ```
 
-And the page references it:
+| Variable | What it sets |
+|----------|-------------|
+| `--bg`, `--text` | The page's background and text |
+| `--muted` | Quieter text: quotes, the navigation |
+| `--accent` | Links, the page you're on in the navigation, the contents list |
+| `--border`, `--surface` | Lines, and the background of code, table headings and the contents list |
+| `--font-body`, `--font-mono` | Fonts for text and for code |
+| `--font-heading` | Headings' font (they use `--font-body` unless you set it) |
+| `--measure` | How wide the text runs |
+| `--radius` | How round the corners are |
+| `--note`, `--tip`, `--important`, `--warning`, `--caution` | The [[pages#callouts\|callout]] colours |
 
-```markdown
-title: My Page
-theme: duckdown
+You can still write any CSS you like after that: the variables are just the easy part.
 
-# This gets the theme
+## Dark mode
+
+The site follows each reader's light or dark setting. To adjust your theme for dark mode, set its variables again inside a media query:
+
+```css
+@media (prefers-color-scheme: dark) {
+  body.mytheme {
+    --accent: #f28fdf;
+  }
+}
 ```
 
-## Per-folder themes
+## Themes cascade
 
-Each folder can have its own `-theme.css`. A blog section can look completely different from your homepage:
+A page gets the `-theme.css` of the top folder, then of each folder down to its own. A theme set at the top applies everywhere, and a folder can refine it:
 
 ```
 pages/
-├── -theme.css        ← homepage theme
+├── -theme.css        ← every page
 ├── index.md
 └── blog/
-    ├── -theme.css    ← blog theme
-    └── index.md
+    ├── -theme.css    ← pages in blog/, after the one above
+    └── first-post.md
 ```
 
-## Base styles
+> [!TIP]
+> Since the top folder's `-theme.css` reaches every page, keep each theme's rules under its own `body.name`.
 
-The file `static/site.css` is loaded on every page *before* the theme. Use it for resets and shared styles. The theme builds on top.
+## Example
+
+This page uses the `duckdown` theme. Here it is:
+
+```css
+body.duckdown {
+  --accent: #147c99;
+  --font-heading: Georgia, "Times New Roman", serif;
+  --duck: var(--accent); /* the logo: see the Images guide */
+}
+
+@media (prefers-color-scheme: dark) {
+  body.duckdown {
+    --accent: #5cc1dc;
+  }
+}
+```
 
 ## Live preview
 
-When you edit `-theme.css` in the editor, the CSS preview panel shows your changes applied to sample content — with the correct `body` class, so you see exactly what your theme does.
+When you edit `-theme.css` in the editor, the preview shows your changes on sample content — headings, links, code, a table and a callout — with your theme's `body` class, so you see exactly what it does.

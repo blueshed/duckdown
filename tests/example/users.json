@@ -1,1 +1,1 @@
-{ "admin": "admin" }
+{ "admin": "$argon2id$v=19$m=65536,t=2,p=1$sA9SLlknYdD3a/aDlRXgjsgf9qHOIRGJ6F1ZpZzsPPA$RjI2R7yqczX8wshDnh+mUw4WJ1mzedtXWce4LrGAs44" }

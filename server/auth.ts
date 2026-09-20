@@ -1,10 +1,19 @@
 import type { BunRequest } from "bun";
 import { createStorage } from "./storage";
-import { USERS_PATH } from "./config";
+import { USERS_PATH, DEBUG } from "./config";
 
 const site = createStorage();
 
-const SECRET = process.env.COOKIE_SECRET || "duckie-dev-secret";
+export function loadSecret(secret = process.env.COOKIE_SECRET, debug = DEBUG): string {
+  if (secret) return secret;
+  if (debug) {
+    console.warn("COOKIE_SECRET not set — using an insecure development default. Set COOKIE_SECRET before deploying.");
+    return "duckie-dev-secret";
+  }
+  throw new Error("COOKIE_SECRET must be set outside development mode (set DEBUG=1 for local dev instead).");
+}
+
+const SECRET = loadSecret();
 const COOKIE_NAME = process.env.COOKIE_NAME || "duckie_token";
 const TOKEN_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
 
@@ -31,7 +40,7 @@ async function hmacKey(): Promise<CryptoKey> {
   );
 }
 
-async function signJwt(payload: Record<string, unknown>): Promise<string> {
+export async function signJwt(payload: Record<string, unknown>): Promise<string> {
   const header = base64url(new TextEncoder().encode(JSON.stringify({ alg: "HS256", typ: "JWT" })));
   const body = base64url(new TextEncoder().encode(JSON.stringify(payload)));
   const data = `${header}.${body}`;
@@ -40,37 +49,77 @@ async function signJwt(payload: Record<string, unknown>): Promise<string> {
   return `${data}.${base64url(new Uint8Array(sig))}`;
 }
 
-async function verifyJwt(token: string): Promise<Record<string, unknown> | null> {
+export async function verifyJwt(token: string): Promise<Record<string, unknown> | null> {
   const parts = token.split(".");
   if (parts.length !== 3) return null;
 
-  const data = `${parts[0]}.${parts[1]}`;
-  const sig = base64urlDecode(parts[2]);
-  const key = await hmacKey();
-  const valid = await crypto.subtle.verify("HMAC", key, sig.buffer as ArrayBuffer, new TextEncoder().encode(data));
-  if (!valid) return null;
+  try {
+    const data = `${parts[0]}.${parts[1]}`;
+    const sig = base64urlDecode(parts[2]!);
+    const key = await hmacKey();
+    const valid = await crypto.subtle.verify("HMAC", key, sig.buffer as ArrayBuffer, new TextEncoder().encode(data));
+    if (!valid) return null;
 
-  const payload = JSON.parse(new TextDecoder().decode(base64urlDecode(parts[1])));
-  if (payload.exp && Date.now() / 1000 > payload.exp) return null;
+    const payload = JSON.parse(new TextDecoder().decode(base64urlDecode(parts[1]!)));
+    if (payload.exp && Date.now() / 1000 > payload.exp) return null;
 
-  return payload;
+    return payload;
+  } catch {
+    // Not base64 or not JSON: not a token we issued, so simply signed out
+    // (rather than a 500 for whoever carries a mangled cookie).
+    return null;
+  }
 }
 
 // --- Users ---
 
+// No users file means nobody can sign in: say so in the log, rather than
+// leave every attempt looking like a wrong password. A broken one throws,
+// and the login page says the file can't be read.
 async function loadUsers(): Promise<Record<string, string>> {
-  try {
-    const raw = await site.read(USERS_PATH);
-    return JSON.parse(raw);
-  } catch {
+  if (!(await site.exists(USERS_PATH))) {
+    console.error(`No ${USERS_PATH} in the site folder, so nobody can sign in.`);
     return {};
   }
+  return JSON.parse(await site.read(USERS_PATH));
+}
+
+// A deployment's first user, from the environment. A site seeded from the
+// example (or from `bun create`) would otherwise carry that seed's admin onto
+// the internet, at a known URL. Set DUCKDOWN_ADMIN_PASSWORD and the user is
+// written to users.json at startup, so the secret lives in the platform rather
+// than in git; change the variable and the next restart changes the password.
+// Nothing happens when it isn't set, which is every local run.
+export async function ensureAdmin(
+  password = process.env.DUCKDOWN_ADMIN_PASSWORD,
+  email = process.env.DUCKDOWN_ADMIN_USER || "admin",
+): Promise<boolean> {
+  if (!password) return false;
+  const users: Record<string, string> = (await site.exists(USERS_PATH))
+    ? JSON.parse(await site.read(USERS_PATH))
+    : {};
+  // Already this password: leave the file alone, so a restart isn't a write
+  // (on S3 that's a PUT) and the hash doesn't churn.
+  if (users[email] && (await Bun.password.verify(password, users[email]))) return false;
+  users[email] = await Bun.password.hash(password);
+  await site.write(USERS_PATH, JSON.stringify(users, null, 2) + "\n");
+  console.log(`  admin: ${email} set in ${USERS_PATH} from DUCKDOWN_ADMIN_PASSWORD`);
+  return true;
+}
+
+// Only allow redirecting to a same-origin path — an absolute or
+// protocol-relative `next` would let /login act as an open redirect.
+function safeNext(next: string | null | undefined, fallback = "/"): string {
+  if (next && next.startsWith("/") && !next.startsWith("//")) return next;
+  return fallback;
 }
 
 // --- Public API ---
 
-export async function getUser(req: BunRequest): Promise<string | null> {
-  const token = req.cookies.get(COOKIE_NAME);
+// Takes any Request: the site's pages are served by the fetch fallback, which
+// gets a plain one (no .cookies), and they show an edit link when signed in.
+export async function getUser(req: Request): Promise<string | null> {
+  const token = new Bun.CookieMap(req.headers.get("cookie") ?? "").get(COOKIE_NAME);
   if (!token) return null;
   const payload = await verifyJwt(token);
   return (payload?.sub as string) || null;
@@ -79,7 +128,12 @@ export async function getUser(req: BunRequest): Promise<string | null> {
 export async function requireAuth(req: BunRequest): Promise<Response | null> {
   const user = await getUser(req);
   if (user) return null;
-  const next = encodeURIComponent(new URL(req.url).pathname);
+  // A page load goes to the login form and comes back; the editor's fetches
+  // get a 401 to act on (see edit/api.ts), not the login page's HTML.
+  if (!req.headers.get("accept")?.includes("text/html")) {
+    return new Response("Unauthorized", { status: 401 });
+  }
+  const next = encodeURIComponent(safeNext(new URL(req.url).pathname));
   return Response.redirect(`/login?next=${next}`, 302);
 }
 
@@ -87,7 +141,7 @@ export async function requireAuth(req: BunRequest): Promise<Response | null> {
 
 const loginHtml = await Bun.file(import.meta.dir + "/edit/login.html").text();
 
-function renderLogin(status: number, error?: string, email?: string, next?: string): Response {
+function renderLogin(status: number, next: string, error?: string, email?: string): Response {
   const res = new Response(loginHtml, { headers: { "Content-Type": "text/html" } });
   const rewritten = new HTMLRewriter()
     .on("#error", {
@@ -105,7 +159,7 @@ function renderLogin(status: number, error?: string, email?: string, next?: stri
     })
     .on("input[name=next]", {
       element(el) {
-        el.setAttribute("value", next || "/");
+        el.setAttribute("value", next);
       },
     })
     .transform(res);
@@ -118,24 +172,34 @@ function renderLogin(status: number, error?: string, email?: string, next?: stri
 
 // --- Route handlers ---
 
+// Signing in lands in the editor unless `next` says otherwise; already signed
+// in, /login goes straight there.
 export async function handleLoginGet(req: BunRequest): Promise<Response> {
-  const next = new URL(req.url).searchParams.get("next") || "/";
-  return renderLogin(200, undefined, undefined, next);
+  const next = safeNext(new URL(req.url).searchParams.get("next"), "/edit");
+  if (await getUser(req)) return Response.redirect(next, 302);
+  return renderLogin(200, next);
 }
 
 export async function handleLoginPost(req: BunRequest): Promise<Response> {
   const form = await req.formData();
   const email = form.get("email") as string;
   const password = form.get("password") as string;
-  const next = (form.get("next") as string) || "/";
+  const next = safeNext(form.get("next") as string, "/edit");
 
   if (!email || !password) {
-    return renderLogin(400, "Email and password required", email, next);
+    return renderLogin(400, next, "Email and password required", email);
   }
 
-  const users = await loadUsers();
-  if (users[email] !== password) {
-    return renderLogin(401, "Invalid email or password", email, next);
+  let users: Record<string, string>;
+  try {
+    users = await loadUsers();
+  } catch (e) {
+    console.error(`Couldn't read ${USERS_PATH}:`, e);
+    return renderLogin(500, next, `Sign-in is broken: ${USERS_PATH} can't be read. See the server log.`, email);
+  }
+  const hash = users[email];
+  if (!hash || !(await Bun.password.verify(password, hash))) {
+    return renderLogin(401, next, "Invalid email or password", email);
   }
 
   const token = await signJwt({
@@ -152,8 +216,13 @@ export async function handleLoginPost(req: BunRequest): Promise<Response> {
   return res;
 }
 
+// POST only (see main.ts), and never from another site: browsers label each
+// request with Sec-Fetch-Site, so a form elsewhere can't sign you out.
 export function handleLogout(req: BunRequest): Response {
-  const next = new URL(req.url).searchParams.get("next") || "/";
+  if (req.headers.get("sec-fetch-site") === "cross-site") {
+    return new Response("Cross-site logout refused", { status: 403 });
+  }
+  const next = safeNext(new URL(req.url).searchParams.get("next"));
   const res = Response.redirect(next, 302);
   res.headers.append("Set-Cookie", `${COOKIE_NAME}=; Path=/; HttpOnly; Max-Age=0`);
   return res;

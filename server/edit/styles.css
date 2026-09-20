@@ -77,6 +77,18 @@ html, body {
   color: var(--text);
 }
 
+/* Logout is a form (a POST); its button looks like the other header links */
+.header-form {
+  display: contents;
+}
+
+button.header-link,
+button.header-link:hover {
+  padding: 0;
+  border: none;
+  background: none;
+}
+
 /* --- Panels --- */
 
 .panel {
@@ -133,6 +145,15 @@ html, body {
 .file-list .folder {
   color: var(--accent);
   font-weight: 500;
+}
+
+.file-list .thumb {
+  width: 20px;
+  height: 20px;
+  object-fit: cover;
+  border-radius: 3px;
+  flex-shrink: 0;
+  background: var(--border);
 }
 
 /* --- Editor area --- */
@@ -222,20 +243,41 @@ button.danger-subtle:hover {
   background: rgba(220, 38, 38, 0.1);
 }
 
-/* --- Toast --- */
+/* --- Notice: failures speak --- */
 
-.toast {
-  padding: 6px 12px;
-  background: #34c759;
+.notice {
+  position: fixed;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: min(640px, calc(100vw - 32px));
+  padding: 8px 8px 8px 14px;
+  border-radius: 6px;
+  background: #dc2626;
   color: #fff;
-  font-size: 12px;
-  text-align: center;
-  animation: toast-in 0.2s ease-out;
+  font-size: 13px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  animation: notice-in 0.2s ease-out;
 }
 
-@keyframes toast-in {
-  from { opacity: 0; transform: translateY(-4px); }
-  to { opacity: 1; transform: translateY(0); }
+.notice button {
+  padding: 4px;
+  border: none;
+  background: transparent;
+  color: #fff;
+}
+
+.notice button:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+@keyframes notice-in {
+  from { opacity: 0; transform: translate(-50%, 4px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
 }
 
 /* --- Browser header --- */
@@ -393,6 +435,12 @@ button.danger-subtle:hover {
   font-size: 12px;
   color: var(--text-dim);
   line-height: 1.5;
+}
+
+.dialog-error {
+  margin-top: 12px;
+  font-size: 12px;
+  color: #dc2626;
 }
 
 .new-options {

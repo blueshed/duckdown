@@ -1,0 +1,8 @@
+[test]
+# Configures the environment and a DOM before any test file loads.
+preload = ["./tests/setup.ts"]
+
+# bun run test enforces full line and function coverage of the app
+# (the helpers under tests/ aren't the app).
+coverageThreshold = 1.0
+coveragePathIgnorePatterns = ["tests/**"]

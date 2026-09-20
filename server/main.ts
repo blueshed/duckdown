@@ -1,20 +1,37 @@
 import homepage from "./edit/index.html";
 import { PORT, DEBUG, printConfig } from "./config";
-import { handleLoginGet, handleLoginPost, handleLogout } from "./auth";
+import { claimPidFile } from "./pid";
+import { seedLocalSite } from "./storage";
+import { handleLoginGet, handleLoginPost, handleLogout, ensureAdmin } from "./auth";
 import { handlePages } from "./routes/pages";
 import { handleMark } from "./routes/mark";
 import { handleBrowse } from "./routes/browse";
 import { handleStatic } from "./routes/static";
 import { handleSite } from "./routes/site";
+import { handleError } from "./routes/error";
 
-const server = Bun.serve({
+// The editor's stylesheet at a stable URL, for the login page (which is not
+// an HTML import, so Bun never bundles its <link>).
+const editorCss = Bun.file(`${import.meta.dir}/edit/styles.css`);
+
+// Before listening: a second server stops here, and a dev site is seeded
+// before any request reads it.
+claimPidFile();
+seedLocalSite();
+await ensureAdmin();
+
+export const server = Bun.serve({
   port: PORT,
   development: DEBUG,
 
   routes: {
+    // A platform's healthcheck: proves the process is listening without
+    // reading storage, so a content mistake never reads as a dead service.
+    "/health": new Response("OK"),
     "/edit": homepage,
+    "/edit/styles.css": editorCss,
     "/login": { GET: handleLoginGet, POST: handleLoginPost },
-    "/logout": handleLogout,
+    "/logout": { POST: handleLogout },
     "/edit/pages/*": handlePages,
     "/edit/mark/": handleMark,
     "/edit/browse/*": handleBrowse,
@@ -22,6 +39,7 @@ const server = Bun.serve({
   },
 
   fetch: handleSite,
+  error: handleError,
 });
 
 printConfig();

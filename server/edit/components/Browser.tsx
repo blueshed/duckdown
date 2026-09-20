@@ -1,38 +1,37 @@
 import { createElement, signal, effect, list, when } from "@blueshed/railroad";
+import type { FileEntry, FolderEntry, Listing } from "../../storage";
 import { Icon } from "./Icon";
 import { NewDialog } from "./NewDialog";
+import { apiJson, urlPath } from "../api";
 import { loadFile, createFile, browserRevision } from "../store";
 
+export const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name);
+
 export function Browser() {
-  const files = signal<any[]>([]);
-  const folders = signal<any[]>([]);
+  const files = signal<FileEntry[]>([]);
+  const folders = signal<FolderEntry[]>([]);
   const path = signal("");
   const showNew = signal(false);
   const hasTheme = signal(false);
 
   const load = async (folder: string) => {
     path.set(folder);
-    try {
-      const res = await fetch(`/edit/pages/${folder}`);
-      if (!res.ok) return;
-      const data = await res.json();
-      files.set((data.files || []).sort((a: any, b: any) => a.name.localeCompare(b.name)));
-      folders.set((data.folders || []).sort((a: any, b: any) => a.name.localeCompare(b.name)));
-      hasTheme.set(files.peek().some((f: any) => f.name === "-theme.css"));
-    } catch {}
+    const data = await apiJson<Listing>(`list /${folder}`, `/edit/pages/${urlPath(folder)}`);
+    if (!data) return;
+    files.set(data.files.sort(byName));
+    folders.set(data.folders.sort(byName));
+    hasTheme.set(data.files.some((f) => f.name === "-theme.css"));
   };
 
-  const onCreate = (type: "page" | "folder" | "theme", name: string) => {
+  // Resolves to a message (the name is taken) to keep the dialog open with.
+  const onCreate = async (type: "page" | "folder" | "theme", name: string): Promise<string | void> => {
+    const dir = `/${path.peek() ? path.peek() + "/" : ""}`;
+    const error =
+      type === "theme" ? await createFile(`${dir}-theme.css`, "-theme.css")
+      : type === "folder" ? await createFile(`${dir}${name}/index.md`, name)
+      : await createFile(`${dir}${name.endsWith(".md") ? name : `${name}.md`}`, name);
+    if (error) return error;
     showNew.set(false);
-    const p = path.peek();
-    if (type === "theme") {
-      createFile(`/${p ? p + "/" : ""}-theme.css`, "-theme.css");
-    } else if (type === "folder") {
-      createFile(`/${p ? p + "/" : ""}${name}/index.md`, "index.md");
-    } else {
-      const fileName = name.endsWith(".md") ? name : `${name}.md`;
-      createFile(`/${p ? p + "/" : ""}${fileName}`, fileName);
-    }
   };
 
   // Reload when browserRevision changes
@@ -58,14 +57,15 @@ export function Browser() {
             </li>
           ),
         )}
-        {list(folders, (f: any) => f.path, (f: any) => (
-          <li class="folder" onclick={() => load(f.path.replace(/^\//, ""))}>
-            <Icon name="folder" size={12} /> {f.name}
+        {/* Keyed rows get a signal per row, not the item: read it with .map/.peek */}
+        {list(folders, (f) => f.path, (f$) => (
+          <li class="folder" onclick={() => load(f$.peek().path.replace(/^\//, ""))}>
+            <Icon name="folder" size={12} /> {f$.map((f) => f.name)}
           </li>
         ))}
-        {list(files, (f: any) => f.path, (f: any) => (
-          <li onclick={() => loadFile(f.path)}>
-            <Icon name={f.name.endsWith(".css") ? "droplet" : "file-text"} size={12} /> {f.name}
+        {list(files, (f) => f.path, (f$) => (
+          <li onclick={() => loadFile(f$.peek().path)}>
+            <Icon name={f$.peek().name.endsWith(".css") ? "droplet" : "file-text"} size={12} /> {f$.map((f) => f.name)}
           </li>
         ))}
       </ul>

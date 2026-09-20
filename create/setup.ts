@@ -3,66 +3,62 @@
 // Post-create setup: run after `bun create blueshed/duckdown my-site`
 // Tidies the cloned repo into a fresh site.
 
-import { rmSync, mkdirSync, cpSync, writeFileSync, existsSync } from "fs";
+import { rmSync, mkdirSync, writeFileSync, existsSync, copyFileSync } from "fs";
 import { join } from "path";
 
-const root = process.cwd();
-const name = root.split("/").pop() || "my-site";
+// Only when run (bun create's postinstall), never on import: tests call
+// setup() on a scratch folder, since it deletes things.
+if (import.meta.main) await setup(process.cwd());
 
-console.log(`Setting up ${name}...`);
+export async function setup(root: string): Promise<void> {
+  const name = root.split("/").pop() || "my-site";
 
-// Remove development artifacts
-for (const path of ["tests", "feature.md", ".claude"]) {
-  rmSync(join(root, path), { recursive: true, force: true });
-}
+  console.log(`Setting up ${name}...`);
 
-// Create a fresh site folder from the seed data
-const siteDir = join(root, "site");
-if (!existsSync(siteDir)) {
-  mkdirSync(join(siteDir, "pages"), { recursive: true });
-  mkdirSync(join(siteDir, "static", "images"), { recursive: true });
-  mkdirSync(join(siteDir, "templates"), { recursive: true });
+  // Create a fresh site folder, before the seed site (tests/example) goes
+  const siteDir = join(root, "site");
+  if (!existsSync(siteDir)) {
+    mkdirSync(join(siteDir, "pages"), { recursive: true });
+    mkdirSync(join(siteDir, "static", "images"), { recursive: true });
+    mkdirSync(join(siteDir, "templates"), { recursive: true });
 
-  // Default pages
-  writeFileSync(join(siteDir, "pages", "index.md"), `title: ${name}
+    // Default pages
+    writeFileSync(join(siteDir, "pages", "index.md"), `title: ${name}
 
 # Welcome to ${name}
 
 Your new site is ready. [Login to edit](/login).
 `);
 
-  // Default static
-  writeFileSync(join(siteDir, "static", "site.css"), `body {
-  margin: 0;
-  padding: 2em;
-  font-family: system-ui, -apple-system, sans-serif;
-  color: #333;
-}
-`);
+    // The seed site's stylesheet: built on variables, so a theme is a few lines
+    copyFileSync(join(root, "tests", "example", "static", "site.css"), join(siteDir, "static", "site.css"));
 
-  // Default template
-  writeFileSync(join(siteDir, "templates", "site.html"), `<!DOCTYPE html>
+    // Default template
+    writeFileSync(join(siteDir, "templates", "site.html"), `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{{title}}</title>
+  {{description}}
   <link href="/static/site.css" rel="stylesheet">
   {{theme_css}}
 </head>
 <body class="{{theme}}">
   {{nav}}
   {{content}}
+  {{edit}}
 </body>
 </html>
 `);
 
-  // Default users
-  writeFileSync(join(siteDir, "users.json"), JSON.stringify({ admin: "admin" }, null, 2) + "\n");
-}
+    // Default users — password hashed, never stored in plaintext
+    const adminHash = await Bun.password.hash("admin");
+    writeFileSync(join(siteDir, "users.json"), JSON.stringify({ admin: adminHash }, null, 2) + "\n");
+  }
 
-// Write .env pointing to the site folder
-writeFileSync(join(root, ".env"), `DUCKDOWN_PATH=./site
+  // Write .env pointing to the site folder
+  writeFileSync(join(root, ".env"), `DUCKDOWN_PATH=./site
 PORT=8080
 DEBUG=1
 
@@ -75,10 +71,18 @@ DEBUG=1
 # S3_SECRET_ACCESS_KEY=minio123
 `);
 
-// Clean up create folder itself
-rmSync(join(root, "create"), { recursive: true, force: true });
+  // Remove what belongs to developing duckdown itself. A new site keeps the
+  // rest of .claude: the authoring skill, for writing the site's content, and
+  // launch.json, for the desktop app's preview. Railroad's skills are for
+  // working on the editor, so they go.
+  for (const path of [
+    "tests", "feature.md", "todo.jsonl", "bunfig.toml", "create",
+    join(".claude", "skills", "railroad"), join(".claude", "skills", "bun-route"),
+  ]) {
+    rmSync(join(root, path), { recursive: true, force: true });
+  }
 
-console.log(`
+  console.log(`
   ${name} is ready!
 
   bun run dev        # Start development server
@@ -88,3 +92,4 @@ console.log(`
   Editor:       http://localhost:8080/edit
   Login:        http://localhost:8080/login (admin/admin)
 `);
+}

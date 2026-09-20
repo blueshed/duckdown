@@ -14,6 +14,12 @@ export const BUCKET_REGION = process.env.DUCKDOWN_REGION || "us-east-1";
 
 // Local storage
 export const APP_PATH = resolve(process.env.DUCKDOWN_PATH || "./tests/example");
+// Local dev: if APP_PATH doesn't exist yet, start it as a copy of this seed
+// site, so editing never touches the seed (e.g. DUCKDOWN_SEED=./tests/example).
+export const SEED_PATH = process.env.DUCKDOWN_SEED ? resolve(process.env.DUCKDOWN_SEED) : "";
+
+// Pid file, written at startup and removed on exit. DUCKDOWN_PID= (empty) turns it off.
+export const PID_FILE = process.env.DUCKDOWN_PID === "" ? "" : resolve(process.env.DUCKDOWN_PID || "duckdown.pid");
 
 // Derived paths (shared layout regardless of backend)
 export const PAGE_PATH = "pages/";
@@ -24,13 +30,25 @@ export const USERS_PATH = "users.json";
 
 export const IS_S3 = BUCKET !== "";
 
-export function printConfig() {
-  console.log(`duckie`);
-  if (IS_S3) {
-    console.log(`  storage: s3://${BUCKET}/${BUCKET_PREFIX}`);
-    if (BUCKET_ENDPOINT) console.log(`  endpoint: ${BUCKET_ENDPOINT}`);
+const running = {
+  s3: IS_S3, bucket: BUCKET, prefix: BUCKET_PREFIX, endpoint: BUCKET_ENDPOINT,
+  path: APP_PATH, debug: DEBUG, pidFile: PID_FILE, pid: process.pid,
+};
+
+// The startup banner's lines, for this configuration or any other.
+export function configLines(c: typeof running = running): string[] {
+  const lines = ["duckie"];
+  if (c.s3) {
+    lines.push(`  storage: s3://${c.bucket}/${c.prefix}`);
+    if (c.endpoint) lines.push(`  endpoint: ${c.endpoint}`);
   } else {
-    console.log(`  storage: ${APP_PATH}`);
+    lines.push(`  storage: ${c.path}`);
   }
-  console.log(`  mode: ${DEBUG ? "development" : "production"}`);
+  lines.push(`  mode: ${c.debug ? "development" : "production"}`);
+  if (c.pidFile) lines.push(`  pid: ${c.pid} (${c.pidFile})`);
+  return lines;
+}
+
+export function printConfig() {
+  for (const line of configLines()) console.log(line);
 }

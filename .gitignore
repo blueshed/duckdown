@@ -3,3 +3,5 @@ node_modules
 .env
 .env.s3
 .env.local
+*.pid
+.dev-site/

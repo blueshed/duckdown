@@ -1,9 +1,9 @@
-import { resolve, join, extname, dirname, relative } from "path";
+import { resolve, join, extname, dirname, sep } from "path";
 import { readdir, stat, readFile, writeFile, unlink, mkdir } from "fs/promises";
-import { existsSync } from "fs";
+import { existsSync, cpSync } from "fs";
 import { S3Client } from "bun";
 import {
-  IS_S3, APP_PATH, BUCKET, BUCKET_PREFIX, BUCKET_ENDPOINT, BUCKET_REGION,
+  IS_S3, APP_PATH, SEED_PATH, BUCKET, BUCKET_PREFIX, BUCKET_ENDPOINT, BUCKET_REGION,
   PAGE_PATH, STATIC_PATH, IMAGES_PATH,
 } from "./config";
 
@@ -57,13 +57,16 @@ function guessMime(path: string): string {
 
 function safePath(base: string, userPath: string): string {
   const resolved = resolve(base, userPath);
-  if (!resolved.startsWith(resolve(base))) {
+  // Inside the root, not merely sharing its prefix: "…/pages-old" must not
+  // pass for "…/pages".
+  const root = resolve(base);
+  if (resolved !== root && !resolved.startsWith(root + sep)) {
     throw new Error("Path traversal denied");
   }
   return resolved;
 }
 
-class LocalStorage implements Storage {
+export class LocalStorage implements Storage {
   constructor(private root: string) {}
 
   async list(prefix: string): Promise<Listing> {
@@ -129,16 +132,19 @@ class LocalStorage implements Storage {
 
 // --- S3 ---
 
-class S3Storage implements Storage {
+export class S3Storage implements Storage {
   private client: InstanceType<typeof S3Client>;
   private prefix: string;
 
-  constructor(bucket: string, prefix: string, endpoint: string, region: string) {
+  // Credentials default to Bun's own S3_* / AWS_* environment (read at startup).
+  constructor(bucket: string, prefix: string, endpoint: string, region: string,
+    credentials: { accessKeyId?: string; secretAccessKey?: string } = {}) {
     this.prefix = prefix;
     this.client = new S3Client({
       bucket,
       endpoint: endpoint || undefined,
       region,
+      ...credentials,
     });
   }
 
@@ -150,19 +156,22 @@ class S3Storage implements Storage {
     const fullPrefix = this.key(prefix ? `${prefix}/` : "");
     const result = await this.client.list({ prefix: fullPrefix, delimiter: "/" });
 
-    const files: FileEntry[] = (result.contents || []).map((obj: any) => {
-      const name = obj.key.slice(fullPrefix.length);
-      if (!name || name.includes("/")) return null;
-      return {
-        name,
-        path: `/${obj.key.slice(this.prefix.length)}`,
-        file: true as const,
-        size: obj.size || 0,
-        type: guessMime(name),
-      };
-    }).filter(Boolean) as FileEntry[];
+    // With a delimiter, deeper keys come back as commonPrefixes; the only key
+    // to skip is a folder marker (an object named exactly the prefix).
+    const files: FileEntry[] = (result.contents || [])
+      .filter((obj) => obj.key !== fullPrefix)
+      .map((obj) => {
+        const name = obj.key.slice(fullPrefix.length);
+        return {
+          name,
+          path: `/${obj.key.slice(this.prefix.length)}`,
+          file: true as const,
+          size: obj.size || 0,
+          type: guessMime(name),
+        };
+      });
 
-    const folders: FolderEntry[] = (result.commonPrefixes || []).map((p: any) => {
+    const folders: FolderEntry[] = (result.commonPrefixes || []).map((p) => {
       const name = p.prefix.slice(fullPrefix.length).replace(/\/$/, "");
       return {
         name,
@@ -199,33 +208,25 @@ class S3Storage implements Storage {
   }
 }
 
+// --- Dev seed ---
+
+// Local dev: the first run copies DUCKDOWN_SEED into DUCKDOWN_PATH, so the
+// editor works on a copy and never changes the seed site itself.
+export function seedLocalSite(seed = SEED_PATH, target = APP_PATH, s3 = IS_S3): void {
+  if (s3 || !seed || existsSync(target)) return;
+  cpSync(seed, target, { recursive: true });
+  console.log(`seeded ${target} from ${seed}`);
+}
+
 // --- Factory ---
 
-export function createStorage(): Storage {
-  if (IS_S3) {
-    return new S3Storage(BUCKET, BUCKET_PREFIX, BUCKET_ENDPOINT, BUCKET_REGION);
-  }
-  return new LocalStorage(APP_PATH);
+// Storage rooted at a sub-path of the site (pages/, static/, …), on S3 or disk.
+export function storageAt(sub = "", s3 = IS_S3): Storage {
+  if (s3) return new S3Storage(BUCKET, BUCKET_PREFIX + sub, BUCKET_ENDPOINT, BUCKET_REGION);
+  return new LocalStorage(join(APP_PATH, sub));
 }
 
-// Scoped storage for a sub-path (pages, static, images)
-export function createPageStorage(): Storage {
-  if (IS_S3) {
-    return new S3Storage(BUCKET, BUCKET_PREFIX + PAGE_PATH, BUCKET_ENDPOINT, BUCKET_REGION);
-  }
-  return new LocalStorage(join(APP_PATH, PAGE_PATH));
-}
-
-export function createStaticStorage(): Storage {
-  if (IS_S3) {
-    return new S3Storage(BUCKET, BUCKET_PREFIX + STATIC_PATH, BUCKET_ENDPOINT, BUCKET_REGION);
-  }
-  return new LocalStorage(join(APP_PATH, STATIC_PATH));
-}
-
-export function createImageStorage(): Storage {
-  if (IS_S3) {
-    return new S3Storage(BUCKET, BUCKET_PREFIX + IMAGES_PATH, BUCKET_ENDPOINT, BUCKET_REGION);
-  }
-  return new LocalStorage(join(APP_PATH, IMAGES_PATH));
-}
+export const createStorage = () => storageAt();
+export const createPageStorage = () => storageAt(PAGE_PATH);
+export const createStaticStorage = () => storageAt(STATIC_PATH);
+export const createImageStorage = () => storageAt(IMAGES_PATH);

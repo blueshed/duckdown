@@ -6,11 +6,35 @@ import { after } from "../utils";
 
 const images = createImageStorage();
 
+const THUMB_MIN = 16;
+const THUMB_MAX = 256;
+
 export const handleBrowse = {
   async GET(req: BunRequest) {
     const denied = await requireAuth(req);
     if (denied) return denied;
-    return Response.json(await images.list(after(req, "/edit/browse/")));
+    const path = after(req, "/edit/browse/");
+    const thumb = new URL(req.url).searchParams.get("thumb");
+
+    if (path && (await images.exists(path))) {
+      // SVG is vector and already scales cleanly — Bun.Image only decodes
+      // raster formats, so it's served as-is rather than resized.
+      if (thumb && !path.toLowerCase().endsWith(".svg")) {
+        const size = Math.min(Math.max(parseInt(thumb, 10) || THUMB_MIN, THUMB_MIN), THUMB_MAX);
+        const bytes = await new Bun.Image(await images.readBytes(path))
+          .resize(size, size, { fit: "inside", withoutEnlargement: true })
+          .webp({ quality: 70 })
+          .bytes();
+        return new Response(Buffer.from(bytes), {
+          headers: { "Content-Type": "image/webp", "Cache-Control": "private, max-age=86400" },
+        });
+      }
+      return new Response(Buffer.from(await images.readBytes(path)), {
+        headers: { "Content-Type": images.mime(path), "Cache-Control": "private, max-age=86400" },
+      });
+    }
+
+    return Response.json(await images.list(path));
   },
 
   async PUT(req: BunRequest) {

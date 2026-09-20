@@ -1,6 +1,8 @@
 # Duckie — Feature Checklist
 
-Rewrite of Duckdown CMS: **Tornado + Vue** → **Bun + Crank.js**
+Rewrite of Duckdown CMS: **Tornado + Vue** → **Bun + Railroad**
+
+This is the feature map. Bugs and tasks live in `todo.jsonl`.
 
 ---
 
@@ -12,11 +14,14 @@ Rewrite of Duckdown CMS: **Tornado + Vue** → **Bun + Crank.js**
 - [x] Path traversal protection (`safePath` validation)
 - [x] MIME type detection for static file serving
 - [x] HTML import for editor app (auto-bundled by Bun)
+- [x] Pid file (`duckdown.pid`, `DUCKDOWN_PID`); refuses a second live server
+- [x] Error handler: failures are logged and answered with a line the editor can show
 
 ### Editor API
-- [x] `GET /edit` — serve Crank.js editor app (Bun HTML import)
+- [x] `GET /edit` — serve Railroad editor app (Bun HTML import)
+- [x] `GET /edit/styles.css` — editor stylesheet at a stable URL (the login page uses it)
 - [x] `GET /edit/pages/*` — list folder or return file contents
-- [x] `PUT /edit/pages/*` — save file (auto-create directories)
+- [x] `PUT /edit/pages/*` — save file (auto-create directories); `If-None-Match: *` creates only
 - [x] `DELETE /edit/pages/*` — delete file
 - [x] `PUT /edit/mark/` — markdown-to-HTML preview (with front-matter parsing)
 
@@ -29,8 +34,14 @@ Rewrite of Duckdown CMS: **Tornado + Vue** → **Bun + Crank.js**
 - [x] `fetch` fallback: render markdown pages as HTML
 - [x] Front-matter metadata parsing (title, theme)
 - [x] Site template loaded from storage (`templates/site.html`)
-- [x] Theme CSS loading from `-theme.css` files
-- [x] Navigation generation from `index.md` files
+- [x] Theme CSS loading from `-theme.css` files, cascading: the root's, then each folder's
+- [x] Navigation generation from `index.md` files (cached; dropped when the editor changes a page)
+- [x] The nav marks the current page, or the section it's in (`aria-current`)
+- [x] Default stylesheet built on CSS variables (a theme is a few lines), with dark mode
+- [x] Per-page `layout`, `description` and `draft`
+- [x] Folder listings (`{{pages}}`, newest first by `date:`)
+- [x] Folders served by their index (`/blog`, `/blog/`, `/blog/index.html`)
+- [x] "Edit this page" for whoever is signed in (`{{edit}}`)
 - [ ] Custom scripts via `x-script-*` metadata
 - [x] `GET /static/*` — serve site static files
 
@@ -39,16 +50,21 @@ Rewrite of Duckdown CMS: **Tornado + Vue** → **Bun + Crank.js**
 - [x] Tables, fenced code blocks
 - [x] Task lists
 - [x] Strikethrough, autolinks
+- [x] Heading ids; headings link to themselves
+- [x] Table of contents generation (`toc: true`)
+- [x] Callouts (GitHub's `> [!NOTE]` … `[!CAUTION]`)
+- [x] `[[Wiki links]]` between pages (`[[page|label]]`, `[[page#heading]]`)
+- [ ] Maths and highlighted code: not built in — add KaTeX or highlight.js to your template (todo 27)
 - [ ] Emoji support (twemoji)
-- [ ] Table of contents generation
 
 ### Auth
 - [x] Login page (`GET/POST /login`) — HTML file + HTMLRewriter
-- [x] Logout (`GET /logout`)
+- [x] Signing in lands in the editor (`/edit`), or on `next`
+- [x] Logout (`POST /logout`, refused cross-site)
 - [x] JWT (HS256) cookie sessions (`COOKIE_SECRET`, `COOKIE_NAME` env vars)
 - [x] `users.json` credential store
-- [x] Protected editor routes (redirect to `/login?next=...`)
-- [ ] Password encryption (port from Python `cryptography`)
+- [x] Protected editor routes (page loads redirect to `/login?next=...`; fetches get 401)
+- [x] Password hashing (`Bun.password`, argon2id), in place of the Python `cryptography` encryption
 
 ### Storage
 - [x] Local filesystem backend
@@ -60,19 +76,23 @@ Rewrite of Duckdown CMS: **Tornado + Vue** → **Bun + Crank.js**
 ### Dev Experience
 - [x] `development: true` — HMR via Bun HTML imports
 - [x] `bun run --hot server.ts` for server hot-reload
+- [x] `bun run stop` — stop the server the pid file names (checked to be duckdown's)
 - [x] `.env` file for local config
 - [x] `.env.s3` for MinIO/S3 config
 - [x] `compose.yml` for MinIO with auto-seeded bucket
 - [x] Self-contained `tests/example/` seed data
+- [x] Dev works on a copy: `DUCKDOWN_SEED` seeds `DUCKDOWN_PATH` (`.dev-site/`) on first run
+- [x] `.claude/launch.json` for the desktop app's preview pane
 
 ---
 
-## Client (Crank.js)
+## Client (Railroad)
 
 ### App Shell
 - [x] 3-column layout: file browser | editor | preview
 - [x] URL parameter support (`?path=file.md`)
-- [x] Feather icons throughout (via `feather.replace()`)
+- [x] Lucide icons throughout (`lucide-static` via `<Icon />`)
+- [x] Signed out: any request's 401 sends the page to `/login?next=...` and back (`api.ts`)
 - [ ] Loading spinner states
 
 ### File Browser (Browser)
@@ -81,7 +101,7 @@ Rewrite of Duckdown CMS: **Tornado + Vue** → **Bun + Crank.js**
 - [x] Click folder → load folder contents
 - [x] Click file → load file into editor
 - [x] Sorted alphabetically
-- [x] New file creation (prompt + auto-open)
+- [x] New page/folder/theme (dialog + auto-open; never overwrites an existing file)
 - [x] Reloads after save/delete
 
 ### Editor
@@ -97,6 +117,7 @@ Rewrite of Duckdown CMS: **Tornado + Vue** → **Bun + Crank.js**
 - [x] Debounced updates on editor input
 - [x] Calls `/edit/mark/` API for server-side rendering
 - [x] Renders on initial file load
+- [x] Sandboxed (`allow-same-origin`, no scripts) with site CSS, theme CSS and images
 
 ### CSS Preview
 - [x] Detect `.css` file extension
@@ -110,20 +131,21 @@ Rewrite of Duckdown CMS: **Tornado + Vue** → **Bun + Crank.js**
 - [x] Create new image folder
 - [x] Preview selected image
 - [x] Copy markdown image syntax to clipboard
+- [x] Thumbnails (`Bun.Image`, `?thumb=`)
 
 ### Menu (Header)
 - [x] Images toggle (show/hide image browser sidebar)
 - [x] View button (open rendered page in new tab)
-- [x] Logout link
+- [x] Logout button (a POST form)
 - [ ] Help link (markdown cheat sheet)
 
 ### State Management
-- [x] Event-based state (CustomEvents through Crank.js context)
+- [x] Signals and actions (`store.ts`)
 - [x] File/folder list state
 - [x] Current file path and content
 - [x] Editor content (live)
 - [x] Image browser state
-- [ ] Error state
+- [x] Error state: failures speak (`notice.ts`, shown by `Notice`)
 - [ ] Loading states
 
 ---
@@ -131,16 +153,20 @@ Rewrite of Duckdown CMS: **Tornado + Vue** → **Bun + Crank.js**
 ## Tooling & Infrastructure
 
 ### Build
-- [x] tsconfig.json for Crank.js JSX transform
-- [x] `package.json` scripts: `dev`, `dev:s3`, `start`, `test`, `check`
+- [x] tsconfig.json for Railroad's JSX (`createElement` / `Fragment`)
+- [x] `package.json` scripts: `dev`, `dev:s3`, `start`, `stop`, `test`, `check`
 - [ ] Production build (`bun build --target=bun`)
 
 ### Testing
 - [x] Server route tests (file CRUD, markdown, images, static, site rendering)
 - [x] Path traversal prevention tests
 - [x] Markdown unit tests (front-matter, rendering)
-- [x] Tests spawn own server subprocess with temp data
-- [x] Auth flow tests (login, logout, protected routes)
+- [x] Tests run the server in-process on a scratch copy of the seed site (subprocesses only for process behaviour)
+- [x] Auth flow tests (login, logout, protected routes: 401 vs redirect)
+- [x] Pid file and dev seed tests
+- [x] 100% line and function coverage, enforced by `bun run test` (server in-process)
+- [x] Editor tests in happy-dom, against the real server
+- [x] S3 storage tests (Bun's S3 client against an in-memory fake S3)
 - [ ] S3 integration tests (MinIO via compose)
 
 ### CLI
@@ -151,8 +177,8 @@ Rewrite of Duckdown CMS: **Tornado + Vue** → **Bun + Crank.js**
 
 ## Not Porting (intentional omissions)
 - Tornado-specific code (IOLoop, async decorators)
-- Vuex / Vue reactivity system (replaced by Crank.js generators)
-- CodeJar (evaluate Crank.js-friendly alternatives)
+- Vuex / Vue reactivity system (replaced by Railroad signals)
+- CodeJar (evaluate alternatives that suit Railroad)
 - invoke tasks (replaced by bun scripts / package.json)
 - Python packaging (setup.py, PyPI release)
 - Vite (replaced by Bun HTML imports)

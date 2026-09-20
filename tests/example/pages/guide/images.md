@@ -39,6 +39,42 @@ Then style it in your theme:
 }
 ```
 
+## Colouring an SVG with CSS
+
+An SVG shown with `![…](…)` or `<img>` keeps its own colours: the page's CSS can't reach inside it. To colour a logo or icon from your theme, use the drawing as a **mask** and let CSS paint the shape.
+
+Put an empty element where the image goes:
+
+```html
+<span id="logo" role="img" aria-label="duckdown"></span>
+```
+
+and in your `-theme.css`, give it a size, a colour, and the SVG as its mask:
+
+```css
+#logo {
+  display: block;
+  width: min(320px, 100%);
+  aspect-ratio: 1;
+  background: var(--duck, currentColor);
+  -webkit-mask: url(/static/images/logo.svg) center / contain no-repeat;
+  mask: url(/static/images/logo.svg) center / contain no-repeat;
+}
+```
+
+The drawn parts take the `background`, and anything transparent in the file stays transparent — the duck's eye and wing are holes, so the page shows through them. Because the colour is ordinary CSS, it can be a variable:
+
+```css
+body.duckdown {
+  --duck: var(--accent);
+}
+```
+
+Left as `currentColor`, it simply follows the text, so it turns light in dark mode by itself. That's how the duck on the home page works.
+
+> [!NOTE]
+> A mask paints the whole shape one colour. For a picture with several colours, paste the `<svg>…</svg>` straight into the page and style its parts with CSS. (`<use href="file.svg#id">` reads nicely but only works in Firefox, so it isn't worth using.)
+
 ## Organising images
 
 Create folders to keep things tidy:

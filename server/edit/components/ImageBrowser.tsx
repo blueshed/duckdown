@@ -1,10 +1,14 @@
 import { createElement, signal, computed, list, when } from "@blueshed/railroad";
+import type { FileEntry, FolderEntry, Listing } from "../../storage";
 import { Icon } from "./Icon";
+import { byName } from "./Browser";
+import { api, apiJson, urlPath } from "../api";
+import { speak } from "../notice";
 import { closeImages } from "../store";
 
 export function ImageBrowser() {
-  const files = signal<any[]>([]);
-  const folders = signal<any[]>([]);
+  const files = signal<FileEntry[]>([]);
+  const folders = signal<FolderEntry[]>([]);
   const path = signal("");
   const imgPath = signal("/static/images/");
   const selected = signal<string | null>(null);
@@ -15,23 +19,15 @@ export function ImageBrowser() {
   const load = async (folder: string) => {
     path.set(folder);
     selected.set(null);
-    try {
-      const res = await fetch(`/edit/browse/${folder}`);
-      if (!res.ok) return;
-      const data = await res.json();
-      files.set((data.files || []).sort((a: any, b: any) => a.name.localeCompare(b.name)));
-      folders.set((data.folders || []).sort((a: any, b: any) => a.name.localeCompare(b.name)));
-    } catch {}
+    const data = await apiJson<Listing>(`list images/${folder}`, `/edit/browse/${urlPath(folder)}`);
+    if (!data) return;
+    files.set(data.files.sort(byName));
+    folders.set(data.folders.sort(byName));
   };
 
   const loadImgPath = async () => {
-    try {
-      const res = await fetch("/edit/browse/", { method: "PUT" });
-      if (res.ok) {
-        const data = await res.json();
-        imgPath.set(data.img_path || imgPath.peek());
-      }
-    } catch {}
+    const data = await apiJson<{ img_path: string }>("find the images folder", "/edit/browse/", { method: "PUT" });
+    if (data) imgPath.set(data.img_path);
   };
 
   const upload = async (e: Event) => {
@@ -40,7 +36,7 @@ export function ImageBrowser() {
     uploading.set(true);
     const form = new FormData();
     for (const file of input.files) form.append("file", file);
-    await fetch(`/edit/browse/${path.peek()}`, { method: "POST", body: form });
+    await api(`upload to images/${path.peek()}`, `/edit/browse/${urlPath(path.peek())}`, { method: "POST", body: form });
     input.value = "";
     uploading.set(false);
     load(path.peek());
@@ -53,8 +49,8 @@ export function ImageBrowser() {
     if (name) {
       const p = path.peek();
       const newPath = p ? `${p}/${name}` : name;
-      await fetch(`/edit/browse/${newPath}`, { method: "PUT" });
-      load(newPath);
+      const res = await api(`create images/${newPath}`, `/edit/browse/${urlPath(newPath)}`, { method: "PUT" });
+      if (res.ok) load(newPath);
     }
   };
 
@@ -62,15 +58,13 @@ export function ImageBrowser() {
     const name = selected.get();
     if (!name) return "";
     const p = path.get();
-    return `${imgPath.get()}${p ? p + "/" : ""}${name}`;
+    return `${imgPath.get()}${urlPath(p ? `${p}/${name}` : name)}`;
   });
 
-  const copyMarkdown = () => {
-    const name = selected.peek();
-    if (!name) return;
-    const url = imageUrl.peek();
-    navigator.clipboard.writeText(`![${name}](${url})`);
-  };
+  // Only reachable while an image is selected (the button lives in that branch).
+  const copyMarkdown = () =>
+    navigator.clipboard.writeText(`![${selected.peek()}](${imageUrl.peek()})`)
+      .catch(() => speak("Couldn't copy to the clipboard: the browser refused."));
 
   loadImgPath();
   load("");
@@ -79,7 +73,7 @@ export function ImageBrowser() {
     <div class="sidebar">
       <div class="sidebar-header">
         <span style="flex:1; font-weight: 600;">Images</span>
-        <button onclick={closeImages}>
+        <button aria-label="Close images" title="Close images" onclick={closeImages}>
           <Icon name="x" />
         </button>
       </div>
@@ -101,14 +95,15 @@ export function ImageBrowser() {
               </li>
             ),
           )}
-          {list(folders, (f: any) => f.path, (f: any) => (
-            <li class="folder" onclick={() => load(f.path.replace(/^\//, ""))}>
-              <Icon name="folder" size={12} /> {f.name}
+          {/* Keyed rows get a signal per row, not the item: read it with .map/.peek */}
+          {list(folders, (f) => f.path, (f$) => (
+            <li class="folder" onclick={() => load(f$.peek().path.replace(/^\//, ""))}>
+              <Icon name="folder" size={12} /> {f$.map((f) => f.name)}
             </li>
           ))}
-          {list(files, (f: any) => f.path, (f: any) => (
-            <li onclick={() => selected.set(f.name)}>
-              <Icon name="image" size={12} /> {f.name}
+          {list(files, (f) => f.path, (f$) => (
+            <li onclick={() => selected.set(f$.peek().name)}>
+              <img class="thumb" src={f$.map((f) => `/edit/browse${urlPath(f.path)}?thumb=32`)} alt="" loading="lazy" /> {f$.map((f) => f.name)}
             </li>
           ))}
         </ul>

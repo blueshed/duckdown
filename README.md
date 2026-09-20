@@ -18,10 +18,11 @@ Login at [http://localhost:8080/login](http://localhost:8080/login) with `admin`
 ## Features
 
 - Markdown editor with live preview
-- Front-matter metadata (title, theme, nav)
-- Theme CSS per folder
+- Front-matter metadata (title, theme, nav, toc, layout, description, date, draft)
+- Contents lists, callouts (`> [!NOTE]`) and `[[wiki links]]` between pages
+- Themes in a few CSS variables, per folder and cascading, with dark mode
 - Image browser with upload
-- Navigation generated from `index.md` files
+- Navigation generated from `index.md` files, and folder listings that keep themselves
 - JWT authentication
 - Local filesystem or S3 storage
 - Zero build step — Bun serves everything
@@ -49,10 +50,13 @@ Login at [http://localhost:8080/login](http://localhost:8080/login) with `admin`
 ```sh
 bun run dev        # Development with HMR
 bun run start      # Production
-bun run test       # Run tests
+bun run stop       # Stop the server started from this folder
+bun run test       # Run tests (100% coverage required)
 bun run check      # TypeScript check
 bun run dev:s3     # Start MinIO + run with S3 storage
 ```
+
+The server writes its pid to `duckdown.pid` and removes it on exit; `bun run stop` stops it (after checking the pid really is a duckdown server, and clearing away a stale file). Set `DUCKDOWN_PID` to move the file, or to an empty value to turn it off.
 
 ## Storage
 

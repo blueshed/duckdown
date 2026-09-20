@@ -4,7 +4,7 @@ nav: Home
 
 # Welcome to duckdown
 
-<img id="logo" src="/static/images/logo.svg" alt="duckdown">
+<span id="logo" role="img" aria-label="duckdown"></span>
 
 A markdown CMS built with [Bun](https://bun.sh) and [Railroad](https://github.com/blueshed/railroad).
 
