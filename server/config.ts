@@ -5,6 +5,9 @@ import { resolve } from "path";
 
 export const PORT = parseInt(process.env.PORT || "8080");
 export const DEBUG = process.env.DEBUG === "1";
+// A line per page view on stdout (DUCKDOWN_LOG=1). What is read and how much,
+// never who: no address, no user agent, no cookie. Off unless asked for.
+export const LOG_VIEWS = process.env.DUCKDOWN_LOG === "1";
 
 // S3 storage
 export const BUCKET = process.env.DUCKDOWN_BUCKET || "";

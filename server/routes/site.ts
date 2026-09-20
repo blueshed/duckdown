@@ -4,6 +4,7 @@ import { renderMarkdown, loadThemeCss, folderOf, yes } from "../markdown";
 import { siteNav, markCurrent, folderListing } from "../nav";
 import { getUser } from "../auth";
 import { escapeHtml, outsideCode } from "../utils";
+import { logView } from "../log";
 
 const site = createStorage();
 const pages = createPageStorage();
@@ -39,7 +40,16 @@ async function template(layout = ""): Promise<string> {
   return BARE;
 }
 
+// Every page view is counted the same way, whatever the answer was — a 404
+// that keeps being asked for is worth knowing about too.
 export const handleSite = async (req: Request) => {
+  const startedAt = performance.now();
+  const res = await renderPage(req);
+  logView(req, res.status, startedAt);
+  return res;
+};
+
+const renderPage = async (req: Request) => {
   const url = new URL(req.url);
   const path = decodeURIComponent(url.pathname).replace(/^\//, "") || "index.html";
   const name = path.replace(/\.html$/, "").replace(/\/$/, "") || "index";

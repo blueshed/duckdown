@@ -7,6 +7,7 @@ import { configLines, printConfig } from "../server/config";
 import { LocalStorage, S3Storage, storageAt, seedLocalSite } from "../server/storage";
 import { loadSecret, signJwt, verifyJwt, ensureAdmin } from "../server/auth";
 import { handleError } from "../server/routes/error";
+import { fromSite, viewLine, logView } from "../server/log";
 
 const scratch = (name: string) => join(RUN, `units-${name}`);
 
@@ -298,6 +299,50 @@ describe("error handler", () => {
       expect(error).toHaveBeenCalled();
     } finally {
       error.mockRestore();
+    }
+  });
+});
+
+describe("view log", () => {
+  const req = (url: string, headers: Record<string, string> = {}) => new Request(url, { headers });
+
+  test("fromSite: another site's host, never your own and never the full URL", () => {
+    expect(fromSite("https://news.ycombinator.com/item?id=1", "www.blueshed.co.uk")).toBe("news.ycombinator.com");
+    // A search referrer carries what was typed; only the host is kept.
+    expect(fromSite("https://www.google.com/search?q=someone+private", "www.blueshed.co.uk")).toBe("www.google.com");
+    expect(fromSite("https://www.blueshed.co.uk/journey/", "www.blueshed.co.uk")).toBe(""); // following a link through the site
+    expect(fromSite("", "www.blueshed.co.uk")).toBe("");
+    expect(fromSite("not a url", "www.blueshed.co.uk")).toBe("");
+  });
+
+  test("viewLine says what was read, and nothing about who read it", () => {
+    expect(viewLine("/journey/", 200, 12.4, "", "Mozilla/5.0")).toBe("view /journey/ 200 12ms");
+    expect(viewLine("/", 200, 3, "lobste.rs", "Mozilla/5.0")).toBe("view / 200 3ms from=lobste.rs");
+    expect(viewLine("/gone", 404, 1, "", "Googlebot/2.1")).toBe("view /gone 404 1ms crawler");
+  });
+
+  test("logView is off unless asked for, and carries no identifier when on", () => {
+    const log = spyOn(console, "log").mockImplementation(() => {});
+    try {
+      logView(req("https://www.blueshed.co.uk/journey/"), 200, performance.now(), false);
+      expect(log).not.toHaveBeenCalled();
+
+      logView(req("http://internal:8080/journey/", {
+        "x-forwarded-host": "www.blueshed.co.uk",
+        referer: "https://www.blueshed.co.uk/index.html",
+        "user-agent": "Mozilla/5.0 (Macintosh)",
+        cookie: "duckie_token=secret",
+      }), 200, performance.now(), true);
+      const line = String(log.mock.calls[0]?.[0]);
+      expect(line).toStartWith("view /journey/ 200 ");
+      expect(line).not.toContain("from="); // same site: following a link
+      expect(line).not.toContain("secret");
+      expect(line).not.toContain("Macintosh");
+
+      logView(req("https://www.blueshed.co.uk/"), 200, performance.now(), true); // no host header at all
+      expect(String(log.mock.calls[1]?.[0])).toStartWith("view / 200 ");
+    } finally {
+      log.mockRestore();
     }
   });
 });

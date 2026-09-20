@@ -248,6 +248,16 @@ Users stored in `users.json` in the content directory, passwords hashed with `Bu
 
 Signed out, a page load of a protected route is redirected to `/login?next=…`; a fetch (no `text/html` in `Accept`) gets a 401. The editor sends every request through `edit/api.ts`, which turns a 401 into a trip to the login page and back. `/edit` itself is an HTML import and can't be guarded server-side, so the editor's first request does it. Signing in lands on `/edit` unless `next` says otherwise (and `/login` when already signed in goes straight there). Logout is POST-only and refuses `Sec-Fetch-Site: cross-site`.
 
+## The view log
+
+`DUCKDOWN_LOG=1` prints one line per page view (`server/log.ts`, called from the
+site route, which wraps every answer so a 404 counts too). It records what was
+read and how much — path, status, duration, the referring host when it is
+another site, a crawler flag — and deliberately records nothing that identifies
+a reader: no IP, no user agent, no cookie, no session. Keep it that way. An IP
+is personal data, and the moment one is logged the site needs a lawful basis, a
+privacy notice and a retention policy.
+
 ## Failures speak
 
 Nothing fails silently. In the editor, every request goes through `api(what, url, init?, allow?)`: a failed one speaks — `speak()` in `edit/notice.ts` shows it (the `Notice` alert) and logs it — naming what was attempted ("Couldn't save hello.md: 500 …"); `allow` lists statuses the caller handles itself (New's 412). A request that never arrives resolves to `Response.error()`, so callers check `res.ok` and need no `catch`. `app.tsx` speaks for anything uncaught. On the server, `routes/error.ts` logs what a handler throws and answers 500 with a line (the detail only in development). No bare `catch {}`: if a failure is deliberately survived (a theme that won't load), log why.
