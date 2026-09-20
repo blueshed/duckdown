@@ -513,6 +513,22 @@ describe("folders, the edit link, layouts, drafts and listings", () => {
     expect(await (await fetch(`${BASE}/news/`)).text()).toContain('<a href="/news/newest.html">Newest post</a>');
   });
 
+  test("a placeholder used twice is filled twice, and {{url}} is the page's address", async () => {
+    // og:title repeats {{title}}. String.replace with a string pattern only
+    // does the first, so every page published <meta property="og:title"
+    // content="{{title}}"> — the placeholder itself.
+    writeFileSync(join(SITE, "templates", "twicer.html"),
+      `<html><head><title>{{title}}</title><meta property="og:title" content="{{title}}">` +
+      `<link rel="canonical" href="{{url}}"></head><body>{{content}}</body></html>`);
+    await put("twice.md", "title: Said Twice\nlayout: twicer\n\n# Hello");
+
+    const html = await (await fetch(`${BASE}/twice.html`)).text();
+    expect(html).toContain("<title>Said Twice</title>");
+    expect(html).toContain('<meta property="og:title" content="Said Twice">');
+    expect(html).toContain(`<link rel="canonical" href="${BASE}/twice.html">`);
+    expect(html).not.toContain("{{");
+  });
+
   test("{{pages}} in code stays as written, so a page can document it", async () => {
     await put("docs/index.md", "title: Docs\n\nWrite `{{pages}}`:\n\n```markdown\ntitle: Blog\n\n{{pages}}\n```\n\n{{pages}}");
     await put("docs/one.md", "title: One\n\nOne");

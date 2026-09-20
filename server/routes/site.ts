@@ -10,6 +10,24 @@ const pages = createPageStorage();
 
 const BARE = "<!DOCTYPE html><html><head><title>{{title}}</title></head><body>{{content}}</body></html>";
 
+// Fill every occurrence of a placeholder: a template may use one more than once
+// (a title belongs in <title> and again in og:title), and String.replace with a
+// string pattern only ever does the first. The value is a function rather than
+// a string because a string replacement reads $$, $& and $' in the page as
+// patterns — "$$5" would publish as "$5".
+function fill(html: string, name: string, value: () => string): string {
+  return html.replace(new RegExp(`\\{\\{${name}\\}\\}`, "g"), value);
+}
+
+// The page's own address, for a canonical link and og:url. Behind a proxy the
+// request's own URL names the container, so the forwarded headers win.
+function pageUrl(req: Request): string {
+  const url = new URL(req.url);
+  const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || url.host;
+  const proto = req.headers.get("x-forwarded-proto") || url.protocol.replace(":", "");
+  return `${proto}://${host}${url.pathname}`;
+}
+
 // `layout: post` picks templates/post.html, else templates/site.html, else a
 // bare one. The name is a plain word: a page can't reach out of templates/.
 async function template(layout = ""): Promise<string> {
@@ -53,19 +71,22 @@ export const handleSite = async (req: Request) => {
       part.replace(/<p>\{\{pages\}\}<\/p>|\{\{pages\}\}/g, () => list));
   }
 
-  // Replacer functions, not strings: a string replacement reads $$, $& and $'
-  // in the page as patterns, so "$$5" would publish as "$5" (the preview,
-  // built another way, would still show "$$5").
-  const html = (await template(meta.layout?.[0]))
-    .replace("{{title}}", () => escapeHtml(meta.title?.[0] || "duckie"))
-    .replace("{{theme}}", () => escapeHtml(meta.theme?.[0] || ""))
-    .replace("{{description}}", () => description
+  let html = await template(meta.layout?.[0]);
+  for (const [name, value] of [
+    ["title", () => escapeHtml(meta.title?.[0] || "duckie")],
+    ["theme", () => escapeHtml(meta.theme?.[0] || "")],
+    ["url", () => escapeHtml(pageUrl(req))],
+    ["description", () => description
       ? `<meta name="description" content="${escapeHtml(description)}">\n  <meta property="og:description" content="${escapeHtml(description)}">`
-      : "")
-    .replace("{{nav}}", () => nav ? `<nav><ul class="nav">${nav}</ul></nav>` : "")
-    .replace("{{theme_css}}", () => themeCss ? `<style>${themeCss}</style>` : "")
-    .replace("{{edit}}", () => user ? `<a class="user-edit" href="/edit?path=${encodeURIComponent(key)}">Edit this page</a>` : "")
-    .replace("{{content}}", () => body);
+      : ""],
+    ["nav", () => nav ? `<nav><ul class="nav">${nav}</ul></nav>` : ""],
+    ["theme_css", () => themeCss ? `<style>${themeCss}</style>` : ""],
+    ["edit", () => user ? `<a class="user-edit" href="/edit?path=${encodeURIComponent(key)}">Edit this page</a>` : ""],
+    // Last, so a placeholder written in a page's own text is never filled in.
+    ["content", () => body],
+  ] as const) {
+    html = fill(html, name, value);
+  }
 
   return new Response(html, {
     headers: { "Content-Type": "text/html; charset=utf-8" },
