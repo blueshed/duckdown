@@ -1,4 +1,4 @@
-import { resolve, join, extname, dirname, sep } from "path";
+import { resolve, join, extname, dirname, relative, sep } from "path";
 import { readdir, stat, readFile, writeFile, unlink, mkdir } from "fs/promises";
 import { existsSync, cpSync } from "fs";
 import { S3Client } from "bun";
@@ -208,7 +208,7 @@ export class S3Storage implements Storage {
   }
 }
 
-// --- Dev seed ---
+// --- Seeding a new site ---
 
 // Local dev: the first run copies DUCKDOWN_SEED into DUCKDOWN_PATH, so the
 // editor works on a copy and never changes the seed site itself.
@@ -216,6 +216,36 @@ export function seedLocalSite(seed = SEED_PATH, target = APP_PATH, s3 = IS_S3): 
   if (s3 || !seed || existsSync(target)) return;
   cpSync(seed, target, { recursive: true });
   console.log(`seeded ${target} from ${seed}`);
+}
+
+// Every file under `root`, as keys relative to it and separated by "/".
+async function filesUnder(root: string, dir = root): Promise<string[]> {
+  const found: string[] = [];
+  for (const name of await readdir(dir)) {
+    const path = join(dir, name);
+    if ((await stat(path)).isDirectory()) found.push(...(await filesUnder(root, path)));
+    else found.push(relative(root, path).split(sep).join("/"));
+  }
+  return found;
+}
+
+// The same for a bucket: the first run uploads DUCKDOWN_SEED. Without this a
+// fresh deployment serves 404s and nobody can sign in, with nothing in the log
+// to say why — the bucket is simply empty. Seeded only when it holds no
+// index.md, so it can never overwrite a site someone has been writing.
+export async function seedBucketSite(seed = SEED_PATH, store?: Storage, s3 = IS_S3): Promise<number> {
+  if (!s3 || !seed) return 0;
+  if (!existsSync(seed)) {
+    console.error(`DUCKDOWN_SEED is ${seed}, which isn't there: the bucket was left alone.`);
+    return 0;
+  }
+  const site = store ?? storageAt();
+  if (await site.exists(`${PAGE_PATH}index.md`)) return 0;
+
+  const keys = await filesUnder(seed);
+  for (const key of keys) await site.write(key, await Bun.file(join(seed, key)).bytes());
+  console.log(`seeded the bucket from ${seed} (${keys.length} files)`);
+  return keys.length;
 }
 
 // --- Factory ---

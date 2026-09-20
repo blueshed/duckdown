@@ -1,7 +1,7 @@
 import homepage from "./edit/index.html";
 import { PORT, DEBUG, printConfig } from "./config";
 import { claimPidFile } from "./pid";
-import { seedLocalSite } from "./storage";
+import { seedLocalSite, seedBucketSite } from "./storage";
 import { handleLoginGet, handleLoginPost, handleLogout, ensureAdmin } from "./auth";
 import { handlePages } from "./routes/pages";
 import { handleMark } from "./routes/mark";
@@ -18,6 +18,7 @@ const editorCss = Bun.file(`${import.meta.dir}/edit/styles.css`);
 // before any request reads it.
 claimPidFile();
 seedLocalSite();
+await seedBucketSite();
 await ensureAdmin();
 
 export const server = Bun.serve({

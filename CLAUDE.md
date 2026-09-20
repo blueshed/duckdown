@@ -228,7 +228,7 @@ Swappable via env vars. Set `DUCKDOWN_BUCKET` to use S3, otherwise local filesys
 DUCKDOWN_PATH=./.dev-site
 DUCKDOWN_SEED=./tests/example
 
-# S3 / MinIO
+# S3 / MinIO — an empty bucket is seeded from DUCKDOWN_SEED on the first run
 DUCKDOWN_BUCKET=my-bucket
 DUCKDOWN_ENDPOINT=http://localhost:9000
 S3_ACCESS_KEY_ID=minio
