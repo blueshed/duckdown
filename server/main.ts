@@ -1,3 +1,5 @@
+#!/usr/bin/env bun
+
 import homepage from "./edit/index.html";
 import { PORT, DEBUG, printConfig } from "./config";
 import { claimPidFile } from "./pid";

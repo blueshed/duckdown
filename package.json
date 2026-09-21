@@ -17,6 +17,17 @@
     "signals",
     "jsx"
   ],
+  "bin": {
+    "duckdown": "./server/main.ts",
+    "duckdown-export": "./server/export.ts"
+  },
+  "files": [
+    "server",
+    "create",
+    "tests/example",
+    "CHANGELOG.md",
+    "README.md"
+  ],
   "engines": {
     "bun": ">=1.4.0"
   },
