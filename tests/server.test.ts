@@ -611,6 +611,13 @@ describe("layout: a page's own template", () => {
     expect(html).not.toContain('<ul class="nav">'); // a post is arrived at, not browsed from
   });
 
+  test("the seed's poster page links its own stylesheet, and no other page does", async () => {
+    const poster = await (await fetch(`${BASE}/blog/one-page-that-looks-different.html`)).text();
+    expect(poster).toContain('<link rel="stylesheet" href="/static/poster.css">');
+    const other = await (await fetch(`${BASE}/blog/`)).text();
+    expect(other).not.toContain("poster.css");
+  });
+
   test("other pages still get site.html, which has the nav", async () => {
     const html = await (await fetch(`${BASE}/blog/`)).text();
     expect(html).toContain('<ul class="nav">');

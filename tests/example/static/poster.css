@@ -1,0 +1,36 @@
+/* Linked by `css: poster` in one page's front matter, and by nothing else.
+
+   It arrives after site.css and after the theme, so it only has to say what
+   differs — and because it reaches exactly one page, it can use plain
+   selectors without worrying about the rest of the site. */
+
+body {
+  --measure: 34rem;
+  --accent: #b0405a;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 8%, var(--bg)), var(--bg) 60%);
+}
+
+/* The title and its opening line are centred; the prose and the code below
+   are left where they are, because centred paragraphs are hard to read. */
+body h1,
+body h1 + p {
+  text-align: center;
+}
+
+body h1 {
+  margin-top: 1.2em;
+  font-size: clamp(2.4rem, 1.6rem + 4vw, 4rem);
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+}
+
+body h1 + p {
+  color: var(--muted);
+  font-size: 1.2rem;
+}
+
+/* The navigation would fight the look, so this page does without it. */
+ul.nav {
+  justify-content: center;
+  border-bottom: 0;
+}

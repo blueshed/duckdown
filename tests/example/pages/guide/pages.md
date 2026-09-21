@@ -194,11 +194,11 @@ Reach for a layout when a *kind* of page wants a different shape. For one page
 that only wants to look different, `css: print` links `/static/print.css` after
 the theme, and a `theme:` changes the variables. Three sizes of override:
 
-| | changes | good for |
-|---|---|---|
-| `theme:` | a few CSS variables | a section that reads differently |
-| `css:` | one extra stylesheet | one page that has to look unusual |
-| `layout:` | the whole page shape | posts, landing pages, print |
+| | changes | good for | on this site |
+|---|---|---|---|
+| `theme:` | a few CSS variables | a section that reads differently | every page here |
+| `css:` | one extra stylesheet | one page that has to look unusual | [[/blog/one-page-that-looks-different\|the poster page]] |
+| `layout:` | the whole page shape | posts, landing pages, print | [[/blog/a-post-with-its-own-layout\|the post]] |
 
 ## Drafts
 
