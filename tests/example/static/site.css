@@ -297,6 +297,24 @@ ul.pages p {
   border-color: var(--accent);
 }
 
+/* On a narrow screen there is no corner to spare: floating it puts it on top
+   of whatever the reader is reading. It goes back into the flow at the foot
+   of the page, where it is still the last thing and covers nothing. */
+@media (max-width: 34rem) {
+  .user-edit {
+    position: static;
+    display: inline-block;
+    margin-top: 2.5rem;
+  }
+}
+
+/* A bare URL is one long unbreakable word. Markdown turns it into a link, and
+   on a phone it sets the page's minimum width and drags everything sideways.
+   Let a link break wherever it has to; nothing else about it changes. */
+a {
+  overflow-wrap: anywhere;
+}
+
 /* --- Code --- */
 
 code, kbd, pre {
@@ -308,6 +326,11 @@ code {
   border-radius: 4px;
   background: var(--surface);
   font-size: 0.875em;
+  /* A path like templates/post.html is one unbreakable word, and in a table
+     cell on a narrow phone it sets the column's minimum width and pushes the
+     whole page sideways. `anywhere` lets it wrap and, unlike `break-word`,
+     counts for the minimum too — which is the half that fixes the table. */
+  overflow-wrap: anywhere;
 }
 
 pre {
@@ -324,6 +347,7 @@ pre code {
   padding: 0;
   background: none;
   font-size: inherit;
+  overflow-wrap: normal;   /* a fenced block scrolls; it must not rewrap */
 }
 
 kbd {
