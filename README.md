@@ -21,6 +21,24 @@ server won't start, and will tell you why.
 Open [http://localhost:8080](http://localhost:8080) to see your site.
 Login at [http://localhost:8080/login](http://localhost:8080/login) with `admin` / `admin`.
 
+## Two ways to deploy it
+
+duckdown is a server, and it is also a static site generator. Neither is the
+upgrade of the other — the question they answer is **who edits the site, and
+from where.**
+
+|  | **served** | **published** |
+|---|---|---|
+| What runs | duckdown | any static host |
+| Where the site is | a folder or an S3 bucket | the files `bun run export` writes |
+| Editing | at `/edit`, from any browser | locally, then deploy the output |
+| Needs | `COOKIE_SECRET`, a password, `users.json` | nothing — no login to guard |
+
+Serve it when someone has to fix a typo from a phone. Publish it when one
+person writes at a desk and would rather the internet held no login at all.
+The content is the same markdown either way, and the pages are rendered by the
+same code, so you can change your mind.
+
 ## Features
 
 - Markdown editor whose preview is the page: the same renderer the site uses,
@@ -89,20 +107,25 @@ bun run dev:s3     # Start MinIO + run with S3 storage
 
 The server writes its pid to `duckdown.pid` and removes it on exit; `bun run stop` stops it (after checking the pid really is a duckdown server, and clearing away a stale file). Set `DUCKDOWN_PID` to move the file, or to an empty value to turn it off.
 
-## Exporting a static site
-
-If a site doesn't need editing in the browser, it doesn't need a server:
+## Publishing it
 
 ```sh
 DUCKDOWN_ORIGIN=https://example.com bun run export
 ```
 
-That writes the whole site to `dist/` — every page rendered by the same code
-that serves it, with its template, navigation and stylesheets — ready for any
-static host. Drafts are left out, and there's no `/edit`, no login and no view
-log, which means no `COOKIE_SECRET`, no `users.json` and no S3 credentials in
-production. Edit locally with `bun run dev`, where the editor previews through
-the same renderer, then export and deploy.
+That writes the whole site to `dist/`: every page rendered by the same code
+that serves it, with its template, navigation and stylesheets, at its one
+canonical address — `/` and `/blog/` as `index.html`, `about.md` as
+`about.html`. Then `static/` alongside. Ready for any static host.
+
+Drafts are left out rather than hidden behind a login, `{{edit}}` is empty, and
+`{{url}}` takes its origin from `DUCKDOWN_ORIGIN` because there's no request to
+read one from. It reads through the storage layer, so it will export a folder
+on disk or a live bucket — a running site can be turned into a static snapshot
+without moving its content first.
+
+Edit locally with `bun run dev`, where the editor previews through the same
+renderer, so what you see is what ships.
 
 ## Storage
 
