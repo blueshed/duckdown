@@ -1,6 +1,10 @@
 # Changelog
 
-## Unreleased
+## 0.1.0 — 2026-09-21
+
+Three ways to style a page became two that don't overlap, and duckdown became
+something you can publish as well as run. Most of it is removal.
+
 
 ### `bun run export` — the whole site as files
 

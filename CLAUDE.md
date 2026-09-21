@@ -44,11 +44,15 @@ duckdown/
 │   ├── nav.ts              # The site nav, cached until the editor changes a page
 │   ├── pid.ts              # Pid file: written at startup, removed on exit; stopServer()
 │   ├── stop.ts             # bun run stop
+│   ├── log.ts              # The view log: what was read, never who
+│   ├── scaffold.ts         # Says so when `bun create` left a half-scaffold
 │   ├── page.ts             # A page, rendered: markdown in its template
 │   ├── export.ts           # bun run export — the whole site as files
 │   ├── utils.ts            # Shared helpers: paths, escaping, dates, a pass outside code
 │   ├── routes/
-│   │   ├── pages.ts        # /edit/pages/* — file CRUD
+│   │   ├── files.ts        # fileRoutes() — GET/PUT/DELETE over one folder
+│   │   ├── pages.ts        # /edit/pages/* — file CRUD, via fileRoutes
+│   │   ├── site-files.ts   # /edit/templates/* and /edit/static/*, via fileRoutes
 │   │   ├── mark.ts         # /edit/mark/  — the preview, through page.ts
 │   │   ├── browse.ts       # /edit/browse/* — image browser + upload
 │   │   ├── static.ts       # /static/* — site static files
@@ -83,6 +87,7 @@ duckdown/
 │   ├── setup.ts            # Preload: env + happy-dom, before any module loads
 │   ├── helpers.ts          # The in-process server, signIn(), waitFor()
 │   ├── server.test.ts      # HTTP against the in-process server
+│   ├── export.test.ts      # bun run export, onto a scratch folder
 │   ├── editor.test.tsx     # The editor's code in happy-dom, against that server
 │   ├── units.test.ts       # pid, config, storage, auth, error handler
 │   ├── s3.test.ts          # S3Storage via Bun's S3 client + fake-s3.ts
