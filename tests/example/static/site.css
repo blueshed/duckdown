@@ -466,7 +466,11 @@ th {
   background: var(--bg);
   color: var(--text);
   font: inherit;
-  font-size: 0.9rem;
+  /* Never below 16px. Safari on iOS zooms the whole page when you focus an
+     input smaller than that, and the reader is left scrolled sideways on a
+     page they were only trying to search. max() so a reader who has set a
+     larger base size still gets it. */
+  font-size: max(1rem, 16px);
 }
 
 .search-results:not(:empty) {
