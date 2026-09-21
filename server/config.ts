@@ -25,6 +25,10 @@ export const SEED_PATH = process.env.DUCKDOWN_SEED ? resolve(process.env.DUCKDOW
 export const PID_FILE = process.env.DUCKDOWN_PID === "" ? "" : resolve(process.env.DUCKDOWN_PID || "duckdown.pid");
 
 // Derived paths (shared layout regardless of backend)
+// The site's address, for each page's canonical link. A served site takes it
+// from the request; an exported one has no request, so it is said here.
+export const ORIGIN = process.env.DUCKDOWN_ORIGIN || "";
+
 export const PAGE_PATH = "pages/";
 export const STATIC_PATH = "static/";
 export const IMAGES_PATH = "static/images/";

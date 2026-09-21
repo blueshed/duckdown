@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+### `bun run export` — the whole site as files
+
+```sh
+DUCKDOWN_ORIGIN=https://example.com bun run export        # into ./dist
+```
+
+A site that isn't edited in the browser doesn't need a server behind it. The
+export is rendered by the same `pageHtml()` the site route uses, so a page
+comes out as the page — its template, its navigation, its `{{pages}}` listing,
+its stylesheets — written at its one canonical address. Drafts are left out
+rather than hidden behind a login, `{{edit}}` is empty, and `{{url}}` takes its
+origin from `DUCKDOWN_ORIGIN` because there's no request to read one from.
+
+It reads through the storage layer, so it will export a folder on disk or a
+live bucket, whichever the environment points at.
+
+What a static deployment then doesn't need: `COOKIE_SECRET`,
+`DUCKDOWN_ADMIN_PASSWORD`, `users.json`, S3 credentials, or a bucket.
+
 ### Styling is templates and stylesheets
 
 `-theme.css` is gone, and with it the last thing about styling a duckdown site

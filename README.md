@@ -83,10 +83,26 @@ bun run start      # Production
 bun run stop       # Stop the server started from this folder
 bun run test       # Run tests (100% coverage required)
 bun run check      # TypeScript check
+bun run export     # Write the whole site to ./dist as plain files
 bun run dev:s3     # Start MinIO + run with S3 storage
 ```
 
 The server writes its pid to `duckdown.pid` and removes it on exit; `bun run stop` stops it (after checking the pid really is a duckdown server, and clearing away a stale file). Set `DUCKDOWN_PID` to move the file, or to an empty value to turn it off.
+
+## Exporting a static site
+
+If a site doesn't need editing in the browser, it doesn't need a server:
+
+```sh
+DUCKDOWN_ORIGIN=https://example.com bun run export
+```
+
+That writes the whole site to `dist/` — every page rendered by the same code
+that serves it, with its template, navigation and stylesheets — ready for any
+static host. Drafts are left out, and there's no `/edit`, no login and no view
+log, which means no `COOKIE_SECRET`, no `users.json` and no S3 credentials in
+production. Edit locally with `bun run dev`, where the editor previews through
+the same renderer, then export and deploy.
 
 ## Storage
 

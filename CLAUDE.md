@@ -45,6 +45,7 @@ duckdown/
 │   ├── pid.ts              # Pid file: written at startup, removed on exit; stopServer()
 │   ├── stop.ts             # bun run stop
 │   ├── page.ts             # A page, rendered: markdown in its template
+│   ├── export.ts           # bun run export — the whole site as files
 │   ├── utils.ts            # Shared helpers: paths, escaping, dates, a pass outside code
 │   ├── routes/
 │   │   ├── pages.ts        # /edit/pages/* — file CRUD
@@ -224,6 +225,7 @@ bun run stop       # Stop the server this folder's pid file names
 bun run dev:s3     # Start MinIO + run with S3 storage
 bun run test       # Run tests; fails below 100% line/function coverage
 bun run check      # TypeScript check
+bun run export     # Write the whole site to ./dist as plain files
 ```
 
 The server writes its pid to `duckdown.pid` (`DUCKDOWN_PID` moves it; set it empty to turn it off) and removes it on exit. `bun run stop` (`server/stop.ts` → `stopServer()` in `pid.ts`) SIGTERMs it and waits for it to go; it signals only a process whose command line names `main.ts` (a stale file's number may since belong to something else), clears a stale pid file, and says what it did. That includes a server the desktop app's preview pane started. A second server started while the first is alive stops with a message rather than failing on the port. Tests give each server they spawn its own pid file.
@@ -297,6 +299,16 @@ renders it, or, with no page open, a sample page for whatever you're composing
 with (sample content for a stylesheet, a sample page put through a template).
 Every branch is a `when()` built as it's shown, and they're mutually exclusive,
 so at most one is an element at a time.
+
+`export.ts` is the third caller of `pageHtml()`, after the site route and the
+preview: it walks `pages/`, renders each page and writes it at its one
+canonical address (`/` and `/blog/` as `index.html`, `about.md` as
+`about.html`), then copies `static/`. Drafts are left out rather than hidden,
+`{{edit}}` is empty, and `{{url}}` takes its origin from `DUCKDOWN_ORIGIN`
+because there is no request to read it from. It reads through the storage
+layer, so it exports a folder on disk or a live bucket. A new placeholder or a
+new thing a page can say has to work here too — if it needs a request, it
+can't go in `pageHtml`.
 
 `page.ts` turns a page into a document: its markdown inside the template `layout:` asks for, with the nav, the `{{pages}}` listing, the page's `css:` and the rest filled in, every value escaped. `routes/site.ts` and `routes/mark.ts` both go through it — `parsePage()` first, so the site can 404 a `draft:` before the expensive part, then `pageHtml()`. That is why the editor's preview is a preview and not a likeness: same template, same nav. The preview may pass an unsaved template as `draft`, used in place of the saved one when it is the one the page wears, and `pageHtml` reports which template it settled on.
 
