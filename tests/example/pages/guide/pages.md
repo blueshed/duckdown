@@ -201,9 +201,20 @@ Two overrides, and that's all there is:
 | `css:` | one extra stylesheet | one page that has to look unusual | [[/blog/one-page-that-looks-different\|the poster page]] |
 | `layout:` | the whole page shape, and what it links | posts, landing pages, print | [[/blog/a-post-with-its-own-layout\|the post]] |
 
+## Being found
+
+Readers search from the box at the top, and every page is in the index the
+moment it's saved — there's nothing to register. What decides whether yours is
+found is the front matter: a word in the `title:` ranks above one in the
+`description:`, which ranks above one in the body, and every word of the query
+has to appear somewhere.
+
+So a `description:` earns its keep twice: search engines quote it, and it's
+what a reader sees under your page in the results here.
+
 ## Drafts
 
-`draft: true` keeps a page to yourself. It's left out of the navigation and out of listings, and anyone visiting it gets "not found" — except you, while you're signed in to the editor, so you can read it in place before publishing.
+`draft: true` keeps a page to yourself. It's left out of the navigation, out of listings, out of the search index, and anyone visiting it gets "not found" — except you, while you're signed in to the editor, so you can read it in place before publishing.
 
 ## Navigation
 

@@ -45,6 +45,12 @@ describe("exportSite", () => {
     expect(home).not.toContain("user-edit");
     expect(home).not.toMatch(/\{\{\w+\}\}/);
 
+    // The index the browser searches, as a file: a published site has no
+    // server to ask for it.
+    const index = JSON.parse(read(dir, "search.json"));
+    expect(index.length).toBe(count.pages);
+    expect(index.find((e: { url: string }) => e.url === "/").title).toBe("duckdown");
+
     // static/ comes along, bytes and all.
     expect(read(dir, "static/site.css")).toContain("--accent");
     expect(existsSync(join(dir, "static/images/logo.svg"))).toBe(true);

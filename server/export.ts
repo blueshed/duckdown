@@ -18,6 +18,7 @@ import { dirname, join } from "path";
 import { ORIGIN, STATIC_PATH } from "./config";
 import { createPageStorage, createStaticStorage, type Storage } from "./storage";
 import { parsePage, pageHtml } from "./page";
+import { buildIndex } from "./search";
 import { canonicalPath } from "./utils";
 import { yes } from "./markdown";
 
@@ -83,6 +84,12 @@ export async function exportSite(o: {
     put(join(STATIC_PATH, key), await files.readBytes(key));
     count.files++;
   }
+
+  // The same index the served site answers at /search.json, as a file. A
+  // published site has no server to ask, so the browser fetches this and does
+  // the matching itself.
+  put("search.json", JSON.stringify(await buildIndex(pages)));
+  count.files++;
 
   say(`${count.pages} page(s) and ${count.files} file(s) written to ${out}/`);
   if (count.drafts) say(`${count.drafts} draft(s) left out.`);

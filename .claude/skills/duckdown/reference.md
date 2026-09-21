@@ -10,8 +10,9 @@
 8. [Static files and images](#static-files-and-images)
 9. [Users](#users)
 10. [The editor](#the-editor)
-11. [Publishing](#publishing)
-12. [Troubleshooting](#troubleshooting)
+11. [Search](#search)
+12. [Publishing](#publishing)
+13. [Troubleshooting](#troubleshooting)
 
 ## The content folder
 
@@ -312,6 +313,25 @@ A page's `layout:` chooses the template (`layout: post` → `templates/post.html
 - **Header**: *Resources* (the sidebar), *View* (the page on the site), *Logout*.
 - **Deleting always asks first**, wherever it is — a stylesheet or a template is as easy to lose as a page, and there's no undo behind any of them.
 - Anything that fails shows in a red notice at the foot of the screen until dismissed.
+
+## Search
+
+Readers search in the browser. duckdown builds one entry per page — `url`,
+`title`, `description`, and the page's words with the markdown taken out — and
+hands the lot over at `/search.json`; `bun run export` writes the same thing to
+`dist/search.json`, so search works on a published site with no server.
+
+- **Every non-draft page is in it**, found the same way the navigation walks
+  the folders. There is nothing to register and no index to rebuild by hand.
+- **Drafts are left out.** A result leading to a 404 is worse than no result.
+- **`title` ranks above `description`, which ranks above the body**, and every
+  word of the query has to appear somewhere. A page with a good `title:` and
+  `description:` is a page that can be found — which is the practical reason to
+  write a description.
+- **The matching is the site's own code**, `static/search.js` in the seed,
+  included by `templates/site.html` along with a `.search` form. Both are
+  editable in the editor. A site that wants search copies them; one that
+  doesn't, doesn't.
 
 ## Publishing
 

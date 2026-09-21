@@ -11,6 +11,7 @@ import { handleTemplateFiles, handleStaticFiles } from "./routes/site-files";
 import { handleMark } from "./routes/mark";
 import { handleBrowse } from "./routes/browse";
 import { handleStatic } from "./routes/static";
+import { handleSearch } from "./routes/search";
 import { handleSite } from "./routes/site";
 import { handleError } from "./routes/error";
 
@@ -42,6 +43,7 @@ export const server = Bun.serve({
     "/edit/static/*": handleStaticFiles,
     "/edit/mark/": handleMark,
     "/edit/browse/*": handleBrowse,
+    "/search.json": handleSearch,
     "/static/*": handleStatic,
   },
 

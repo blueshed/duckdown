@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased
+
+### Search, in the browser
+
+`/search.json` on a served site, `dist/search.json` on a published one: one
+entry per readable page — url, title, description, and the page's words with
+the markdown taken out. The browser fetches it once and does the matching, so
+there is no search service, no index format and no dependency. A few dozen
+pages is a few dozen kilobytes; the seed site's whole index is 12KB.
+
+Drafts are left out — a search result that 404s is worse than no result, and a
+test asserts every entry's url answers 200. The seed ships `static/search.js`
+and a box in `templates/site.html`: ordinary site code, in `static/`, editable
+in the editor like any other stylesheet or template. Sites that want search
+copy those two; duckdown's job ends at handing over the index.
+
 ## 0.1.0 — 2026-09-21
 
 Three ways to style a page became two that don't overlap, and duckdown became

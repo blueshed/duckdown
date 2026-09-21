@@ -21,6 +21,7 @@ Bun.serve({
     "/edit/templates/*": handleTemplateFiles,
     "/edit/static/*":    handleStaticFiles,
     "/edit/mark/":       handleMark,
+    "/search.json":      handleSearch,       // the index; the browser matches
     "/edit/browse/*":    handleBrowse,
     "/static/*":         handleStatic,
   },
@@ -45,6 +46,7 @@ duckdown/
 │   ├── pid.ts              # Pid file: written at startup, removed on exit; stopServer()
 │   ├── stop.ts             # bun run stop
 │   ├── log.ts              # The view log: what was read, never who
+│   ├── search.ts           # The index readers search, cached like the nav
 │   ├── scaffold.ts         # Says so when `bun create` left a half-scaffold
 │   ├── page.ts             # A page, rendered: markdown in its template
 │   ├── export.ts           # bun run export — the whole site as files
@@ -56,6 +58,7 @@ duckdown/
 │   │   ├── mark.ts         # /edit/mark/  — the preview, through page.ts
 │   │   ├── browse.ts       # /edit/browse/* — image browser + upload
 │   │   ├── static.ts       # /static/* — site static files
+│   │   ├── search.ts       # /search.json — the whole index, for the browser
 │   │   ├── site.ts         # fetch fallback — the site, through page.ts
 │   │   └── error.ts        # error handler — log it, answer 500 with a line to show
 │   └── edit/               # Editor client (served at /edit)
@@ -88,6 +91,7 @@ duckdown/
 │   ├── helpers.ts          # The in-process server, signIn(), waitFor()
 │   ├── server.test.ts      # HTTP against the in-process server
 │   ├── export.test.ts      # bun run export, onto a scratch folder
+│   ├── search.test.ts      # plainText, the index, and its cache
 │   ├── editor.test.tsx     # The editor's code in happy-dom, against that server
 │   ├── units.test.ts       # pid, config, storage, auth, error handler
 │   ├── s3.test.ts          # S3Storage via Bun's S3 client + fake-s3.ts
@@ -286,6 +290,8 @@ Nothing fails silently. In the editor, every request goes through `api(what, url
 When a content feature changes (syntax, front matter, themes, navigation, the editor), update the authoring skill — `.claude/skills/duckdown/` (`SKILL.md`, `reference.md`) — and the seed site's guide pages (`tests/example/pages/guide/`) with it: the skill is what a session writing a site's content reads.
 
 Styling is templates and stylesheets, and nothing else. `templates/site.html` links `static/site.css` (duckdown's base, everything drawn from CSS variables) and `static/theme.css` (this site's look, saying only what differs). There is no `theme:` key, no class on `<body>`, and no per-folder cascade: every page is styled because the template links the files, so a page can't opt in and can't forget to. Style new things through the variables so `theme.css` reaches them. For one page, `css:` links a stylesheet after the template's own; for a kind of page, `layout:` picks a template that links what that kind needs.
+
+Search happens in the browser. `search.ts` builds one entry per readable page — url, title, description, and the page's words with the markdown taken out — and the whole thing goes over as `/search.json` (served) or `dist/search.json` (published). Nothing on the server searches: a few dozen pages is a few dozen kilobytes, and a linear scan of that in the browser beats asking anyone. Drafts are left out, because a result that 404s is worse than no result, and the seed's `static/search.js` is ordinary site code a site can rewrite. The index is cached exactly like the nav, and `routes/pages.ts` drops both on a write.
 
 What the site knows about itself lives in `nav.ts`: the nav, and each folder's `{{pages}}` listing. In production both are built once and dropped by `pagesChanged()` whenever the pages route writes or deletes, because every write goes through the server — a new write path to pages must call it too. With `DEBUG=1` they're built per request instead, so pages written straight to disk (by hand, or by a session using the authoring skill) show up at once.
 

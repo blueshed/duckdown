@@ -11,8 +11,13 @@
   {{css}}
 </head>
 <body>
+  <form class="search" role="search">
+    <input type="search" placeholder="Search" aria-label="Search this site" autocomplete="off">
+    <div class="search-results" role="region" aria-live="polite"></div>
+  </form>
   {{nav}}
   {{content}}
   {{edit}}
+  <script src="/static/search.js" defer></script>
 </body>
 </html>

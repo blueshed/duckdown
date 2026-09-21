@@ -48,6 +48,8 @@ same code, so you can change your mind.
 - Styling in a few CSS variables: `static/theme.css`, linked by the template, with dark mode
 - **Templates and stylesheets are editable in the browser too**, in a pane
   below the page, so you watch the page change as you write them
+- Client-side search: one JSON index, matched in the browser — no service, no
+  dependency, and it works on a published site
 - Image browser with upload
 - Navigation generated from `index.md` files, and folder listings that keep themselves
 - JWT authentication

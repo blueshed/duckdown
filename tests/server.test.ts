@@ -286,6 +286,26 @@ describe("markdown preview", () => {
   });
 });
 
+describe("search", () => {
+  test("the whole index, at /search.json, for the browser to match against", async () => {
+    const res = await fetch(`${BASE}/search.json`);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("cache-control")).toContain("max-age");
+
+    const entries = await res.json();
+    const home = entries.find((e: any) => e.url === "/");
+    expect(home.title).toBe("duckdown");
+    expect(home.text).toContain("Write markdown");
+    expect(home.text).not.toContain("["); // the words, not the marks
+
+    // No result may lead anywhere a reader can't go: nothing guards this file,
+    // and a search result that 404s is worse than no result.
+    for (const entry of entries) {
+      expect((await fetch(`${BASE}${entry.url}`)).status).toBe(200);
+    }
+  });
+});
+
 describe("image browser", () => {
   test("lists images folder", async () => {
     const data = await (await fetch(`${BASE}/edit/browse/`, authed())).json();

@@ -394,3 +394,66 @@ th {
 .posted:empty {
   display: none;
 }
+
+
+/* --- Search ---
+   The index arrives as one file and static/search.js does the matching; this
+   is only where the results sit. Closed, it is an input and nothing else. */
+
+.search {
+  position: relative;
+  max-width: var(--measure);
+  margin: 0 auto 1rem;
+}
+
+.search input {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.9rem;
+}
+
+.search-results:not([open]) {
+  display: none;
+}
+
+.search-results {
+  position: absolute;
+  z-index: 5;
+  left: 0;
+  right: 0;
+  margin-top: 0.25rem;
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  box-shadow: 0 6px 24px rgb(0 0 0 / 0.12);
+}
+
+.search-results ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.search-results li + li {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border);
+}
+
+.search-results a {
+  font-weight: 600;
+}
+
+.search-results p,
+.search-none {
+  margin: 0.15rem 0 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
