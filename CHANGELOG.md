@@ -11,8 +11,9 @@ there is no search service, no index format and no dependency. A few dozen
 pages is a few dozen kilobytes; the seed site's whole index is 12KB.
 
 Drafts are left out — a search result that 404s is worse than no result, and a
-test asserts every entry's url answers 200. The seed ships `static/search.js`
-and a box in `templates/site.html`: ordinary site code, in `static/`, editable
+test asserts every entry's url answers 200. It is a magnifier in the navigation
+row until you press it, because a search box is chrome on a page nobody came to
+search. The seed ships `static/search.js` and the button in `templates/site.html`: ordinary site code, in `static/`, editable
 in the editor like any other stylesheet or template. Sites that want search
 copy those two; duckdown's job ends at handing over the index.
 

@@ -161,13 +161,28 @@ img, video {
 
 /* --- The site navigation (each folder's index.md) --- */
 
+/* The navigation and the search button share a row; the rule under it belongs
+   to the row, not to the list, so the button sits above it too. */
+.topbar {
+  display: flex;
+  align-items: baseline;
+  gap: 1.5rem;
+  margin: 0 0 3rem;
+  padding: 0 0 0.9rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.topbar > nav {
+  flex: 1;
+  min-width: 0;
+}
+
 ul.nav {
   display: flex;
   flex-wrap: wrap;
   gap: 0.25rem 1.5rem;
-  margin: 0 0 3rem;
-  padding: 0 0 0.9rem;
-  border-bottom: 1px solid var(--border);
+  margin: 0;
+  padding: 0;
   list-style: none;
 }
 
@@ -397,18 +412,54 @@ th {
 
 
 /* --- Search ---
-   The index arrives as one file and static/search.js does the matching; this
-   is only where the results sit. Closed, it is an input and nothing else. */
+   A button until you want it. The index arrives as one file and
+   static/search.js does the matching; this is only where it sits. */
 
 .search {
   position: relative;
-  max-width: var(--measure);
-  margin: 0 auto 1rem;
+  flex: none;
 }
 
-.search input {
+.search-toggle {
+  display: flex;
+  align-items: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.search-toggle:hover,
+.search[data-open] .search-toggle {
+  color: var(--text);
+}
+
+.search-toggle svg {
+  width: 1.05rem;
+  height: 1.05rem;
+}
+
+.search:not([data-open]) .search-panel {
+  display: none;
+}
+
+.search-panel {
+  position: absolute;
+  z-index: 5;
+  top: calc(100% + 0.6rem);
+  right: 0;
+  width: min(24rem, 78vw);
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  box-shadow: 0 6px 24px rgb(0 0 0 / 0.12);
+}
+
+.search-panel input {
   width: 100%;
-  padding: 0.5rem 0.75rem;
+  padding: 0.45rem 0.6rem;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--bg);
@@ -417,21 +468,8 @@ th {
   font-size: 0.9rem;
 }
 
-.search-results:not([open]) {
-  display: none;
-}
-
-.search-results {
-  position: absolute;
-  z-index: 5;
-  left: 0;
-  right: 0;
-  margin-top: 0.25rem;
-  padding: 0.5rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg);
-  box-shadow: 0 6px 24px rgb(0 0 0 / 0.12);
+.search-results:not(:empty) {
+  margin-top: 0.5rem;
 }
 
 .search-results ul {

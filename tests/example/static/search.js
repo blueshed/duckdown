@@ -11,10 +11,20 @@
   const form = document.querySelector(".search");
   if (!form) return;
 
+  const toggle = form.querySelector(".search-toggle");
   const input = form.querySelector("input");
   const output = form.querySelector(".search-results");
   let index = null;
   let loading = null;
+
+  // Shut until asked for. A search box is chrome on a page nobody came to
+  // search, so it is a button first and a box second.
+  function open(wanted) {
+    form.toggleAttribute("data-open", wanted);
+    toggle.setAttribute("aria-expanded", String(wanted));
+    if (wanted) input.focus();
+    else { input.value = ""; output.innerHTML = ""; }
+  }
 
   // Fetched once, on the first keystroke rather than on page load: a reader
   // who never searches never pays for it.
@@ -56,8 +66,7 @@
 
   function show(results, query) {
     output.innerHTML = "";
-    if (!query) return output.removeAttribute("open");
-    output.setAttribute("open", "");
+    if (!query) return;
 
     if (!results.length) {
       output.innerHTML = `<p class="search-none">Nothing matches “${query.replace(/[<&]/g, "")}”.</p>`;
@@ -90,13 +99,14 @@
     show(hits, query);
   }
 
+  toggle.addEventListener("click", () => open(!form.hasAttribute("data-open")));
   input.addEventListener("input", search);
   form.addEventListener("submit", (e) => e.preventDefault());
-  // Escape closes it; clicking away does too.
-  input.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") { input.value = ""; show([], ""); input.blur(); }
+  // Escape shuts it, and so does clicking anywhere else on the page.
+  form.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") { open(false); toggle.focus(); }
   });
   document.addEventListener("click", (e) => {
-    if (!form.contains(e.target)) show([], "");
+    if (!form.contains(e.target)) open(false);
   });
 })();
