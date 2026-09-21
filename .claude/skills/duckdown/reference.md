@@ -198,7 +198,7 @@ It follows each reader's light or dark setting (`prefers-color-scheme`), with it
 ### A theme
 
 1. Choose a name, and set `theme: mytheme` on the pages that should wear it.
-2. In a `-theme.css` (in the editor: **New → Theme**), set variables on `body.mytheme`:
+2. In a `-theme.css` (in the editor: the theme button in the tree's header, which makes one for the folder you're browsing), set variables on `body.mytheme`:
 
 ```css
 body.mytheme {
@@ -224,7 +224,7 @@ A page gets the `-theme.css` of the top of `pages/`, then of each folder down to
 
 `ul.nav` and `a[aria-current]` (navigation) · `nav.toc`, `.toc-h2`, `.toc-h3` (contents list) · `.callout.note` … `.callout.caution` and `.callout-title` · `a.wikilink` · `h2 > a` (a heading's self-link).
 
-In the editor, opening a `-theme.css` previews it on sample content — navigation, headings, a link, code, a callout, a table — with the class of the first `body.name { … }` rule in the file.
+In the editor, a `-theme.css` opens from the tree, at the foot of the folder it themes, in a pane below whatever page you're reading — so the page restyles as you type. With no page open it previews on sample content — navigation, headings, a link, code, a callout, a table — under the class of the first `body.name { … }` rule in the file.
 
 ## The site template
 
@@ -265,7 +265,7 @@ A page's `layout:` chooses the template (`layout: post` → `templates/post.html
 
 - Everything in `static/` is served at `/static/…`, typed by its extension.
 - Keep images in `static/images/`, in folders if you like; refer to them from pages as `/static/images/…`.
-- The editor's **Images** sidebar lists them with thumbnails, makes folders (**New**) and uploads files (**Upload**, several at once). Clicking one shows it, with **Copy Markdown** for the `![name](/static/images/…)` line, names encoded.
+- The editor's **Resources** sidebar, *images* tab, lists them with thumbnails, makes folders (the folder button) and uploads files (**Upload**, several at once). Clicking one shows it, with **Copy Markdown** for the `![name](/static/images/…)` line, names encoded.
 
 ## Users
 
@@ -286,14 +286,16 @@ A page's `layout:` chooses the template (`layout: post` → `templates/post.html
 ## The editor
 
 - At `/edit`. Signing in lands there; `/login` when already signed in goes straight there; the home page's "Login to edit" link does the same.
-- **Content** (left): the site's pages — folders and `.md` files; click to open, `..` to go up. Only pages: a `-theme.css` lives in `pages/` so the cascade finds it, but it is styling, so it's in Resources instead. Two buttons in its header make a **new page** and a **new folder** (`folder/index.md`, titled with the folder's name). Neither ever overwrites — it says when a name is taken.
+- **The tree** (left): the site's folders and pages; click to open, `..` to go up. At the foot of each folder, quietly, its `-theme.css` — not a page, and it opens as a resource (below), but listed here because *which folder it's in is what it means*: that folder and everything under it. Three buttons in the header make a **new page**, a **new folder** (`folder/index.md`, titled with the folder's name) and, where the folder hasn't one, a **new theme**. None ever overwrites — each says when a name is taken.
 - **Editing** (middle): Save or ⌘⏎. The button lights up while there are unsaved changes, flashes green for "Saved", and red for "Not saved" (the notice says why). The bin deletes the page, after asking.
 - **Resources** (right sidebar, from the header): what a page is composed with, in three tabs.
   - *images* — browse and upload, and copy a markdown link for one.
-  - *css* — the stylesheets in `static/`, and below them the `-theme.css` files that reach the page you have open, in the order they cascade. A button makes a new stylesheet, and another makes a theme for the open page's folder when it hasn't one.
+  - *css* — the stylesheets in `static/`, the ones a page names with `css:`. Themes aren't here: they belong to a folder, and the tree is where the folders are.
   - *templates* — the files in `templates/`, and a button for a new one.
-- **Editing a resource**: picking one closes the sidebar and opens it in a second pane *below* the page, with the same header — name, unsaved dot, delete, Save, and a close button. The page in the middle stays where it is, so you can click through pages and watch one stylesheet against each. It's transient: closing the pane leaves nothing behind.
-- **Preview** (right): the page as the site will show it, rendered by the same code — its own template, the navigation, the `{{pages}}` listing, the theme cascade, wiki links resolved from the page's folder — sandboxed, so no scripts run. A template open in the pane below is used in place of the saved one when it's the one this page wears, so you watch the page change as you write it; a stylesheet goes straight into the preview's head as you type. For a `.css` file opened as the page itself, sample content styled by it.
+- **Editing a resource** (a theme from the tree, or a stylesheet or template from the sidebar): it opens in a pane *below* the page, with the same header — name, unsaved dot, delete, Save, and a close button. The page stays where it is, so you can click through pages and watch one stylesheet against each. It's transient: closing the pane leaves nothing behind.
+- **The middle column holds whatever is open**, and each pane closes, the page included. Two split it; one fills it. With no page open, a theme, stylesheet or template has the column to itself — which is how you write one from scratch.
+- **Preview** (right): what you'd see. With a page open, the page as the site will show it, rendered by the same code — its own template, the navigation, the `{{pages}}` listing, the theme cascade, wiki links resolved from the page's folder — sandboxed, so no scripts run. A template open in the pane below is used in place of the saved one when it's the one this page wears, so you watch the page change as you write it; a stylesheet goes straight into the preview's head as you type, after the saved one, so it wins.
+- **With no page open**, whatever you're composing with gets a sample page of its own: for a stylesheet or a theme, a bit of everything `site.css` styles; for a template, a sample page put through it, with the site's real navigation and theme cascade. So a template or a stylesheet can be written with nothing else on screen.
 - **Header**: *Resources* (the sidebar), *View* (the page on the site), *Logout*.
 - **Deleting always asks first**, wherever it is — a stylesheet or a template is as easy to lose as a page, and there's no undo behind any of them.
 - Anything that fails shows in a red notice at the foot of the screen until dismissed.

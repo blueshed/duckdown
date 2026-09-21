@@ -101,8 +101,15 @@ async function writeNew(section: Resource["section"], file: string, body: string
     { method: "PUT", headers: { "If-None-Match": "*" }, body }, [412]);
   if (res.status === 412) return `${file} already exists`;
   if (!res.ok) return `Couldn't create ${file}`;
-  reloadResources();
+  changed(section);
   await openResource({ section, path: file });
+}
+
+// A stylesheet or template shows in the sidebar; a theme shows in the tree,
+// in its folder. Tell whichever one lists it.
+function changed(section: Resource["section"]) {
+  reloadResources();
+  if (section === "pages") reloadBrowser();
 }
 
 export function reloadResources() {
@@ -123,7 +130,7 @@ export async function deleteResource(): Promise<boolean> {
   const res = await api(`delete ${open.path}`, resourceUrl(open), { method: "DELETE" });
   if (!res.ok) return false;
   closeResource();
-  reloadResources();
+  changed(open.section);
   return true;
 }
 
@@ -154,9 +161,7 @@ export async function loadFile(path: string): Promise<boolean> {
 // replace a file that already exists. Returns a message for the dialog if so.
 export async function createFile(path: string, name: string): Promise<string | void> {
   const fp = path.replace(/^\//, "");
-  const body = name === "-theme.css"
-    ? `/* Theme CSS for this folder */\n/* Set theme: mytheme in your page front-matter */\n/* Then target body.mytheme here */\n\nbody.mytheme {\n  \n}\n`
-    : `title: ${name.replace(/\.md$/, "")}\n\n`;
+  const body = `title: ${name.replace(/\.md$/, "")}\n\n`;
   const res = await api(`create ${fp}`, at(fp), { method: "PUT", headers: { "If-None-Match": "*" }, body }, [412]);
   if (res.status === 412) return `${fp} already exists`;
   if (!res.ok) return `Couldn't create ${fp}`;
@@ -179,13 +184,22 @@ export async function deleteFile(): Promise<boolean> {
   if (!fp) return false;
   const res = await api(`delete ${fp}`, at(fp), { method: "DELETE" });
   if (!res.ok) return false;
+  closeFile();
+  reloadBrowser();
+  return true;
+}
+
+// The page closes like the resource below it does, and the column gives the
+// room back to whatever is still open. pageLayout goes with it: it describes
+// the open page, and left behind it has the resource pane telling you what
+// "the page you are looking at" wears when you are not looking at one.
+export function closeFile() {
   batch(() => {
     filePath.set(null);
     fileContent.set("");
     editorContent.set("");
+    pageLayout.set("");
   });
-  reloadBrowser();
-  return true;
 }
 
 export function reloadBrowser() {

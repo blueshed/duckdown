@@ -17,10 +17,12 @@ Bun.serve({
     "/edit/styles.css": editorCss,   // Bun.file — also styles /login
     "/login":           { GET: handleLoginGet, POST: handleLoginPost },
     "/logout":          { POST: handleLogout },
-    "/edit/pages/*":    handlePages,
-    "/edit/mark/":      handleMark,
-    "/edit/browse/*":   handleBrowse,
-    "/static/*":        handleStatic,
+    "/edit/pages/*":     handlePages,
+    "/edit/templates/*": handleTemplateFiles,
+    "/edit/static/*":    handleStaticFiles,
+    "/edit/mark/":       handleMark,
+    "/edit/browse/*":    handleBrowse,
+    "/static/*":         handleStatic,
   },
   fetch: handleSite,
   error: handleError,   // failures speak: logged, and a line the editor can show
@@ -68,6 +70,8 @@ duckdown/
 │           ├── ImageBrowser.tsx # Resources sidebar: images, css, templates
 │           ├── ResourceList.tsx # One tab of it: the css or template files
 │           ├── ResourcePane.tsx # A resource open below the page
+│           ├── PreviewFrame.tsx # The sandboxed iframe, in one place
+│           ├── TemplatePreview.tsx # A sample page through the draft template
 │           ├── PaneHeader.tsx   # The one header both panes wear
 │           ├── NewDialog.tsx    # Name a new page, folder, stylesheet, template
 │           ├── ConfirmDialog.tsx # Confirm action dialog
@@ -206,6 +210,8 @@ function Counter() {
 - **`effect(fn)` may return a cleanup**, run before its next run and when it's disposed: the place to clear a timer (Preview's debounce).
 - **Build conditional panels with `when()`**, not by swapping prebuilt nodes: a component made when it's shown starts from the current state (an iframe attached as its `srcdoc` changes can keep the old document).
 
+**`when()` renders on a microtask, not in the `mount()` call.** Straight after mounting, a branch whose condition is already true is not in the DOM yet — a synchronous `querySelector` for it comes back null. Await a tick (the tests' `waitFor`) before looking. Transitions after that are synchronous. This looks exactly like "`when()` ignores an initially-true condition", which it doesn't, and chasing that wastes an hour.
+
 Don't wrap signal updates in a bare `catch {}`: a render error inside `.set()` throws back to the caller, and an empty catch hides it.
 
 ## Running
@@ -283,6 +289,14 @@ root, in none of them, which is why the hashes stay out of the editor. Keep it
 that way when adding a section.
 
 Front matter takes only the keys duckdown reads (`KEYS` in `markdown.ts`) or an `x-` extension, unless the block is fenced with `---`, which takes anything: a page opening "Update: closed Monday" keeps its first line. Add a key there and in the skill's reference together.
+
+The editor's two right-hand columns each hold whatever is open. The middle one
+holds the page and a resource beneath it — each closes, two split the column,
+one fills it. The preview column shows what you'd see: the page as the site
+renders it, or, with no page open, a sample page for whatever you're composing
+with (sample content for a stylesheet, a sample page put through a template).
+Every branch is a `when()` built as it's shown, and they're mutually exclusive,
+so at most one is an element at a time.
 
 `page.ts` turns a page into a document: its markdown inside the template `layout:` asks for, with the nav, the `{{pages}}` listing, the theme cascade and the rest filled in, every value escaped. `routes/site.ts` and `routes/mark.ts` both go through it — `parsePage()` first, so the site can 404 a `draft:` before the expensive part, then `pageHtml()`. That is why the editor's preview is a preview and not a likeness: same template, same nav. The preview may pass an unsaved template as `draft`, used in place of the saved one when it is the one the page wears, and `pageHtml` reports which template it settled on.
 

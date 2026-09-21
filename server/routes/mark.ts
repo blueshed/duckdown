@@ -3,7 +3,7 @@ import { requireAuth } from "../auth";
 import { parsePage, pageHtml, type DraftTemplate } from "../page";
 import { siteOrigin } from "./site";
 
-type MarkRequest = { source: string; draft?: DraftTemplate };
+type MarkRequest = { source: string; draft?: DraftTemplate; through?: string };
 
 export const handleMark = {
   // The preview, rendered the way the site renders: the page's markdown inside
@@ -14,16 +14,17 @@ export const handleMark = {
   // ?path= is the page being edited: its [[wiki links]], its theme cascade and
   // its place in the nav all depend on where it lives. `draft` is a template
   // open in the editor and not yet saved, used in place of the saved one when
-  // it is the template this page wears.
+  // it is the template this page wears; `through` renders in exactly the
+  // template given, which is how the editor previews one with no page open.
   async PUT(req: BunRequest) {
     const denied = await requireAuth(req);
     if (denied) return denied;
     const path = new URL(req.url).searchParams.get("path") ?? "";
-    const { source, draft } = (await req.json()) as MarkRequest;
+    const { source, draft, through } = (await req.json()) as MarkRequest;
     const page = parsePage(path, source);
     // No edit link: the preview shows the page a reader gets, and a link into
     // the editor from inside the editor helps nobody.
-    const { html, layout } = await pageHtml(page, { origin: siteOrigin(req), draft });
+    const { html, layout } = await pageHtml(page, { origin: siteOrigin(req), draft, through });
     return Response.json({ html, layout, meta: page.meta });
   },
 };

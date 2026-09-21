@@ -1,6 +1,6 @@
 import { createElement, signal, computed, effect } from "@blueshed/railroad";
 import { PaneHeader } from "./PaneHeader";
-import { filePath, editorContent, saveFile, deleteFile } from "../store";
+import { filePath, editorContent, saveFile, deleteFile, closeFile } from "../store";
 
 export function Editor() {
   const dirty = signal(false);
@@ -30,7 +30,7 @@ export function Editor() {
 
   return (
     <div class="editor-area">
-      <PaneHeader icon="file-text" name={fp} dirty={dirty} onsave={save} ondelete={deleteFile} />
+      <PaneHeader icon="file-text" name={fp} dirty={dirty} onsave={save} ondelete={deleteFile} onclose={closeFile} />
       <textarea value={editorContent} onkeydown={onkeydown} oninput={oninput} />
     </div>
   );

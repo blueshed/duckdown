@@ -58,7 +58,13 @@ export function parsePage(key: string, source: string): Page {
 export type PageOptions = {
   origin: string;        // scheme and host, for the canonical URL
   editHref?: string;     // where {{edit}} points, when there is somewhere
-  draft?: DraftTemplate; // an unsaved template from the editor
+  // Two different questions the editor asks. `draft` is "this template is
+  // open and unsaved — use my copy if this page wears it", which is how a
+  // page reshapes itself while you edit its template, and leaves a page that
+  // wears another one alone. `through` is "render this page in exactly this
+  // template", which is how a template can be previewed with no page open.
+  draft?: DraftTemplate;
+  through?: string;
 };
 
 // The whole document: the page's markdown inside the template it asks for,
@@ -79,7 +85,9 @@ export async function pageHtml(page: Page, o: PageOptions): Promise<{ html: stri
       part.replace(/<p>\{\{pages\}\}<\/p>|\{\{pages\}\}/g, () => list));
   }
 
-  const template = await templateFor(meta.layout?.[0], o.draft);
+  const template = o.through === undefined
+    ? await templateFor(meta.layout?.[0], o.draft)
+    : { name: "", body: o.through };
   let html = template.body;
   for (const [name, value] of [
     ["title", () => escapeHtml(meta.title?.[0] || "duckie")],

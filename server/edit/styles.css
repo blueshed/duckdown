@@ -154,6 +154,12 @@ button.header-link:hover {
   font-weight: 500;
 }
 
+/* In the tree but not a page: the folder it sits in is what it means, so it
+   belongs here, quieter than the pages it themes. */
+.file-list .resource {
+  color: var(--text-dim);
+}
+
 .file-list .thumb {
   width: 20px;
   height: 20px;
@@ -165,11 +171,11 @@ button.header-link:hover {
 
 /* --- Editor area --- */
 
+/* The page's own pane. Its height comes from the column it is in. */
 .editor-area {
   display: flex;
-  flex: 1;
   flex-direction: column;
-  min-height: 0;
+  background: var(--bg);
 }
 
 .editor-area textarea,
@@ -591,27 +597,37 @@ button.danger-subtle:hover {
   border-bottom-color: var(--accent);
 }
 
-/* --- The middle column: the page, and a resource open beneath it --- */
+/* --- The two right-hand columns ---
+   Each holds whatever is open: the page and a resource beneath it in the
+   middle, and in the preview column the one thing that answers to them. One
+   fills its column, two split it, and a rule between them says where one ends
+   — so closing either gives the room back rather than leaving a gap. */
 
-.column-middle {
+.column-middle,
+.column-preview {
   display: flex;
-  flex: 1;
   flex-direction: column;
   min-width: 0;
+}
+
+.column-middle {
   border-right: 1px solid var(--border);
 }
 
-.column-middle .panel-editor {
+.column-middle > *,
+.column-preview > * {
   flex: 1;
   min-height: 0;
-  border-right: 0;
+}
+
+/* Adjacent-sibling ignores the comment markers when() leaves behind, so this
+   is the second pane only when there really is one above it. */
+.column-middle > * + * {
+  border-top: 1px solid var(--border);
 }
 
 .panel-resource {
   display: flex;
-  flex: 0 0 40%;
   flex-direction: column;
-  min-height: 0;
-  border-top: 1px solid var(--border);
 }
 

@@ -1,5 +1,5 @@
 import { createElement, computed } from "@blueshed/railroad";
-import { editorContent } from "../store";
+import { PreviewFrame } from "./PreviewFrame";
 
 // A bit of everything site.css styles, so a theme's variables show.
 const sampleContent = `
@@ -16,10 +16,13 @@ const sampleContent = `
   <img src="/static/images/logo.svg" alt="duckdown" style="width:80px;height:80px;">
 `;
 
-export function CssPreview() {
+// A stylesheet with no page to try it on: sample content, styled by what you
+// are typing. `css` says where the text comes from — the editor when a .css is
+// open as the page, the pane's draft when one is open as a resource.
+export function CssPreview({ css }: { css: () => string }) {
   const srcdoc = computed(() => {
-    const css = editorContent.get();
-    const classMatch = css.match(/body\.(\w[\w-]*)\s*\{/);
+    const text = css();
+    const classMatch = text.match(/body\.(\w[\w-]*)\s*\{/);
     const bodyClass = classMatch ? classMatch[1] : "";
 
     return `<!DOCTYPE html>
@@ -28,7 +31,7 @@ export function CssPreview() {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link href="/static/site.css" rel="stylesheet">
-  <style>${css}</style>
+  <style>${text}</style>
 </head>
 <body class="${bodyClass}">
   ${sampleContent}
@@ -36,10 +39,5 @@ export function CssPreview() {
 </html>`;
   });
 
-  return (
-    <div class="panel panel-preview">
-      {/* allow-same-origin without allow-scripts: see Preview.tsx */}
-      <iframe srcdoc={srcdoc} sandbox="allow-same-origin" style="width: 100%; height: 100%; border: none;" />
-    </div>
-  );
+  return <PreviewFrame srcdoc={srcdoc} />;
 }

@@ -1,0 +1,22 @@
+/* The blog's theme, and a demonstration of what "themes cascade" means.
+
+   Every page here says `theme: duckdown`, the same as the rest of the site,
+   and the root's -theme.css has already set that theme's variables by the
+   time this file is read. This one is read second, because it sits in the
+   folder the page is in — so it doesn't restate the theme, it says what is
+   different about the blog. Put a file like this in any folder and it reaches
+   that folder and everything under it, after everything above it.
+
+   Move it up to pages/ and these become the whole site's. That is the only
+   difference between the two files: where they are. */
+
+body.duckdown {
+  --accent: #8a4b2a;      /* warmer than the site's blue-green, for reading */
+  --measure: 38rem;       /* a narrower column: prose, not documentation */
+}
+
+@media (prefers-color-scheme: dark) {
+  body.duckdown {
+    --accent: #e0a080;
+  }
+}

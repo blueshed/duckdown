@@ -27,17 +27,21 @@ Open [http://localhost:8080](http://localhost:8080) to see your site.
 
 Go to [http://localhost:8080/edit](http://localhost:8080/edit) and log in with `admin` / `admin`.
 
-You'll see three panels:
+You'll see three columns:
 
-| Panel | Purpose |
-|-------|---------|
-| **Left** | Browse your pages and files |
-| **Center** | Edit markdown or CSS |
-| **Right** | Live preview with your theme |
+| Column | What's in it |
+|--------|--------------|
+| **Left** | Your content: folders and pages, and at the foot of each folder the `-theme.css` that styles it |
+| **Middle** | Whatever you have open. A page; underneath it, a theme, stylesheet or template you're composing with; or just one of those, filling the column |
+| **Right** | What you'd see — the page as the site will render it, or, with no page open, a sample page for whatever you're editing |
+
+**Resources**, in the header, is the other half of the left column: the images,
+stylesheets and templates that don't belong to any one folder. Pick one and it
+opens below your page, so you watch the page change while you edit it.
 
 ## 4. Save your changes
 
-Edit the markdown, then press **⌘⏎** (or click **Save**). The preview updates instantly.
+Edit the markdown, then press **⌘⏎** (or click **Save**). The preview updates as you type; saving is what puts it on the site.
 
 ## Next steps
 

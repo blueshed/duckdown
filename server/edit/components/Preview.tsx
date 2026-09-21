@@ -1,6 +1,7 @@
 import { createElement, signal, computed, effect } from "@blueshed/railroad";
 import { apiJson } from "../api";
 import { editorContent, filePath, pageLayout, resource, resourceDraft } from "../store";
+import { PreviewFrame } from "./PreviewFrame";
 
 // The server renders the whole document, the way the site will: the page's
 // markdown inside its template, with the nav, the theme cascade and the rest
@@ -56,11 +57,5 @@ export function Preview() {
     return html.includes("</head>") ? html.replace("</head>", `${css}</head>`) : css + html;
   });
 
-  return (
-    <div class="panel panel-preview">
-      {/* allow-same-origin without allow-scripts: page script can't run, but
-          stylesheets, images and the session cookie still load. Never both. */}
-      <iframe srcdoc={srcdoc} sandbox="allow-same-origin" style="width: 100%; height: 100%; border: none;" />
-    </div>
-  );
+  return <PreviewFrame srcdoc={srcdoc} />;
 }
