@@ -1,5 +1,4 @@
 title: Getting Started
-theme: duckdown
 nav: Guide
 
 # Getting Started

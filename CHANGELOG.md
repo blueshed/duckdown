@@ -1,5 +1,34 @@
 # Changelog
 
+## Unreleased
+
+### `theme:` is gone — styling follows the folder
+
+A `-theme.css` already reached every page in its folder and everything under
+it. `theme:` then made each page *also* name the theme, and the CSS nest under
+`body.<name>`, before any of it applied. Both real duckdown sites had exactly
+one theme and put the same line on every page, so the class matched everything
+and selected nothing — while a page that forgot the line silently lost its
+folder's styling, with nothing to say why.
+
+So the key, the `{{theme}}` placeholder and the body class are all removed. A
+`-theme.css` styles its folder and everything under it, full stop.
+
+**Upgrading**, two mechanical steps in your content folder:
+
+- **Delete the `theme:` line** from every page's front matter. Left in, it is
+  no longer a key duckdown reads, so the block ends there and the line shows up
+  in the page — unless the block is fenced with `---`, which takes anything.
+- **Unwrap your `-theme.css`**: `body.mytheme { --accent: … }` becomes
+  `:root { --accent: … }`, and rules like `body.mytheme h1 { … }` become
+  `h1 { … }`. They only reach that folder's pages either way, because only
+  those pages are served the file.
+- **`<body class="{{theme}}">` in a template** becomes `<body>`. Left in, it
+  publishes the literal text.
+
+For one page that has to look different, `css:` is unchanged: it links
+`/static/<name>.css` after the cascade, so it can override the same variables.
+
 ## 0.0.2
 
 ### Upgrading an existing site

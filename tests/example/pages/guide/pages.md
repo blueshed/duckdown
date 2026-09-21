@@ -1,5 +1,4 @@
 title: Writing Pages
-theme: duckdown
 toc: true
 
 # Writing Pages
@@ -12,7 +11,6 @@ Pages start with metadata — key-value pairs before your content:
 
 ```markdown
 title: My Page
-theme: duckdown
 nav: About
 
 # Your content here
@@ -21,13 +19,17 @@ nav: About
 | Key | What it does |
 |-----|-------------|
 | `title` | Sets the page title in the browser tab |
-| `theme` | Adds a CSS class to `<body>` for styling |
 | `nav` | In a folder's `index.md`: its label in the site navigation |
 | `toc` | `toc: true` adds a list of the page's contents under its title |
 | `layout` | `layout: post` wraps the page in `templates/post.html` |
+| `css` | `css: poster` links `/static/poster.css` to this page alone |
 | `description` | Fills in the page's description for search engines and links shared online |
 | `date` | Used to order a folder's [[#listing-a-folder\|listing]], newest first |
 | `draft` | `draft: true` keeps the page off the site until you're ready |
+
+Nothing here says how the page looks, and that's deliberate: styling comes from
+the folder a page is in, not from a line each page has to remember. See
+[[themes|Themes]].
 
 A blank line separates front-matter from your markdown.
 
@@ -192,13 +194,16 @@ rather than failing.
 
 Reach for a layout when a *kind* of page wants a different shape. For one page
 that only wants to look different, `css: print` links `/static/print.css` after
-the theme, and a `theme:` changes the variables. Three sizes of override:
+the theme. Three sizes of override, and only two of them are a line on the page:
 
 | | changes | good for | on this site |
 |---|---|---|---|
-| `theme:` | a few CSS variables | a section that reads differently | every page here |
+| a `-theme.css` | a few CSS variables | a section that reads differently | [[/blog/index\|the blog]], which reads warmer and narrower |
 | `css:` | one extra stylesheet | one page that has to look unusual | [[/blog/one-page-that-looks-different\|the poster page]] |
 | `layout:` | the whole page shape | posts, landing pages, print | [[/blog/a-post-with-its-own-layout\|the post]] |
+
+The first isn't front matter at all: you put the file in the folder and every
+page in it is styled, including the ones you write next year.
 
 ## Drafts
 

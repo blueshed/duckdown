@@ -1,15 +1,17 @@
-/* The duckdown theme, for pages with `theme: duckdown`: it sets a few of
-   site.css's variables rather than restyling anything. Every page on the
-   site gets this file (themes cascade), so rules for one theme go under
-   its body class. */
-body.duckdown {
+/* The site's theme. It sits at the top of pages/, so every page gets it.
+
+   It sets a few of site.css's variables rather than restyling anything —
+   that is what a theme is for. Put a file like this in any folder and it
+   reaches that folder and everything under it, read after this one. */
+
+:root {
   --accent: #147c99;
   --font-heading: Georgia, "Times New Roman", serif;
   --duck: var(--accent); /* the logo's colour (see the Images guide) */
 }
 
 @media (prefers-color-scheme: dark) {
-  body.duckdown {
+  :root {
     --accent: #5cc1dc;
   }
 }

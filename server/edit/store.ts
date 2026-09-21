@@ -58,7 +58,7 @@ const STARTER = {
   <link rel="stylesheet" href="/static/site.css">
   {{theme_css}}
 </head>
-<body class="{{theme}}">
+<body>
   <nav class="nav">{{nav}}</nav>
   <main>{{content}}</main>
 </body>
@@ -87,11 +87,12 @@ export async function createTheme(dir: string): Promise<string | void> {
   return writeNew("pages", file, THEME_STARTER);
 }
 
-const THEME_STARTER = `/* A theme for this folder and the ones under it.
-   Put theme: mytheme in a page's front matter, then set site.css's
-   variables on body.mytheme here. */
+const THEME_STARTER = `/* The theme for this folder and every folder under it.
+   Every page here is styled by it — there is nothing to write on the pages.
+   Set site.css's variables rather than restyling elements, and say only what
+   differs from the theme above this one. */
 
-body.mytheme {
+:root {
   --accent: #5856d6;
 }
 `;

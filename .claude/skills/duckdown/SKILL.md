@@ -33,7 +33,6 @@ users.json    who can sign in (password hashes)
 2. Start it with front matter — `key: value` lines, then a blank line:
    ```markdown
    title: About us
-   theme: duckdown
    toc: true
 
    # About us
@@ -49,7 +48,7 @@ users.json    who can sign in (password hashes)
 
 - **A plain block of front matter may only use the keys duckdown reads** — `title`, `theme`, `nav`, `toc`, `layout`, `css`, `description`, `date`, `draft`, or an `x-…` of your own. For any other key, fence it with `---` … `---`. (That's why prose starting "Update: closed Monday" keeps its first line.)
 - **Only a folder's `index.md` is in the navigation**, labelled by its `nav:` (else its `title:`). To put "About" in the nav, write `pages/about/index.md`, not `pages/about.md`. Folders starting with `-` or `.` stay out of it, though their pages are still served. Drafts stay out too.
-- **Themes set variables, not styles**: `theme: name` on the page, and in a `-theme.css` set site.css's variables on `body.name`. Themes cascade — the top folder's `-theme.css` reaches every page, then each folder's down to the page's own — so keep each theme's rules under its own `body.name`, and let a folder's file say only what differs. This site does it: `pages/-theme.css` and `pages/blog/-theme.css`.
+- **Styling follows the folder, not the page**: a `-theme.css` in a `pages/` folder styles that folder and everything under it, and there is nothing to write on the pages themselves — that is the point, because a post written later can't forget a line. They cascade: the top folder's reaches every page, then each folder's down to the page's own, so set site.css's variables (`:root { --accent: … }`) and let a folder's file say only what differs. This site does it: `pages/-theme.css` and `pages/blog/-theme.css`. For a single page that must look different, `css: poster` links `/static/poster.css` after them.
 - **In development (`DEBUG=1`) the navigation is rebuilt on every request**, so a folder's `index.md` written straight to disk shows up at once. In production it's cached and rebuilt when a page is saved or deleted through the editor, so files put there another way need a restart (`bun run stop`, then start again).
 - **`users.json` holds password hashes**, never passwords: a plain one won't sign in. Make a hash with `bun -e 'console.log(await Bun.password.hash("their-password"))'`.
 

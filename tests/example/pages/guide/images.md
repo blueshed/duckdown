@@ -1,5 +1,4 @@
 title: Images
-theme: duckdown
 
 # Images
 

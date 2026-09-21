@@ -1,5 +1,4 @@
 title: A post with its own layout
-theme: duckdown
 layout: post
 date: 2026-09-21
 description: What layout: is for, demonstrated by the page you are reading.
@@ -26,5 +25,6 @@ back to `site.html` rather than failing.
 
 > [!TIP]
 > Use a layout when a kind of page wants a different *shape* — a post, a
-> landing page, something to print. Use a [[/guide/themes|theme]] when it only wants
-> to look different, and `css:` when one single page does.
+> landing page, something to print. When a whole *section* should look
+> different, put a [[/guide/themes|theme]] in its folder; when one single page
+> should, give that page a `css:`.

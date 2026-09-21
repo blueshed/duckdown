@@ -1,5 +1,4 @@
 title: duckdown
-theme: duckdown
 nav: Home
 
 # Welcome to duckdown

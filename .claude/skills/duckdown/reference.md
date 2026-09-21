@@ -56,7 +56,6 @@
 | Key | What it does |
 |-----|-------------|
 | `title` | The page's `<title>`; `duckie` if absent. A folder's `index.md` title is also its nav label, unless it has a `nav` |
-| `theme` | Put on `<body>` as a class, so a theme's `body.name { … }` rules apply |
 | `nav` | In a folder's `index.md` only: its label in the navigation |
 | `toc` | `true` (or `yes`) adds a contents list under the page's title |
 | `layout` | `post` wraps the page in `templates/post.html`, falling back to `site.html` |
@@ -197,18 +196,20 @@ It follows each reader's light or dark setting (`prefers-color-scheme`), with it
 
 ### A theme
 
-1. Choose a name, and set `theme: mytheme` on the pages that should wear it.
-2. In a `-theme.css` (in the editor: the theme button in the tree's header, which makes one for the folder you're browsing), set variables on `body.mytheme`:
+Put a `-theme.css` in a `pages/` folder and it styles that folder and every
+folder under it. Nothing goes on the pages — they don't opt in and can't
+forget to. In the editor it's the theme button in the tree's header, which
+makes one for the folder you're browsing.
 
 ```css
-body.mytheme {
+:root {
   --accent: #b5179e;
   --font-heading: Georgia, "Times New Roman", serif;
   --measure: 40rem;
 }
 
 @media (prefers-color-scheme: dark) {
-  body.mytheme {
+  :root {
     --accent: #f28fdf;
   }
 }
@@ -218,13 +219,13 @@ Any other CSS may follow; setting variables is just the easy, reliable part. Cha
 
 ### The cascade
 
-A page gets the `-theme.css` of the top of `pages/`, then of each folder down to its own, in that order, inlined in a `<style>` after `site.css`. So the top folder's file reaches every page — keep each theme's rules under its own `body.name` — and a folder can refine what's above it.
+A page gets the `-theme.css` of the top of `pages/`, then of each folder down to its own, in that order, inlined in a `<style>` after `site.css`. The top folder's file reaches every page, so put the site's look there and let a folder's file say only what differs — it overrides the variables it cares about and leaves the rest. Nothing has to be undone.
 
 ### Hooks for extra CSS
 
 `ul.nav` and `a[aria-current]` (navigation) · `nav.toc`, `.toc-h2`, `.toc-h3` (contents list) · `.callout.note` … `.callout.caution` and `.callout-title` · `a.wikilink` · `h2 > a` (a heading's self-link).
 
-In the editor, a `-theme.css` opens from the tree, at the foot of the folder it themes, in a pane below whatever page you're reading — so the page restyles as you type. With no page open it previews on sample content — navigation, headings, a link, code, a callout, a table — under the class of the first `body.name { … }` rule in the file.
+In the editor, a `-theme.css` opens from the tree, at the foot of the folder it themes, in a pane below whatever page you're reading — so the page restyles as you type. With no page open it previews on sample content: navigation, headings, a link, code, a callout, a table.
 
 ## The site template
 
@@ -233,7 +234,6 @@ In the editor, a `-theme.css` opens from the tree, at the foot of the folder it 
 | Placeholder | Becomes |
 |-------------|---------|
 | `{{title}}` | The page's `title`, else `duckie` |
-| `{{theme}}` | The page's `theme`, else nothing — use it as `<body class="{{theme}}">` |
 | `{{description}}` | The page's `description` as `<meta name="description">` and `og:description`, or nothing |
 | `{{url}}` | The page's one canonical address — use it as `<link rel="canonical" href="{{url}}">` |
 | `{{date}}` | The page's `date` as a `<time>`, written out (`21 September 2026`), or nothing |
@@ -254,7 +254,7 @@ A page's `layout:` chooses the template (`layout: post` → `templates/post.html
   <link href="/static/site.css" rel="stylesheet">
   {{theme_css}}
 </head>
-<body class="{{theme}}">
+<body>
   {{nav}}
   {{content}}
 </body>
@@ -307,7 +307,7 @@ A page's `layout:` chooses the template (`layout: post` → `templates/post.html
 | A page isn't in the navigation | Not a folder's `index.md`; no `nav`/`title`; its folder starts with `-`; or, in production only, written to disk after the nav was built (save a page in the editor, or restart) |
 | A line like `author: Peter` shows up in the page | It isn't a key duckdown reads: fence the block with `---` to keep it as metadata |
 | A page is "not found" although the file is there | `draft: true` — sign in to the editor to read it, or take the line out to publish |
-| A theme doesn't apply | The page's `theme:` doesn't match the `body.name` in the CSS; or the `-theme.css` isn't in the page's folder or one above it |
+| A theme doesn't apply | The `-theme.css` isn't in the page's folder or one above it; or its rules are nested under a selector nothing matches (write `:root { … }`, not `body.name { … }` — pages carry no class) |
 | An SVG ignores the theme's colours | It's shown with `<img>` or `![…]`, which CSS can't reach into: use it as a mask (above) |
 | An SVG shows nothing at all | It isn't valid XML — check with `xmllint --noout file.svg`; a `--` inside a comment is the usual culprit |
 | A folder's page isn't found | Give the folder an `index.md`: `/blog` is served by `pages/blog/index.md` |
@@ -317,10 +317,12 @@ A page's `layout:` chooses the template (`layout: post` → `templates/post.html
 
 ## Three sizes of override
 
+Only two of the three are a line on the page.
+
 | | changes | good for |
 |---|---|---|
-| `theme: name` | a few CSS variables, via `-theme.css` on `body.name` | a section that reads differently |
-| `css: name` | links `/static/name.css` after the theme | one page that has to look unusual |
+| a `-theme.css` in a folder | a few CSS variables, for that folder and everything under it | a section that reads differently |
+| `css: name` | links `/static/name.css` after the themes | one page that has to look unusual |
 | `layout: name` | the whole page shape — `templates/name.html` | posts, landing pages, print |
 
 A layout's name must be a plain word, so a page can't reach out of `templates/`,

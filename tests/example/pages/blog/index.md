@@ -1,6 +1,5 @@
 title: Blog
 nav: Blog
-theme: duckdown
 
 # Blog
 

@@ -1,5 +1,4 @@
 title: Themes
-theme: duckdown
 toc: true
 
 # Themes
@@ -8,18 +7,22 @@ Themes let you style your site with CSS. No build tools, no config — just a CS
 
 ## How it works
 
-1. Create a file called `-theme.css` in your pages folder (in the editor: browse to the folder and press the theme button in the tree's header)
-2. Set `theme: mytheme` in a page's front-matter
-3. In `-theme.css`, set a few variables on `body.mytheme`
+Put a file called `-theme.css` in a folder under `pages/`. Every page in that
+folder, and in every folder under it, is styled by it. That's the whole idea.
 
-That's it.
+In the editor: browse to the folder and press the theme button in the tree's
+header.
+
+There's nothing to write on the pages themselves. A page doesn't opt in, and
+can't forget to — which is the point, because the post you write next year
+can't remember a line you wrote this year.
 
 ## Set variables, not styles
 
 The site's stylesheet, `static/site.css`, draws everything — text, links, code, tables, callouts, the navigation — from a handful of CSS variables. A theme only changes the ones it cares about:
 
 ```css
-body.mytheme {
+:root {
   --accent: #b5179e;
   --font-body: Georgia, serif;
   --measure: 40rem;
@@ -46,7 +49,7 @@ The site follows each reader's light or dark setting. To adjust your theme for d
 
 ```css
 @media (prefers-color-scheme: dark) {
-  body.mytheme {
+  :root {
     --accent: #f28fdf;
   }
 }
@@ -66,32 +69,42 @@ pages/
 ```
 
 > [!TIP]
-> Since the top folder's `-theme.css` reaches every page, keep each theme's rules under its own `body.name`.
+> The top folder's file reaches every page, so put the site's look there and
+> let each folder's file say only what differs. A folder's file doesn't have
+> to undo the one above it — it just overrides the variables it cares about.
 
 This site does exactly that, and you can read both files. `pages/-theme.css`
-sets the `duckdown` theme for everything. `pages/blog/-theme.css` is read after
-it, only for pages in [the blog](/blog/), and says just what's different there:
-a warmer accent and a narrower column, for prose rather than documentation.
-Neither file names the other; the only thing that decides the order is which
+sets the look for everything. `pages/blog/-theme.css` is read after it, only
+for pages in [the blog](/blog/), and says just what's different there: a
+warmer accent and a narrower column, for prose rather than documentation.
+Neither file names the other; the only thing deciding the order is which
 folder each one is in.
 
 ## Example
 
-This page uses the `duckdown` theme. Here it is:
+This is `pages/-theme.css`, which styles the page you're reading:
 
 ```css
-body.duckdown {
+:root {
   --accent: #147c99;
   --font-heading: Georgia, "Times New Roman", serif;
   --duck: var(--accent); /* the logo: see the Images guide */
 }
 
 @media (prefers-color-scheme: dark) {
-  body.duckdown {
+  :root {
     --accent: #5cc1dc;
   }
 }
 ```
+
+## One page that shouldn't follow its folder
+
+A theme belongs to a folder, so it's the wrong tool for a single page. That's
+what `css:` is for: `css: poster` in a page's front matter links
+`/static/poster.css` after the themes, so it can override the same variables
+for that page alone. See [[/blog/one-page-that-looks-different|the poster
+page]].
 
 ## Where to find it in the editor
 
@@ -110,4 +123,4 @@ folder, and they're in **Resources**.
 Edit a theme with a page open and the preview restyles that page as you type,
 your unsaved copy winning over the saved one. With no page open, the theme
 takes the column to itself and the preview shows sample content — headings,
-links, code, a table and a callout — under your theme's `body` class.
+links, code, a table and a callout — styled by what you're typing.

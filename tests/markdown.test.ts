@@ -208,9 +208,9 @@ describe("markCurrent", () => {
 
 describe("parseFrontMatter", () => {
   test("parses key-value pairs", () => {
-    const { meta, body } = parseFrontMatter("title: Hello\ntheme: dark\n\n# Content");
+    const { meta, body } = parseFrontMatter("title: Hello\nnav: Home\n\n# Content");
     expect(meta.title).toEqual(["Hello"]);
-    expect(meta.theme).toEqual(["dark"]);
+    expect(meta.nav).toEqual(["Home"]);
     expect(body).toBe("# Content");
   });
 
@@ -253,9 +253,9 @@ describe("parseFrontMatter", () => {
   });
 
   test("lowercases keys", () => {
-    const { meta } = parseFrontMatter("Title: Foo\nTHEME: bar\n\nbody");
+    const { meta } = parseFrontMatter("Title: Foo\nNAV: bar\n\nbody");
     expect(meta.title).toEqual(["Foo"]);
-    expect(meta.theme).toEqual(["bar"]);
+    expect(meta.nav).toEqual(["bar"]);
   });
 
   test("handles keys with hyphens", () => {

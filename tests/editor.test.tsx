@@ -413,7 +413,7 @@ describe("resources", () => {
   test("a theme is made beside the page it themes, and a write that fails says so", async () => {
     expect(await createTheme("guide")).toBeUndefined();
     expect(resource.peek()).toEqual({ section: "pages", path: "guide/-theme.css" });
-    expect(resourceDraft.peek()).toContain("body.mytheme");
+    expect(resourceDraft.peek()).toContain(":root {");   // plain rules: no page wears a class
     expect(await deleteResource()).toBe(true); // put it back as it was
     expect(await createTheme("")).toBe("-theme.css already exists"); // the root has one
 
@@ -509,7 +509,7 @@ describe("themes in the tree", () => {
     await waitFor(() => offer() === null);
 
     click(row(host, "-theme.css"));
-    await waitFor(() => resourceDraft.peek().includes("body.mytheme"));
+    await waitFor(() => resourceDraft.peek().includes(":root {"));
     await deleteResource();
     await waitFor(() => !rows(host).includes("-theme.css")); // the tree hears about it
     dispose();
@@ -730,9 +730,8 @@ describe("Preview", () => {
     const doc = frame(host).srcdoc;
     expect(doc).toContain("<title>Typed</title>");
     expect(doc).toContain('<link href="/static/site.css" rel="stylesheet">');
-    expect(doc).toContain("<style>/* The duckdown theme"); // the root's, inherited by My folder/
+    expect(doc).toContain("--accent: #147c99"); // the root theme, inherited by My folder/
     expect(doc).toContain('href="/My%20folder/other.html"'); // the wiki link, from where the page lives
-    expect(doc).toContain('<body class="dark">');
     dispose();
   });
 
@@ -740,9 +739,8 @@ describe("Preview", () => {
     editorContent.set("Just text");
     const { host, dispose } = render(() => <Preview />);
     await waitFor(() => frame(host).srcdoc.includes("Just text"));
-    expect(frame(host).srcdoc).toContain("<style>/* The duckdown theme");
+    expect(frame(host).srcdoc).toContain("--accent: #147c99");
     expect(frame(host).srcdoc).toContain("<title>duckie</title>"); // the site's default title
-    expect(frame(host).srcdoc).toContain('<body class="">');
     dispose();
   });
 
@@ -791,14 +789,16 @@ describe("Preview", () => {
 });
 
 describe("CssPreview", () => {
-  test("shows the CSS on sample content, with the body class it styles", () => {
-    editorContent.set("body.mytheme { color: red }");
+  test("shows the CSS on sample content, on a body with no class of its own", () => {
+    editorContent.set(":root { --accent: red }");
     const { host, dispose } = render(() => <CssPreview css={() => editorContent.get()} />);
-    const doc = (host.querySelector("iframe") as HTMLIFrameElement).srcdoc;
-    expect(doc).toContain("<style>body.mytheme { color: red }</style>");
-    expect(doc).toContain('<body class="mytheme">');
+    const frame = () => (host.querySelector("iframe") as HTMLIFrameElement).srcdoc;
+    expect(frame()).toContain("<style>:root { --accent: red }</style>");
+    // No page wears a class, so neither does the preview's body: a class here
+    // would style sample content the way no real page is ever styled.
+    expect(frame()).toContain("<body>");
     editorContent.set("p { margin: 0 }");
-    expect((host.querySelector("iframe") as HTMLIFrameElement).srcdoc).toContain('<body class="">');
+    expect(frame()).toContain("<style>p { margin: 0 }</style>");
     dispose();
   });
 });

@@ -25,9 +25,9 @@ Login at [http://localhost:8080/login](http://localhost:8080/login) with `admin`
 
 - Markdown editor whose preview is the page: the same renderer the site uses,
   so it has your template, your navigation and your theme cascade in it
-- Front-matter metadata (title, theme, nav, toc, layout, css, description, date, draft)
+- Front-matter metadata (title, nav, toc, layout, css, description, date, draft)
 - Contents lists, callouts (`> [!NOTE]`) and `[[wiki links]]` between pages
-- Themes in a few CSS variables, per folder and cascading, with dark mode
+- Themes in a few CSS variables — a file in a folder styles that folder and everything under it, with nothing to write on the pages — cascading, with dark mode
 - **Templates and stylesheets are editable in the browser too**, in a pane
   below the page, so you watch the page change as you write them
 - Image browser with upload

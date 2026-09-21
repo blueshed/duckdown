@@ -19,11 +19,13 @@ const sampleContent = `
 // A stylesheet with no page to try it on: sample content, styled by what you
 // are typing. `css` says where the text comes from — the editor when a .css is
 // open as the page, the pane's draft when one is open as a resource.
+//
+// The body carries no class, because no page does either: a theme styles the
+// folder it sits in, so it writes plain rules. A preview that invented a class
+// would show you something the site will never render.
 export function CssPreview({ css }: { css: () => string }) {
   const srcdoc = computed(() => {
     const text = css();
-    const classMatch = text.match(/body\.(\w[\w-]*)\s*\{/);
-    const bodyClass = classMatch ? classMatch[1] : "";
 
     return `<!DOCTYPE html>
 <html lang="en">
@@ -33,7 +35,7 @@ export function CssPreview({ css }: { css: () => string }) {
   <link href="/static/site.css" rel="stylesheet">
   <style>${text}</style>
 </head>
-<body class="${bodyClass}">
+<body>
   ${sampleContent}
 </body>
 </html>`;

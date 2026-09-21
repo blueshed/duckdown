@@ -278,7 +278,7 @@ Nothing fails silently. In the editor, every request goes through `api(what, url
 
 When a content feature changes (syntax, front matter, themes, navigation, the editor), update the authoring skill — `.claude/skills/duckdown/` (`SKILL.md`, `reference.md`) — and the seed site's guide pages (`tests/example/pages/guide/`) with it: the skill is what a session writing a site's content reads.
 
-A page's theme cascades (`loadThemeCss`): the root's `-theme.css`, then each folder's down to its own. The seed site's `static/site.css` draws everything from CSS variables; a theme sets variables on `body.<theme>`. Style new things through those variables so themes reach them.
+Styling follows the folder, not the page (`loadThemeCss`): the root's `-theme.css`, then each folder's down to the page's own, inlined in that order. There is no `theme:` key and no class on `<body>` — a page can't opt in, so it can't forget to, and a post written next year is styled by the folder it lands in. A theme writes `:root { --accent: … }`; the seed's `static/site.css` draws everything from those variables, so style new things through them and themes reach them. For one page that must differ, `css:` links a stylesheet after the cascade.
 
 What the site knows about itself lives in `nav.ts`: the nav, and each folder's `{{pages}}` listing. In production both are built once and dropped by `pagesChanged()` whenever the pages route writes or deletes, because every write goes through the server — a new write path to pages must call it too. With `DEBUG=1` they're built per request instead, so pages written straight to disk (by hand, or by a session using the authoring skill) show up at once.
 

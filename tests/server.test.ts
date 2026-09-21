@@ -259,7 +259,7 @@ describe("markdown preview", () => {
     try {
       const data = await (await mark("See [[themes]].", "guide/new.md")).json();
       expect(data.html).toContain('<a class="wikilink" href="/guide/themes.html">themes</a>');
-      expect(data.html).toContain("/* The duckdown theme");
+      expect(data.html).toContain("--accent: #147c99");   // the root theme
       expect(data.html).toContain("/* guide theme */");
     } finally {
       rmSync(guideTheme);
@@ -267,11 +267,9 @@ describe("markdown preview", () => {
   });
 
   test("parses front-matter, and the template it names picks the layout", async () => {
-    const data = await (await mark("title: My Page\ntheme: dark\nlayout: post\n\n# Content", "blog/new.md")).json();
+    const data = await (await mark("title: My Page\nlayout: post\n\n# Content", "blog/new.md")).json();
     expect(data.meta.title).toEqual(["My Page"]);
-    expect(data.meta.theme).toEqual(["dark"]);
     expect(data.html).toContain("<title>My Page</title>");
-    expect(data.html).toContain('<body class="dark">');
     expect(data.html).not.toContain("title:");
     expect(data.layout).toBe("post.html");
   });
@@ -383,7 +381,7 @@ describe("site rendering", () => {
     expect(html).toContain("<title>duckdown</title>");
     expect(html).toContain('<a href="/" aria-current="page">Home</a>');
     expect(html).toContain('<a href="/guide/">Guide</a>');
-    expect(html).toContain("<style>/* The duckdown theme");
+    expect(html).toContain("--accent: #147c99");   // the root theme, styling every page
     expect(html).toContain("/* Wobbling duck */");
   });
 
@@ -396,7 +394,7 @@ describe("site rendering", () => {
       const page = await (await fetch(`${BASE}/guide/pages.html`)).text();
       expect(page).toContain('<a href="/guide/" aria-current="true">Guide</a>');
       expect(page).toContain('<a href="/">Home</a>');
-      expect(page).toMatch(/<style>\/\* The duckdown theme[\s\S]*\/\* guide theme \*\/<\/style>/);
+      expect(page).toMatch(/<style>[\s\S]*--accent: #147c99[\s\S]*\/\* guide theme \*\/<\/style>/);
     } finally {
       rmSync(guideTheme);
     }

@@ -91,17 +91,17 @@ export async function pageHtml(page: Page, o: PageOptions): Promise<{ html: stri
   let html = template.body;
   for (const [name, value] of [
     ["title", () => escapeHtml(meta.title?.[0] || "duckie")],
-    ["theme", () => escapeHtml(meta.theme?.[0] || "")],
     ["url", () => escapeHtml(o.origin + canonicalPath(page.key))],
     ["date", () => dateHtml(meta.date?.[0] ?? "")],
     ["description", () => description
       ? `<meta name="description" content="${escapeHtml(description)}">\n  <meta property="og:description" content="${escapeHtml(description)}">`
       : ""],
     ["nav", () => nav ? `<nav><ul class="nav">${nav}</ul></nav>` : ""],
-    // The theme cascade, then a stylesheet this page asked for by name:
-    // `css: print` links /static/print.css after it, so one page can look
-    // however it likes without needing a template of its own. Guarded like
-    // `layout`, so a page can't reach out of static/.
+    // Every -theme.css from the site root down to this page's folder, in that
+    // order, then a stylesheet the page asked for by name: `css: print` links
+    // /static/print.css after them, so one page can look however it likes
+    // without a folder or a template of its own. Guarded like `layout`, so a
+    // page can't reach out of static/.
     ["theme_css", () => {
       const sheet = meta.css?.[0] ?? "";
       return (themeCss ? `<style>${themeCss}</style>` : "")
