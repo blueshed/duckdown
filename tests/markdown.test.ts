@@ -43,10 +43,10 @@ describe("buildNav", () => {
 
   test("lists each folder's index.md by its nav, else its title", async () => {
     const nav = await buildNav(pages);
-    expect(nav).toContain('<li><a href="/index.html">Home</a></li>');
-    expect(nav).toContain('<li><a href="/guide/index.html">Guide</a></li>');
-    expect(nav).toContain('<li><a href="/guide/deep/index.html">Deep</a></li>');
-    expect(nav).toContain('<li><a href="/My%20Folder/index.html">Mine</a></li>');
+    expect(nav).toContain('<li><a href="/">Home</a></li>');
+    expect(nav).toContain('<li><a href="/guide/">Guide</a></li>');
+    expect(nav).toContain('<li><a href="/guide/deep/">Deep</a></li>');
+    expect(nav).toContain('<li><a href="/My%20Folder/">Mine</a></li>');
   });
 
   test("leaves out plain pages, untitled folders, and - or . folders", async () => {
@@ -187,20 +187,20 @@ describe("loadThemeCss", () => {
 
 describe("markCurrent", () => {
   const nav = [
-    '<li><a href="/index.html">Home</a></li>',
-    '<li><a href="/guide/index.html">Guide</a></li>',
-    '<li><a href="/My%20Folder/index.html">Mine</a></li>',
+    '<li><a href="/">Home</a></li>',
+    '<li><a href="/guide/">Guide</a></li>',
+    '<li><a href="/My%20Folder/">Mine</a></li>',
   ].join("\n");
 
   test("marks the page's own link", () => {
-    expect(markCurrent(nav, "index")).toContain('<a href="/index.html" aria-current="page">Home</a>');
-    expect(markCurrent(nav, "guide/index")).toContain('<a href="/guide/index.html" aria-current="page">Guide</a>');
-    expect(markCurrent(nav, "My Folder/index")).toContain('href="/My%20Folder/index.html" aria-current="page"');
+    expect(markCurrent(nav, "index")).toContain('<a href="/" aria-current="page">Home</a>');
+    expect(markCurrent(nav, "guide/index")).toContain('<a href="/guide/" aria-current="page">Guide</a>');
+    expect(markCurrent(nav, "My Folder/index")).toContain('href="/My%20Folder/" aria-current="page"');
   });
 
   test("else the nearest folder the page is in, but never the root", () => {
-    expect(markCurrent(nav, "guide/pages")).toContain('<a href="/guide/index.html" aria-current="true">Guide</a>');
-    expect(markCurrent(nav, "guide/deep/page")).toContain('href="/guide/index.html" aria-current="true"');
+    expect(markCurrent(nav, "guide/pages")).toContain('<a href="/guide/" aria-current="true">Guide</a>');
+    expect(markCurrent(nav, "guide/deep/page")).toContain('href="/guide/" aria-current="true"');
     expect(markCurrent(nav, "about")).toBe(nav);
     expect(markCurrent(nav, "about").match(/aria-current/g)).toBeNull();
   });

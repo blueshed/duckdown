@@ -25,11 +25,11 @@
 ```
 <content folder>/
 ├── pages/
-│   ├── index.md          /              (and /index.html)
+│   ├── index.md          /              (also /index.html)
 │   ├── -theme.css        theme rules for every page
 │   ├── about.md          /about.html    (and /about)
 │   └── blog/
-│       ├── index.md      /blog/index.html — in the nav
+│       ├── index.md      /blog/          — in the nav
 │       ├── -theme.css    theme rules for blog pages, after the root's
 │       └── first-post.md /blog/first-post.html
 ├── static/
@@ -44,7 +44,7 @@
 ## Pages and URLs
 
 - Every `pages/**/*.md` is a page at the same path with `.html`, or without an extension: `pages/blog/first-post.md` is `/blog/first-post.html` and `/blog/first-post`.
-- `pages/index.md` is also `/`, and a folder is served by its index: `/blog`, `/blog/` and `/blog/index.html` all reach `pages/blog/index.md`. A page of the same name wins over a folder (`blog.md` before `blog/index.md`).
+- `pages/index.md` is `/`, and a folder is served by its index: `/blog`, `/blog/` and `/blog/index.html` all reach `pages/blog/index.md`. The shortest is the page's canonical address — what the nav links to and what the page declares — so write links that way. A page of the same name wins over a folder (`blog.md` before `blog/index.md`).
 - Names may contain spaces (`About us.md` is `/About%20us.html`), but lowercase-with-dashes names make tidier URLs.
 - A folder whose name starts with `-` (say `-drafts/`) is left out of the navigation; its pages are still served to anyone with the URL. Names starting with `.` aren't listed in the editor.
 - A page that doesn't exist is a plain 404.
@@ -170,7 +170,7 @@ The template receives it as:
 
 ```html
 <nav><ul class="nav">
-<li><a href="/index.html">Home</a></li>
+<li><a href="/">Home</a></li>
 <li><a href="/blog/index.html" aria-current="true">Blog</a></li>
 </ul></nav>
 ```

@@ -20,3 +20,13 @@ export function outsideCode(html: string, fn: (part: string) => string): string 
     .map((part, i) => (i % 2 ? part : fn(part)))
     .join("");
 }
+
+// Where a page lives, in one form. Three addresses reach the same page —
+// /blog, /blog/ and /blog/index.html — so one of them has to be the name it
+// goes by: the links we emit and the canonical we declare both use this.
+export function canonicalPath(key: string): string {
+  const file = key.replace(/\.md$/, "");
+  if (file === "index") return "/";
+  if (file.endsWith("/index")) return `/${file.slice(0, -"/index".length)}/`;
+  return `/${file}.html`;
+}

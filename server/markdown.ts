@@ -1,4 +1,5 @@
 import type { Storage } from "./storage";
+import { canonicalPath } from "./utils";
 
 // Front-matter parser + Bun.markdown wrapper
 
@@ -125,7 +126,7 @@ export async function buildNav(pages: Storage, prefix = ""): Promise<string> {
       const { meta } = parseFrontMatter(raw);
       const title = meta.nav?.[0] || meta.title?.[0];
       if (title && !yes(meta.draft)) { // a draft stays out of the nav
-        const href = encodeURI("/" + f.path.replace(/\.md$/, ".html").replace(/^\//, ""));
+        const href = encodeURI(canonicalPath(f.path.replace(/^\//, "")));
         items.push(`<li><a href="${href}">${title}</a></li>`);
       }
     }

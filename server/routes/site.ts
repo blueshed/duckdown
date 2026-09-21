@@ -3,7 +3,7 @@ import { createPageStorage, createStorage } from "../storage";
 import { renderMarkdown, loadThemeCss, folderOf, yes } from "../markdown";
 import { siteNav, markCurrent, folderListing } from "../nav";
 import { getUser } from "../auth";
-import { escapeHtml, outsideCode } from "../utils";
+import { escapeHtml, outsideCode, canonicalPath } from "../utils";
 import { logView } from "../log";
 
 const site = createStorage();
@@ -20,13 +20,17 @@ function fill(html: string, name: string, value: () => string): string {
   return html.replace(new RegExp(`\\{\\{${name}\\}\\}`, "g"), value);
 }
 
-// The page's own address, for a canonical link and og:url. Behind a proxy the
-// request's own URL names the container, so the forwarded headers win.
-function pageUrl(req: Request): string {
+// Where the page lives, in one form. Three addresses reach the same page —
+// /blog, /blog/ and /blog/index.html — so the address it was asked for is the
+// wrong thing to call canonical: each would name itself and search engines
+// would see one page three times. This names the page by what it resolved to.
+// Behind a proxy the request's own URL names the container, so the forwarded
+// headers win.
+function siteOrigin(req: Request): string {
   const url = new URL(req.url);
   const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || url.host;
   const proto = req.headers.get("x-forwarded-proto") || url.protocol.replace(":", "");
-  return `${proto}://${host}${url.pathname}`;
+  return `${proto}://${host}`;
 }
 
 // `layout: post` picks templates/post.html, else templates/site.html, else a
@@ -85,7 +89,7 @@ const renderPage = async (req: Request) => {
   for (const [name, value] of [
     ["title", () => escapeHtml(meta.title?.[0] || "duckie")],
     ["theme", () => escapeHtml(meta.theme?.[0] || "")],
-    ["url", () => escapeHtml(pageUrl(req))],
+    ["url", () => escapeHtml(siteOrigin(req) + canonicalPath(key))],
     ["description", () => description
       ? `<meta name="description" content="${escapeHtml(description)}">\n  <meta property="og:description" content="${escapeHtml(description)}">`
       : ""],

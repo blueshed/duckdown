@@ -1,7 +1,7 @@
 import type { Storage } from "./storage";
 import { DEBUG } from "./config";
 import { buildNav, parseFrontMatter, yes } from "./markdown";
-import { escapeHtml } from "./utils";
+import { escapeHtml, canonicalPath } from "./utils";
 
 // What the site knows about itself: its nav, and each folder's list of pages.
 // Both are built once and kept until a page changes — in production every
@@ -77,8 +77,11 @@ async function buildListing(pages: Storage, folder: string): Promise<string> {
 // gets aria-current="true" (not the root: every page sits there).
 export function markCurrent(nav: string, file: string): string {
   const folders = file.split("/").slice(0, -1);
-  const candidates: [string, string][] = [[`/${file}.html`, "page"]];
-  for (let i = folders.length; i > 0; i--) candidates.push([`/${folders.slice(0, i).join("/")}/index.html`, "true"]);
+  // The same addresses the nav emits, or nothing would match.
+  const candidates: [string, string][] = [[canonicalPath(`${file}.md`), "page"]];
+  for (let i = folders.length; i > 0; i--) {
+    candidates.push([canonicalPath(`${folders.slice(0, i).join("/")}/index.md`), "true"]);
+  }
   for (const [path, current] of candidates) {
     const href = `href="${encodeURI(path)}"`;
     if (nav.includes(href)) return nav.replace(href, () => `${href} aria-current="${current}"`);

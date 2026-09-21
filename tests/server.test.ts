@@ -359,8 +359,8 @@ describe("site rendering", () => {
     expect(res.status).toBe(200);
     const html = await res.text();
     expect(html).toContain("<title>duckdown</title>");
-    expect(html).toContain('<a href="/index.html" aria-current="page">Home</a>');
-    expect(html).toContain('<a href="/guide/index.html">Guide</a>');
+    expect(html).toContain('<a href="/" aria-current="page">Home</a>');
+    expect(html).toContain('<a href="/guide/">Guide</a>');
     expect(html).toContain("<style>/* The duckdown theme");
     expect(html).toContain("/* Wobbling duck */");
   });
@@ -370,10 +370,10 @@ describe("site rendering", () => {
     writeFileSync(guideTheme, "/* guide theme */");
     try {
       const guide = await (await fetch(`${BASE}/guide/index.html`)).text();
-      expect(guide).toContain('<a href="/guide/index.html" aria-current="page">Guide</a>');
+      expect(guide).toContain('<a href="/guide/" aria-current="page">Guide</a>');
       const page = await (await fetch(`${BASE}/guide/pages.html`)).text();
-      expect(page).toContain('<a href="/guide/index.html" aria-current="true">Guide</a>');
-      expect(page).toContain('<a href="/index.html">Home</a>');
+      expect(page).toContain('<a href="/guide/" aria-current="true">Guide</a>');
+      expect(page).toContain('<a href="/">Home</a>');
       expect(page).toMatch(/<style>\/\* The duckdown theme[\s\S]*\/\* guide theme \*\/<\/style>/);
     } finally {
       rmSync(guideTheme);
@@ -569,6 +569,32 @@ describe("editing the site's other folders", () => {
     for (const path of ["/edit/pages/users.json", "/edit/templates/users.json", "/edit/static/users.json"]) {
       expect((await fetch(`${BASE}${path}`, authed())).status).toBe(404);
     }
+  });
+});
+
+describe("one page, one canonical address", () => {
+  const put = (path: string, body: string) => fetch(`${BASE}/edit/pages/${path}`, authed({ method: "PUT", body }));
+  const canonical = async (url: string) =>
+    (await (await fetch(url)).text()).match(/<link rel="canonical" href="([^"]+)"/)?.[1];
+
+  test("the three addresses of a folder index all name the same one", async () => {
+    await put("shop/index.md", "title: Shop\n\n# Shop");
+    const one = `${BASE}/shop/`;
+    for (const url of [`${BASE}/shop`, `${BASE}/shop/`, `${BASE}/shop/index.html`]) {
+      expect(await canonical(url)).toBe(one);
+    }
+  });
+
+  test("a page is named by its .html, and the site root by /", async () => {
+    expect(await canonical(`${BASE}/guide/pages.html`)).toBe(`${BASE}/guide/pages.html`);
+    expect(await canonical(`${BASE}/`)).toBe(`${BASE}/`);
+    expect(await canonical(`${BASE}/index.html`)).toBe(`${BASE}/`);
+  });
+
+  test("and the nav links to those addresses, not to index.html", async () => {
+    const nav = (await (await fetch(`${BASE}/`)).text()).match(/<nav><ul class="nav">[\s\S]*?<\/ul><\/nav>/)![0];
+    expect(nav).toContain('href="/guide/"');
+    expect(nav).not.toContain("index.html");
   });
 });
 

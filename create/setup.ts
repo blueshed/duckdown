@@ -41,6 +41,7 @@ Your new site is ready. [Login to edit](/login).
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{{title}}</title>
   {{description}}
+  <link rel="canonical" href="{{url}}">
   <link href="/static/site.css" rel="stylesheet">
   {{theme_css}}
 </head>

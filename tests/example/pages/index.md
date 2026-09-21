@@ -10,7 +10,7 @@ A markdown CMS built with [Bun](https://bun.sh) and [Railroad](https://github.co
 
 Write markdown, see it live, publish your site.
 
-- [Get Started](/guide/index.html) — your first page in 2 minutes
+- [Get Started](/guide/) — your first page in 2 minutes
 - [Writing Pages](/guide/pages.html) — markdown, front-matter, and folders
 - [Themes](/guide/themes.html) — make it your own
 - [Images](/guide/images.html) — upload and embed

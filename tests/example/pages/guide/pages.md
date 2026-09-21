@@ -155,14 +155,14 @@ Organise pages in folders. Each folder can have its own `index.md`:
 
 ```
 pages/
-├── index.md          → /index.html
+├── index.md          → /
 ├── about.md          → /about.html
 └── blog/
-    ├── index.md      → /blog/index.html
+    ├── index.md      → /blog/
     └── first-post.md → /blog/first-post.html
 ```
 
-A folder is served by its index, so `/blog`, `/blog/` and `/blog/index.html` all reach `pages/blog/index.md`.
+A folder is served by its index, so `/blog`, `/blog/` and `/blog/index.html` all reach `pages/blog/index.md`. One of those three is the page's real address — the shortest, `/blog/` — and it is the one the navigation links to and the one the page names as canonical. Link to it that way yourself, so a search engine isn't offered the same page three times.
 
 ## Listing a folder
 
