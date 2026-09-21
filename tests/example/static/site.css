@@ -385,3 +385,12 @@ th {
   color: var(--muted);
   font-size: 0.9rem;
 }
+
+.posted::before {
+  content: "Posted ";
+}
+
+/* A post with no date: leave nothing behind, not a rule and a lone label. */
+.posted:empty {
+  display: none;
+}

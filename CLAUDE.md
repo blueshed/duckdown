@@ -42,13 +42,14 @@ duckdown/
 │   ├── nav.ts              # The site nav, cached until the editor changes a page
 │   ├── pid.ts              # Pid file: written at startup, removed on exit; stopServer()
 │   ├── stop.ts             # bun run stop
-│   ├── utils.ts            # Shared helpers (wildcard path extraction)
+│   ├── page.ts             # A page, rendered: markdown in its template
+│   ├── utils.ts            # Shared helpers: paths, escaping, dates, a pass outside code
 │   ├── routes/
 │   │   ├── pages.ts        # /edit/pages/* — file CRUD
-│   │   ├── mark.ts         # /edit/mark/  — markdown preview
+│   │   ├── mark.ts         # /edit/mark/  — the preview, through page.ts
 │   │   ├── browse.ts       # /edit/browse/* — image browser + upload
 │   │   ├── static.ts       # /static/* — site static files
-│   │   ├── site.ts         # fetch fallback — render markdown pages
+│   │   ├── site.ts         # fetch fallback — the site, through page.ts
 │   │   └── error.ts        # error handler — log it, answer 500 with a line to show
 │   └── edit/               # Editor client (served at /edit)
 │       ├── index.html      # Entry HTML (Bun auto-bundles .tsx + .css)
@@ -283,7 +284,9 @@ that way when adding a section.
 
 Front matter takes only the keys duckdown reads (`KEYS` in `markdown.ts`) or an `x-` extension, unless the block is fenced with `---`, which takes anything: a page opening "Update: closed Monday" keeps its first line. Add a key there and in the skill's reference together.
 
-`routes/site.ts` turns a page into a response: a folder is served by its `index.md` (`/blog`, `/blog/`, `/blog/index.html`), `draft: true` is 404 unless the reader is signed in, `layout:` picks the template, and the values it puts into the template are escaped.
+`page.ts` turns a page into a document: its markdown inside the template `layout:` asks for, with the nav, the `{{pages}}` listing, the theme cascade and the rest filled in, every value escaped. `routes/site.ts` and `routes/mark.ts` both go through it — `parsePage()` first, so the site can 404 a `draft:` before the expensive part, then `pageHtml()`. That is why the editor's preview is a preview and not a likeness: same template, same nav. The preview may pass an unsaved template as `draft`, used in place of the saved one when it is the one the page wears, and `pageHtml` reports which template it settled on.
+
+A folder is served by its `index.md` (`/blog`, `/blog/`, `/blog/index.html`), and `draft: true` is 404 unless the reader is signed in. `plainName()` guards both `layout:` and `css:`: a page names a file in a folder it must not climb out of.
 
 Paths: storage keys are real names. The server decodes the URL path (`after()`); the editor builds URLs with `urlPath()` (each segment encoded). Never interpolate a name into a URL raw.
 

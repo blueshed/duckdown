@@ -31,7 +31,10 @@ export function canonicalPath(key: string): string {
   return `/${file}.html`;
 }
 
-const day = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric" });
+// In UTC, because the date it is given has no time in it: new Date("2026-09-21")
+// is UTC midnight, and formatting that in a timezone west of UTC prints the day
+// before — the wrong day, under a datetime= saying the right one.
+const day = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
 
 // A date: as a <time>, written the way a reader expects. A date nobody can
 // parse is shown as it was written rather than as "Invalid Date".

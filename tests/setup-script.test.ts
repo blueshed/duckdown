@@ -10,10 +10,11 @@ describe("bun create setup", () => {
   const root = join(RUN, "my-site");
 
   test("turns a clone into a fresh site", async () => {
-    for (const dir of ["tests/example/static", ".claude/skills/duckdown", ".claude/skills/railroad", "create", "server"]) {
+    for (const dir of ["tests/example/static", "tests/example/templates", ".claude/skills/duckdown", ".claude/skills/railroad", "create", "server"]) {
       mkdirSync(join(root, dir), { recursive: true });
     }
     writeFileSync(join(root, "tests", "example", "static", "site.css"), ":root { --accent: red; }");
+    writeFileSync(join(root, "tests", "example", "templates", "site.html"), "<body>{{content}}</body>");
     writeFileSync(join(root, ".claude", "skills", "duckdown", "SKILL.md"), "the authoring skill");
     writeFileSync(join(root, ".claude", "skills", "railroad", "SKILL.md"), "for working on duckdown itself");
     writeFileSync(join(root, ".claude", "launch.json"), "{}");
@@ -33,7 +34,7 @@ describe("bun create setup", () => {
     expect(existsSync(join(root, ".claude", "launch.json"))).toBe(true);
     expect(existsSync(join(root, "server", "main.ts"))).toBe(true);
     expect(readFileSync(join(root, "site", "pages", "index.md"), "utf8")).toStartWith("title: my-site\n\n# Welcome to my-site");
-    expect(readFileSync(join(root, "site", "templates", "site.html"), "utf8")).toContain("{{content}}");
+    expect(readFileSync(join(root, "site", "templates", "site.html"), "utf8")).toBe("<body>{{content}}</body>"); // the seed's
     expect(readFileSync(join(root, "site", "static", "site.css"), "utf8")).toBe(":root { --accent: red; }"); // the seed's
     const users = JSON.parse(readFileSync(join(root, "site", "users.json"), "utf8"));
     expect(await Bun.password.verify("admin", users.admin)).toBe(true);

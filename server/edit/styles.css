@@ -346,6 +346,19 @@ button.danger-subtle:hover {
   font-weight: 600;
 }
 
+/* A word from the pane about what you are editing — not a failure, so not the
+   red notice; just something worth knowing, under the header it belongs to. */
+.pane-note {
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+.pane-note code {
+  font-size: 11px;
+}
+
 /* A label over a group of rows: quieter than the rows it introduces. */
 .file-group {
   margin: 12px 0 4px;

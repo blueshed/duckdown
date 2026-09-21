@@ -293,7 +293,7 @@ A page's `layout:` chooses the template (`layout: post` → `templates/post.html
   - *css* — the stylesheets in `static/`, and below them the `-theme.css` files that reach the page you have open, in the order they cascade. A button makes a new stylesheet, and another makes a theme for the open page's folder when it hasn't one.
   - *templates* — the files in `templates/`, and a button for a new one.
 - **Editing a resource**: picking one closes the sidebar and opens it in a second pane *below* the page, with the same header — name, unsaved dot, delete, Save, and a close button. The page in the middle stays where it is, so you can click through pages and watch one stylesheet against each. It's transient: closing the pane leaves nothing behind.
-- **Preview** (right): the page as the site will show it — `site.css`, the theme cascade, wiki links resolved from the page's folder — sandboxed, so no scripts run. For a `.css` file, sample content styled by it.
+- **Preview** (right): the page as the site will show it, rendered by the same code — its own template, the navigation, the `{{pages}}` listing, the theme cascade, wiki links resolved from the page's folder — sandboxed, so no scripts run. A template open in the pane below is used in place of the saved one when it's the one this page wears, so you watch the page change as you write it; a stylesheet goes straight into the preview's head as you type. For a `.css` file opened as the page itself, sample content styled by it.
 - **Header**: *Resources* (the sidebar), *View* (the page on the site), *Logout*.
 - **Deleting always asks first**, wherever it is — a stylesheet or a template is as easy to lose as a page, and there's no undo behind any of them.
 - Anything that fails shows in a red notice at the foot of the screen until dismissed.
@@ -312,7 +312,6 @@ A page's `layout:` chooses the template (`layout: post` → `templates/post.html
 | A `[[wiki link]]` goes to the wrong place | It's relative to the page's folder: start it with `/` to go from the top |
 | Nobody can sign in | `users.json` needs hashes, not passwords; or it's missing (see the server log) |
 | Edits don't show on the running site (duckdown repo) | The site runs from `.dev-site`, not the seed `tests/example` |
-
 
 ## Three sizes of override
 

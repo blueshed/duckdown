@@ -8,7 +8,7 @@ import { notice, speak, hush } from "../server/edit/notice";
 import {
   filePath, fileContent, editorContent, showImages, browserRevision,
   loadFile, createFile, saveFile, deleteFile, reloadBrowser, toggleImages, closeImages,
-  resource, resourceDraft, resourceSaved, resourceDirty, openResource, closeResource,
+  resource, resourceDraft, resourceSaved, resourceDirty, pageLayout, openResource, closeResource,
   saveResource, deleteResource, createResource, createTheme,
 } from "../server/edit/store";
 import { Icon } from "../server/edit/components/Icon";
@@ -502,6 +502,30 @@ describe("ResourcePane", () => {
     dispose();
   });
 
+  test("says so when the open template isn't the one the page is wearing", async () => {
+    pageLayout.set("site.html");
+    await openResource({ section: "templates", path: "post.html" });
+    const { host, dispose } = render(() => <ResourcePane />);
+    // when() renders on a microtask, not in the mount call.
+    const note = () => host.querySelector(".pane-note");
+    await waitFor(note);
+    expect(note()!.textContent).toContain("uses site.html");
+
+    // The one it does wear, and a stylesheet, say nothing.
+    await openResource({ section: "templates", path: "site.html" });
+    await waitFor(() => note() === null);
+    await openResource({ section: "static", path: "poster.css" });
+    await settle();
+    expect(note()).toBeNull();
+
+    // Nor does it guess before the preview has rendered anything.
+    pageLayout.set("");
+    await openResource({ section: "templates", path: "post.html" });
+    await settle();
+    expect(note()).toBeNull();
+    dispose();
+  });
+
   test("shows a template's own icon, and deletes once confirmed", async () => {
     await createResource("templates", "pane-scratch");
     const { host, dispose } = render(() => <ResourcePane />);
@@ -677,8 +701,35 @@ describe("Preview", () => {
     const { host, dispose } = render(() => <Preview />);
     await waitFor(() => frame(host).srcdoc.includes("Just text"));
     expect(frame(host).srcdoc).toContain("<style>/* The duckdown theme");
-    expect(frame(host).srcdoc).toContain("<title>preview</title>");
+    expect(frame(host).srcdoc).toContain("<title>duckie</title>"); // the site's default title
     expect(frame(host).srcdoc).toContain('<body class="">');
+    dispose();
+  });
+
+  test("a template being edited is what the page is shown in, and its own css wins", async () => {
+    batch(() => {
+      filePath.set("index.md");
+      editorContent.set("title: Typed\n\n# Hi");
+    });
+    const { host, dispose } = render(() => <Preview />);
+    await waitFor(() => frame(host).srcdoc.includes("Hi"));
+    expect(pageLayout.get()).toBe("site.html");
+
+    // The template, unsaved: the preview goes back to the server for it,
+    // because only the server can put the page through a template.
+    await openResource({ section: "templates", path: "site.html" });
+    resourceDraft.set("<html><head></head><body><h9>from the pane</h9>{{content}}</body></html>");
+    await waitFor(() => frame(host).srcdoc.includes("from the pane"));
+    expect(frame(host).srcdoc).toContain('<h1 id="hi">');
+    closeResource();
+    await waitFor(() => !frame(host).srcdoc.includes("from the pane"));
+
+    // A stylesheet, unsaved: no round trip at all — it goes into the head.
+    await openResource({ section: "static", path: "poster.css" });
+    resourceDraft.set("body { color: fuchsia }");
+    await waitFor(() => frame(host).srcdoc.includes("fuchsia"));
+    expect(frame(host).srcdoc).toContain("<style>body { color: fuchsia }</style></head>");
+    closeResource();
     dispose();
   });
 

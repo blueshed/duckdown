@@ -1,35 +1,42 @@
-import { createElement, signal, computed, effect, batch } from "@blueshed/railroad";
+import { createElement, signal, computed, effect } from "@blueshed/railroad";
 import { apiJson } from "../api";
-import { editorContent, filePath, resource, resourceDraft } from "../store";
+import { editorContent, filePath, pageLayout, resource, resourceDraft } from "../store";
 
-// The server renders the page as the site will: its content, its front
-// matter, and its theme (the whole cascade, root first).
-type Rendered = { content: string; meta: Record<string, string[]>; theme: string };
+// The server renders the whole document, the way the site will: the page's
+// markdown inside its template, with the nav, the theme cascade and the rest
+// filled in. `layout` says which template it used.
+type Rendered = { html: string; layout: string };
 
 export function Preview() {
-  const html = signal("");
-  const meta = signal<Record<string, string[]>>({});
-  const theme = signal("");
+  const page = signal("");
 
-  const update = async (raw: string) => {
+  const update = async (source: string, draft: { name: string; body: string } | undefined) => {
     const path = encodeURIComponent(filePath.peek() || "");
-    const data = await apiJson<Rendered>("render the preview", `/edit/mark/?path=${path}`, { method: "PUT", body: raw });
-    if (!data) return;
-    batch(() => {
-      html.set(data.content);
-      meta.set(data.meta);
-      theme.set(data.theme);
+    const data = await apiJson<Rendered>("render the preview", `/edit/mark/?path=${path}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ source, draft }),
     });
+    if (!data) return;
+    page.set(data.html);
+    pageLayout.set(data.layout);
   };
 
-  // Debounced preview update — tracks both content and filePath. The cleanup
-  // cancels a render still pending when anything changes again, or when the
-  // preview goes away, so nothing is rendered after the fact.
+  // Debounced preview update — tracks the page's text, which page it is, and
+  // an open template's draft, because editing the template changes the page.
+  // The cleanup cancels a render still pending when anything changes again, or
+  // when the preview goes away, so nothing is rendered after the fact.
   effect(() => {
-    const content = editorContent.get();
+    const source = editorContent.get();
     filePath.get(); // track file changes too
-    if (!content) return;
-    const timer = setTimeout(() => update(content), 300);
+    const open = resource.get();
+    // A stylesheet is handled below without a round trip; a template is not,
+    // because only the server can put the page through it.
+    const draft = open?.section === "templates"
+      ? { name: open.path, body: resourceDraft.get() }
+      : undefined;
+    if (!source) return;
+    const timer = setTimeout(() => update(source, draft), 300);
     return () => clearTimeout(timer);
   });
 
@@ -41,25 +48,12 @@ export function Preview() {
   };
 
   const srcdoc = computed(() => {
-    const h = html.get();
-    if (!h) return "";
-    const m = meta.get();
-    const title = m.title?.[0] || "preview";
-
-    return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${title}</title>
-  <link href="/static/site.css" rel="stylesheet">
-  <style>${theme.get()}</style>
-  ${draftCss()}
-</head>
-<body class="${m.theme?.[0] || ""}">
-  ${h}
-</body>
-</html>`;
+    const html = page.get();
+    if (!html) return "";
+    const css = draftCss();
+    if (!css) return html;
+    // Last in <head> so it wins, or at the top of a template that has no head.
+    return html.includes("</head>") ? html.replace("</head>", `${css}</head>`) : css + html;
   });
 
   return (

@@ -33,25 +33,9 @@ Your new site is ready. [Login to edit](/login).
     // The seed site's stylesheet: built on variables, so a theme is a few lines
     copyFileSync(join(root, "tests", "example", "static", "site.css"), join(siteDir, "static", "site.css"));
 
-    // Default template
-    writeFileSync(join(siteDir, "templates", "site.html"), `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{{title}}</title>
-  {{description}}
-  <link rel="canonical" href="{{url}}">
-  <link href="/static/site.css" rel="stylesheet">
-  {{theme_css}}
-</head>
-<body class="{{theme}}">
-  {{nav}}
-  {{content}}
-  {{edit}}
-</body>
-</html>
-`);
+    // The seed's template, not a second copy of it: the two drifted, and a
+    // canonical link had to be added in both places last time.
+    copyFileSync(join(root, "tests", "example", "templates", "site.html"), join(siteDir, "templates", "site.html"));
 
     // Default users — password hashed, never stored in plaintext
     const adminHash = await Bun.password.hash("admin");

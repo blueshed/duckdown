@@ -54,7 +54,7 @@ users.json    who can sign in (password hashes)
 
 ## Check your work
 
-Open the page on the running site (`bun run dev`, then http://localhost:8080), or in the editor, whose preview renders exactly as the site will: the same stylesheet and the same theme cascade (though it runs no scripts).
+Open the page on the running site (`bun run dev`, then http://localhost:8080), or in the editor, whose preview goes through the same renderer the site does — the same template, navigation, stylesheet and theme cascade (though it runs no scripts).
 
 ## Everything else
 

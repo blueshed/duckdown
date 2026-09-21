@@ -18,6 +18,10 @@ export const resource = signal<Resource | null>(null);
 export const resourceSaved = signal("");   // what is on the server
 export const resourceDraft = signal("");   // what is in the pane
 export const resourceRevision = signal(0); // bumped when the folders change
+// The template the preview last put the open page through, as the server
+// resolved it: a page's layout: may name one that isn't there, and then it is
+// wearing site.html whatever it asked for.
+export const pageLayout = signal("");
 export const resourceDirty = computed(() => resourceDraft.get() !== resourceSaved.get());
 
 const at = (path: string) => `/edit/pages/${urlPath(path)}`;

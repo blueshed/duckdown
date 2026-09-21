@@ -1,7 +1,8 @@
-import { createElement, computed } from "@blueshed/railroad";
+import { createElement, computed, when } from "@blueshed/railroad";
 import { PaneHeader } from "./PaneHeader";
 import {
-  resource, resourceDraft, resourceDirty, closeResource, saveResource, deleteResource,
+  resource, resourceDraft, resourceDirty, pageLayout,
+  closeResource, saveResource, deleteResource,
 } from "../store";
 
 // A template or a stylesheet, open below the page rather than instead of it:
@@ -10,6 +11,15 @@ import {
 export function ResourcePane() {
   const name = computed(() => resource.get()?.path ?? "");
   const icon = computed(() => (resource.get()?.section === "templates" ? "layout-template" : "droplet"));
+
+  // Editing a template the page isn't wearing changes nothing you can see, and
+  // silence about that is the confusing part. Say it once and edit anyway —
+  // you may well be writing the template you are about to switch to.
+  const elsewhere = computed(() => {
+    const open = resource.get();
+    const worn = pageLayout.get();
+    return open?.section === "templates" && worn !== "" && open.path !== worn;
+  });
 
   return (
     <div class="panel-resource">
@@ -21,6 +31,11 @@ export function ResourcePane() {
         ondelete={deleteResource}
         onclose={closeResource}
       />
+      {when(elsewhere, () => (
+        <p class="pane-note">
+          The page you are looking at uses <code>{pageLayout}</code>, so this one won't show in the preview.
+        </p>
+      ))}
       <textarea
         spellcheck={false}
         value={resourceDraft}

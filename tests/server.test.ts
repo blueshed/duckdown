@@ -237,38 +237,60 @@ describe("editor API", () => {
 });
 
 describe("markdown preview", () => {
-  test("renders markdown to HTML", async () => {
-    const res = await fetch(`${BASE}/edit/mark/`, authed({ method: "PUT", body: "# Hello\n\nWorld" }));
-    const data = await res.json();
-    expect(data.content).toContain('<h1 id="hello">');
-    expect(data.content).toContain("<p>World</p>");
+  // The preview is the page as the site renders it — same template, same nav,
+  // same theme cascade — so what it answers is a whole document.
+  const mark = (source: string, path = "", draft?: { name: string; body: string }) =>
+    fetch(`${BASE}/edit/mark/?path=${encodeURIComponent(path)}`,
+      authed({ method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ source, draft }) }));
+
+  test("renders the whole document, through the page's own template", async () => {
+    const data = await (await mark("# Hello\n\nWorld")).json();
+    expect(data.html).toContain('<h1 id="hello">');
+    expect(data.html).toContain("<p>World</p>");
+    expect(data.html).toContain('<link href="/static/site.css" rel="stylesheet">'); // the template's
+    expect(data.html).toContain('<ul class="nav">');                                // and its nav
+    expect(data.html).not.toContain("Edit this page");                              // a reader's view
+    expect(data.layout).toBe("site.html");
   });
 
   test("renders where the page lives: its wiki links, and its whole theme cascade", async () => {
     const guideTheme = join(SITE, "pages", "guide", "-theme.css");
     writeFileSync(guideTheme, "/* guide theme */");
     try {
-      const res = await fetch(`${BASE}/edit/mark/?path=guide%2Fnew.md`, authed({ method: "PUT", body: "See [[themes]]." }));
-      const data = await res.json();
-      expect(data.content).toContain('<a class="wikilink" href="/guide/themes.html">themes</a>');
-      expect(data.theme).toStartWith("/* The duckdown theme");
-      expect(data.theme).toEndWith("\n/* guide theme */");
+      const data = await (await mark("See [[themes]].", "guide/new.md")).json();
+      expect(data.html).toContain('<a class="wikilink" href="/guide/themes.html">themes</a>');
+      expect(data.html).toContain("/* The duckdown theme");
+      expect(data.html).toContain("/* guide theme */");
     } finally {
       rmSync(guideTheme);
     }
   });
 
-  test("parses front-matter", async () => {
-    const res = await fetch(`${BASE}/edit/mark/`, authed({ method: "PUT", body: "title: My Page\ntheme: dark\n\n# Content" }));
-    const data = await res.json();
+  test("parses front-matter, and the template it names picks the layout", async () => {
+    const data = await (await mark("title: My Page\ntheme: dark\nlayout: post\n\n# Content", "blog/new.md")).json();
     expect(data.meta.title).toEqual(["My Page"]);
     expect(data.meta.theme).toEqual(["dark"]);
-    expect(data.content).not.toContain("title:");
+    expect(data.html).toContain("<title>My Page</title>");
+    expect(data.html).toContain('<body class="dark">');
+    expect(data.html).not.toContain("title:");
+    expect(data.layout).toBe("post.html");
+  });
+
+  test("an unsaved template is used in place of the saved one it stands for", async () => {
+    const draft = { name: "site.html", body: "<html><body><h9>draft</h9>{{content}}</body></html>" };
+    const data = await (await mark("# Hi", "index.md", draft)).json();
+    expect(data.html).toContain("<h9>draft</h9>");
+    expect(data.html).toContain('<h1 id="hi">');
+
+    // One this page doesn't wear changes nothing, and `layout` says which it did.
+    const other = await (await mark("# Hi", "index.md", { name: "post.html", body: "<p>nope</p>" })).json();
+    expect(other.html).not.toContain("nope");
+    expect(other.layout).toBe("site.html");
   });
 
   test("handles GFM tables", async () => {
-    const res = await fetch(`${BASE}/edit/mark/`, authed({ method: "PUT", body: "| a | b |\n|---|---|\n| 1 | 2 |" }));
-    expect((await res.json()).content).toContain("<table>");
+    const data = await (await mark("| a | b |\n|---|---|\n| 1 | 2 |")).json();
+    expect(data.html).toContain("<table>");
   });
 });
 

@@ -9,6 +9,7 @@ import { loadSecret, signJwt, verifyJwt, ensureAdmin } from "../server/auth";
 import { handleError } from "../server/routes/error";
 import { fromSite, viewLine, logView } from "../server/log";
 import { scaffoldNotice } from "../server/scaffold";
+import { dateHtml, canonicalPath, outsideCode } from "../server/utils";
 
 const scratch = (name: string) => join(RUN, `units-${name}`);
 
@@ -387,5 +388,27 @@ describe("scaffold notice", () => {
     expect(scaffoldNotice(make({ "package.json": "{}" }))).toBe("");        // setup already removed itself
     expect(scaffoldNotice(make({ "create/setup.ts": "" }))).toBe("");       // not a bun project at all
     expect(scaffoldNotice(make({ ...scaffolded, "package.json": "{ not json" }))).toBe("");
+  });
+});
+
+describe("utils", () => {
+  test("a date reads as a reader expects it, on the day it says", () => {
+    // Formatted in UTC, so a server west of it doesn't print the day before
+    // the one in datetime= — the failure this test exists for.
+    expect(dateHtml("2026-09-21")).toBe('<time datetime="2026-09-21">21 September 2026</time>');
+    expect(dateHtml("")).toBe("");
+    expect(dateHtml("one day")).toBe('<time datetime="one day">one day</time>'); // as written, not "Invalid Date"
+  });
+
+  test("one address per page: the shortest one", () => {
+    expect(canonicalPath("index.md")).toBe("/");
+    expect(canonicalPath("blog/index.md")).toBe("/blog/");
+    expect(canonicalPath("blog/a-post.md")).toBe("/blog/a-post.html");
+  });
+
+  test("a pass over the html leaves code alone", () => {
+    const html = "<p>{{pages}}</p><code>{{pages}}</code><p>{{pages}}</p>";
+    expect(outsideCode(html, (part) => part.replaceAll("{{pages}}", "LIST")))
+      .toBe("<p>LIST</p><code>{{pages}}</code><p>LIST</p>");
   });
 });
