@@ -8,7 +8,8 @@ import { notice, speak, hush } from "../server/edit/notice";
 import {
   filePath, fileContent, editorContent, showImages, browserRevision,
   loadFile, createFile, saveFile, deleteFile, reloadBrowser, toggleImages, closeImages,
-  section, goToSection,
+  resource, resourceDraft, resourceSaved, resourceDirty, openResource, closeResource,
+  saveResource, deleteResource, createResource, createTheme,
 } from "../server/edit/store";
 import { Icon } from "../server/edit/components/Icon";
 import { Notice } from "../server/edit/components/Notice";
@@ -20,6 +21,8 @@ import { Preview } from "../server/edit/components/Preview";
 import { CssPreview } from "../server/edit/components/CssPreview";
 import { Header } from "../server/edit/components/Header";
 import { ImageBrowser } from "../server/edit/components/ImageBrowser";
+import { ResourceList } from "../server/edit/components/ResourceList";
+import { ResourcePane } from "../server/edit/components/ResourcePane";
 
 // --- Harness ---
 
@@ -300,18 +303,15 @@ describe("ConfirmDialog", () => {
 });
 
 describe("NewDialog", () => {
-  test("asks for a name, keeps an error until the name changes, and goes back or away", async () => {
-    const oncreate = mock(async (_type: string, name: string) => (name === "taken" ? "taken.md already exists" : undefined));
+  test("asks for a name, keeps an error until the name changes, and goes away", async () => {
+    const oncreate = mock(async (name: string) => (name === "taken" ? "taken.md already exists" : undefined));
     const oncancel = mock(() => {});
-    const { host, dispose } = render(() => <NewDialog hasTheme={false} oncreate={oncreate} oncancel={oncancel} />);
+    const { host, dispose } = render(() => <NewDialog kind="page" oncreate={oncreate} oncancel={oncancel} />);
     const dialog = host.querySelector("dialog")!;
     await waitFor(() => dialog.open);
 
-    click(button(dialog, "Folder")!);
-    expect(dialog.querySelector("input")!.placeholder).toBe("folder-name");
-    click(button(dialog, "Back")!);
-    click(button(dialog, "Page")!);
     const input = dialog.querySelector("input")!;
+    expect(dialog.querySelector("h3")!.textContent).toBe("New page");
     expect(input.placeholder).toBe("my-page.md");
 
     submit(dialog.querySelector("form")!); // no name yet: nothing to create
@@ -324,12 +324,8 @@ describe("NewDialog", () => {
     expect(dialog.querySelector(".dialog-error")).toBeNull();
     submit(dialog.querySelector("form")!);
     await settle();
-    expect(oncreate).toHaveBeenLastCalledWith("page", "fine");
+    expect(oncreate).toHaveBeenLastCalledWith("fine");
 
-    click(button(dialog, "Back")!);
-    click(button(dialog, "Theme")!);
-    await settle();
-    expect(oncreate).toHaveBeenLastCalledWith("theme", "-theme.css");
     click(button(dialog, "Cancel")!);
     expect(oncancel).toHaveBeenCalled();
     dialog.close(); // Escape, say
@@ -337,53 +333,190 @@ describe("NewDialog", () => {
     dispose();
   });
 
-  test("offers no Theme where the folder has one", async () => {
-    const { host, dispose } = render(() => <NewDialog hasTheme={true} oncreate={async () => {}} oncancel={() => {}} />);
-    expect(button(host, "Theme")).toBeUndefined();
+  test("names the kind it was opened for", async () => {
+    const { host, dispose } = render(() => <NewDialog kind="stylesheet" oncreate={async () => {}} oncancel={() => {}} />);
+    expect(host.querySelector("h3")!.textContent).toBe("New stylesheet");
+    expect(host.querySelector("input")!.placeholder).toBe("poster.css");
     dispose();
   });
 });
 
-describe("sections", () => {
-  afterEach(() => goToSection("pages"));
+describe("resources", () => {
+  afterEach(closeResource);
 
-  test("goToSection puts down whatever was open, so nothing is saved to the wrong folder", async () => {
+  test("a resource opens below the page, and the page stays where it is", async () => {
     expect(await loadFile("index.md")).toBe(true);
-    expect(filePath.peek()).toBe("index.md");
+    expect(await openResource({ section: "static", path: "site.css" })).toBe(true);
 
-    goToSection("templates");
-    expect(section.peek()).toBe("templates");
-    expect(filePath.peek()).toBeNull();
-    expect(editorContent.peek()).toBe("");
+    expect(resource.peek()?.path).toBe("site.css");
+    expect(resourceDraft.peek()).toContain("--accent");
+    expect(filePath.peek()).toBe("index.md");   // the content is untouched
+    expect(showImages.peek()).toBe(false);      // the chooser got out of the way
+    expect(resourceDirty.peek()).toBe(false);
   });
 
-  test("the editor reads and writes in the section it is in", async () => {
-    goToSection("templates");
-    expect(await loadFile("site.html")).toBe(true);
-    expect(fileContent.peek()).toContain("{{content}}");
+  test("editing marks it unsaved; saving writes it and clears that", async () => {
+    await openResource({ section: "static", path: "site.css" });
+    resourceDraft.set(resourceDraft.peek() + "\n/* from the pane */\n");
+    expect(resourceDirty.peek()).toBe(true);
 
-    editorContent.set(fileContent.peek() + "\n<!-- edited in the editor -->");
-    expect(await saveFile()).toBe(true);
-
-    const fresh = await (await fetch(`${BASE}/edit/templates/site.html`, { headers: { Accept: "text/plain" } })).text();
-    expect(fresh).toContain("edited in the editor");
+    expect(await saveResource()).toBe(true);
+    expect(resourceDirty.peek()).toBe(false);
+    const onDisk = await (await fetch(`${BASE}/edit/static/site.css`, { headers: { Accept: "text/plain" } })).text();
+    expect(onDisk).toContain("from the pane");
   });
 
-  test("the browser lists the section you pick", async () => {
-    const { host, dispose } = render(() => <Browser />);
-    await waitFor(() => rows(host).includes("index.md"));
+  test("templates open the same way", async () => {
+    expect(await openResource({ section: "templates", path: "site.html" })).toBe(true);
+    expect(resourceDraft.peek()).toContain("{{content}}");
+  });
 
-    const button = (name: string) =>
-      [...host.querySelectorAll(".browser-sections button")].find((b) => b.textContent === name) as HTMLElement;
-    expect(button("pages").className).toContain("on");
+  test("closing leaves nothing behind, and a missing one opens nothing", async () => {
+    await openResource({ section: "static", path: "site.css" });
+    closeResource();
+    expect(resource.peek()).toBeNull();
+    expect(resourceDraft.peek()).toBe("");
 
-    click(button("templates"));
+    expect(await openResource({ section: "static", path: "nope.css" })).toBe(false);
+    hush(); // api() has spoken; the notice is asserted elsewhere
+    expect(await saveResource()).toBe(false); // nothing open
+    expect(await deleteResource()).toBe(false);
+  });
+
+  test("a new one is made with something to read, and opens straight away", async () => {
+    expect(await createResource("templates", "made-up")).toBeUndefined();
+    expect(resource.peek()).toEqual({ section: "templates", path: "made-up.html" });
+    expect(resourceDraft.peek()).toContain("{{content}}");
+
+    expect(await createResource("static", "made-up.css")).toBeUndefined();
+    expect(resource.peek()?.path).toBe("made-up.css");
+    expect(resourceDraft.peek()).toContain("css: made-up.css");
+
+    expect(await createResource("static", "made-up")).toBe("made-up.css already exists");
+    expect(await deleteResource()).toBe(true);
+    expect(resource.peek()).toBeNull();
+  });
+
+  test("a theme is made beside the page it themes, and a write that fails says so", async () => {
+    expect(await createTheme("guide")).toBeUndefined();
+    expect(resource.peek()).toEqual({ section: "pages", path: "guide/-theme.css" });
+    expect(resourceDraft.peek()).toContain("body.mytheme");
+    expect(await createTheme("")).toBe("-theme.css already exists"); // the root has one
+
+    const restore = intercept(() => new Response("read-only", { status: 403 }));
+    try {
+      expect(await createTheme("blog")).toBe("Couldn't create blog/-theme.css");
+    } finally {
+      restore();
+    }
+    hush();
+  });
+});
+
+describe("ResourceList", () => {
+  afterEach(closeResource);
+
+  test("lists templates, and picking one opens it below the page", async () => {
+    const { host, dispose } = render(() => <ResourceList section="templates" />);
     await waitFor(() => rows(host).includes("site.html"));
-    expect(rows(host)).not.toContain("index.md");
-    expect(button("templates").className).toContain("on");
+    expect(host.querySelector(".pane-path")!.textContent).toBe("/templates");
+    expect(rows(host)).not.toContain("favicon.ico");
 
-    click(button("static"));
+    click(row(host, "site.html"));
+    await waitFor(() => resource.peek()?.path === "site.html");
+    expect(resource.peek()?.section).toBe("templates");
+    dispose();
+  });
+
+  test("the css tab lists stylesheets, and the themes that reach the open page", async () => {
+    await loadFile("guide/index.md");
+    const { host, dispose } = render(() => <ResourceList section="static" />);
     await waitFor(() => rows(host).includes("site.css"));
+    await waitFor(() => rows(host).includes("/-theme.css"));
+    expect(host.querySelector(".file-group")!.textContent).toBe("themes on this page");
+
+    click(row(host, "/-theme.css"));
+    await waitFor(() => resource.peek()?.path === "-theme.css");
+    expect(resource.peek()?.section).toBe("pages"); // where the cascade finds it
+    dispose();
+  });
+
+  test("makes one from its header, and keeps the dialog open to say the name is taken", async () => {
+    const { host, dispose } = render(() => <ResourceList section="static" />);
+    await waitFor(() => rows(host).includes("site.css"));
+
+    const name = async (text: string) => {
+      click(host.querySelector('[aria-label="New stylesheet"]')!);
+      const dialog = host.querySelector("dialog")!;
+      await waitFor(() => dialog.open);
+      type(dialog.querySelector("input")!, text);
+      submit(dialog.querySelector("form")!);
+      return dialog;
+    };
+
+    const taken = await name("site");
+    await waitFor(() => taken.textContent!.includes("site.css already exists"));
+    click(button(taken, "Cancel")!);
+
+    await name("from-the-list");
+    await waitFor(() => resource.peek()?.path === "from-the-list.css");
+    expect(host.querySelector("dialog")).toBeNull();
+    await deleteResource();
+    dispose();
+  });
+
+  test("offers a theme only where the open page's folder hasn't one", async () => {
+    await loadFile("blog/index.md");
+    const { host, dispose } = render(() => <ResourceList section="static" />);
+    await waitFor(() => rows(host).includes("site.css"));
+    const theme = () => host.querySelector('[aria-label="New theme"]');
+    await waitFor(theme);
+
+    click(theme()!);
+    await waitFor(() => resource.peek()?.path === "blog/-theme.css");
+    await waitFor(() => theme() === null); // now it has one
+    await deleteResource();
+    dispose();
+  });
+});
+
+describe("ResourcePane", () => {
+  afterEach(closeResource);
+
+  test("names what is open, edits it, saves on ⌘⏎, and closes", async () => {
+    await openResource({ section: "static", path: "poster.css" });
+    const { host, dispose } = render(() => <ResourcePane />);
+    expect(host.querySelector(".pane-name")!.textContent).toBe("poster.css");
+    expect(host.querySelector(".lucide-droplet")).not.toBeNull();
+
+    const area = host.querySelector("textarea")!;
+    type(area, `${resourceDraft.peek()}\n/* pane */\n`);
+    expect(resourceDirty.peek()).toBe(true);
+    area.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", metaKey: true }));
+    await waitFor(() => !resourceDirty.peek());
+    expect(resourceSaved.peek()).toContain("/* pane */");
+
+    area.dispatchEvent(new KeyboardEvent("keydown", { key: "a", metaKey: true })); // not a save
+    click(host.querySelector('[aria-label="Close"]')!);
+    expect(resource.peek()).toBeNull();
+    dispose();
+  });
+
+  test("shows a template's own icon, and deletes once confirmed", async () => {
+    await createResource("templates", "pane-scratch");
+    const { host, dispose } = render(() => <ResourcePane />);
+    expect(host.querySelector(".lucide-layout-template")).not.toBeNull();
+
+    click(host.querySelector('[aria-label="Delete pane-scratch.html"]')!);
+    await waitFor(() => host.querySelector("dialog")?.open);
+    expect(host.querySelector("dialog h3")!.textContent).toBe("Delete pane-scratch.html?");
+    click(button(host.querySelector("dialog")!, "Cancel")!);
+    expect(resource.peek()?.path).toBe("pane-scratch.html");
+
+    click(host.querySelector('[aria-label="Delete pane-scratch.html"]')!);
+    await waitFor(() => host.querySelector("dialog")?.open);
+    click(button(host.querySelector("dialog")!, "Delete")!);
+    await waitFor(() => resource.peek() === null);
     dispose();
   });
 });
@@ -393,7 +526,7 @@ describe("Browser", () => {
     const { host, dispose } = render(() => <Browser />);
     await waitFor(() => rows(host).includes("index.md"));
     expect(rows(host)).toContain("guide");
-    expect(row(host, "-theme.css").querySelector(".lucide-droplet")).not.toBeNull();
+    expect(rows(host)).not.toContain("-theme.css"); // composition, not content
     expect(row(host, "index.md").querySelector(".lucide-file-text")).not.toBeNull();
 
     click(row(host, "guide"));
@@ -407,43 +540,30 @@ describe("Browser", () => {
     dispose();
   });
 
-  test("New makes pages, folders and themes, and keeps the dialog open to say a name is taken", async () => {
+  test("the two buttons make a page and a folder, and say when a name is taken", async () => {
     const { host, dispose } = render(() => <Browser />);
     await waitFor(() => rows(host).includes("index.md"));
-    const create = async (kind: string, name?: string) => {
-      click(button(host, "New")!);
+    const create = async (label: string, name: string) => {
+      click(host.querySelector(`[aria-label="${label}"]`)!);
       const dialog = host.querySelector("dialog")!;
       await waitFor(() => dialog.open);
-      click(button(dialog, kind)!);
-      if (name !== undefined) {
-        type(dialog.querySelector("input")!, name);
-        submit(dialog.querySelector("form")!);
-      }
+      type(dialog.querySelector("input")!, name);
+      submit(dialog.querySelector("form")!);
       return dialog;
     };
 
-    expect(button((await create("Page")) as HTMLElement, "Theme")).toBeUndefined; // root has one
-    click(button(host.querySelector("dialog")!, "Back")!);
-    expect(button(host.querySelector("dialog")!, "Theme")).toBeUndefined();
-    click(button(host.querySelector("dialog")!, "Cancel")!);
-
-    const taken = await create("Page", "index");
+    const taken = await create("New page", "index");
     await waitFor(() => taken.textContent!.includes("index.md already exists"));
-    click(button(taken, "Back")!);
     click(button(taken, "Cancel")!);
+    expect(host.querySelector("dialog")).toBeNull();
 
-    await create("Page", "browser-page");
+    await create("New page", "browser-page");
     await waitFor(() => filePath.get() === "browser-page.md");
     expect(host.querySelector("dialog")).toBeNull();
 
-    await create("Folder", "browser-folder");
+    await create("New folder", "browser-folder");
     await waitFor(() => filePath.get() === "browser-folder/index.md");
     expect(editorContent.get()).toBe("title: browser-folder\n\n");
-
-    click(row(host, "guide"));
-    await waitFor(() => rows(host).includes("pages.md"));
-    await create("Theme");
-    await waitFor(() => filePath.get() === "guide/-theme.css");
     dispose();
   });
 
@@ -467,7 +587,7 @@ describe("Editor", () => {
     const { host, dispose } = render(() => <Editor />);
     const area = host.querySelector("textarea")!;
     const save = button(host, "Save")!;
-    expect(host.querySelector(".editor-toolbar span")!.textContent).toBe("editor-test.md");
+    expect(host.querySelector(".pane-header .pane-name")!.textContent).toBe("editor-test.md");
     expect(area.value).toBe("title: editor-test\n\n");
 
     type(area, "title: editor-test\n\n# Edited");
@@ -505,7 +625,7 @@ describe("Editor", () => {
   test("deletes only once confirmed", async () => {
     await createFile("/editor-delete.md", "editor-delete.md");
     const { host, dispose } = render(() => <Editor />);
-    const trash = host.querySelector('[aria-label="Delete file"]')!;
+    const trash = host.querySelector('[aria-label="Delete editor-delete.md"]')!;
     click(trash);
     await waitFor(() => host.querySelector("dialog")?.open);
     expect(host.querySelector("dialog h3")!.textContent).toBe("Delete editor-delete.md?");
@@ -593,13 +713,13 @@ describe("CssPreview", () => {
 });
 
 describe("Header", () => {
-  test("links View to the open page, toggles images, and logs out by POST", () => {
+  test("links View to the open page, opens the resources, and logs out by POST", () => {
     const { host, dispose } = render(() => <Header />);
     const view = [...host.querySelectorAll("a")].find((a) => a.textContent!.includes("View"))!;
     expect(view.getAttribute("href")).toBe("/");
     filePath.set("My folder/a b.md");
     expect(view.getAttribute("href")).toBe("/My%20folder/a%20b.html");
-    click(button(host, "Images")!);
+    click(button(host, "Resources")!);
     expect(showImages.get()).toBe(true);
     const logout = host.querySelector("form.header-form") as HTMLFormElement;
     expect(logout.getAttribute("method")).toBe("post");
@@ -628,7 +748,7 @@ describe("ImageBrowser", () => {
 
     // A folder: an empty name makes nothing; a name makes it and opens it
     const newFolder = async (name: string) => {
-      click(button(host, "New")!);
+      click(host.querySelector('[aria-label="New folder"]')!);
       const dialog = host.querySelector("dialog")!;
       await waitFor(() => dialog.open);
       if (name) type(dialog.querySelector("input")!, name);
@@ -657,21 +777,42 @@ describe("ImageBrowser", () => {
     click(row(host, "My shots"));
     await waitFor(() => rows(host).includes("a b.svg"));
 
-    click(host.querySelector('[aria-label="Close images"]')!);
+    click(host.querySelector('[aria-label="Close resources"]')!);
     expect(showImages.get()).toBe(false);
+    dispose();
+  });
+
+  test("three tabs over one sidebar: images, css, templates", async () => {
+    const { host, dispose } = render(() => <ImageBrowser />);
+    await waitFor(() => rows(host).includes("logo.svg"));
+    const tab = (name: string) => button(host.querySelector(".browser-sections")!, name)!;
+    expect(tab("images").className).toBe("section on");
+
+    click(tab("css"));
+    await waitFor(() => rows(host).includes("site.css"));
+    expect(tab("css").className).toBe("section on");
+    expect(tab("images").className).toBe("section");
+    expect(host.querySelector(".upload-area")).toBeNull(); // the images tab stepped aside
+
+    click(tab("templates"));
+    await waitFor(() => rows(host).includes("site.html"));
+    expect(host.querySelector(".pane-path")!.textContent).toBe("/templates");
+
+    click(tab("images"));
+    await waitFor(() => rows(host).includes("logo.svg"));
     dispose();
   });
 
   test("the folder dialog cancels, and a folder that can't be made speaks", async () => {
     const { host, dispose } = render(() => <ImageBrowser />);
     await waitFor(() => rows(host).includes("logo.svg"));
-    click(button(host, "New")!);
+    click(host.querySelector('[aria-label="New folder"]')!);
     let dialog = host.querySelector("dialog")!;
     await waitFor(() => dialog.open);
     click(button(dialog, "Cancel")!);
     expect(host.querySelector("dialog")).toBeNull();
 
-    click(button(host, "New")!);
+    click(host.querySelector('[aria-label="New folder"]')!);
     dialog = host.querySelector("dialog")!;
     await waitFor(() => dialog.open);
     dialog.close(); // Escape
@@ -679,7 +820,7 @@ describe("ImageBrowser", () => {
 
     const restore = intercept(() => new Response("read-only", { status: 403 }));
     try {
-      click(button(host, "New")!);
+      click(host.querySelector('[aria-label="New folder"]')!);
       dialog = host.querySelector("dialog")!;
       await waitFor(() => dialog.open);
       type(dialog.querySelector("input")!, "nope");
@@ -724,13 +865,10 @@ describe("the app", () => {
     await loadFile("-theme.css");
     await waitFor(() => previewFrame()?.srcdoc.includes("Wobbling duck"));
 
-    // A template is neither markdown nor CSS: say so rather than run its
-    // placeholders through the markdown renderer.
-    goToSection("templates");
-    await loadFile("site.html");
+    // Neither markdown nor CSS: say so rather than render it as prose.
+    filePath.set("odd.txt");
     await waitFor(() => app.querySelector(".panel-preview .placeholder") !== null);
     expect(app.querySelector(".panel-preview .placeholder")!.textContent).toBe("no preview for this kind of file");
-    goToSection("pages");
 
     filePath.set(null);
     expect(app.querySelector(".panel-editor .placeholder")!.textContent).toBe("select a file");
@@ -738,6 +876,14 @@ describe("the app", () => {
 
     showImages.set(true);
     expect(app.querySelector(".sidebar")).not.toBeNull();
+
+    // A resource opens below the page, in the same column, and closing the
+    // pane takes it away again.
+    await openResource({ section: "templates", path: "site.html" });
+    expect(app.querySelector(".sidebar")).toBeNull(); // the chooser stepped aside
+    expect(app.querySelector(".column-middle .panel-resource .pane-name")!.textContent).toBe("site.html");
+    closeResource();
+    expect(app.querySelector(".panel-resource")).toBeNull();
 
     window.dispatchEvent(new ErrorEvent("error", { message: "kaboom" }));
     expect(notice.get()).toBe("Something broke: kaboom");

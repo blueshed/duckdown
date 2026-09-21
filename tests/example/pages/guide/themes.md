@@ -8,7 +8,7 @@ Themes let you style your site with CSS. No build tools, no config — just a CS
 
 ## How it works
 
-1. Create a file called `-theme.css` in your pages folder (in the editor: **New → Theme**)
+1. Create a file called `-theme.css` in your pages folder (in the editor: **Resources → css**, then the theme button)
 2. Set `theme: mytheme` in a page's front-matter
 3. In `-theme.css`, set a few variables on `body.mytheme`
 
@@ -85,6 +85,14 @@ body.duckdown {
   }
 }
 ```
+
+## Where to find it in the editor
+
+A `-theme.css` lives in `pages/` so the cascade can find it, but it isn't a page
+— nobody reads it. So it isn't in the content tree on the left: it's in
+**Resources → css**, under the stylesheets, where the editor lists every theme
+that reaches the page you have open, in the order it applies them. The button
+beside them makes one for the open page's folder when it hasn't got one yet.
 
 ## Live preview
 

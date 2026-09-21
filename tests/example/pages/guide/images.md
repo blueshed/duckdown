@@ -9,11 +9,12 @@ Images live in `static/images/` and are served at `/static/images/`.
 
 ### From the editor
 
-1. Click **Images** in the header bar
-2. Browse or create folders
-3. Click **Upload** to add files
-4. Click an image to select it
-5. Click **Copy Markdown** to get the syntax
+1. Click **Resources** in the header bar
+2. Stay on the **images** tab
+3. Browse, or make a folder with the folder button
+4. Click **Upload** to add files
+5. Click an image to select it
+6. Click **Copy Markdown** to get the syntax
 
 Paste it into your page:
 

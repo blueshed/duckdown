@@ -1,9 +1,9 @@
 import { createElement, signal, effect, list, when } from "@blueshed/railroad";
 import type { FileEntry, FolderEntry, Listing } from "../../storage";
 import { Icon } from "./Icon";
-import { NewDialog } from "./NewDialog";
+import { NewDialog, type NewKind } from "./NewDialog";
 import { apiJson, urlPath } from "../api";
-import { loadFile, createFile, browserRevision, section, goToSection, SECTIONS } from "../store";
+import { loadFile, createFile, browserRevision } from "../store";
 
 export const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name);
 
@@ -11,50 +11,44 @@ export function Browser() {
   const files = signal<FileEntry[]>([]);
   const folders = signal<FolderEntry[]>([]);
   const path = signal("");
-  const showNew = signal(false);
-  const hasTheme = signal(false);
+  const newKind = signal<NewKind | null>(null);
 
   const load = async (folder: string) => {
     path.set(folder);
-    const data = await apiJson<Listing>(`list /${folder}`, `/edit/${section.peek()}/${urlPath(folder)}`);
+    const data = await apiJson<Listing>(`list /${folder}`, `/edit/pages/${urlPath(folder)}`);
     if (!data) return;
-    files.set(data.files.sort(byName));
+    // Pages only. A -theme.css sits in pages/ so the cascade can find it, but
+    // it is not something anyone reads — it belongs with the other things a
+    // page is composed with, in the resources sidebar.
+    files.set(data.files.filter((f) => f.name.endsWith(".md")).sort(byName));
     folders.set(data.folders.sort(byName));
-    hasTheme.set(data.files.some((f) => f.name === "-theme.css"));
   };
 
   // Resolves to a message (the name is taken) to keep the dialog open with.
-  const onCreate = async (type: "page" | "folder" | "theme", name: string): Promise<string | void> => {
+  const onCreate = async (name: string): Promise<string | void> => {
     const dir = `/${path.peek() ? path.peek() + "/" : ""}`;
-    const error =
-      type === "theme" ? await createFile(`${dir}-theme.css`, "-theme.css")
-      : type === "folder" ? await createFile(`${dir}${name}/index.md`, name)
+    const error = newKind.peek() === "folder"
+      ? await createFile(`${dir}${name}/index.md`, name)
       : await createFile(`${dir}${name.endsWith(".md") ? name : `${name}.md`}`, name);
     if (error) return error;
-    showNew.set(false);
+    newKind.set(null);
   };
 
   // Reload when browserRevision changes
   effect(() => {
     browserRevision.get();
-    section.get(); // a new section lists from its own root, at the top
     load(path.peek());
   });
 
   return (
     <div class="panel panel-browser">
-      <div class="browser-sections">
-        {SECTIONS.map((name) => (
-          <button
-            class={section.map((s) => (s === name ? "section on" : "section"))}
-            onclick={() => { path.set(""); goToSection(name); }}
-          >{name}</button>
-        ))}
-      </div>
       <div class="browser-header">
-        <span style="flex:1; font-size: 12px; color: var(--text-dim);">/{path}</span>
-        <button onclick={() => showNew.set(true)}>
-          <Icon name="plus" /> New
+        <span class="pane-path">/{path}</span>
+        <button class="icon-btn" aria-label="New page" title="New page" onclick={() => newKind.set("page")}>
+          <Icon name="file-plus" />
+        </button>
+        <button class="icon-btn" aria-label="New folder" title="New folder" onclick={() => newKind.set("folder")}>
+          <Icon name="folder-plus" />
         </button>
       </div>
       <ul class="file-list">
@@ -74,15 +68,15 @@ export function Browser() {
         ))}
         {list(files, (f) => f.path, (f$) => (
           <li onclick={() => loadFile(f$.peek().path)}>
-            <Icon name={f$.peek().name.endsWith(".css") ? "droplet" : "file-text"} size={12} /> {f$.map((f) => f.name)}
+            <Icon name="file-text" size={12} /> {f$.map((f) => f.name)}
           </li>
         ))}
       </ul>
-      {when(showNew, () => (
+      {when(newKind, () => (
         <NewDialog
-          hasTheme={hasTheme.peek()}
+          kind={newKind.peek()!}
           oncreate={onCreate}
-          oncancel={() => showNew.set(false)}
+          oncancel={() => newKind.set(null)}
         />
       ))}
     </div>

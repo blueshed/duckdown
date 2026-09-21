@@ -8,6 +8,7 @@
 
 :root {
   --sidebar-w: 240px;
+  --pane-header-h: 45px;
   --preview-w: 1fr;
   --editor-w: 1fr;
   --bg: #f5f5f7;
@@ -104,7 +105,13 @@ button.header-link:hover {
   border-right: 1px solid var(--border);
 }
 
+/* No padding, like .panel-browser: the pane header inside has to sit flush,
+   so its rule is the only thing deciding how tall it is and how far its
+   bottom border runs. The placeholder pads itself. */
 .panel-editor {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
   background: var(--bg);
 }
 
@@ -160,11 +167,13 @@ button.header-link:hover {
 
 .editor-area {
   display: flex;
+  flex: 1;
   flex-direction: column;
-  height: 100%;
+  min-height: 0;
 }
 
-.editor-area textarea {
+.editor-area textarea,
+.panel-resource textarea {
   flex: 1;
   resize: none;
   padding: 12px;
@@ -233,6 +242,22 @@ button.danger:hover {
   background: #b91c1c;
 }
 
+/* An action with no room for a word: square, quiet until you reach for it.
+   The icon plus a title and an aria-label say what it does. */
+button.icon-btn {
+  width: 28px;
+  justify-content: center;
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
+  color: var(--text-dim);
+}
+
+button.icon-btn:hover {
+  background: var(--border);
+  color: var(--text);
+}
+
 button.danger-subtle {
   color: #dc2626;
   border-color: transparent;
@@ -280,15 +305,63 @@ button.danger-subtle:hover {
   to { opacity: 1; transform: translate(-50%, 0); }
 }
 
-/* --- Browser header --- */
-
+/* --- Pane headers ---
+   Four panes wear the same bar: the file browser, the page, a resource open
+   beneath it, and the resources sidebar. One rule for all four, with a fixed
+   height rather than one that falls out of whatever is inside — a header with
+   a button is otherwise taller than one without, and they stop lining up
+   across the columns. Each pane is a flex column with no padding of its own,
+   so the border runs the full width. */
 .browser-header,
-.editor-toolbar {
+.pane-header,
+.sidebar-header {
   display: flex;
+  flex: 0 0 var(--pane-header-h);
   align-items: center;
   gap: 8px;
-  padding: 8px 12px;
+  height: var(--pane-header-h);
+  padding: 0 12px;
   border-bottom: 1px solid var(--border);
+}
+
+/* What a pane is showing: a file's name, or the folder a list is in. Same
+   type in every header, so the bars read as one family. */
+.pane-name,
+.pane-path {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 12px;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pane-path,
+.pane-title {
+  flex: 1;
+  min-width: 0;
+}
+
+.pane-title {
+  font-weight: 600;
+}
+
+/* A label over a group of rows: quieter than the rows it introduces. */
+.file-group {
+  margin: 12px 0 4px;
+  padding: 0 8px;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.pane-header .dot {
+  color: var(--accent);
+  font-size: 9px;
+  line-height: 1;
+}
+
+.pane-gap {
+  flex: 1;
 }
 
 .browser-list {
@@ -336,14 +409,6 @@ button.danger-subtle:hover {
   flex-direction: column;
   z-index: 10;
   box-shadow: -4px 0 12px rgba(0, 0, 0, 0.1);
-}
-
-.sidebar-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--border);
 }
 
 .sidebar-content {
@@ -475,18 +540,26 @@ button.danger-subtle:hover {
   font-style: italic;
 }
 
-/* Which folder of the site the browser is showing: pages, templates, static. */
+/* Which kind of resource the sidebar is showing: images, css, templates.
+   A bar on the same rhythm and the same 12px gutter as the pane headers, so
+   it lines up with them — but tabs, not a heading: each one underlines when
+   it is the one you are looking at, over the bar's own divider. */
 .browser-sections {
   display: flex;
-  gap: 2px;
-  padding: 6px 8px 0;
+  flex: 0 0 var(--pane-header-h);
+  gap: 4px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--border);
 }
 
 .browser-sections .section {
   flex: 1;
-  padding: 4px 6px;
+  justify-content: center;
+  padding: 0;
+  margin-bottom: -1px;
   border: 0;
-  border-radius: 4px 4px 0 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
   background: transparent;
   color: var(--text-dim);
   font: inherit;
@@ -496,9 +569,36 @@ button.danger-subtle:hover {
 
 .browser-sections .section:hover {
   color: var(--text);
+  background: transparent;
+  border-bottom-color: var(--border);
 }
 
 .browser-sections .section.on {
-  background: var(--panel-alt, rgba(127, 127, 127, 0.12));
   color: var(--text);
+  border-bottom-color: var(--accent);
 }
+
+/* --- The middle column: the page, and a resource open beneath it --- */
+
+.column-middle {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  border-right: 1px solid var(--border);
+}
+
+.column-middle .panel-editor {
+  flex: 1;
+  min-height: 0;
+  border-right: 0;
+}
+
+.panel-resource {
+  display: flex;
+  flex: 0 0 40%;
+  flex-direction: column;
+  min-height: 0;
+  border-top: 1px solid var(--border);
+}
+

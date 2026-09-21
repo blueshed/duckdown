@@ -1,10 +1,11 @@
-import { createElement, signal, computed, list, when } from "@blueshed/railroad";
+import { createElement, Fragment, signal, computed, list, when } from "@blueshed/railroad";
 import type { FileEntry, FolderEntry, Listing } from "../../storage";
 import { Icon } from "./Icon";
 import { byName } from "./Browser";
 import { api, apiJson, urlPath } from "../api";
 import { speak } from "../notice";
 import { closeImages } from "../store";
+import { ResourceList } from "./ResourceList";
 
 export function ImageBrowser() {
   const files = signal<FileEntry[]>([]);
@@ -69,19 +70,34 @@ export function ImageBrowser() {
   loadImgPath();
   load("");
 
+  // Three kinds of resource, one chooser. Images are inserted into the page at
+  // the cursor; a stylesheet or a template opens below the page to be edited.
+  const tab = signal<"images" | "styles" | "templates">("images");
+  const on = (name: string) => tab.map((t) => (t === name ? "section on" : "section"));
+
   return (
     <div class="sidebar">
       <div class="sidebar-header">
-        <span style="flex:1; font-weight: 600;">Images</span>
-        <button aria-label="Close images" title="Close images" onclick={closeImages}>
+        <span class="pane-title">Resources</span>
+        <button class="icon-btn" aria-label="Close resources" title="Close resources" onclick={closeImages}>
           <Icon name="x" />
         </button>
       </div>
 
+      <div class="browser-sections">
+        <button class={on("images")} onclick={() => tab.set("images")}>images</button>
+        <button class={on("styles")} onclick={() => tab.set("styles")}>css</button>
+        <button class={on("templates")} onclick={() => tab.set("templates")}>templates</button>
+      </div>
+
+      {when(tab.map((t) => t === "styles"), () => <ResourceList section="static" />)}
+      {when(tab.map((t) => t === "templates"), () => <ResourceList section="templates" />)}
+
+      {when(tab.map((t) => t === "images"), () => <>
       <div class="browser-header">
-        <span style="flex:1; font-size: 12px; color: var(--text-dim);">/{path}</span>
-        <button onclick={() => showFolderInput.set(true)}>
-          <Icon name="folder-plus" /> New
+        <span class="pane-path">/{path}</span>
+        <button class="icon-btn" aria-label="New folder" title="New folder" onclick={() => showFolderInput.set(true)}>
+          <Icon name="folder-plus" />
         </button>
       </div>
 
@@ -124,6 +140,7 @@ export function ImageBrowser() {
           </label>
         </div>
       </div>
+      </>)}
 
       {when(showFolderInput, () => {
         let dialogRef: HTMLDialogElement | null = null;

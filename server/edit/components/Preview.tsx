@@ -1,6 +1,6 @@
 import { createElement, signal, computed, effect, batch } from "@blueshed/railroad";
 import { apiJson } from "../api";
-import { editorContent, filePath } from "../store";
+import { editorContent, filePath, resource, resourceDraft } from "../store";
 
 // The server renders the page as the site will: its content, its front
 // matter, and its theme (the whole cascade, root first).
@@ -33,6 +33,13 @@ export function Preview() {
     return () => clearTimeout(timer);
   });
 
+  // A stylesheet being edited wins over the saved one, and needs no round trip
+  // to the server: the iframe restyles itself as the text changes.
+  const draftCss = () => {
+    const open = resource.get();
+    return open && open.path.endsWith(".css") ? `<style>${resourceDraft.get()}</style>` : "";
+  };
+
   const srcdoc = computed(() => {
     const h = html.get();
     if (!h) return "";
@@ -47,6 +54,7 @@ export function Preview() {
   <title>${title}</title>
   <link href="/static/site.css" rel="stylesheet">
   <style>${theme.get()}</style>
+  ${draftCss()}
 </head>
 <body class="${m.theme?.[0] || ""}">
   ${h}

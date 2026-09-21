@@ -1,7 +1,7 @@
 import { createElement } from "@blueshed/railroad";
 import {
-  Copy, CornerLeftUp, Droplet, ExternalLink, FileText, Folder, FolderPlus,
-  Image, LogOut, Plus, Save, Trash2, Upload, X,
+  Copy, CornerLeftUp, Droplet, ExternalLink, FilePlus, FileText, Folder, FolderPlus,
+  Image, LayoutTemplate, LogOut, Plus, Save, Trash2, Upload, X,
 } from "lucide-static";
 
 const ICONS: Record<string, string> = {
@@ -9,10 +9,12 @@ const ICONS: Record<string, string> = {
   "corner-left-up": CornerLeftUp,
   "droplet": Droplet,
   "external-link": ExternalLink,
+  "file-plus": FilePlus,
   "file-text": FileText,
   "folder": Folder,
   "folder-plus": FolderPlus,
   "image": Image,
+  "layout-template": LayoutTemplate,
   "log-out": LogOut,
   "plus": Plus,
   "save": Save,

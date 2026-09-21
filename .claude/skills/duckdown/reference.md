@@ -286,11 +286,16 @@ A page's `layout:` chooses the template (`layout: post` → `templates/post.html
 ## The editor
 
 - At `/edit`. Signing in lands there; `/login` when already signed in goes straight there; the home page's "Login to edit" link does the same.
-- **Files** (left): folders and pages; click to open, `..` to go up.
-- **New**: *Page* (adds `.md`), *Folder* (makes `folder/index.md`, titled with the folder's name), *Theme* (a `-theme.css` starter, offered only where the folder has none). New never overwrites — it says when a name is taken.
+- **Content** (left): the site's pages — folders and `.md` files; click to open, `..` to go up. Only pages: a `-theme.css` lives in `pages/` so the cascade finds it, but it is styling, so it's in Resources instead. Two buttons in its header make a **new page** and a **new folder** (`folder/index.md`, titled with the folder's name). Neither ever overwrites — it says when a name is taken.
 - **Editing** (middle): Save or ⌘⏎. The button lights up while there are unsaved changes, flashes green for "Saved", and red for "Not saved" (the notice says why). The bin deletes the page, after asking.
+- **Resources** (right sidebar, from the header): what a page is composed with, in three tabs.
+  - *images* — browse and upload, and copy a markdown link for one.
+  - *css* — the stylesheets in `static/`, and below them the `-theme.css` files that reach the page you have open, in the order they cascade. A button makes a new stylesheet, and another makes a theme for the open page's folder when it hasn't one.
+  - *templates* — the files in `templates/`, and a button for a new one.
+- **Editing a resource**: picking one closes the sidebar and opens it in a second pane *below* the page, with the same header — name, unsaved dot, delete, Save, and a close button. The page in the middle stays where it is, so you can click through pages and watch one stylesheet against each. It's transient: closing the pane leaves nothing behind.
 - **Preview** (right): the page as the site will show it — `site.css`, the theme cascade, wiki links resolved from the page's folder — sandboxed, so no scripts run. For a `.css` file, sample content styled by it.
-- **Header**: *Images* (the sidebar), *View* (the page on the site), *Logout*.
+- **Header**: *Resources* (the sidebar), *View* (the page on the site), *Logout*.
+- **Deleting always asks first**, wherever it is — a stylesheet or a template is as easy to lose as a page, and there's no undo behind any of them.
 - Anything that fails shows in a red notice at the foot of the screen until dismissed.
 
 ## Troubleshooting

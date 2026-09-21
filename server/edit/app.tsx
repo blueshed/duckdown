@@ -5,8 +5,9 @@ import { Editor } from "./components/Editor";
 import { Preview } from "./components/Preview";
 import { CssPreview } from "./components/CssPreview";
 import { ImageBrowser } from "./components/ImageBrowser";
+import { ResourcePane } from "./components/ResourcePane";
 import { Notice } from "./components/Notice";
-import { filePath, showImages, loadFile } from "./store";
+import { filePath, showImages, loadFile, resource } from "./store";
 import { speak } from "./notice";
 
 // App-lifetime root scope: this app is mounted once and never torn down,
@@ -45,7 +46,14 @@ effect(() => {
     editorPanel.replaceChildren(editorPlaceholder);
   }
 });
-app.appendChild(editorPanel);
+
+// The middle column: the page, and under it whatever resource is open. Built
+// with when() as it is shown, so the pane starts from the current draft.
+const middle = document.createElement("div");
+middle.className = "column-middle";
+middle.appendChild(editorPanel);
+middle.appendChild(when(resource, () => <ResourcePane />));
+app.appendChild(middle);
 
 // Preview panel — placeholder, markdown preview, or CSS preview. Each is built
 // when it's shown, from the content as it is then: an iframe attached in the

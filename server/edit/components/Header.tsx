@@ -14,7 +14,7 @@ export function Header() {
       <h1>duckie</h1>
       <span style="flex: 1;" />
       <button onclick={toggleImages}>
-        <Icon name="image" /> Images
+        <Icon name="layout-template" /> Resources
       </button>
       <a href={viewHref} target="_blank" class="header-link">
         <Icon name="external-link" /> View

@@ -63,9 +63,12 @@ duckdown/
 │           ├── Editor.tsx    # Textarea editor with save/delete
 │           ├── Preview.tsx   # Live markdown preview
 │           ├── CssPreview.tsx # CSS preview in iframe
-│           ├── Header.tsx    # Top bar (view site, images, logout)
-│           ├── ImageBrowser.tsx # Sidebar image browser + upload
-│           ├── NewDialog.tsx    # New file/folder/theme dialog
+│           ├── Header.tsx    # Top bar (view site, resources, logout)
+│           ├── ImageBrowser.tsx # Resources sidebar: images, css, templates
+│           ├── ResourceList.tsx # One tab of it: the css or template files
+│           ├── ResourcePane.tsx # A resource open below the page
+│           ├── PaneHeader.tsx   # The one header both panes wear
+│           ├── NewDialog.tsx    # Name a new page, folder, stylesheet, template
 │           ├── ConfirmDialog.tsx # Confirm action dialog
 │           ├── Notice.tsx    # Shows the failure message (role=alert)
 │           └── Icon.tsx      # Lucide icons (lucide-static SVG strings)
