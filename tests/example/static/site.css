@@ -164,6 +164,7 @@ img, video {
 /* The navigation and the search button share a row; the rule under it belongs
    to the row, not to the list, so the button sits above it too. */
 .topbar {
+  position: relative;      /* the search panel hangs off it on a narrow screen */
   display: flex;
   align-items: baseline;
   gap: 1.5rem;
@@ -494,4 +495,25 @@ th {
   color: var(--muted);
   font-size: 0.85rem;
   line-height: 1.4;
+}
+
+
+/* On a narrow screen the navigation has to wrap, and a panel pinned to the
+   magnifier lands on top of it. Below the row instead, the full width of it,
+   so nothing a reader needs is covered while they type. */
+@media (max-width: 34rem) {
+  .topbar {
+    gap: 0.8rem;
+  }
+
+  .search {
+    position: static;
+  }
+
+  .search-panel {
+    top: calc(100% + 0.4rem);
+    right: 0;
+    left: 0;
+    width: auto;
+  }
 }
