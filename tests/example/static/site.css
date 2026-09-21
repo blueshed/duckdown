@@ -1,8 +1,8 @@
 /* duckdown's site stylesheet.
 
-   Everything below is drawn from these variables. A theme (a -theme.css in
-   a pages/ folder) sets a few of them for that folder and everything under
-   it, rather than restyling elements. See the Themes guide. */
+   Everything below is drawn from these variables. theme.css, which the
+   template links after this file, sets a few of them rather than restyling
+   elements. See the Styling guide. */
 
 :root {
   --bg: #ffffff;

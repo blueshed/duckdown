@@ -1,8 +1,12 @@
-/* The site's theme. It sits at the top of pages/, so every page gets it.
+/* This site's look. `templates/site.html` links it after site.css, so it
+   only has to say what differs — mostly by setting site.css's variables
+   rather than restyling anything.
 
-   It sets a few of site.css's variables rather than restyling anything —
-   that is what a theme is for. Put a file like this in any folder and it
-   reaches that folder and everything under it, read after this one. */
+   There is nothing clever about it: it is an ordinary stylesheet in
+   static/, linked by the template, which is why every page has it. To give
+   one page something else, name a second stylesheet with `css:` in its
+   front matter. To give a whole kind of page something else, make it a
+   template of its own and link whatever that one needs. */
 
 :root {
   --accent: #147c99;

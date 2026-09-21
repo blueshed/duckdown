@@ -12,7 +12,7 @@ export const showImages = signal(false);
 // their front matter. Templates and stylesheets are not content — they are what
 // a page is composed with — so they are reached from the resource sidebar and
 // edited in a pane below the page, against the page you are already looking at.
-export type Resource = { section: "templates" | "static" | "pages"; path: string };
+export type Resource = { section: "templates" | "static"; path: string };
 
 export const resource = signal<Resource | null>(null);
 export const resourceSaved = signal("");   // what is on the server
@@ -56,7 +56,8 @@ const STARTER = {
   <title>{{title}}</title>
   <link rel="canonical" href="{{url}}">
   <link rel="stylesheet" href="/static/site.css">
-  {{theme_css}}
+  <link rel="stylesheet" href="/static/theme.css">
+  {{css}}
 </head>
 <body>
   <nav class="nav">{{nav}}</nav>
@@ -71,8 +72,8 @@ const STARTER = {
   },
 } as const;
 
-// Made where it is used from: a stylesheet or template in its own folder, a
-// theme beside the page it themes, because that is how the cascade finds it.
+// Made in the folder it belongs to, and opened at once: a new stylesheet or
+// template is no use until you can see what it does.
 export async function createResource(
   section: "templates" | "static",
   name: string,
@@ -82,35 +83,14 @@ export async function createResource(
   return writeNew(section, file, body.replace("{{name}}", file));
 }
 
-export async function createTheme(dir: string): Promise<string | void> {
-  const file = `${dir ? `${dir}/` : ""}-theme.css`;
-  return writeNew("pages", file, THEME_STARTER);
-}
-
-const THEME_STARTER = `/* The theme for this folder and every folder under it.
-   Every page here is styled by it — there is nothing to write on the pages.
-   Set site.css's variables rather than restyling elements, and say only what
-   differs from the theme above this one. */
-
-:root {
-  --accent: #5856d6;
-}
-`;
 
 async function writeNew(section: Resource["section"], file: string, body: string): Promise<string | void> {
   const res = await api(`create ${file}`, `/edit/${section}/${urlPath(file)}`,
     { method: "PUT", headers: { "If-None-Match": "*" }, body }, [412]);
   if (res.status === 412) return `${file} already exists`;
   if (!res.ok) return `Couldn't create ${file}`;
-  changed(section);
-  await openResource({ section, path: file });
-}
-
-// A stylesheet or template shows in the sidebar; a theme shows in the tree,
-// in its folder. Tell whichever one lists it.
-function changed(section: Resource["section"]) {
   reloadResources();
-  if (section === "pages") reloadBrowser();
+  await openResource({ section, path: file });
 }
 
 export function reloadResources() {
@@ -131,7 +111,7 @@ export async function deleteResource(): Promise<boolean> {
   const res = await api(`delete ${open.path}`, resourceUrl(open), { method: "DELETE" });
   if (!res.ok) return false;
   closeResource();
-  changed(open.section);
+  reloadResources();
   return true;
 }
 

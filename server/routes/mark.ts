@@ -7,12 +7,12 @@ type MarkRequest = { source: string; draft?: DraftTemplate; through?: string };
 
 export const handleMark = {
   // The preview, rendered the way the site renders: the page's markdown inside
-  // the template it asks for, with the nav, the theme cascade and the rest
+  // the template it asks for, with the nav, its stylesheets and the rest
   // filled in. It used to build a shell of its own, which looked close enough
   // until you edited the template and nothing changed.
   //
-  // ?path= is the page being edited: its [[wiki links]], its theme cascade and
-  // its place in the nav all depend on where it lives. `draft` is a template
+  // ?path= is the page being edited: its [[wiki links]] and its place in the
+  // nav both depend on where it lives. `draft` is a template
   // open in the editor and not yet saved, used in place of the saved one when
   // it is the template this page wears; `through` renders in exactly the
   // template given, which is how the editor previews one with no page open.

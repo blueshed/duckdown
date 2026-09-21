@@ -25,6 +25,6 @@ back to `site.html` rather than failing.
 
 > [!TIP]
 > Use a layout when a kind of page wants a different *shape* — a post, a
-> landing page, something to print. When a whole *section* should look
-> different, put a [[/guide/themes|theme]] in its folder; when one single page
-> should, give that page a `css:`.
+> landing page, something to print; the template it names can link whatever
+> stylesheets that kind needs. When one single page should look different,
+> give that page a [[/guide/themes|`css:`]] instead.

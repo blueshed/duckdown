@@ -30,8 +30,12 @@ export async function setup(root: string): Promise<void> {
 Your new site is ready. [Login to edit](/login).
 `);
 
-    // The seed site's stylesheet: built on variables, so a theme is a few lines
-    copyFileSync(join(root, "tests", "example", "static", "site.css"), join(siteDir, "static", "site.css"));
+    // The seed's two stylesheets: site.css is the base, drawn from variables,
+    // and theme.css is this site's own look. The template links both, so a
+    // new site can say what it wants in theme.css and leave the base alone.
+    for (const sheet of ["site.css", "theme.css"]) {
+      copyFileSync(join(root, "tests", "example", "static", sheet), join(siteDir, "static", sheet));
+    }
 
     // The seed's template, not a second copy of it: the two drifted, and a
     // canonical link had to be added in both places last time.

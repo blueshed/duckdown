@@ -49,7 +49,7 @@ Put an empty element where the image goes:
 <span id="logo" role="img" aria-label="duckdown"></span>
 ```
 
-and in your `-theme.css`, give it a size, a colour, and the SVG as its mask:
+and in `static/theme.css`, give it a size, a colour, and the SVG as its mask:
 
 ```css
 #logo {

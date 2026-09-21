@@ -9,7 +9,7 @@ import {
   filePath, fileContent, editorContent, showImages, browserRevision,
   loadFile, createFile, saveFile, deleteFile, closeFile, reloadBrowser, toggleImages, closeImages,
   resource, resourceDraft, resourceSaved, resourceDirty, pageLayout, openResource, closeResource,
-  saveResource, deleteResource, createResource, createTheme,
+  saveResource, deleteResource, createResource,
 } from "../server/edit/store";
 import { Icon } from "../server/edit/components/Icon";
 import { Notice } from "../server/edit/components/Notice";
@@ -410,21 +410,6 @@ describe("resources", () => {
     expect(resource.peek()).toBeNull();
   });
 
-  test("a theme is made beside the page it themes, and a write that fails says so", async () => {
-    expect(await createTheme("guide")).toBeUndefined();
-    expect(resource.peek()).toEqual({ section: "pages", path: "guide/-theme.css" });
-    expect(resourceDraft.peek()).toContain(":root {");   // plain rules: no page wears a class
-    expect(await deleteResource()).toBe(true); // put it back as it was
-    expect(await createTheme("")).toBe("-theme.css already exists"); // the root has one
-
-    const restore = intercept(() => new Response("read-only", { status: 403 }));
-    try {
-      expect(await createTheme("blog")).toBe("Couldn't create blog/-theme.css");
-    } finally {
-      restore();
-    }
-    hush();
-  });
 });
 
 describe("ResourceList", () => {
@@ -442,14 +427,12 @@ describe("ResourceList", () => {
     dispose();
   });
 
-  test("the css tab is static/ only: a theme is not one of these", async () => {
+  test("the css tab lists the stylesheets in static/, and nothing else", async () => {
     await loadFile("guide/index.md");
     const { host, dispose } = render(() => <ResourceList section="static" />);
     await waitFor(() => rows(host).includes("site.css"));
     expect(host.querySelector(".pane-path")!.textContent).toBe("/static");
-    // A theme lives in pages/, in the folder it themes; listing it beside
-    // these would say it is the same kind of thing, and it isn't.
-    expect(rows(host).some((r) => r.includes("-theme.css"))).toBe(false);
+    expect(rows(host)).toContain("theme.css");   // the site's own look
     expect(rows(host)).not.toContain("favicon.ico");
     dispose();
   });
@@ -478,42 +461,6 @@ describe("ResourceList", () => {
     dispose();
   });
 
-});
-
-describe("themes in the tree", () => {
-  afterEach(closeResource);
-
-  test("a folder without one is offered one, and it opens where it was made", async () => {
-    const { host, dispose } = render(() => <Browser />);
-    await waitFor(() => rows(host).includes("index.md"));
-    const offer = () => host.querySelector('[aria-label="New theme"]');
-    expect(offer()).toBeNull(); // the root has one already
-
-    click(row(host, "blog"));
-    await waitFor(() => rows(host).includes("one-page-that-looks-different.md"));
-    expect(rows(host)).toContain("-theme.css"); // the seed's, showing the cascade
-    expect(offer()).toBeNull();
-
-    click(row(host, ".."));
-    await waitFor(() => rows(host).includes("guide"));
-    click(row(host, "guide"));
-    await waitFor(() => rows(host).includes("themes.md"));
-    await waitFor(offer);
-
-    click(offer()!);
-    // Made in the folder being browsed, opened below as a resource, and
-    // listed in the tree from then on — where it says what it themes.
-    await waitFor(() => resource.peek()?.path === "guide/-theme.css");
-    expect(resource.peek()?.section).toBe("pages");
-    await waitFor(() => rows(host).includes("-theme.css"));
-    await waitFor(() => offer() === null);
-
-    click(row(host, "-theme.css"));
-    await waitFor(() => resourceDraft.peek().includes(":root {"));
-    await deleteResource();
-    await waitFor(() => !rows(host).includes("-theme.css")); // the tree hears about it
-    dispose();
-  });
 });
 
 describe("ResourcePane", () => {
@@ -586,11 +533,9 @@ describe("Browser", () => {
     const { host, dispose } = render(() => <Browser />);
     await waitFor(() => rows(host).includes("index.md"));
     expect(rows(host)).toContain("guide");
-    // Not a page, but in the tree all the same: which folder it sits in is
-    // what it means. It opens below, as a resource, not as content.
-    const themeRow = row(host, "-theme.css");
-    expect(themeRow.className).toBe("resource");
-    expect(themeRow.querySelector(".lucide-droplet")).not.toBeNull();
+    // Pages and folders, nothing else: everything a page is composed with
+    // lives outside pages/ and is reached from Resources.
+    expect(rows(host).some((r) => r.endsWith(".css"))).toBe(false);
     expect(row(host, "index.md").querySelector(".lucide-file-text")).not.toBeNull();
 
     click(row(host, "guide"));
@@ -730,7 +675,7 @@ describe("Preview", () => {
     const doc = frame(host).srcdoc;
     expect(doc).toContain("<title>Typed</title>");
     expect(doc).toContain('<link href="/static/site.css" rel="stylesheet">');
-    expect(doc).toContain("--accent: #147c99"); // the root theme, inherited by My folder/
+    expect(doc).toContain('<link href="/static/theme.css" rel="stylesheet">'); // the site's look, as the template links it
     expect(doc).toContain('href="/My%20folder/other.html"'); // the wiki link, from where the page lives
     dispose();
   });
@@ -739,7 +684,7 @@ describe("Preview", () => {
     editorContent.set("Just text");
     const { host, dispose } = render(() => <Preview />);
     await waitFor(() => frame(host).srcdoc.includes("Just text"));
-    expect(frame(host).srcdoc).toContain("--accent: #147c99");
+    expect(frame(host).srcdoc).toContain('<link href="/static/theme.css" rel="stylesheet">');
     expect(frame(host).srcdoc).toContain("<title>duckie</title>"); // the site's default title
     dispose();
   });
@@ -953,8 +898,8 @@ describe("the app", () => {
     expect(app.querySelector(".editor-area textarea")).not.toBeNull();
     await waitFor(() => previewFrame()?.srcdoc.includes("Welcome to duckdown"));
 
-    await loadFile("-theme.css");
-    await waitFor(() => previewFrame()?.srcdoc.includes("Wobbling duck"));
+    filePath.set("theme.css"); // a .css opened as the page (reachable by ?path=)
+    await waitFor(() => app.querySelector(".panel-preview iframe") !== null);
 
     // Neither markdown nor CSS: say so rather than render it as prose.
     filePath.set("odd.txt");

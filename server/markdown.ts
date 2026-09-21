@@ -141,20 +141,3 @@ export async function buildNav(pages: Storage, prefix = ""): Promise<string> {
 
   return items.length > 0 ? items.join("\n") : "";
 }
-
-// A page's theme cascades: the root's -theme.css, then each folder's down to
-// the page's own, so a folder refines what the site sets. One that won't load
-// is left out rather than failing the page, but says why.
-export async function loadThemeCss(pages: Storage, pagePath: string): Promise<string> {
-  const folders = folderOf(pagePath).split("/").filter(Boolean);
-  const keys = ["-theme.css", ...folders.map((_, i) => `${folders.slice(0, i + 1).join("/")}/-theme.css`)];
-  const css: string[] = [];
-  for (const key of keys) {
-    try {
-      if (await pages.exists(key)) css.push(await pages.read(key));
-    } catch (e) {
-      console.error(`Couldn't load ${key}:`, e);
-    }
-  }
-  return css.join("\n");
-}

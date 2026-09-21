@@ -1,5 +1,5 @@
 import { describe, test, expect, spyOn } from "bun:test";
-import { parseFrontMatter, renderMarkdown, buildNav, loadThemeCss } from "../server/markdown";
+import { parseFrontMatter, renderMarkdown, buildNav } from "../server/markdown";
 import type { Storage, Listing } from "../server/storage";
 import { siteNav, pagesChanged, markCurrent, folderListing } from "../server/nav";
 
@@ -153,34 +153,6 @@ describe("folderListing", () => {
       expect(await folderListing(counting, "blog")).toContain(">One<"); // tried again
     } finally {
       pagesChanged();
-    }
-  });
-});
-
-describe("loadThemeCss", () => {
-  const pages = memory({
-    "-theme.css": "/* root */",
-    "guide/-theme.css": "/* guide */",
-    "guide/deep/-theme.css": "/* deep */",
-  }, "broken/-theme.css");
-
-  test("cascades: the root's theme, then each folder's down to the page's own", async () => {
-    expect(await loadThemeCss(pages, "index")).toBe("/* root */");
-    expect(await loadThemeCss(pages, "guide/deep/page.md")).toBe("/* root */\n/* guide */\n/* deep */");
-    expect(await loadThemeCss(pages, "other/page")).toBe("/* root */"); // a folder without one inherits
-  });
-
-  test("is empty for a site without themes", async () => {
-    expect(await loadThemeCss(memory({}), "guide/intro")).toBe("");
-  });
-
-  test("leaves out a theme it can't load, and says why", async () => {
-    const error = spyOn(console, "error").mockImplementation(() => {});
-    try {
-      expect(await loadThemeCss(pages, "broken/page")).toBe("/* root */");
-      expect(error.mock.calls[0]![0]).toBe("Couldn't load broken/-theme.css:");
-    } finally {
-      error.mockRestore();
     }
   });
 });

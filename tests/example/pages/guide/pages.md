@@ -27,9 +27,8 @@ nav: About
 | `date` | Used to order a folder's [[#listing-a-folder\|listing]], newest first |
 | `draft` | `draft: true` keeps the page off the site until you're ready |
 
-Nothing here says how the page looks, and that's deliberate: styling comes from
-the folder a page is in, not from a line each page has to remember. See
-[[themes|Themes]].
+Only two of these touch how a page looks, and both name a file you wrote:
+`layout:` picks a template, `css:` adds a stylesheet. See [[themes|Styling]].
 
 A blank line separates front-matter from your markdown.
 
@@ -192,18 +191,15 @@ A layout is any file in `templates/`, named by a plain word — so a page can't
 reach out of that folder — and a name with no file falls back to `site.html`
 rather than failing.
 
-Reach for a layout when a *kind* of page wants a different shape. For one page
-that only wants to look different, `css: print` links `/static/print.css` after
-the theme. Three sizes of override, and only two of them are a line on the page:
+Reach for a layout when a *kind* of page wants a different shape — and give
+that template whatever stylesheets the kind needs. For one page that only wants
+to look different, `css: poster` links `/static/poster.css` after the rest.
+Two overrides, and that's all there is:
 
 | | changes | good for | on this site |
 |---|---|---|---|
-| a `-theme.css` | a few CSS variables | a section that reads differently | [[/blog/index\|the blog]], which reads warmer and narrower |
 | `css:` | one extra stylesheet | one page that has to look unusual | [[/blog/one-page-that-looks-different\|the poster page]] |
-| `layout:` | the whole page shape | posts, landing pages, print | [[/blog/a-post-with-its-own-layout\|the post]] |
-
-The first isn't front matter at all: you put the file in the folder and every
-page in it is styled, including the ones you write next year.
+| `layout:` | the whole page shape, and what it links | posts, landing pages, print | [[/blog/a-post-with-its-own-layout\|the post]] |
 
 ## Drafts
 

@@ -1,25 +1,27 @@
-title: Themes
+title: Styling your site
+nav: Styling
 toc: true
 
-# Themes
+# Styling your site
 
-Themes let you style your site with CSS. No build tools, no config — just a CSS file.
+Two files, both ordinary, neither magic: a **template** decides a page's shape
+and what stylesheets it links, and a **stylesheet** in `static/` says how it
+looks. That's the whole of it.
 
-## How it works
+## The two stylesheets
 
-Put a file called `-theme.css` in a folder under `pages/`. Every page in that
-folder, and in every folder under it, is styled by it. That's the whole idea.
+A new site starts with these, and `templates/site.html` links both:
 
-In the editor: browse to the folder and press the theme button in the tree's
-header.
+```html
+<link href="/static/site.css" rel="stylesheet">
+<link href="/static/theme.css" rel="stylesheet">
+```
 
-There's nothing to write on the pages themselves. A page doesn't opt in, and
-can't forget to — which is the point, because the post you write next year
-can't remember a line you wrote this year.
+`site.css` is duckdown's base. It draws everything — text, links, code, tables,
+callouts, the navigation — from a handful of CSS variables, so you rarely have
+to touch it.
 
-## Set variables, not styles
-
-The site's stylesheet, `static/site.css`, draws everything — text, links, code, tables, callouts, the navigation — from a handful of CSS variables. A theme only changes the ones it cares about:
+`theme.css` is yours. It comes second, so it only has to say what differs:
 
 ```css
 :root {
@@ -39,13 +41,16 @@ The site's stylesheet, `static/site.css`, draws everything — text, links, code
 | `--font-heading` | Headings' font (they use `--font-body` unless you set it) |
 | `--measure` | How wide the text runs |
 | `--radius` | How round the corners are |
-| `--note`, `--tip`, `--important`, `--warning`, `--caution` | The [[pages#callouts\|callout]] colours |
+| `--note`, `--tip`, `--important`, `--warning`, `--caution` | The [[pages#callouts|callout]] colours |
 
-You can still write any CSS you like after that: the variables are just the easy part.
+Any other CSS may follow; the variables are just the easy part. Change a colour
+through its variable rather than by restyling elements, and everything that
+uses it — links, callouts, the navigation — changes together.
 
 ## Dark mode
 
-The site follows each reader's light or dark setting. To adjust your theme for dark mode, set its variables again inside a media query:
+The site follows each reader's light or dark setting. Set your variables again
+inside a media query:
 
 ```css
 @media (prefers-color-scheme: dark) {
@@ -55,72 +60,43 @@ The site follows each reader's light or dark setting. To adjust your theme for d
 }
 ```
 
-## Themes cascade
+## One page that has to look different
 
-A page gets the `-theme.css` of the top folder, then of each folder down to its own. A theme set at the top applies everywhere, and a folder can refine it:
+Put `css:` in its front matter and that stylesheet is linked after the others,
+for that page alone:
 
-```
-pages/
-├── -theme.css        ← every page
-├── index.md
-└── blog/
-    ├── -theme.css    ← pages in blog/, after the one above
-    └── first-post.md
+```markdown
+title: The poster
+css: poster
 ```
 
-> [!TIP]
-> The top folder's file reaches every page, so put the site's look there and
-> let each folder's file say only what differs. A folder's file doesn't have
-> to undo the one above it — it just overrides the variables it cares about.
+[[/blog/one-page-that-looks-different|This page]] does it. The name is a plain
+word — no slashes, no extension — so a page can't reach out of `static/`, and a
+name with no file links nothing rather than breaking the page.
 
-This site does exactly that, and you can read both files. `pages/-theme.css`
-sets the look for everything. `pages/blog/-theme.css` is read after it, only
-for pages in [the blog](/blog/), and says just what's different there: a
-warmer accent and a narrower column, for prose rather than documentation.
-Neither file names the other; the only thing deciding the order is which
-folder each one is in.
+## A whole kind of page
 
-## Example
+When a *kind* of page wants its own shape, give it a template. Copy
+`templates/site.html`, change what you need, link whatever stylesheets that
+kind should have, and name it from the pages' front matter:
 
-This is `pages/-theme.css`, which styles the page you're reading:
-
-```css
-:root {
-  --accent: #147c99;
-  --font-heading: Georgia, "Times New Roman", serif;
-  --duck: var(--accent); /* the logo: see the Images guide */
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --accent: #5cc1dc;
-  }
-}
+```markdown
+title: My first post
+layout: post
 ```
 
-## One page that shouldn't follow its folder
+[[/blog/a-post-with-its-own-layout|This post]] uses `templates/post.html`,
+which drops the site navigation and adds the date at the foot. See
+[[pages#a-pages-own-layout|A page's own layout]].
 
-A theme belongs to a folder, so it's the wrong tool for a single page. That's
-what `css:` is for: `css: poster` in a page's front matter links
-`/static/poster.css` after the themes, so it can override the same variables
-for that page alone. See [[/blog/one-page-that-looks-different|the poster
-page]].
+## In the editor
 
-## Where to find it in the editor
+**Resources** in the header has both: *css* lists the stylesheets in `static/`,
+*templates* lists `templates/`. Pick one and it opens in a pane below the page
+you're reading, so the page changes as you type — a stylesheet restyles the
+preview straight away, and a template re-renders the page through your unsaved
+copy.
 
-In the tree on the left, at the foot of the folder it themes — which is the
-whole point of it. A theme isn't a page and doesn't open like one, so it's
-listed quietly, below the pages, and opens in the pane *underneath* the page
-you're reading rather than replacing it. Where it sits is what it says: this
-folder, and everything under it.
-
-Every folder without one offers to make one, from the button in the tree's
-header. Stylesheets and templates are a different thing — they belong to no
-folder, and they're in **Resources**.
-
-## Live preview
-
-Edit a theme with a page open and the preview restyles that page as you type,
-your unsaved copy winning over the saved one. With no page open, the theme
-takes the column to itself and the preview shows sample content — headings,
-links, code, a table and a callout — styled by what you're typing.
+With no page open, either takes the column to itself: a stylesheet previews on
+sample content, a template on a sample page. That's how you write one from
+nothing.

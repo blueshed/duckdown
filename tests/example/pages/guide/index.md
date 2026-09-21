@@ -30,8 +30,8 @@ You'll see three columns:
 
 | Column | What's in it |
 |--------|--------------|
-| **Left** | Your content: folders and pages, and at the foot of each folder the `-theme.css` that styles it |
-| **Middle** | Whatever you have open. A page; underneath it, a theme, stylesheet or template you're composing with; or just one of those, filling the column |
+| **Left** | Your content: the folders and pages of your site |
+| **Middle** | Whatever you have open. A page; underneath it, a stylesheet or template you're composing with; or just one of those, filling the column |
 | **Right** | What you'd see — the page as the site will render it, or, with no page open, a sample page for whatever you're editing |
 
 **Resources**, in the header, is the other half of the left column: the images,
@@ -45,5 +45,5 @@ Edit the markdown, then press **⌘⏎** (or click **Save**). The preview update
 ## Next steps
 
 - [Writing Pages](/guide/pages.html) — learn about markdown and front-matter
-- [Themes](/guide/themes.html) — style your site
+- [Styling](/guide/themes.html) — templates and stylesheets
 - [Images](/guide/images.html) — add images to your pages

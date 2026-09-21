@@ -11,7 +11,7 @@ Write markdown, see it live, publish your site.
 
 - [Get Started](/guide/) — your first page in 2 minutes
 - [Writing Pages](/guide/pages.html) — markdown, front-matter, and folders
-- [Themes](/guide/themes.html) — make it your own
+- [Styling](/guide/themes.html) — make it your own
 - [Images](/guide/images.html) — upload and embed
 
 [Login to edit](/login)

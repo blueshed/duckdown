@@ -253,17 +253,11 @@ describe("markdown preview", () => {
     expect(data.layout).toBe("site.html");
   });
 
-  test("renders where the page lives: its wiki links, and its whole theme cascade", async () => {
-    const guideTheme = join(SITE, "pages", "guide", "-theme.css");
-    writeFileSync(guideTheme, "/* guide theme */");
-    try {
-      const data = await (await mark("See [[themes]].", "guide/new.md")).json();
-      expect(data.html).toContain('<a class="wikilink" href="/guide/themes.html">themes</a>');
-      expect(data.html).toContain("--accent: #147c99");   // the root theme
-      expect(data.html).toContain("/* guide theme */");
-    } finally {
-      rmSync(guideTheme);
-    }
+  test("renders where the page lives: its wiki links, and the template's stylesheets", async () => {
+    const data = await (await mark("See [[themes]].", "guide/new.md")).json();
+    expect(data.html).toContain('<a class="wikilink" href="/guide/themes.html">themes</a>');
+    expect(data.html).toContain('<link href="/static/site.css" rel="stylesheet">');
+    expect(data.html).toContain(`<link href="/static/theme.css" rel="stylesheet">`);
   });
 
   test("parses front-matter, and the template it names picks the layout", async () => {
@@ -381,23 +375,18 @@ describe("site rendering", () => {
     expect(html).toContain("<title>duckdown</title>");
     expect(html).toContain('<a href="/" aria-current="page">Home</a>');
     expect(html).toContain('<a href="/guide/">Guide</a>');
-    expect(html).toContain("--accent: #147c99");   // the root theme, styling every page
-    expect(html).toContain("/* Wobbling duck */");
+    // The site's look is an ordinary stylesheet the template links, so it is
+    // cached once rather than inlined into every page.
+    expect(html).toContain(`<link href="/static/theme.css" rel="stylesheet">`);
+    expect(html).not.toContain("<style>");
   });
 
-  test("marks the section in the nav, and cascades themes down folders", async () => {
-    const guideTheme = join(SITE, "pages", "guide", "-theme.css");
-    writeFileSync(guideTheme, "/* guide theme */");
-    try {
-      const guide = await (await fetch(`${BASE}/guide/index.html`)).text();
-      expect(guide).toContain('<a href="/guide/" aria-current="page">Guide</a>');
-      const page = await (await fetch(`${BASE}/guide/pages.html`)).text();
-      expect(page).toContain('<a href="/guide/" aria-current="true">Guide</a>');
-      expect(page).toContain('<a href="/">Home</a>');
-      expect(page).toMatch(/<style>[\s\S]*--accent: #147c99[\s\S]*\/\* guide theme \*\/<\/style>/);
-    } finally {
-      rmSync(guideTheme);
-    }
+  test("marks the page in the nav, and the section it is in", async () => {
+    const guide = await (await fetch(`${BASE}/guide/index.html`)).text();
+    expect(guide).toContain('<a href="/guide/" aria-current="page">Guide</a>');
+    const page = await (await fetch(`${BASE}/guide/pages.html`)).text();
+    expect(page).toContain('<a href="/guide/" aria-current="true">Guide</a>');
+    expect(page).toContain('<a href="/">Home</a>');
   });
 
   test("publishes contents lists, callouts and wiki links (the Writing Pages guide uses them all)", async () => {

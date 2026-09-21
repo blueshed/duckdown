@@ -1,6 +1,6 @@
 import { TEMPLATES_PATH } from "./config";
 import { createPageStorage, createStorage } from "./storage";
-import { renderMarkdown, loadThemeCss, folderOf } from "./markdown";
+import { renderMarkdown, folderOf } from "./markdown";
 import { siteNav, markCurrent, folderListing } from "./nav";
 import { escapeHtml, outsideCode, canonicalPath, dateHtml } from "./utils";
 
@@ -73,7 +73,6 @@ export type PageOptions = {
 export async function pageHtml(page: Page, o: PageOptions): Promise<{ html: string; layout: string }> {
   const { file, meta } = page;
   const nav = markCurrent(await siteNav(pages), file);
-  const themeCss = await loadThemeCss(pages, file);
   const description = meta.description?.[0] ?? "";
 
   // {{pages}} in a page lists the pages beside it (a blog index writes itself),
@@ -97,15 +96,13 @@ export async function pageHtml(page: Page, o: PageOptions): Promise<{ html: stri
       ? `<meta name="description" content="${escapeHtml(description)}">\n  <meta property="og:description" content="${escapeHtml(description)}">`
       : ""],
     ["nav", () => nav ? `<nav><ul class="nav">${nav}</ul></nav>` : ""],
-    // Every -theme.css from the site root down to this page's folder, in that
-    // order, then a stylesheet the page asked for by name: `css: print` links
-    // /static/print.css after them, so one page can look however it likes
-    // without a folder or a template of its own. Guarded like `layout`, so a
-    // page can't reach out of static/.
-    ["theme_css", () => {
+    // A stylesheet this page asked for by name: `css: poster` links
+    // /static/poster.css after whatever the template links, so one page can
+    // look however it likes without a template of its own. Guarded like
+    // `layout`, so a page can't reach out of static/.
+    ["css", () => {
       const sheet = meta.css?.[0] ?? "";
-      return (themeCss ? `<style>${themeCss}</style>` : "")
-        + (plainName(sheet) ? `\n  <link rel="stylesheet" href="/static/${sheet}.css">` : "");
+      return plainName(sheet) ? `<link rel="stylesheet" href="/static/${sheet}.css">` : "";
     }],
     ["edit", () => o.editHref ? `<a class="user-edit" href="${escapeHtml(o.editHref)}">Edit this page</a>` : ""],
     // Last, so a placeholder written in a page's own text is never filled in.

@@ -1,6 +1,6 @@
 ---
 name: duckdown
-description: Write and organise the content of a Duckdown site — markdown pages and their front matter (title, theme, nav, toc), callouts, [[wiki links]], folders and the navigation, themes built on CSS variables, images, the site template, and who can sign in. Use this whenever the user wants to add, edit, move or restyle pages on a duckdown site, write a post or a guide, change how the site looks, get something into the navigation, put images on a page, or add an editor — even when they don't say "duckdown", if the files live in a duckdown content folder (pages/, static/, templates/, users.json). Not for changing duckdown's own server or editor code.
+description: Write and organise the content of a Duckdown site — markdown pages and their front matter (title, nav, toc, layout, css), callouts, [[wiki links]], folders and the navigation, styling through CSS variables, images, templates, and who can sign in. Use this whenever the user wants to add, edit, move or restyle pages on a duckdown site, write a post or a guide, change how the site looks, get something into the navigation, put images on a page, or add an editor — even when they don't say "duckdown", if the files live in a duckdown content folder (pages/, static/, templates/, users.json). Not for changing duckdown's own server or editor code.
 license: MIT
 metadata:
   author: blueshed
@@ -21,9 +21,9 @@ It's the folder `DUCKDOWN_PATH` names in `.env`:
 
 ```
 pages/        the site: every .md is a page, every folder can have an index.md
-              a folder's -theme.css styles that folder and everything under it
-static/       served as-is at /static/ — site.css, images/, favicon.ico
-templates/    site.html wraps every page; layout: picks another
+static/       served as-is at /static/ — site.css, theme.css, images/, favicon.ico
+templates/    site.html wraps every page and links the stylesheets;
+              layout: picks another
 users.json    who can sign in (password hashes)
 ```
 
@@ -46,16 +46,16 @@ users.json    who can sign in (password hashes)
 
 ## What catches people out
 
-- **A plain block of front matter may only use the keys duckdown reads** — `title`, `theme`, `nav`, `toc`, `layout`, `css`, `description`, `date`, `draft`, or an `x-…` of your own. For any other key, fence it with `---` … `---`. (That's why prose starting "Update: closed Monday" keeps its first line.)
+- **A plain block of front matter may only use the keys duckdown reads** — `title`, `nav`, `toc`, `layout`, `css`, `description`, `date`, `draft`, or an `x-…` of your own. For any other key, fence it with `---` … `---`. (That's why prose starting "Update: closed Monday" keeps its first line.)
 - **Only a folder's `index.md` is in the navigation**, labelled by its `nav:` (else its `title:`). To put "About" in the nav, write `pages/about/index.md`, not `pages/about.md`. Folders starting with `-` or `.` stay out of it, though their pages are still served. Drafts stay out too.
-- **Styling follows the folder, not the page**: a `-theme.css` in a `pages/` folder styles that folder and everything under it, and there is nothing to write on the pages themselves — that is the point, because a post written later can't forget a line. They cascade: the top folder's reaches every page, then each folder's down to the page's own, so set site.css's variables (`:root { --accent: … }`) and let a folder's file say only what differs. This site does it: `pages/-theme.css` and `pages/blog/-theme.css`. For a single page that must look different, `css: poster` links `/static/poster.css` after them.
+- **Styling is templates and stylesheets, nothing else.** `templates/site.html` links `static/site.css` (duckdown's base, drawn from variables) and `static/theme.css` (this site's look, which only says what differs — `:root { --accent: … }`). To restyle the site, edit `theme.css`. For one page, `css: poster` links `/static/poster.css` after them. For a *kind* of page, give it a template with `layout:` and let that template link what it needs.
 - **In development (`DEBUG=1`) the navigation is rebuilt on every request**, so a folder's `index.md` written straight to disk shows up at once. In production it's cached and rebuilt when a page is saved or deleted through the editor, so files put there another way need a restart (`bun run stop`, then start again).
 - **`users.json` holds password hashes**, never passwords: a plain one won't sign in. Make a hash with `bun -e 'console.log(await Bun.password.hash("their-password"))'`.
 
 ## Check your work
 
-Open the page on the running site (`bun run dev`, then http://localhost:8080), or in the editor, whose preview goes through the same renderer the site does — the same template, navigation, stylesheet and theme cascade (though it runs no scripts).
+Open the page on the running site (`bun run dev`, then http://localhost:8080), or in the editor, whose preview goes through the same renderer the site does — the same template, navigation and stylesheets (though it runs no scripts).
 
 ## Everything else
 
-Read [reference.md](reference.md) for the details; it opens with a contents list. It covers front matter keys, the markdown syntax (callouts, wiki links, contents lists, raw HTML), how the navigation is built, themes and every CSS variable (with dark mode), the template's placeholders, static files and images, users, the editor, and troubleshooting.
+Read [reference.md](reference.md) for the details; it opens with a contents list. It covers front matter keys, the markdown syntax (callouts, wiki links, contents lists, raw HTML), how the navigation is built, styling and every CSS variable (with dark mode), the template's placeholders, static files and images, users, the editor, and troubleshooting.

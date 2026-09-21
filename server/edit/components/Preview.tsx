@@ -4,7 +4,7 @@ import { editorContent, filePath, pageLayout, resource, resourceDraft } from "..
 import { PreviewFrame } from "./PreviewFrame";
 
 // The server renders the whole document, the way the site will: the page's
-// markdown inside its template, with the nav, the theme cascade and the rest
+// markdown inside its template, with the nav, its stylesheets and the rest
 // filled in. `layout` says which template it used.
 type Rendered = { html: string; layout: string };
 

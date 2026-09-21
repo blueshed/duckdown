@@ -5,7 +5,7 @@
 3. [Front matter](#front-matter)
 4. [Markdown](#markdown) — headings and contents lists, callouts, wiki links, images, raw HTML
 5. [Navigation](#navigation)
-6. [Themes and the stylesheet](#themes-and-the-stylesheet) — the variables, dark mode, the cascade
+6. [Styling](#styling) — the variables, dark mode, one page, a kind of page
 7. [The site template](#the-site-template)
 8. [Static files and images](#static-files-and-images)
 9. [Users](#users)
@@ -26,18 +26,17 @@
 <content folder>/
 ├── pages/
 │   ├── index.md          /              (also /index.html)
-│   ├── -theme.css        theme rules for every page
 │   ├── about.md          /about.html    (and /about)
 │   └── blog/
 │       ├── index.md      /blog/          — in the nav
-│       ├── -theme.css    theme rules for blog pages, after the root's
 │       └── first-post.md /blog/first-post.html
 ├── static/
-│   ├── site.css          the stylesheet every page loads
+│   ├── site.css          duckdown's base, drawn from CSS variables
+│   ├── theme.css         this site's own look, linked after it
 │   ├── favicon.ico
 │   └── images/
 ├── templates/
-│   └── site.html         wraps every page
+│   └── site.html         wraps every page and links the stylesheets
 └── users.json            who can sign in
 ```
 
@@ -134,7 +133,7 @@ Markdown images take the width of the text at most; use HTML to size one.
   display: block;
   width: min(320px, 100%);
   aspect-ratio: 1;
-  background: var(--duck, currentColor);        /* a theme can set --duck */
+  background: var(--duck, currentColor);        /* theme.css can set --duck */
   -webkit-mask: url(/static/images/logo.svg) center / contain no-repeat;
   mask: url(/static/images/logo.svg) center / contain no-repeat;
 }
@@ -174,7 +173,7 @@ The template receives it as:
 </ul></nav>
 ```
 
-## Themes and the stylesheet
+## Styling
 
 ### The stylesheet
 
@@ -194,12 +193,18 @@ The template receives it as:
 
 It follows each reader's light or dark setting (`prefers-color-scheme`), with its own dark values for the colours.
 
-### A theme
+### The site's look
 
-Put a `-theme.css` in a `pages/` folder and it styles that folder and every
-folder under it. Nothing goes on the pages — they don't opt in and can't
-forget to. In the editor it's the theme button in the tree's header, which
-makes one for the folder you're browsing.
+`templates/site.html` links two stylesheets:
+
+```html
+<link href="/static/site.css" rel="stylesheet">
+<link href="/static/theme.css" rel="stylesheet">
+```
+
+`site.css` is duckdown's base. `static/theme.css` is the site's own, read
+second, so it only has to say what differs. Nothing goes on the pages — every
+page has both because the template links both.
 
 ```css
 :root {
@@ -217,15 +222,22 @@ makes one for the folder you're browsing.
 
 Any other CSS may follow; setting variables is just the easy, reliable part. Change a colour through its variable rather than by restyling elements, so everything that uses it — links, callouts, the navigation — changes together.
 
-### The cascade
+### One page, and one kind of page
 
-A page gets the `-theme.css` of the top of `pages/`, then of each folder down to its own, in that order, inlined in a `<style>` after `site.css`. The top folder's file reaches every page, so put the site's look there and let a folder's file say only what differs — it overrides the variables it cares about and leaves the rest. Nothing has to be undone.
+`css: poster` in a page's front matter links `/static/poster.css` after the
+template's own, for that page alone. The name is a plain word, so a page can't
+reach out of `static/`, and a name with no file links nothing rather than
+breaking the page.
+
+For a *kind* of page, give it a template: `layout: post` wraps it in
+`templates/post.html`, and that template links whatever that kind needs. Then
+no page has to remember anything beyond its `layout:`.
 
 ### Hooks for extra CSS
 
 `ul.nav` and `a[aria-current]` (navigation) · `nav.toc`, `.toc-h2`, `.toc-h3` (contents list) · `.callout.note` … `.callout.caution` and `.callout-title` · `a.wikilink` · `h2 > a` (a heading's self-link).
 
-In the editor, a `-theme.css` opens from the tree, at the foot of the folder it themes, in a pane below whatever page you're reading — so the page restyles as you type. With no page open it previews on sample content: navigation, headings, a link, code, a callout, a table.
+In the editor, a stylesheet opens from **Resources → css** in a pane below whatever page you're reading, so the page restyles as you type. With no page open it previews on sample content: navigation, headings, a link, code, a callout, a table.
 
 ## The site template
 
@@ -238,7 +250,7 @@ In the editor, a `-theme.css` opens from the tree, at the foot of the folder it 
 | `{{url}}` | The page's one canonical address — use it as `<link rel="canonical" href="{{url}}">` |
 | `{{date}}` | The page's `date` as a `<time>`, written out (`21 September 2026`), or nothing |
 | `{{nav}}` | The navigation (above), or nothing |
-| `{{theme_css}}` | `<style>` with the page's theme cascade, or nothing |
+| `{{css}}` | `<link>` for the page's `css:`, or nothing |
 | `{{edit}}` | An "Edit this page" link to the editor — only for whoever is signed in |
 | `{{content}}` | The page's rendered markdown |
 
@@ -252,7 +264,7 @@ A page's `layout:` chooses the template (`layout: post` → `templates/post.html
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{{title}}</title>
   <link href="/static/site.css" rel="stylesheet">
-  {{theme_css}}
+  {{css}}
 </head>
 <body>
   {{nav}}
@@ -286,16 +298,16 @@ A page's `layout:` chooses the template (`layout: post` → `templates/post.html
 ## The editor
 
 - At `/edit`. Signing in lands there; `/login` when already signed in goes straight there; the home page's "Login to edit" link does the same.
-- **The tree** (left): the site's folders and pages; click to open, `..` to go up. At the foot of each folder, quietly, its `-theme.css` — not a page, and it opens as a resource (below), but listed here because *which folder it's in is what it means*: that folder and everything under it. Three buttons in the header make a **new page**, a **new folder** (`folder/index.md`, titled with the folder's name) and, where the folder hasn't one, a **new theme**. None ever overwrites — each says when a name is taken.
+- **The tree** (left): the site's folders and pages, and nothing else — everything a page is composed with lives outside `pages/`. Click to open, `..` to go up. Two buttons in the header make a **new page** and a **new folder** (`folder/index.md`, titled with the folder's name). Neither ever overwrites — each says when a name is taken.
 - **Editing** (middle): Save or ⌘⏎. The button lights up while there are unsaved changes, flashes green for "Saved", and red for "Not saved" (the notice says why). The bin deletes the page, after asking.
 - **Resources** (right sidebar, from the header): what a page is composed with, in three tabs.
   - *images* — browse and upload, and copy a markdown link for one.
   - *css* — the stylesheets in `static/`, the ones a page names with `css:`. Themes aren't here: they belong to a folder, and the tree is where the folders are.
   - *templates* — the files in `templates/`, and a button for a new one.
-- **Editing a resource** (a theme from the tree, or a stylesheet or template from the sidebar): it opens in a pane *below* the page, with the same header — name, unsaved dot, delete, Save, and a close button. The page stays where it is, so you can click through pages and watch one stylesheet against each. It's transient: closing the pane leaves nothing behind.
-- **The middle column holds whatever is open**, and each pane closes, the page included. Two split it; one fills it. With no page open, a theme, stylesheet or template has the column to itself — which is how you write one from scratch.
-- **Preview** (right): what you'd see. With a page open, the page as the site will show it, rendered by the same code — its own template, the navigation, the `{{pages}}` listing, the theme cascade, wiki links resolved from the page's folder — sandboxed, so no scripts run. A template open in the pane below is used in place of the saved one when it's the one this page wears, so you watch the page change as you write it; a stylesheet goes straight into the preview's head as you type, after the saved one, so it wins.
-- **With no page open**, whatever you're composing with gets a sample page of its own: for a stylesheet or a theme, a bit of everything `site.css` styles; for a template, a sample page put through it, with the site's real navigation and theme cascade. So a template or a stylesheet can be written with nothing else on screen.
+- **Editing a resource** (a stylesheet or a template, from the sidebar): it opens in a pane *below* the page, with the same header — name, unsaved dot, delete, Save, and a close button. The page stays where it is, so you can click through pages and watch one stylesheet against each. It's transient: closing the pane leaves nothing behind.
+- **The middle column holds whatever is open**, and each pane closes, the page included. Two split it; one fills it. With no page open, a stylesheet or template has the column to itself — which is how you write one from scratch.
+- **Preview** (right): what you'd see. With a page open, the page as the site will show it, rendered by the same code — its own template and the stylesheets it links, the navigation, the `{{pages}}` listing, wiki links resolved from the page's folder — sandboxed, so no scripts run. A template open in the pane below is used in place of the saved one when it's the one this page wears, so you watch the page change as you write it; a stylesheet goes straight into the preview's head as you type, after the saved one, so it wins.
+- **With no page open**, whatever you're composing with gets a sample page of its own: for a stylesheet, a bit of everything `site.css` styles; for a template, a sample page put through it, with the site's real navigation. So a template or a stylesheet can be written with nothing else on screen.
 - **Header**: *Resources* (the sidebar), *View* (the page on the site), *Logout*.
 - **Deleting always asks first**, wherever it is — a stylesheet or a template is as easy to lose as a page, and there's no undo behind any of them.
 - Anything that fails shows in a red notice at the foot of the screen until dismissed.
@@ -307,8 +319,8 @@ A page's `layout:` chooses the template (`layout: post` → `templates/post.html
 | A page isn't in the navigation | Not a folder's `index.md`; no `nav`/`title`; its folder starts with `-`; or, in production only, written to disk after the nav was built (save a page in the editor, or restart) |
 | A line like `author: Peter` shows up in the page | It isn't a key duckdown reads: fence the block with `---` to keep it as metadata |
 | A page is "not found" although the file is there | `draft: true` — sign in to the editor to read it, or take the line out to publish |
-| A theme doesn't apply | The `-theme.css` isn't in the page's folder or one above it; or its rules are nested under a selector nothing matches (write `:root { … }`, not `body.name { … }` — pages carry no class) |
-| An SVG ignores the theme's colours | It's shown with `<img>` or `![…]`, which CSS can't reach into: use it as a mask (above) |
+| A stylesheet doesn't apply | The template doesn't link it (check `templates/site.html`), or a page's `css:` names a file that isn't in `static/` |
+| An SVG ignores the stylesheet's colours | It's shown with `<img>` or `![…]`, which CSS can't reach into: use it as a mask (above) |
 | An SVG shows nothing at all | It isn't valid XML — check with `xmllint --noout file.svg`; a `--` inside a comment is the usual culprit |
 | A folder's page isn't found | Give the folder an `index.md`: `/blog` is served by `pages/blog/index.md` |
 | A `[[wiki link]]` goes to the wrong place | It's relative to the page's folder: start it with `/` to go from the top |
@@ -317,12 +329,11 @@ A page's `layout:` chooses the template (`layout: post` → `templates/post.html
 
 ## Three sizes of override
 
-Only two of the three are a line on the page.
+Two, both naming a file you wrote.
 
 | | changes | good for |
 |---|---|---|
-| a `-theme.css` in a folder | a few CSS variables, for that folder and everything under it | a section that reads differently |
-| `css: name` | links `/static/name.css` after the themes | one page that has to look unusual |
+| `css: name` | links `/static/name.css` after the template's own | one page that has to look unusual |
 | `layout: name` | the whole page shape — `templates/name.html` | posts, landing pages, print |
 
 A layout's name must be a plain word, so a page can't reach out of `templates/`,

@@ -14,6 +14,7 @@ describe("bun create setup", () => {
       mkdirSync(join(root, dir), { recursive: true });
     }
     writeFileSync(join(root, "tests", "example", "static", "site.css"), ":root { --accent: red; }");
+    writeFileSync(join(root, "tests", "example", "static", "theme.css"), "/* this site's own look */");
     writeFileSync(join(root, "tests", "example", "templates", "site.html"), "<body>{{content}}</body>");
     writeFileSync(join(root, ".claude", "skills", "duckdown", "SKILL.md"), "the authoring skill");
     writeFileSync(join(root, ".claude", "skills", "railroad", "SKILL.md"), "for working on duckdown itself");
@@ -36,6 +37,7 @@ describe("bun create setup", () => {
     expect(readFileSync(join(root, "site", "pages", "index.md"), "utf8")).toStartWith("title: my-site\n\n# Welcome to my-site");
     expect(readFileSync(join(root, "site", "templates", "site.html"), "utf8")).toBe("<body>{{content}}</body>"); // the seed's
     expect(readFileSync(join(root, "site", "static", "site.css"), "utf8")).toBe(":root { --accent: red; }"); // the seed's
+    expect(readFileSync(join(root, "site", "static", "theme.css"), "utf8")).toBe("/* this site's own look */");
     const users = JSON.parse(readFileSync(join(root, "site", "users.json"), "utf8"));
     expect(await Bun.password.verify("admin", users.admin)).toBe(true);
     expect(readFileSync(join(root, ".env"), "utf8")).toStartWith("DUCKDOWN_PATH=./site\n");

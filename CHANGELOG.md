@@ -2,6 +2,35 @@
 
 ## Unreleased
 
+### Styling is templates and stylesheets
+
+`-theme.css` is gone, and with it the last thing about styling a duckdown site
+that had to be learned rather than guessed. A magic filename, in a magic place,
+with cascade semantics you couldn't see from the file itself — and in practice
+it was only ever a site's stylesheet wearing a costume. On blueshed.co.uk it
+was 5KB of `header.site`, `h1`, `p.standfirst` inlined into every page's HTML,
+uncacheable, because living in `pages/` left duckdown nowhere to link it from.
+
+What replaces it is what people expect, and all of it already existed:
+
+- **the site** — `static/theme.css`, linked by `templates/site.html` after
+  `static/site.css`. Cached once instead of re-sent with every page.
+- **one page** — `css: poster` in its front matter, unchanged.
+- **a kind of page** — `layout: post`, and that template links what it needs.
+
+`{{theme_css}}` is now `{{css}}` and emits only the page's `css:` link, since
+there is no cascade left to inline. `loadThemeCss` is gone.
+
+**Upgrading**, in your content folder:
+
+- **Move each `-theme.css` into `static/`** — the root one as `theme.css`; any
+  in subfolders become either part of it, or their own stylesheet named by the
+  template of the pages that want it.
+- **Link it from the template**: `<link href="/static/theme.css" rel="stylesheet">`
+  after `site.css`.
+- **Replace `{{theme_css}}` with `{{css}}`.** Left as it is, it publishes the
+  literal text.
+
 ### `theme:` is gone — styling follows the folder
 
 A `-theme.css` already reached every page in its folder and everything under

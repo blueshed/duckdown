@@ -24,10 +24,10 @@ Login at [http://localhost:8080/login](http://localhost:8080/login) with `admin`
 ## Features
 
 - Markdown editor whose preview is the page: the same renderer the site uses,
-  so it has your template, your navigation and your theme cascade in it
+  so it has your template, your navigation and your stylesheets in it
 - Front-matter metadata (title, nav, toc, layout, css, description, date, draft)
 - Contents lists, callouts (`> [!NOTE]`) and `[[wiki links]]` between pages
-- Themes in a few CSS variables — a file in a folder styles that folder and everything under it, with nothing to write on the pages — cascading, with dark mode
+- Styling in a few CSS variables: `static/theme.css`, linked by the template, with dark mode
 - **Templates and stylesheets are editable in the browser too**, in a pane
   below the page, so you watch the page change as you write them
 - Image browser with upload
@@ -42,12 +42,11 @@ Login at [http://localhost:8080/login](http://localhost:8080/login) with `admin`
 
 Three columns at `/edit`:
 
-- **Left — your content.** Folders and pages, and at the foot of each folder
-  the `-theme.css` that styles it. Where a theme sits is what it means: that
-  folder, and everything under it.
-- **Middle — whatever you have open.** A page; underneath it a theme,
-  stylesheet or template you're composing with; or just one of those, filling
-  the column. Each closes, and the space goes back to what's left.
+- **Left — your content.** The folders and pages of your site, and nothing
+  else: everything a page is composed with lives outside `pages/`.
+- **Middle — whatever you have open.** A page; underneath it a stylesheet or
+  template you're composing with; or just one of those, filling the column.
+  Each closes, and the space goes back to what's left.
 - **Right — what you'd see.** The page as the site will render it. With no
   page open, a sample page for whatever you're editing, so a template or a
   stylesheet can be written from nothing.
