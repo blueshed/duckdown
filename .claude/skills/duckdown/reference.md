@@ -10,7 +10,8 @@
 8. [Static files and images](#static-files-and-images)
 9. [Users](#users)
 10. [The editor](#the-editor)
-11. [Troubleshooting](#troubleshooting)
+11. [Publishing](#publishing)
+12. [Troubleshooting](#troubleshooting)
 
 ## The content folder
 
@@ -312,6 +313,39 @@ A page's `layout:` chooses the template (`layout: post` → `templates/post.html
 - **Deleting always asks first**, wherever it is — a stylesheet or a template is as easy to lose as a page, and there's no undo behind any of them.
 - Anything that fails shows in a red notice at the foot of the screen until dismissed.
 
+## Publishing
+
+duckdown deploys two ways. Which one a site is decides whether an edit is live
+the moment it's saved, so it's worth knowing before telling anyone a change is
+done.
+
+|  | **served** | **published** |
+|---|---|---|
+| What runs | duckdown | any static host |
+| Where the site is | a folder or an S3 bucket | the files `bun run export` writes |
+| Editing | at `/edit`, from any browser | locally, then deploy the output |
+| A save is live | at once | once it's exported and deployed |
+| Needs | `COOKIE_SECRET`, a password, `users.json` | nothing: no login to guard |
+
+```sh
+DUCKDOWN_ORIGIN=https://example.com bun run export     # into ./dist
+```
+
+- Every page at its one canonical address: `/` and `/blog/` as `index.html`,
+  `about.md` as `about.html`. Nothing written twice.
+- `static/` copied alongside, bytes and all.
+- Drafts left out rather than hidden — there's no login to hide them behind.
+- `{{edit}}` empty, and `{{url}}` from `DUCKDOWN_ORIGIN`, because there's no
+  request to take an origin from. Without it the canonical links are relative.
+- `dist/` is cleared first, so a page deleted since the last export doesn't
+  survive in the output.
+- It reads through the storage layer, so it will export a live bucket as
+  readily as a folder — a served site can be snapshotted without moving its
+  content first.
+
+Where the output goes is the site's own business, not duckdown's: look for a
+`DEPLOY.md`. Don't invent a deployment step that isn't written down.
+
 ## Troubleshooting
 
 | Symptom | Likely cause |
@@ -326,6 +360,7 @@ A page's `layout:` chooses the template (`layout: post` → `templates/post.html
 | A `[[wiki link]]` goes to the wrong place | It's relative to the page's folder: start it with `/` to go from the top |
 | Nobody can sign in | `users.json` needs hashes, not passwords; or it's missing (see the server log) |
 | Edits don't show on the running site (duckdown repo) | The site runs from `.dev-site`, not the seed `tests/example` |
+| Edits don't show on the deployed site | It's a published site: the markdown changed, the files it serves didn't. Export and deploy (see its `DEPLOY.md`) |
 
 ## Three sizes of override
 
