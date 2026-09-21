@@ -1,7 +1,7 @@
 import type { Storage } from "./storage";
 import { DEBUG } from "./config";
 import { buildNav, parseFrontMatter, yes } from "./markdown";
-import { escapeHtml, canonicalPath } from "./utils";
+import { escapeHtml, canonicalPath, dateHtml } from "./utils";
 
 // What the site knows about itself: its nav, and each folder's list of pages.
 // Both are built once and kept until a page changes — in production every
@@ -39,8 +39,6 @@ export function pagesChanged(): void {
   listings.clear();
 }
 
-const when = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric" });
-
 // The folder's pages, newest first by date:, then by title. Its own index,
 // drafts, and anything starting with - are left out.
 async function buildListing(pages: Storage, folder: string): Promise<string> {
@@ -62,10 +60,7 @@ async function buildListing(pages: Storage, folder: string): Promise<string> {
   entries.sort((a, b) => b.date.localeCompare(a.date) || a.title.localeCompare(b.title));
 
   const items = entries.map((entry) => {
-    const day = new Date(entry.date);
-    const date = entry.date
-      ? `<time datetime="${escapeHtml(entry.date)}">${isNaN(day.getTime()) ? escapeHtml(entry.date) : when.format(day)}</time>`
-      : "";
+    const date = dateHtml(entry.date);
     const description = entry.description ? `<p>${escapeHtml(entry.description)}</p>` : "";
     return `<li><a href="${entry.href}">${escapeHtml(entry.title)}</a>${date}${description}</li>`;
   });

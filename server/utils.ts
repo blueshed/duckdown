@@ -30,3 +30,13 @@ export function canonicalPath(key: string): string {
   if (file.endsWith("/index")) return `/${file.slice(0, -"/index".length)}/`;
   return `/${file}.html`;
 }
+
+const day = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric" });
+
+// A date: as a <time>, written the way a reader expects. A date nobody can
+// parse is shown as it was written rather than as "Invalid Date".
+export function dateHtml(date: string): string {
+  if (!date) return "";
+  const on = new Date(date);
+  return `<time datetime="${escapeHtml(date)}">${isNaN(on.getTime()) ? escapeHtml(date) : day.format(on)}</time>`;
+}

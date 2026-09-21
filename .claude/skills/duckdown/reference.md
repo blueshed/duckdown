@@ -235,6 +235,8 @@ In the editor, opening a `-theme.css` previews it on sample content — navigati
 | `{{title}}` | The page's `title`, else `duckie` |
 | `{{theme}}` | The page's `theme`, else nothing — use it as `<body class="{{theme}}">` |
 | `{{description}}` | The page's `description` as `<meta name="description">` and `og:description`, or nothing |
+| `{{url}}` | The page's one canonical address — use it as `<link rel="canonical" href="{{url}}">` |
+| `{{date}}` | The page's `date` as a `<time>`, written out (`21 September 2026`), or nothing |
 | `{{nav}}` | The navigation (above), or nothing |
 | `{{theme_css}}` | `<style>` with the page's theme cascade, or nothing |
 | `{{edit}}` | An "Edit this page" link to the editor — only for whoever is signed in |
@@ -305,3 +307,19 @@ A page's `layout:` chooses the template (`layout: post` → `templates/post.html
 | A `[[wiki link]]` goes to the wrong place | It's relative to the page's folder: start it with `/` to go from the top |
 | Nobody can sign in | `users.json` needs hashes, not passwords; or it's missing (see the server log) |
 | Edits don't show on the running site (duckdown repo) | The site runs from `.dev-site`, not the seed `tests/example` |
+
+
+## Three sizes of override
+
+| | changes | good for |
+|---|---|---|
+| `theme: name` | a few CSS variables, via `-theme.css` on `body.name` | a section that reads differently |
+| `css: name` | links `/static/name.css` after the theme | one page that has to look unusual |
+| `layout: name` | the whole page shape — `templates/name.html` | posts, landing pages, print |
+
+A layout's name must be a plain word, so a page can't reach out of `templates/`,
+and a name with no file falls back to `site.html` rather than failing. The seed
+site ships `templates/post.html` and one post that uses it.
+
+A placeholder may be used more than once: a title belongs in `<title>` and
+again in `og:title`, and both are filled.

@@ -179,6 +179,27 @@ nav: Blog
 
 That's a blog index that writes itself: drafts stay out, and a new post appears the moment you save it.
 
+## A page's own layout
+
+`layout: post` wraps a page in `templates/post.html` instead of the usual
+`templates/site.html`. [[/blog/a-post-with-its-own-layout|This post]] does it,
+and you can see what it bought: no site navigation, a way back to the blog, and
+the date at the foot.
+
+A layout is any file in `templates/`, named by a plain word — so a page can't
+reach out of that folder — and a name with no file falls back to `site.html`
+rather than failing.
+
+Reach for a layout when a *kind* of page wants a different shape. For one page
+that only wants to look different, `css: print` links `/static/print.css` after
+the theme, and a `theme:` changes the variables. Three sizes of override:
+
+| | changes | good for |
+|---|---|---|
+| `theme:` | a few CSS variables | a section that reads differently |
+| `css:` | one extra stylesheet | one page that has to look unusual |
+| `layout:` | the whole page shape | posts, landing pages, print |
+
 ## Drafts
 
 `draft: true` keeps a page to yourself. It's left out of the navigation and out of listings, and anyone visiting it gets "not found" — except you, while you're signed in to the editor, so you can read it in place before publishing.

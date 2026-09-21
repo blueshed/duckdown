@@ -457,11 +457,13 @@ describe("folders, the edit link, layouts, drafts and listings", () => {
   });
 
   test("layout: picks a template; anything else falls back to site.html", async () => {
-    const post = join(SITE, "templates", "post.html");
-    writeFileSync(post, '<!DOCTYPE html><html><head><title>{{title}}</title></head><body class="post">{{content}}</body></html>');
+    // Its own name: the seed ships templates/post.html now, and this test
+    // removes what it makes.
+    const trial = join(SITE, "templates", "trial.html");
+    writeFileSync(trial, '<!DOCTYPE html><html><head><title>{{title}}</title></head><body class="trial">{{content}}</body></html>');
     try {
-      await put("laid-out.md", "title: Laid out\nlayout: post\n\n# Laid out");
-      expect(await (await fetch(`${BASE}/laid-out.html`)).text()).toContain('<body class="post">');
+      await put("laid-out.md", "title: Laid out\nlayout: trial\n\n# Laid out");
+      expect(await (await fetch(`${BASE}/laid-out.html`)).text()).toContain('<body class="trial">');
 
       await put("laid-out.md", "title: Laid out\nlayout: ../../etc/passwd\n\n# Laid out"); // not a plain name
       expect(await (await fetch(`${BASE}/laid-out.html`)).text()).toContain('<ul class="nav">');
@@ -469,7 +471,7 @@ describe("folders, the edit link, layouts, drafts and listings", () => {
       await put("laid-out.md", "title: Laid out\nlayout: missing\n\n# Laid out"); // no such template
       expect(await (await fetch(`${BASE}/laid-out.html`)).text()).toContain('<ul class="nav">');
     } finally {
-      rmSync(post);
+      rmSync(trial);
     }
   });
 
@@ -542,9 +544,12 @@ describe("folders, the edit link, layouts, drafts and listings", () => {
 
 describe("editing the site's other folders", () => {
   test("templates and static are listed, read, written and deleted", async () => {
+    // Names the seed doesn't use: this test deletes what it writes, and the
+    // scratch site is shared, so taking templates/post.html would remove the
+    // layout another test depends on.
     for (const [section, name, body] of [
-      ["templates", "post.html", "<html><body>{{content}}</body></html>"],
-      ["static", "print.css", "body { color: black }"],
+      ["templates", "scratch-layout.html", "<html><body>{{content}}</body></html>"],
+      ["static", "scratch.css", "body { color: black }"],
     ] as const) {
       const at = `${BASE}/edit/${section}/${name}`;
       expect((await fetch(at, authed({ method: "PUT", body }))).status).toBe(200);
@@ -595,6 +600,21 @@ describe("one page, one canonical address", () => {
     const nav = (await (await fetch(`${BASE}/`)).text()).match(/<nav><ul class="nav">[\s\S]*?<\/ul><\/nav>/)![0];
     expect(nav).toContain('href="/guide/"');
     expect(nav).not.toContain("index.html");
+  });
+});
+
+describe("layout: a page's own template", () => {
+  test("the seed's post uses post.html: no nav, a way back, and its date", async () => {
+    const html = await (await fetch(`${BASE}/blog/a-post-with-its-own-layout.html`)).text();
+    expect(html).toContain('<a href="/blog/">← all posts</a>');
+    expect(html).toContain('<time datetime="2026-09-21">21 September 2026</time>');
+    expect(html).not.toContain('<ul class="nav">'); // a post is arrived at, not browsed from
+  });
+
+  test("other pages still get site.html, which has the nav", async () => {
+    const html = await (await fetch(`${BASE}/blog/`)).text();
+    expect(html).toContain('<ul class="nav">');
+    expect(html).not.toContain("all posts");
   });
 });
 

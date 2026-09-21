@@ -3,7 +3,7 @@ import { createPageStorage, createStorage } from "../storage";
 import { renderMarkdown, loadThemeCss, folderOf, yes } from "../markdown";
 import { siteNav, markCurrent, folderListing } from "../nav";
 import { getUser } from "../auth";
-import { escapeHtml, outsideCode, canonicalPath } from "../utils";
+import { escapeHtml, outsideCode, canonicalPath, dateHtml } from "../utils";
 import { logView } from "../log";
 
 const site = createStorage();
@@ -90,6 +90,7 @@ const renderPage = async (req: Request) => {
     ["title", () => escapeHtml(meta.title?.[0] || "duckie")],
     ["theme", () => escapeHtml(meta.theme?.[0] || "")],
     ["url", () => escapeHtml(siteOrigin(req) + canonicalPath(key))],
+    ["date", () => dateHtml(meta.date?.[0] ?? "")],
     ["description", () => description
       ? `<meta name="description" content="${escapeHtml(description)}">\n  <meta property="og:description" content="${escapeHtml(description)}">`
       : ""],
