@@ -1,6 +1,7 @@
 import type { Storage } from "./storage";
 import { DEBUG } from "./config";
 import { escapeHtml } from "./utils";
+import { type Images, DEFAULT_IMAGES, ownImages, imageUrl, thumbName } from "./images";
 
 // A collection is a folder of pages duckdown writes for you: `collection.json`
 // beside a folder's index.md lists groups of items, and each item becomes a
@@ -18,13 +19,6 @@ import { escapeHtml } from "./utils";
 // Every key duckdown itself reads. Anything else on an item is one of its
 // fields, addressable as {{item-<field>}} and groupable with {{items by=…}}.
 const RESERVED = ["aliases"];
-
-export type Images = {
-  src: string;        // base for the original
-  thumb: string;      // base for the thumbnail (the same, unless said)
-  suffix: string;     // "_tn": Battersea.jpg → Battersea_tn.jpg
-  extension: string;  // ".png" when every thumbnail is a png, whatever the original is
-};
 
 export type Group = {
   name: string;
@@ -64,8 +58,6 @@ export const COLLECTION_FILE = "collection.json";
 
 // Where a folder's collection is written, as a key under pages/.
 export const collectionPath = (folder: string) => `${folder ? `${folder}/` : ""}${COLLECTION_FILE}`;
-
-const DEFAULT_IMAGES: Images = { src: "/static/images/", thumb: "", suffix: "_tn", extension: "" };
 
 // --- Slugs -------------------------------------------------------------
 
@@ -110,11 +102,11 @@ const text = (value: unknown): string | null =>
   typeof value === "string" ? value : typeof value === "number" ? String(value) : null;
 
 function images(raw: unknown, problems: string[]): Images {
-  if (raw === undefined) return { ...DEFAULT_IMAGES, thumb: DEFAULT_IMAGES.src };
+  if (raw === undefined) return ownImages();
   const said = typeof raw === "string" ? { src: raw } : raw as Raw;
   if (typeof said !== "object" || said === null || Array.isArray(said)) {
     problems.push(`"images" should be a base URL or an object, not ${JSON.stringify(raw)} — the default is used`);
-    return { ...DEFAULT_IMAGES, thumb: DEFAULT_IMAGES.src };
+    return ownImages();
   }
   const src = text(said.src) ?? DEFAULT_IMAGES.src;
   return {
@@ -123,21 +115,6 @@ function images(raw: unknown, problems: string[]): Images {
     suffix: text(said.suffix) ?? DEFAULT_IMAGES.suffix,
     extension: text(said.extension) ?? DEFAULT_IMAGES.extension,
   };
-}
-
-// base + name, each part of the name escaped as a URL path is: a file called
-// "Large Car Painting.jpeg" is fetched as Large%20Car%20Painting.jpeg.
-function imageUrl(base: string, name: string): string {
-  if (!name) return "";
-  return (base.endsWith("/") || base === "" ? base : `${base}/`) + encodeURI(name);
-}
-
-// The thumbnail's name: the suffix goes before the extension, and a collection
-// whose thumbnails are all png says so once rather than per item.
-export function thumbName(src: string, images: Images): string {
-  const cut = src.lastIndexOf(".");
-  const dot = cut > src.lastIndexOf("/") ? cut : src.length;
-  return src.slice(0, dot) + images.suffix + (images.extension || src.slice(dot));
 }
 
 function asArray(value: unknown): Raw[] {

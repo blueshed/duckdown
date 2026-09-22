@@ -362,6 +362,113 @@ describe("image thumbnails", () => {
   });
 });
 
+// The one thing the collection pane can't do through the folders the editor
+// already has: put a picture where a collection says its pictures live, and
+// write the thumbnail beside it. The folders here start with a dot, so the
+// site's own walks — nav, search, export — never see the test's collections.
+describe("a collection's pictures", () => {
+  const PNG = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+    "base64",
+  );
+
+  // Written through the pages route, which is what drops the collection cache.
+  const collectionAt = async (folder: string, body: unknown) => {
+    const res = await fetch(`${BASE}/edit/pages/${folder}/collection.json`,
+      authed({ method: "PUT", body: JSON.stringify(body) }));
+    expect(res.status).toBe(200);
+  };
+
+  const send = (folder: string, file: Blob, as: string, name?: string) => {
+    const form = new FormData();
+    form.set("file", file, as);
+    if (name !== undefined) form.set("name", name);
+    return fetch(`${BASE}/edit/collection/${folder}`, authed({ method: "POST", body: form }));
+  };
+
+  const picture = (...parts: string[]) => join(SITE, "static", "images", ...parts);
+
+  test("tells the pane where the pictures are and what is wrong with the file", async () => {
+    const res = await fetch(`${BASE}/edit/collection/gallery`, authed());
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.images.src).toBe("/static/images/gallery/");
+    expect(data.images.thumb).toBe("/static/images/gallery/"); // said once, meant for both
+    expect(data.uploads).toBe(true);
+    expect(data.problems).toEqual([]);
+  });
+
+  test("a folder with no collection.json says so, trailing slash or not", async () => {
+    expect((await fetch(`${BASE}/edit/collection/blog`, authed())).status).toBe(404);
+    const res = await fetch(`${BASE}/edit/collection/blog/`, authed({ method: "POST", body: new FormData() }));
+    expect(res.status).toBe(404);
+    expect(await res.text()).toBe("There is no blog/collection.json");
+  });
+
+  test("signed out, it answers neither", async () => {
+    expect((await fetch(`${BASE}/edit/collection/gallery`)).status).toBe(401);
+    expect((await fetch(`${BASE}/edit/collection/gallery`, { method: "POST", body: new FormData() })).status).toBe(401);
+  });
+
+  test("writes the original and a 128px thumbnail beside it, and answers with both", async () => {
+    await collectionAt(".pics", { images: "/static/images/.pics/", groups: [] });
+    const res = await send(".pics", new Blob([PNG], { type: "image/png" }), "A Work.png");
+    expect(res.status).toBe(200);
+    const up = await res.json();
+    expect(up.name).toBe("A Work.png");
+    expect(up.src).toBe("/static/images/.pics/A%20Work.png");
+    expect(up.thumb).toBe("/static/images/.pics/A%20Work_tn.png");
+    expect(up.v).toMatch(/^[a-z0-9]+$/);           // what ?v= is set to
+    expect(existsSync(picture(".pics", "A Work.png"))).toBe(true);
+    expect(readFileSync(picture(".pics", "A Work_tn.png")).subarray(1, 4).toString()).toBe("PNG");
+  });
+
+  test("a picture swapped in place is written under the name it is given", async () => {
+    const res = await send(".pics", new Blob([PNG], { type: "image/png" }), "whatever.png", "A Work.png");
+    expect((await res.json()).name).toBe("A Work.png");
+    expect(existsSync(picture(".pics", "whatever.png"))).toBe(false);
+  });
+
+  test("the thumbnail is in the format its own name asks for", async () => {
+    await collectionAt(".webp", { images: { src: "/static/images/.webp/", extension: ".webp" }, groups: [] });
+    expect((await send(".webp", new Blob([PNG]), "w.png")).status).toBe(200);
+    expect(readFileSync(picture(".webp", "w_tn.webp")).subarray(8, 12).toString()).toBe("WEBP");
+
+    await collectionAt(".jpg", { images: { src: "/static/images/.jpg/", extension: ".jpeg" }, groups: [] });
+    expect((await send(".jpg", new Blob([PNG]), "j.png")).status).toBe(200);
+    expect(readFileSync(picture(".jpg", "j_tn.jpeg")).subarray(0, 2).toString("hex")).toBe("ffd8");
+  });
+
+  test("an svg is its own thumbnail: Bun.Image decodes raster formats only", async () => {
+    await collectionAt(".svg", { images: "/static/images/.svg/", groups: [] });
+    expect((await send(".svg", new Blob(["<svg/>"], { type: "image/svg+xml" }), "v.svg")).status).toBe(200);
+    expect(readFileSync(picture(".svg", "v_tn.svg"), "utf8")).toBe("<svg/>");
+  });
+
+  test("a file that isn't a picture is said, not thrown", async () => {
+    const res = await send(".pics", new Blob(["not an image"]), "notes.png");
+    expect(res.status).toBe(422);
+    expect(await res.text()).toContain("Couldn't read notes.png as a picture");
+  });
+
+  test("nothing sent, and a name that is all path, are both refused", async () => {
+    expect((await fetch(`${BASE}/edit/collection/.pics`, authed({ method: "POST", body: new FormData() }))).status).toBe(400);
+    const res = await send(".pics", new Blob([PNG]), "a.png", "/");
+    expect(res.status).toBe(400);
+    expect(await res.text()).toBe("That picture has no name");
+  });
+
+  test("a collection whose pictures live elsewhere can't be uploaded to, and says where they are", async () => {
+    await collectionAt(".away", { images: "https://pictures.example.com/works/", groups: [] });
+    const info = await (await fetch(`${BASE}/edit/collection/.away`, authed())).json();
+    expect(info.uploads).toBe(false);
+
+    const res = await send(".away", new Blob([PNG]), "a.png");
+    expect(res.status).toBe(409);
+    expect(await res.text()).toContain("https://pictures.example.com/works/");
+  });
+});
+
 // --- Public routes (no auth needed) ---
 
 describe("health", () => {

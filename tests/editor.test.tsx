@@ -10,6 +10,7 @@ import {
   loadFile, createFile, saveFile, deleteFile, closeFile, reloadBrowser, toggleImages, closeImages,
   resource, resourceDraft, resourceSaved, resourceDirty, pageLayout, pageIncludes, openResource, closeResource,
   saveResource, deleteResource, createResource,
+  collection, openCollection, closeCollection,
 } from "../server/edit/store";
 import { Icon } from "../server/edit/components/Icon";
 import { Notice } from "../server/edit/components/Notice";
@@ -23,6 +24,7 @@ import { Header } from "../server/edit/components/Header";
 import { ImageBrowser } from "../server/edit/components/ImageBrowser";
 import { ResourceList } from "../server/edit/components/ResourceList";
 import { ResourcePane } from "../server/edit/components/ResourcePane";
+import { CollectionPane } from "../server/edit/components/CollectionPane";
 
 // --- Harness ---
 
@@ -899,6 +901,362 @@ describe("ImageBrowser", () => {
   });
 });
 
+// --- The collection pane ---
+//
+// Its collection lives in a folder whose name starts with a dot, so the site's
+// own walks — the nav, the search index, the export — never meet what these
+// tests write, and the pane can be pulled about without breaking a page.
+
+describe("CollectionPane", () => {
+  // One folder per test: the pane writes as you change it, and a write still
+  // in the air when a test ends must not land on the next test's file.
+  let FOLDER = "";
+  let made = 0;
+  const fresh = () => { FOLDER = `.pane${++made}`; return FOLDER; };
+  const FILE = () => `/edit/pages/${FOLDER}/collection.json`;
+
+  const seed = () => ({
+    layout: "item",
+    images: { src: `/static/images/${FOLDER}/`, suffix: "_tn" },
+    groups: [
+      {
+        name: "paintings",
+        label: "Paintings",
+        items: [
+          { src: "one.svg", title: "First", caption: "First caption", year: "1961" },
+          { src: "two.svg", title: "Second", caption: "" },
+        ],
+        groups: [{ name: "studies", items: [{ src: "three.svg", title: "Study" }] }],
+      },
+      { name: "prints", items: [{ src: "four.svg", title: "Print" }] },
+    ],
+  });
+
+  const write = (body: unknown) =>
+    fetch(FILE(), { method: "PUT", body: typeof body === "string" ? body : JSON.stringify(body) });
+  const stored = async () => JSON.parse(await (await fetch(FILE())).text());
+
+  // The pane writes as you change it, so a test waits for the file to say so.
+  async function storedWhen(check: (file: any) => boolean): Promise<any> {
+    const start = Date.now();
+    for (;;) {
+      const file = await stored();
+      if (check(file)) return file;
+      if (Date.now() - start > 2000) throw new Error(`the file never said so: ${JSON.stringify(file)}`);
+      await settle(10);
+    }
+  }
+
+  const edit = (el: Element, value: string) => {
+    (el as HTMLInputElement).value = value;
+    el.dispatchEvent(new Event("change"));
+  };
+  const values = (host: ParentNode, selector: string) =>
+    [...host.querySelectorAll(selector)].map((el) => (el as HTMLInputElement).value);
+  const titles = (host: ParentNode) => values(host, ".item-title");
+  const names = (host: ParentNode) => values(host, ".group-name");
+  const tool = (row: Element, label: string) => row.querySelector(`[aria-label="${label}"]`)!;
+  const items = (host: ParentNode) => [...host.querySelectorAll(".collection-item")];
+
+  // A drag or a drop, as the pane sees one: happy-dom has no DragEvent, and
+  // the pane deliberately keeps what is being dragged in a signal rather than
+  // in dataTransfer, so this is the whole of it.
+  const fire = (el: Element, type: string, dataTransfer?: unknown) => {
+    const event = new Event(type, { bubbles: true, cancelable: true });
+    Object.assign(event, { dataTransfer });
+    el.dispatchEvent(event);
+  };
+  const choose = (input: Element, file: File) => {
+    Object.defineProperty(input, "files", { value: [file], configurable: true });
+    input.dispatchEvent(new Event("change"));
+  };
+  const picture = (name: string) => new File(["<svg/>"], name, { type: "image/svg+xml" });
+
+  async function open() {
+    fresh();
+    await write(seed());
+    openCollection(FOLDER);
+    const { host, dispose } = render(() => <CollectionPane />);
+    await waitFor(() => host.querySelectorAll(".collection-item").length === 4);
+    return { host, dispose: () => { dispose(); closeCollection(); } };
+  }
+
+  test("shows the groups and works of a collection, and edits a title and a caption in place", async () => {
+    const { host, dispose } = await open();
+    // A group is shown by its label when it has one, and by its name when it
+    // hasn't — exactly what the site shows.
+    expect(names(host)).toEqual(["Paintings", "studies", "prints"]);
+    expect(titles(host)).toEqual(["First", "Second", "Study", "Print"]);
+    expect(host.querySelector(".pane-header .pane-name")!.textContent).toBe(`${FOLDER}/collection.json`);
+    expect(items(host)[0]!.querySelector("img")!.getAttribute("src"))
+      .toBe(`/static/images/${FOLDER}/one_tn.svg`);
+    expect(items(host)[0]!.querySelector(".item-src")!.textContent).toBe("one.svg");
+
+    edit(host.querySelector(".item-title")!, "First Light");
+    const file = await storedWhen((f) => f.groups[0].items[0].title === "First Light");
+    expect(file.groups[0].items[0].year).toBe("1961");     // a field the pane doesn't show is kept
+    expect(file.layout).toBe("item");                      // and so is everything around the groups
+
+    edit(host.querySelector(".item-caption")!, "Ink on paper");
+    await storedWhen((f) => f.groups[0].items[0].caption === "Ink on paper");
+    dispose();
+  });
+
+  test("moves a work up and down, and a group with it", async () => {
+    const { host, dispose } = await open();
+    click(tool(items(host)[1]!, "Move up"));
+    await storedWhen((f) => f.groups[0].items[0].title === "Second");
+    await waitFor(() => titles(host)[0] === "Second");
+
+    click(tool(items(host)[0]!, "Move down"));
+    await storedWhen((f) => f.groups[0].items[0].title === "First");
+
+    // The ends hold: the first can't go up and the last can't go down.
+    click(tool(items(host)[0]!, "Move up"));
+    click(tool(items(host)[3]!, "Move down"));
+    await settle(60);
+    expect(titles(host)).toEqual(["First", "Second", "Study", "Print"]);
+
+    const group = host.querySelectorAll(".collection-group")[0]!;
+    click(tool(group, "Move group down"));
+    await storedWhen((f) => f.groups[0].name === "prints");
+    await waitFor(() => names(host)[0] === "prints");
+    click(host.querySelectorAll(".collection-group")[1]!.querySelector('[aria-label="Move group up"]')!);
+    await storedWhen((f) => f.groups[0].name === "paintings");
+    dispose();
+  });
+
+  test("moves a work by dragging it, inside its group and into another", async () => {
+    const { host, dispose } = await open();
+    const row = (i: number) => items(host)[i]!;
+
+    fire(row(1), "dragstart", { setData: () => {} });
+    fire(row(0), "dragover");
+    fire(row(0), "drop");
+    await storedWhen((f) => f.groups[0].items[0].title === "Second");
+
+    // Into the group below: the work leaves one and joins the other.
+    fire(row(0), "dragstart");
+    fire(row(3), "drop");
+    await storedWhen((f) => f.groups[1].items.length === 2);
+    expect((await stored()).groups[0].items).toHaveLength(1);
+
+    // A drop with nothing being dragged is not a move.
+    fire(row(0), "dragend");
+    fire(row(0), "drop");
+    await settle(60);
+    expect((await stored()).groups[1].items).toHaveLength(2);
+    dispose();
+  });
+
+  test("adds, renames and removes a group, and asks before it removes one", async () => {
+    const { host, dispose } = await open();
+    click(button(host, "Add group")!);
+    await storedWhen((f) => f.groups.length === 3);
+    await waitFor(() => names(host).length === 4);
+    expect(names(host)[3]).toBe("New group");
+
+    edit(host.querySelectorAll(".group-name")[3]!, "Drawings");
+    await storedWhen((f) => f.groups[2].name === "Drawings");
+
+    // A subgroup, under the group it belongs to.
+    click(tool(host.querySelectorAll(".collection-group")[3]!, "Add subgroup"));
+    await storedWhen((f) => f.groups[2].groups?.length === 1);
+
+    // Removing asks first, and says there is no undo.
+    click(tool(host.querySelectorAll(".collection-group")[3]!, "Remove group"));
+    await waitFor(() => host.querySelector("dialog")?.open);
+    expect(host.querySelector("dialog h3")!.textContent).toBe("Remove Drawings and its items?");
+    expect(host.querySelector("dialog p")!.textContent).toContain("no undo");
+    click(button(host.querySelector("dialog")!, "Cancel")!);
+    expect(host.querySelector("dialog")).toBeNull();
+    expect((await stored()).groups).toHaveLength(3);
+
+    click(tool(host.querySelectorAll(".collection-group")[3]!, "Remove group"));
+    await waitFor(() => host.querySelector("dialog")?.open);
+    click(button(host.querySelector("dialog")!, "Remove")!);
+    await storedWhen((f) => f.groups.length === 2);
+    dispose();
+  });
+
+  test("removes a work, once asked", async () => {
+    const { host, dispose } = await open();
+    click(tool(items(host)[3]!, "Remove item"));
+    await waitFor(() => host.querySelector("dialog")?.open);
+    expect(host.querySelector("dialog h3")!.textContent).toBe("Remove Print?");
+    click(button(host.querySelector("dialog")!, "Remove")!);
+    await storedWhen((f) => f.groups[1].items.length === 0);
+    dispose();
+  });
+
+  test("adds a work by choosing a picture, and by dropping one", async () => {
+    const { host, dispose } = await open();
+    const drop = host.querySelectorAll(".item-drop")[0]!;
+
+    // Nothing chosen is nothing done.
+    choose(drop.querySelector("input")!, undefined as unknown as File);
+    await settle(30);
+    expect(titles(host)).toHaveLength(4);
+
+    click(drop);  // opens the chooser; the choosing is the next line
+    choose(drop.querySelector("input")!, picture("Fifth Work.svg"));
+    await storedWhen((f) => f.groups[0].items.length === 3);
+    const added = (await stored()).groups[0].items[2];
+    expect(added).toEqual({ src: "Fifth Work.svg", title: "Fifth Work", caption: "" });
+    await waitFor(() => titles(host).includes("Fifth Work"));
+    // The picture and its thumbnail are both where the collection says.
+    expect((await fetch(`/static/images/${FOLDER}/Fifth%20Work.svg`)).status).toBe(200);
+    expect((await fetch(`/static/images/${FOLDER}/Fifth%20Work_tn.svg`)).status).toBe(200);
+
+    fire(drop, "dragover");
+    fire(drop, "drop", { files: [picture("Sixth.svg")] });
+    await storedWhen((f) => f.groups[0].items.length === 4);
+    dispose();
+  });
+
+  test("swaps a work's picture in place, under the same name, and busts the cache", async () => {
+    const { host, dispose } = await open();
+    const thumb = items(host)[0]!.querySelector(".item-thumb")!;
+    const was = items(host)[0]!.querySelector("img")!.getAttribute("src");
+
+    click(thumb);   // the picture is the control: clicking it opens the chooser
+    thumb.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }));
+    thumb.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab" }));  // not a way in
+    choose(thumb.querySelector("input")!, picture("ignored.svg"));
+    await waitFor(() => items(host)[0]!.querySelector("img")!.getAttribute("src") !== was);
+    expect(items(host)[0]!.querySelector("img")!.getAttribute("src"))
+      .toMatch(new RegExp(`^/static/images/${FOLDER}/one_tn\\.svg\\?v=`));
+    // The file itself is untouched: the work keeps its address.
+    expect((await stored()).groups[0].items[0].src).toBe("one.svg");
+
+    fire(thumb, "dragover");
+    fire(thumb, "drop", { files: [picture("also-ignored.svg")] });
+    await settle(60);
+    expect((await stored()).groups[0].items[0].src).toBe("one.svg");
+    dispose();
+  });
+
+  test("an item with no picture says so rather than writing one under no name", async () => {
+    await write({ images: { src: `/static/images/${fresh()}/` }, groups: [{ name: "odd", items: [{ title: "No picture" }] }] });
+    openCollection(FOLDER);
+    const { host, dispose } = render(() => <CollectionPane />);
+    await waitFor(() => host.querySelector(".collection-item"));
+    expect(host.querySelector(".item-thumb img")!.getAttribute("src")).toBe("");
+
+    choose(host.querySelector(".item-thumb input")!, picture("nowhere.svg"));
+    await waitFor(() => notice.get());
+    expect(notice.get()).toBe("That item has no picture to replace — its src is empty.");
+    dispose();
+    closeCollection();
+  });
+
+  test("a collection whose pictures live elsewhere says so, and offers no way to add one", async () => {
+    fresh();
+    await write({ images: "https://pictures.example.com/", groups: [{ name: "away", items: [{ src: "a.jpg", title: "Away" }] }] });
+    openCollection(FOLDER);
+    const { host, dispose } = render(() => <CollectionPane />);
+    await waitFor(() => host.querySelector(".pane-note"));
+    expect(host.querySelector(".pane-note")!.textContent).toContain("can't write");
+    expect(host.querySelector(".item-drop")).toBeNull();
+    expect(host.querySelector(".item-thumb img")!.getAttribute("src")).toBe("https://pictures.example.com/a_tn.jpg");
+    dispose();
+    closeCollection();
+  });
+
+  test("a collection.json the pane can't read is said, not shown as an empty collection", async () => {
+    fresh();
+    await write("{ groups: oops");
+    openCollection(FOLDER);
+    const { host, dispose } = render(() => <CollectionPane />);
+    await waitFor(() => notice.get().includes("can't be read"));
+    expect(notice.get()).toContain(`${FOLDER}/collection.json can't be read`);
+    expect(host.querySelector(".placeholder")!.textContent).toContain("edit it as a file");
+    expect(host.querySelector(".collection-group")).toBeNull();
+    dispose();
+    closeCollection();
+
+    // JSON, but not a collection: a list of groups where the file goes.
+    await write([{ name: "loose" }]);
+    openCollection(FOLDER);
+    const second = render(() => <CollectionPane />);
+    await waitFor(() => notice.get().includes("isn't an object"));
+    second.dispose();
+    closeCollection();
+  });
+
+  test("a write that fails leaves the pane unsaved and speaks; Save tries again", async () => {
+    const { host, dispose } = await open();
+    const save = button(host, "Save")!;
+    const restore = intercept(() => new Response("read-only", { status: 403 }));
+    try {
+      edit(host.querySelector(".item-title")!, "Nope");
+      await waitFor(() => notice.get());
+      expect(notice.get()).toBe(`Couldn't save ${FOLDER}/collection.json: 403 read-only`);
+      await waitFor(() => host.querySelector(".pane-header .dot") !== null);
+    } finally {
+      restore();
+    }
+    click(save);
+    await waitFor(() => save.textContent!.includes("Saved"));
+    await storedWhen((f) => f.groups[0].items[0].title === "Nope");
+    dispose();
+  });
+
+  test("the pane follows the folder, and deletes the file it has open", async () => {
+    const { host, dispose } = await open();
+    // Another collection, opened while this one is up: when() doesn't rebuild
+    // a pane that is already showing, so the pane itself has to follow.
+    openCollection("gallery");
+    await waitFor(() => titles(host).includes("First Light"));
+    expect(host.querySelector(".pane-header .pane-name")!.textContent).toBe("gallery/collection.json");
+    openCollection(FOLDER);
+    await waitFor(() => host.querySelector(".pane-header .pane-name")!.textContent === `${FOLDER}/collection.json`);
+
+    click(host.querySelector(`[aria-label="Delete ${FOLDER}/collection.json"]`)!);
+    await waitFor(() => host.querySelector("dialog")?.open);
+    click(button(host.querySelector("dialog")!, "Delete")!);
+    await waitFor(() => collection.get() === null);
+    expect((await fetch(FILE())).status).toBe(404);
+    dispose();
+  });
+
+  test("a collection is offered when its folder's page is opened, and the tree opens one directly", async () => {
+    fresh();
+    await write(seed());
+    await fetch(`/edit/pages/${FOLDER}/index.md`, { method: "PUT", body: "title: Pane\n\n{{items}}" });
+
+    await loadFile(`${FOLDER}/index.md`);
+    expect(collection.get()).toEqual({ folder: FOLDER });
+
+    // A page in another folder takes it away: the pane belongs to the folder.
+    await loadFile("index.md");
+    expect(collection.get()).toBeNull();
+
+    // With something else already in that slot, the offer stands down.
+    await openResource({ section: "static", path: "poster.css" });
+    await loadFile(`${FOLDER}/index.md`);
+    expect(collection.get()).toBeNull();
+    closeResource();
+
+    // Opening a resource closes the collection: one thing below the page.
+    openCollection(FOLDER);
+    await openResource({ section: "static", path: "poster.css" });
+    expect(collection.get()).toBeNull();
+    closeResource();
+
+    // And the file itself is in the tree, opening as a pane rather than as JSON.
+    const { host, dispose } = render(() => <Browser />);
+    await waitFor(() => rows(host).includes("gallery"));
+    click(row(host, "gallery"));
+    await waitFor(() => rows(host).includes("collection.json"));
+    click(row(host, "collection.json"));
+    expect(collection.get()).toEqual({ folder: "gallery" });
+    expect(filePath.get()).toBe(`${FOLDER}/index.md`);   // the page in the middle stayed put
+    closeCollection();
+    dispose();
+  });
+});
+
 // --- app.tsx (last: it mounts for good) ---
 
 describe("the app", () => {
@@ -950,6 +1308,18 @@ describe("the app", () => {
     await waitFor(() => previewFrame()?.srcdoc.includes("A sample page"));
     expect(previewFrame()!.srcdoc).toContain("all posts");     // post.html's own chrome
     expect(previewFrame()!.srcdoc).toContain("21 September 2026"); // and its {{date}}, from the sample
+    closeResource();
+
+    // A collection takes the same slot as a resource — one thing below the
+    // page — and with no page open there is nothing to render it against.
+    openCollection("gallery");
+    await waitFor(() => app.querySelector(".column-middle .panel-collection") !== null);
+    expect(app.querySelector(".panel-collection .pane-name")!.textContent).toBe("gallery/collection.json");
+    await waitFor(() => app.querySelector(".panel-preview .placeholder") !== null);
+    expect(app.querySelector(".panel-preview .placeholder")!.textContent)
+      .toBe("open the folder's page to see the collection");
+    await openResource({ section: "templates", path: "post.html" });
+    expect(app.querySelector(".panel-collection")).toBeNull();
     closeResource();
 
     window.dispatchEvent(new ErrorEvent("error", { message: "kaboom" }));

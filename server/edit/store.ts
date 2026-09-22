@@ -28,8 +28,49 @@ export const pageLayout = signal("");
 export const pageIncludes = signal<string[]>([]);
 export const resourceDirty = computed(() => resourceDraft.get() !== resourceSaved.get());
 
+// A folder's collection.json, open in the same slot a resource uses: both are
+// the one thing below the page, and two of them in a column leaves no room for
+// either. The signal carries an object, not the folder's name, because the
+// site root's collection lives in a folder called "" and when() swaps on
+// truthiness.
+export const COLLECTION_FILE = "collection.json";
+export const collection = signal<{ folder: string } | null>(null);
+// Bumped when the pane writes collection.json: the preview renders the
+// overview from it, and nothing else it tracks has changed.
+export const collectionRevision = signal(0);
+
 const at = (path: string) => `/edit/pages/${urlPath(path)}`;
 const resourceUrl = (r: Resource) => `/edit/${r.section}/${urlPath(r.path)}`;
+const folderOf = (key: string) => (key.includes("/") ? key.slice(0, key.lastIndexOf("/")) : "");
+export const collectionKey = (folder: string) => `${folder ? `${folder}/` : ""}${COLLECTION_FILE}`;
+
+export function openCollection(folder: string): void {
+  batch(() => {
+    collection.set({ folder });
+    closeResource();      // the slot holds one thing
+    showImages.set(false);
+  });
+}
+
+export function closeCollection(): void {
+  collection.set(null);
+}
+
+export function collectionChanged(): void {
+  collectionRevision.update((n) => n + 1);
+}
+
+// A folder's index page is its collection's overview, so opening one offers
+// the collection beneath it — unless you already have something open there,
+// which you were presumably looking at on purpose. A page in another folder
+// takes the pane away: it belongs to the folder, not to the session.
+async function offerCollection(fp: string): Promise<void> {
+  const folder = folderOf(fp);
+  if (collection.peek() && collection.peek()!.folder !== folder) closeCollection();
+  if (!fp.endsWith("index.md") || resource.peek() || collection.peek()) return;
+  const res = await api(`look for ${collectionKey(folder)}`, at(collectionKey(folder)), undefined, [404]);
+  if (res.ok) openCollection(folder);
+}
 
 // Transient: a resource is open for as long as you are working on it, and the
 // page in the middle stays put, so you can click through pages and watch a
@@ -42,6 +83,7 @@ export async function openResource(next: Resource): Promise<boolean> {
     resource.set(next);
     resourceSaved.set(body);
     resourceDraft.set(body);
+    collection.set(null);  // the slot below the page holds one thing
     showImages.set(false); // the sidebar was the chooser; it gets out of the way
   });
   return true;
@@ -139,6 +181,7 @@ export async function loadFile(path: string): Promise<boolean> {
     fileContent.set(content);
     editorContent.set(content);
   });
+  await offerCollection(fp);
   return true;
 }
 

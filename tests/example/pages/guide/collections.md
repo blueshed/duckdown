@@ -167,6 +167,41 @@ place they came from. A value with spaces in it is turned into a slug for the
 `{{title}}`, `{{description}}`, `{{url}}`, `{{nav}}` and the rest are there as
 on any page: an item is a page.
 
+## Editing one in the editor
+
+You don't have to write the JSON. In the editor, `collection.json` is in the
+tree beside the folder's pages, with a grid icon; and opening a folder's index
+page brings its collection up beneath it by itself, so you edit the works and
+watch the overview redraw next to them.
+
+- **Titles and captions** are edited where they sit. Everything else on an item
+  — a year, a `slug`, its `aliases` — is left exactly as it was.
+- **Order**: drag a work by its picture, inside its group or into another one,
+  or use the up and down arrows. Groups move with theirs.
+- **Groups**: add one, add a subgroup inside one, rename it, remove it.
+- **A picture**: drop one on a group, or click *Drop a picture here* to choose
+  it. Duckdown puts the original where this collection's `images` says its
+  pictures live, writes a 128px thumbnail beside it under the collection's own
+  naming rule, and adds the work — then give it a title and a caption.
+- **Replacing a picture**: drop a new one on the work's own picture. It is
+  written under the same file name, so the work keeps its address and
+  everything that links to it goes on working.
+
+Every change writes the whole file, which is what drops the caches, so the
+preview and the site follow at once.
+
+> [!WARNING]
+> There is no undo in duckdown. Removing a work or a group asks first, and that
+> is the whole of the safety net. On S3, turn the bucket's versioning on; on
+> disk, keep the site in git.
+
+Two things the pane can't do for you. A collection whose pictures live off the
+site — a bucket, a CDN — says so and offers no way to add one: the editor can
+only write this site's own `static/images/`, so name the item and put the file
+where it belongs yourself. And renaming a work changes its address, because
+the slug comes from the title; if anything links to the old one, add it to the
+item's `aliases`.
+
 ## Old addresses
 
 Moving a gallery onto duckdown changes every address. `aliases` keeps the old

@@ -6,9 +6,10 @@ import { Preview } from "./components/Preview";
 import { CssPreview } from "./components/CssPreview";
 import { ImageBrowser } from "./components/ImageBrowser";
 import { ResourcePane } from "./components/ResourcePane";
+import { CollectionPane } from "./components/CollectionPane";
 import { TemplatePreview } from "./components/TemplatePreview";
 import { Notice } from "./components/Notice";
-import { filePath, editorContent, showImages, loadFile, resource, resourceDraft } from "./store";
+import { filePath, editorContent, showImages, loadFile, resource, resourceDraft, collection } from "./store";
 import { speak } from "./notice";
 
 // App-lifetime root scope: this app is mounted once and never torn down,
@@ -32,12 +33,15 @@ const openResourceIsCss = computed(() => resource.get()?.path.endsWith(".css") ?
 // shows what you would see. A page is previewed as the site renders it; with
 // no page open, whatever you are composing with gets a sample page of its own,
 // so a stylesheet or a template can be written with nothing else on screen.
-const nothingOpen = computed(() => !hasFile.get() && resource.get() === null);
+const nothingOpen = computed(() => !hasFile.get() && resource.get() === null && collection.get() === null);
 const pageIsMarkdown = computed(() => filePath.get()?.endsWith(".md") ?? false);
 const pageIsCss = computed(() => filePath.get()?.endsWith(".css") ?? false);
 const pageIsNeither = computed(() => hasFile.get() && !pageIsMarkdown.get() && !pageIsCss.get());
 const cssAlone = computed(() => !hasFile.get() && openResourceIsCss.get());
 const templateAlone = computed(() => !hasFile.get() && resource.get()?.section === "templates");
+// A collection with no page open: the works are in the middle, and what they
+// look like is the folder's index page — which isn't open to render.
+const collectionAlone = computed(() => !hasFile.get() && collection.get() !== null);
 
 const app = document.getElementById("app")!;
 
@@ -51,6 +55,7 @@ app.appendChild(<Browser />);
 const middle = document.createElement("div");
 middle.className = "column-middle";
 middle.appendChild(when(hasFile, () => <Editor />));
+middle.appendChild(when(collection, () => <CollectionPane />));
 middle.appendChild(when(resource, () => <ResourcePane />));
 middle.appendChild(when(nothingOpen, () =>
   <div class="panel panel-editor"><div class="placeholder">select a page or a resource</div></div>));
@@ -66,6 +71,8 @@ right.appendChild(when(pageIsMarkdown, () => <Preview />));
 right.appendChild(when(pageIsCss, () => <CssPreview css={() => editorContent.get()} />));
 right.appendChild(when(cssAlone, () => <CssPreview css={() => resourceDraft.get()} />));
 right.appendChild(when(templateAlone, () => <TemplatePreview />));
+right.appendChild(when(collectionAlone, () =>
+  <div class="panel panel-preview"><div class="placeholder">open the folder's page to see the collection</div></div>));
 right.appendChild(when(pageIsNeither, () =>
   <div class="panel panel-preview"><div class="placeholder">no preview for this kind of file</div></div>));
 right.appendChild(when(nothingOpen, () =>

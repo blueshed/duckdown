@@ -50,6 +50,7 @@ duckdown/
 │   ├── search.ts           # The index readers search, cached like the nav; page and item aliases
 │   ├── sitemap.ts          # sitemap.xml from that index
 │   ├── collection.ts       # collection.json: a folder of items, each one a page
+│   ├── images.ts           # Where a collection's pictures are, and what a thumbnail is called (both ends read it)
 │   ├── base.ts             # Where the base files are (server/base/) and the root files
 │   ├── base/               # site.css, search.js: served and exported when a site has none of its own
 │   ├── init.ts             # scaffold(root, {vendored}): what both ways in write (see below)
@@ -65,6 +66,7 @@ duckdown/
 │   │   ├── site-files.ts   # /edit/templates/* and /edit/static/*, via fileRoutes
 │   │   ├── mark.ts         # /edit/mark/  — the preview, through page.ts
 │   │   ├── browse.ts       # /edit/browse/* — image browser + upload
+│   │   ├── collection.ts   # /edit/collection/* — a collection's pictures (upload + thumbnail), and its problems
 │   │   ├── static.ts       # /static/* — site static files
 │   │   ├── search.ts       # /search.json — the whole index, for the browser
 │   │   ├── sitemap.ts      # /sitemap.xml
@@ -87,6 +89,7 @@ duckdown/
 │           ├── ImageBrowser.tsx # Resources sidebar: images, css, templates
 │           ├── ResourceList.tsx # One tab of it: the css or template files
 │           ├── ResourcePane.tsx # A resource open below the page
+│           ├── CollectionPane.tsx # A folder's collection.json, edited as works
 │           ├── PreviewFrame.tsx # The sandboxed iframe, in one place
 │           ├── TemplatePreview.tsx # A sample page through the draft template
 │           ├── PaneHeader.tsx   # The one header both panes wear
@@ -330,6 +333,23 @@ The preview renders an overview like any page and returns
 `collectionProblems()` beside the html, which is how the editor's Notice hears
 that a slug collides with a page.
 
+`CollectionPane.tsx` edits that file as what it is: groups of pictures with a
+title and a caption each. It keeps the **raw** JSON, not the parsed
+`Collection` — a parsed one has slugs and resolved URLs in it, and writing
+that back would be writing duckdown's reading of the file rather than the file
+— so every key it doesn't show survives a change untouched. Each change
+replaces the model and writes the whole file through `/edit/pages/`, serialised
+through one promise chain, which is the write path that drops all three caches;
+`collectionChanged()` then has the preview render again. The one thing it can't
+do through the folders the editor already has is put a picture where `images`
+says pictures go: `routes/collection.ts` does that (`POST` writes the original
+and a 128px thumbnail named by `thumbName()`, `GET` answers `{images, uploads,
+problems}`), and `server/images.ts` holds `imageUrl()`/`thumbName()` so the
+pane and the renderer resolve the same two URLs. A collection whose `images`
+base is outside `static/images/` is read-only for pictures and says so.
+`LocalStorage.write()` writes beside the file and renames onto it, because a
+pane that writes on every change makes a torn read something you watch happen.
+
 Slugs are addresses, not titles: `slugify()` folds accents and keeps
 `[a-z0-9-]`, `SLUG` is the shape every slug has, duplicates take `-1`/`-2` in
 file order and a title with nothing usable in it takes `item-<n>`. Aliases —
@@ -357,8 +377,11 @@ that way when adding a section.
 Front matter takes only the keys duckdown reads (`KEYS` in `markdown.ts`) or an `x-` extension, unless the block is fenced with `---`, which takes anything: a page opening "Update: closed Monday" keeps its first line. Add a key there and in the skill's reference together.
 
 The editor's two right-hand columns each hold whatever is open. The middle one
-holds the page and a resource beneath it — each closes, two split the column,
-one fills it. The preview column shows what you'd see: the page as the site
+holds the page and, beneath it, either a resource or a folder's collection —
+one slot, so opening either closes the other; each closes, two split the
+column, one fills it. Below 768px the three columns stack, the tree capped and
+scrolling and the preview standing down: there is no room to show a page beside
+the thing you are changing it with. The preview column shows what you'd see: the page as the site
 renders it, or, with no page open, a sample page for whatever you're composing
 with (sample content for a stylesheet, a sample page put through a template).
 Every branch is a `when()` built as it's shown, and they're mutually exclusive,
