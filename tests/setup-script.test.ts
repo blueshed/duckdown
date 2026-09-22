@@ -83,9 +83,13 @@ describe("create: bun create blueshed/duckdown, and the code is yours", () => {
     expect(pkg.scripts.start).toBe("bun run server/serve.ts");
     expect(pkg.dependencies["@blueshed/railroad"]).toBe("^0.11.0");    // the code's own
     expect(pkg.dependencies.duckdown).toBeUndefined();                 // it *is* duckdown
+    expect(pkg.devDependencies.railway).toBe("^3.11.0");               // resolves .railway/railway.ts's import
 
     expect(existsSync(join(root, "site", "static", "site.css"))).toBe(false);   // the base comes from server/base
     expect(read(root, ".gitignore")).toBe("node_modules\n.dev-site/\ndist/\n.env\n*.pid\n.DS_Store\nsite/users.json\n");
+    const createdRailway = read(root, join(".railway", "railway.ts"));
+    expect(createdRailway).toContain('service("created"');
+    expect(createdRailway).toContain('start: "bun run server/serve.ts"');   // vendored: its own server/
     exportIn(root);
   });
 
@@ -137,8 +141,18 @@ describe("install: bun add, then bunx duckdown init", () => {
     expect(existsSync(join(root, "site", "static", "site.css"))).toBe(false);
     expect(read(root, ".env")).toStartWith("DUCKDOWN_PATH=./site\n");
     expect(read(root, ".gitignore")).toBe("mine\nnode_modules\ndist/\n.env\n*.pid\n.DS_Store\nsite/users.json\n");
-    expect(json(root, "railway.json").deploy).toMatchObject({ startCommand: "bun run start", healthcheckPath: "/health" });
+    const installedRailway = read(root, join(".railway", "railway.ts"));
+    expect(installedRailway).toContain('import { defineRailway, github, project, service } from "railway/iac"');
+    expect(installedRailway).toContain('partial = "installed"');
+    expect(installedRailway).toContain('service("installed"');
+    expect(installedRailway).toContain('healthcheck: "/health"');
+    expect(installedRailway).toContain('build: "bun run export"');
+    expect(installedRailway).toContain('start: "bun run node_modules/duckdown/server/serve.ts"');
+    expect(installedRailway).toContain('DUCKDOWN_PATH: "./site"');
+    expect(installedRailway).toContain('project("installed"');
+    expect(pkg.devDependencies.railway).toBe("^3.11.0");
     expect(read(root, "CLAUDE.md")).toContain("pinned dependency");
+    expect(read(root, "CLAUDE.md")).toContain(".railway/railway.ts");
     expect(readdirSync(join(root, ".claude", "skills", "duckdown"))).toContain("SKILL.md");
     expect(existsSync(join(root, ".claude", "launch.json"))).toBe(true);
     const users = json(root, "site/users.json");
@@ -153,7 +167,7 @@ describe("install: bun add, then bunx duckdown init", () => {
     const log = quiet();
     try {
       expect(await cli(["init"], root)).toBe(0);
-      for (const kept of ["site/", ".env", "railway.json", "CLAUDE.md", ".claude/launch.json"]) {
+      for (const kept of ["site/", ".env", join(".railway", "railway.ts"), "CLAUDE.md", ".claude/launch.json"]) {
         expect(said(log)).toContain(`left alone: ${kept}`);
       }
     } finally {
@@ -205,8 +219,9 @@ describe("the two ways in differ in one thing", () => {
   test("and everything else the scaffold writes is the same", () => {
     const created = join(RUN, "created");
     const installed = join(RUN, "installed");
-    // (index.md names the folder and CLAUDE.md the way in; these are byte for byte)
-    for (const file of ["site/static/theme.css", "site/templates/site.html", "railway.json"]) {
+    // (index.md, CLAUDE.md and .railway/railway.ts all name the site or the way
+    // in, so these are the ones that are byte for byte)
+    for (const file of ["site/static/theme.css", "site/templates/site.html"]) {
       expect(read(created, file)).toBe(read(installed, file));
     }
   });

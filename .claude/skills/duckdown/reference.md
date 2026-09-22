@@ -390,8 +390,9 @@ DUCKDOWN_ORIGIN=https://example.com bun run export     # into ./dist
   readily as a folder — a served site can be snapshotted without moving its
   content first.
 
-Where the output goes is the site's own business, not duckdown's: look for a
-`DEPLOY.md`. Don't invent a deployment step that isn't written down.
+Where the output goes is the site's own business, not duckdown's: its
+README.md or CLAUDE.md says how it's deployed — read whichever it has. Don't
+invent a deployment step that isn't written down.
 
 ## Troubleshooting
 
@@ -407,7 +408,7 @@ Where the output goes is the site's own business, not duckdown's: look for a
 | A `[[wiki link]]` goes to the wrong place | It's relative to the page's folder: start it with `/` to go from the top |
 | Nobody can sign in | `users.json` needs hashes, not passwords; or it's missing (see the server log) |
 | Edits don't show on the running site (duckdown repo) | The site runs from `.dev-site`, not the seed `tests/example` |
-| Edits don't show on the deployed site | It's a published site: the markdown changed, the files it serves didn't. Export and deploy (see its `DEPLOY.md`) |
+| Edits don't show on the deployed site | It's a published site: the markdown changed, the files it serves didn't. Export and deploy (see its README.md or CLAUDE.md) |
 
 ## Three sizes of override
 
