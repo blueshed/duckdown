@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.4.0 — 2026-09-22
 
 - **Collections: a folder of items, written once.** A `collection.json` beside
   a folder's `index.md` lists groups of items — a picture, a title, a caption
