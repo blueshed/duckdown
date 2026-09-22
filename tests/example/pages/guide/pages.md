@@ -25,6 +25,7 @@ nav: About
 | `css` | `css: poster` links `/static/poster.css` to this page alone |
 | `description` | Fills in the page's description for search engines and links shared online |
 | `date` | Used to order a folder's [[#listing-a-folder\|listing]], newest first |
+| `order` | On a folder's `index.md`: a whole number, for where it sits among its siblings in the navigation |
 | `draft` | `draft: true` keeps the page off the site until you're ready |
 
 Only two of these touch how a page looks, and both name a file you wrote:
@@ -226,6 +227,8 @@ what a reader sees under your page in the results here.
 ## Navigation
 
 Every folder's `index.md` appears in the site navigation, labelled by its `nav:` key, or by its `title:` if it has no `nav:`. Other pages don't: to put a page in the navigation, give it a folder of its own (`about/index.md` rather than `about.md`). That's it — no config files, no menus to maintain.
+
+A folder's place in that list is its `order:` — a whole number on its own `index.md`. Folders that set it come first, lowest first; folders that don't come after, alphabetical by name, so a site that has never used `order:` sees no change from adding it to one folder. `{{sitemap}}` lists folders the same way, so the two always agree.
 
 The navigation marks the page you're on, or the section it's in.
 

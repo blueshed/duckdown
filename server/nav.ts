@@ -1,6 +1,6 @@
 import type { Storage } from "./storage";
 import { DEBUG } from "./config";
-import { buildNav, parseFrontMatter, yes } from "./markdown";
+import { buildNav, parseFrontMatter, yes, sortFolders } from "./markdown";
 import { escapeHtml, canonicalPath, dateHtml } from "./utils";
 import { NOT_FOUND } from "./search";
 
@@ -90,9 +90,10 @@ async function buildSiteMap(pages: Storage, folder = ""): Promise<string> {
   for (const entry of await folderEntries(pages, folder)) {
     items.push(`<li><a href="${entry.href}">${escapeHtml(entry.title)}</a></li>`);
   }
+  // Follows the nav's own order, so the two agree on which folder comes first.
   const { folders } = await pages.list(folder);
-  for (const sub of folders.sort((a, b) => a.name.localeCompare(b.name))) {
-    if (sub.name.startsWith(".") || sub.name.startsWith("-")) continue;
+  const eligible = folders.filter((f) => !f.name.startsWith(".") && !f.name.startsWith("-"));
+  for (const sub of await sortFolders(pages, eligible)) {
     const path = sub.path.replace(/^\//, "");
     const inside = await buildSiteMap(pages, path);
     if (!inside) continue;

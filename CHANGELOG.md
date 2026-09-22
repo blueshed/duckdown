@@ -58,6 +58,13 @@
   `templates/site.html` uses it for its top bar (`templates/topbar.html`),
   instead of pasting the nav and the search form into every template.
 
+- **`order:` places a folder in the navigation.** A folder's name used to be
+  the only way to order it — the URL carrying the ordering, so reordering meant
+  renaming and breaking every link. A whole number on a folder's `index.md`
+  now puts it among its siblings, lowest first; a folder without one sorts
+  after every numbered one, alphabetically, so a site that has never used it
+  sees no change. `{{sitemap}}` follows the same order.
+
 ## 0.2.0 — 2026-09-21
 
 ### Search, in the browser

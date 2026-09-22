@@ -205,6 +205,25 @@ describe("siteMap", () => {
     expect(await siteMap(memory({ "index.md": "draft: true\n\nx" }), true)).toBe("");
   });
 
+  test("follows order:, the same way the nav does", async () => {
+    const pages = memory({
+      "index.md": "title: Home\n\n",
+      "wayward/index.md": "title: Wayward\norder: 5\n\n",
+      "wayward/page.md": "title: A page\n\nx",
+      "things/index.md": "title: Things\norder: 1\n\n",
+      "things/page.md": "title: A page\n\nx",
+      "news/index.md": "title: News\norder: 6\n\n",
+      "news/page.md": "title: A page\n\nx",
+    });
+    const map = await siteMap(pages, true);
+    // The folder names, in the order they're listed — not "A page", each
+    // folder's own single entry, which would appear once per folder too.
+    const order = [...map.matchAll(/<a href="[^"]*">([^<]+)<\/a>/g)]
+      .map((m) => m[1]!)
+      .filter((title) => title !== "A page");
+    expect(order).toEqual(["Home", "Things", "Wayward", "News"]);
+  });
+
   test("built once and kept, until a page changes", async () => {
     const store = memory({ "index.md": "title: One\n\nx" });
     pagesChanged();

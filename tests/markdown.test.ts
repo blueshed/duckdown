@@ -59,6 +59,53 @@ describe("buildNav", () => {
   });
 });
 
+describe("buildNav: order:", () => {
+  test("numbered folders first, ascending, then everything else alphabetical", async () => {
+    const pages = memory({
+      "wayward/index.md": "title: Wayward\norder: 5\n\n",
+      "things/index.md": "title: Things\norder: 1\n\n",
+      "jadd/index.md": "title: Jadd\norder: 2\n\n",
+      "news/index.md": "title: News\norder: 6\n\n",
+      "look/index.md": "title: Look\norder: 3\n\n",
+      "heartleap/index.md": "title: Heartleap\norder: 4\n\n",
+      "about/index.md": "title: About\n\n",        // no order: — after every numbered one
+      "zzz/index.md": "title: Zzz\n\n",             // ditto, and after About alphabetically
+    });
+    const nav = await buildNav(pages);
+    const order = [...nav.matchAll(/<a href="[^"]*">([^<]+)<\/a>/g)].map((m) => m[1]);
+    expect(order).toEqual(["Things", "Jadd", "Look", "Heartleap", "Wayward", "News", "About", "Zzz"]);
+  });
+
+  test("a value that isn't a whole number is treated as unset, and logged only in development", async () => {
+    const pages = memory({
+      "a/index.md": "title: A\norder: 1\n\n",
+      "b/index.md": "title: B\norder: two\n\n",     // not a number
+      "c/index.md": "title: C\norder: 1.5\n\n",     // not whole
+    });
+    const quiet = spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const order = [...(await buildNav(pages)).matchAll(/>([A-C])</g)].map((m) => m[1]);
+      expect(order).toEqual(["A", "B", "C"]);          // B and C fall back to alphabetical
+      expect(quiet).not.toHaveBeenCalled();             // silent in production (DEBUG=0 in tests)
+    } finally {
+      quiet.mockRestore();
+    }
+  });
+
+  test("order: applies among a folder's own siblings, not across the whole site", async () => {
+    const pages = memory({
+      "shop/index.md": "title: Shop\norder: 2\n\n",
+      "shop/new/index.md": "title: New\norder: 1\n\n",
+      "shop/old/index.md": "title: Old\norder: 2\n\n",
+      "blog/index.md": "title: Blog\norder: 1\n\n",
+      "blog/deep/index.md": "title: Deep\norder: 5\n\n",  // order: 5 is fine among blog/'s own children
+    });
+    const nav = await buildNav(pages);
+    const order = [...nav.matchAll(/>([A-Za-z]+)</g)].map((m) => m[1]);
+    expect(order).toEqual(["Blog", "Deep", "Shop", "New", "Old"]);
+  });
+});
+
 describe("siteNav", () => {
   // The cache is shared with the in-process server: start and end it empty.
   test("builds once, rebuilds after pagesChanged, and never keeps a failure", async () => {

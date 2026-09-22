@@ -1,4 +1,5 @@
 import type { Storage } from "./storage";
+import { DEBUG } from "./config";
 import { canonicalPath } from "./utils";
 
 // Front-matter parser + Bun.markdown wrapper
@@ -13,7 +14,7 @@ export interface MarkdownResult {
 // these (or an x- extension of your own), so a page that opens "Update: closed
 // Monday" keeps its first line instead of losing it to metadata. For any other
 // key, fence the block with --- … --- , which takes whatever you put in it.
-const KEYS = ["title", "nav", "toc", "layout", "css", "description", "draft", "date"];
+const KEYS = ["title", "nav", "toc", "layout", "css", "description", "draft", "date", "order"];
 const isKey = (key: string) => KEYS.includes(key) || key.startsWith("x-");
 
 export function parseFrontMatter(source: string): { meta: Record<string, string[]>; body: string } {
@@ -114,6 +115,37 @@ function withContents(html: string): string {
   return end < 0 ? `${toc}\n${html}` : `${html.slice(0, end + 5)}\n${toc}${html.slice(end + 5)}`;
 }
 
+// A folder's order: (a whole number on its own index.md), for sorting it
+// among its siblings: numbered folders first, ascending, then everything
+// else alphabetical by name — so a site that never sets it sees no change.
+// Not a whole number: ignored (treated as unset) and, per "failures speak",
+// logged once in development, where a content author would see it.
+export async function folderOrder(pages: Storage, path: string): Promise<number> {
+  const key = `${path}/index.md`;
+  if (!await pages.exists(key)) return Infinity;
+  const raw = parseFrontMatter(await pages.read(key)).meta.order?.[0];
+  if (raw === undefined) return Infinity;
+  const n = Number(raw);
+  if (!Number.isInteger(n)) {
+    if (DEBUG) console.error(`order: "${raw}" on ${key} isn't a whole number — ignored`);
+    return Infinity;
+  }
+  return n;
+}
+
+// The nav, {{sitemap}} and any other listing of folders sort them the same
+// way: by folderOrder(), then by name, so a folder without order: still
+// sorts alphabetically among the others without one.
+export async function sortFolders<T extends { name: string; path: string }>(
+  pages: Storage, folders: T[],
+): Promise<T[]> {
+  const withOrder = await Promise.all(
+    folders.map(async (f) => ({ f, order: await folderOrder(pages, f.path.replace(/^\//, "")) })),
+  );
+  withOrder.sort((a, b) => a.order - b.order || a.f.name.localeCompare(b.f.name));
+  return withOrder.map((x) => x.f);
+}
+
 // Build nav from index.md files — walks folders looking for nav/title metadata
 export async function buildNav(pages: Storage, prefix = ""): Promise<string> {
   const { folders, files } = await pages.list(prefix);
@@ -132,9 +164,9 @@ export async function buildNav(pages: Storage, prefix = ""): Promise<string> {
     }
   }
 
-  // Recurse into subfolders
-  for (const folder of folders.sort((a, b) => a.name.localeCompare(b.name))) {
-    if (folder.name.startsWith(".") || folder.name.startsWith("-")) continue;
+  // Recurse into subfolders, ordered
+  const eligible = folders.filter((f) => !f.name.startsWith(".") && !f.name.startsWith("-"));
+  for (const folder of await sortFolders(pages, eligible)) {
     const sub = await buildNav(pages, folder.path.replace(/^\//, ""));
     if (sub) items.push(sub);
   }

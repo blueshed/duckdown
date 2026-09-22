@@ -63,6 +63,7 @@
 | `layout` | `post` wraps the page in `templates/post.html`, falling back to `site.html` |
 | `description` | The page's description, for `<meta name="description">` and `og:description` |
 | `date` | Orders a folder's `{{pages}}` listing, newest first, and is shown beside the link (ISO: `2026-09-19`) |
+| `order` | In a folder's `index.md` only: a whole number, for where that folder sits among its siblings in the navigation and `{{sitemap}}` |
 | `draft` | `true` keeps the page off the site, the nav and listings; signed in to the editor, you still see it |
 
 - A plain block may hold **only those keys**, or one starting `x-` (your own). At the first line that isn't one, the block ends and everything from there is content — so prose opening `Update: closed on Monday` keeps its first line, and a mistyped key appears on the page instead of vanishing.
@@ -165,7 +166,7 @@ Maths (`$x^2$` stays as written), emoji shortcodes, and syntax highlighting in c
 - Built from every folder's `index.md`: the root's first, then each folder's, depth first, folders in alphabetical order.
 - Each entry's label is the page's `nav:`, else its `title:`; an `index.md` with neither, or one marked `draft: true`, isn't listed. Folders starting with `-` or `.` are skipped, with everything inside them.
 - Plain pages (`about.md`) are never listed: give a page a folder (`about/index.md`) to put it in the navigation.
-- Order follows folder names, not labels: to control it, name folders so they sort (`1-about/` with `nav: About`), remembering the name is in the URL.
+- Order follows each folder's `order:` (a whole number, on its own `index.md`) — folders that set it come first, lowest first; folders that don't come after, in alphabetical order by name, so a site that never sets it sees no change. `{{sitemap}}` follows the same order, so the two never disagree.
 - The link for the page being viewed gets `aria-current="page"`; failing that, its section's link (the nearest folder above it with an `index.md`, never the root) gets `aria-current="true"`. The stylesheet underlines either.
 - In development (`DEBUG=1`) it's built on every request, so pages written straight to disk appear immediately. In production it's built once and rebuilt whenever a page is saved or deleted through the editor; files placed there any other way need a restart.
 
