@@ -47,3 +47,4 @@ Edit the markdown, then press **⌘⏎** (or click **Save**). The preview update
 - [Writing Pages](/guide/pages.html) — learn about markdown and front-matter
 - [Styling](/guide/themes.html) — templates and stylesheets
 - [Images](/guide/images.html) — add images to your pages
+- [Collections](/guide/collections.html) — one file describes a folder of items, and each gets a page

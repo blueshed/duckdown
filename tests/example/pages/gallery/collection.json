@@ -1,0 +1,52 @@
+{
+  "layout": "item",
+  "images": { "src": "/static/images/gallery/", "suffix": "_tn" },
+  "labels": { "year": { "1961": "Early work" } },
+  "groups": [
+    {
+      "name": "paintings",
+      "label": "Paintings",
+      "items": [
+        {
+          "src": "one.svg",
+          "title": "First Light",
+          "caption": "First Light, 1961. Ink on paper, 40 x 40 cm.",
+          "year": "1961",
+          "aliases": ["/first-light-1961"]
+        },
+        {
+          "src": "two.svg",
+          "title": "Second Wind",
+          "caption": "Second Wind, 1962. Oil on board, 60 x 60 cm.",
+          "year": "1962"
+        }
+      ],
+      "groups": [
+        {
+          "name": "studies",
+          "label": "Studies",
+          "items": [
+            {
+              "src": "three.svg",
+              "title": "Study in Green",
+              "caption": "Study in Green, 1962. Crayon on paper.",
+              "year": "1962"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "prints",
+      "label": "Prints",
+      "items": [
+        {
+          "src": "four.svg",
+          "title": "One of Three",
+          "caption": "One of Three, 1974. Screenprint, edition of 30.",
+          "year": "skip"
+        }
+      ]
+    }
+  ]
+}

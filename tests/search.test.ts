@@ -1,7 +1,7 @@
 // The index a reader searches: built here, matched in the browser.
 import { describe, test, expect } from "bun:test";
 import type { Storage, Listing } from "../server/storage";
-import { buildSite, searchIndex, pageList, searchChanged } from "../server/search";
+import { buildSite, searchIndex, pageList, searchChanged, aliasTarget } from "../server/search";
 import { siteMap, pagesChanged } from "../server/nav";
 
 const buildIndex = async (pages: Storage) => (await buildSite(pages)).entries;
@@ -240,5 +240,48 @@ describe("siteMap", () => {
     await expect(siteMap(memory({ "index.md": "title: One" }, "index.md"), false)).rejects.toThrow("storage is down");
     expect(await siteMap(memory({ "index.md": "title: Two" }), false)).toContain(">Two<");
     pagesChanged();
+  });
+});
+
+describe("collections in the index", () => {
+  const site = () => memory({
+    "index.md": "title: Home\naliases: /front\n\n# Home",
+    "works/index.md": "title: Works\n\n# Works",
+    "works/collection.json": JSON.stringify({
+      groups: [{
+        name: "1960",
+        items: [
+          { title: "Battersea", caption: "Battersea 1961. Wax crayon on paper.", aliases: ["/battersea"] },
+          { title: "Take Five", caption: "Take Five 1962. Oil on canvas." },
+        ],
+      }],
+    }),
+  });
+
+  test("one entry per item, its caption as the words, and its address in the page list", async () => {
+    const built = await buildSite(site(), "", true);
+    const item = built.entries.find((e) => e.url === "/works/battersea/")!;
+    expect(item.title).toBe("Battersea");
+    expect(item.section).toBe("");
+    expect(item.description).toContain("Wax crayon");
+    expect(item.text).toContain("Wax crayon");
+    expect(built.pages.map((p) => p.url)).toContain("/works/take-five/");
+  });
+
+  test("the aliases of pages and of items come out of the same walk", async () => {
+    const built = await buildSite(site(), "", true);
+    expect(built.aliases).toEqual([
+      { from: "/front", to: "/" },
+      { from: "/battersea", to: "/works/battersea/" },
+    ]);
+  });
+
+  test("an old address is looked up decoded, and anything else is simply a miss", async () => {
+    const pages = site();
+    searchChanged();
+    expect(await aliasTarget(pages, "/battersea", false)).toBe("/works/battersea/");
+    expect(await aliasTarget(pages, "/battersea/", false)).toBe("/works/battersea/");
+    expect(await aliasTarget(pages, "/battersey", false)).toBeNull();
+    searchChanged();
   });
 });

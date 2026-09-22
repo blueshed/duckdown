@@ -986,3 +986,182 @@ describe("{{include}}", () => {
     expect(data.includes).toEqual(["topbar.html"]);
   });
 });
+
+// --- Collections ---
+
+describe("a collection's items are pages", () => {
+  test("an item is served at its own address, through the template the collection names", async () => {
+    const res = await fetch(`${BASE}/gallery/first-light/`);
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).toContain("<title>First Light</title>");
+    expect(html).toContain(`<link rel="canonical" href="${BASE}/gallery/first-light/">`);
+    // The same document a page gets: the template, its includes, the nav —
+    // with the folder marked current, because the item lives inside it.
+    expect(html).toContain('<ul class="nav">');
+    expect(html).toContain('<a href="/gallery/" aria-current="true">Gallery</a>');
+    // What only an item has: its fields, its neighbours, its sections.
+    expect(html).toContain('<img src="/static/images/gallery/one.svg" alt="First Light">');
+    expect(html).toContain("<figcaption>First Light, 1961. Ink on paper, 40 x 40 cm.</figcaption>");
+    expect(html).toContain('<a class="next" rel="next" href="/gallery/second-wind/">Second Wind</a>');
+    expect(html).toContain('<a href="/gallery/first-light/" aria-current="true">Paintings</a>');
+    expect(html).toContain('href="/by-year.html#1961"');   // {{item-year}}, as a fragment
+    expect(html).not.toMatch(/\{\{[\w-]+\}\}/);
+  });
+
+  test("the three addresses of a folder reach it, and prev wraps round the end", async () => {
+    for (const path of ["/gallery/one-of-three", "/gallery/one-of-three/", "/gallery/one-of-three/index.html"]) {
+      expect((await fetch(`${BASE}${path}`)).status).toBe(200);
+    }
+    // The last work's next is the first: a collection is a ring.
+    const html = await (await fetch(`${BASE}/gallery/one-of-three/`)).text();
+    expect(html).toContain('<a class="next" rel="next" href="/gallery/first-light/">First Light</a>');
+    // year: skip, so the back link lands at the top of the overview rather
+    // than at an anchor called #skip.
+    expect(html).toContain('href="/by-year.html#"');
+  });
+
+  test("an unknown item is a 404, never the nearest thing to it", async () => {
+    // The whole point of looking an item up by folder and slug: a miss is a
+    // miss. A fallback here is how a gallery serves the wrong painting with a
+    // 200 and nobody notices for years.
+    for (const path of ["/gallery/first-lite/", "/elsewhere/first-light/", "/first-light/"]) {
+      const res = await fetch(`${BASE}${path}`);
+      expect(res.status).toBe(404);
+      expect(await res.text()).not.toContain("Ink on paper");
+    }
+  });
+
+  test("an overview writes itself from the collection, here and in another folder", async () => {
+    const gallery = await (await fetch(`${BASE}/gallery/`)).text();
+    expect(gallery).toContain('<section class="group" id="paintings">');
+    expect(gallery).toContain('<a class="item" href="/gallery/study-in-green/">');
+    expect(gallery).toContain('src="/static/images/gallery/one_tn.svg"');
+
+    // /by-year.html is not in the gallery folder: {{items gallery by=year}}.
+    const year = await (await fetch(`${BASE}/by-year.html`)).text();
+    expect(year).toContain('<section class="group" id="1961">');
+    expect(year).toContain("<h2>1961 - Early work</h2>");     // the label from collection.json
+    expect(year).not.toContain("One of Three");               // year: skip
+  });
+
+  test("signed in, an item's edit link opens the file it is written in", async () => {
+    const res = await fetch(`${BASE}/gallery/first-light/`, authed());
+    expect(res.headers.get("Cache-Control")).toBe("private, no-cache");
+    expect(await res.text()).toContain("/edit?path=gallery%2Fcollection.json");
+  });
+
+  test("items are in the search index and the sitemap, because they are pages", async () => {
+    const index = await (await fetch(`${BASE}/search.json`)).json();
+    const found = index.find((e: { url: string }) => e.url === "/gallery/second-wind/");
+    expect(found.title).toBe("Second Wind");
+    expect(found.text).toContain("Oil on board");
+    expect(await (await fetch(`${BASE}/sitemap.xml`)).text()).toContain("/gallery/second-wind/");
+  });
+
+  test("writing a collection through the editor is a write under pages/, so every cache drops", async () => {
+    const url = `${BASE}/edit/pages/gallery/collection.json`;
+    const before = await (await fetch(url, authed())).text();
+    const changed = JSON.parse(before);
+    changed.groups[1]!.items.push({ src: "four.svg", title: "Late Addition", year: "1980" });
+    try {
+      expect((await fetch(url, authed({ method: "PUT", body: JSON.stringify(changed) }))).status).toBe(200);
+      expect((await fetch(`${BASE}/gallery/late-addition/`)).status).toBe(200);
+      expect(await (await fetch(`${BASE}/gallery/`)).text()).toContain("Late Addition");
+      expect(await (await fetch(`${BASE}/search.json`)).text()).toContain("Late Addition");
+    } finally {
+      await fetch(url, authed({ method: "PUT", body: before }));
+    }
+  });
+});
+
+describe("an address that has moved", () => {
+  const collection = `${BASE}/edit/pages/gallery/collection.json`;
+
+  test("an item's alias is a 301 to where it lives now", async () => {
+    const res = await fetch(`${BASE}/first-light-1961`, { redirect: "manual" });
+    expect(res.status).toBe(301);
+    expect(res.headers.get("Location")).toBe("/gallery/first-light/");
+  });
+
+  test("a page can carry aliases too, in its front matter", async () => {
+    const url = `${BASE}/edit/pages/moved-here.md`;
+    try {
+      await fetch(url, authed({ method: "PUT", body: "title: Moved\naliases: /old-place\naliases: /older-place.html\n\n# Moved" }));
+      for (const from of ["/old-place", "/older-place.html", "/old-place/"]) {
+        const res = await fetch(`${BASE}${from}`, { redirect: "manual" });
+        expect(res.status).toBe(301);
+        expect(res.headers.get("Location")).toBe("/moved-here.html");
+      }
+    } finally {
+      await fetch(url, authed({ method: "DELETE" }));
+    }
+  });
+
+  test("a legacy address full of punctuation matches as the browser sends it", async () => {
+    // The old site's slugs kept quotes, backticks and curly apostrophes, so a
+    // browser sends them percent-encoded. They are compared decoded, once,
+    // which is the whole reason decodePath runs before the lookup.
+    const before = await (await fetch(collection, authed())).text();
+    const legacy = [`/l"etoile-1976`, "/polly-underground-1976`", "/don’t-write-everything-down"];
+    const changed = JSON.parse(before);
+    changed.groups[0]!.items[0]!.aliases.push(...legacy);
+    try {
+      await fetch(collection, authed({ method: "PUT", body: JSON.stringify(changed) }));
+      for (const from of legacy) {
+        const res = await fetch(`${BASE}${encodeURI(from).replace(/"/g, "%22")}`, { redirect: "manual" });
+        expect(res.status).toBe(301);
+        expect(res.headers.get("Location")).toBe("/gallery/first-light/");
+      }
+      // An address nobody ever had is still a 404, not a near miss.
+      expect((await fetch(`${BASE}/l%22etoile-1977`)).status).toBe(404);
+    } finally {
+      await fetch(collection, authed({ method: "PUT", body: before }));
+    }
+  });
+});
+
+describe("a collection that can't have the addresses it asks for", () => {
+  const collection = `${BASE}/edit/pages/gallery/collection.json`;
+  const preview = (path: string) =>
+    fetch(`${BASE}/edit/mark/?path=${encodeURIComponent(path)}`,
+      authed({ method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ source: "# Gallery" }) }));
+
+  test("the preview says so, which is how the editor's Notice hears about it", async () => {
+    const error = hush("error");
+    const before = await (await fetch(collection, authed())).text();
+    const changed = JSON.parse(before);
+    changed.groups[0]!.items.push({ title: "By Year", slug: "Not A Slug" });
+    try {
+      await fetch(collection, authed({ method: "PUT", body: JSON.stringify(changed) }));
+      const data = await (await preview("gallery/index.md")).json();
+      expect(data.problems.join(" ")).toContain(`slug "Not A Slug" isn't [a-z0-9-]`);
+    } finally {
+      await fetch(collection, authed({ method: "PUT", body: before }));
+      error.mockRestore();
+    }
+  });
+
+  test("a page of the same name wins, and the item that wanted that address is named", async () => {
+    const error = hush("error");
+    const before = await (await fetch(collection, authed())).text();
+    const changed = JSON.parse(before);
+    changed.groups[0]!.items.push({ title: "Notes" });
+    const notes = `${BASE}/edit/pages/gallery/notes.md`;
+    try {
+      await fetch(notes, authed({ method: "PUT", body: "title: Notes\n\n# Notes by hand" }));
+      await fetch(collection, authed({ method: "PUT", body: JSON.stringify(changed) }));
+      expect(await (await fetch(`${BASE}/gallery/notes.html`)).text()).toContain("Notes by hand");
+      const data = await (await preview("gallery/index.md")).json();
+      expect(data.problems.join(" ")).toContain("already a page");
+    } finally {
+      await fetch(notes, authed({ method: "DELETE" }));
+      await fetch(collection, authed({ method: "PUT", body: before }));
+      error.mockRestore();
+    }
+  });
+
+  test("a page with no collection beside it has no problems to report", async () => {
+    expect((await (await preview("index.md")).json()).problems).toEqual([]);
+  });
+});
