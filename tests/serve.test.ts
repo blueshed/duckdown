@@ -107,3 +107,29 @@ describe("serveDist", () => {
     }
   });
 });
+
+describe("an address the export moved", () => {
+  // The export writes an alias as <alias>/index.html under the name a request
+  // decodes to, so a legacy slug full of punctuation still answers here. A
+  // filesystem that can't hold the name (Windows won't take `"`) is the known
+  // limit of the published flavour; the served flavour answers 301 instead.
+  const moved = join(RUN, "dist-moved");
+  for (const name of ["first-light-1961", `l"etoile-1976`, "don’t-write-everything-down"]) {
+    mkdirSync(join(moved, name), { recursive: true });
+    writeFileSync(join(moved, name, "index.html"), `<link rel="canonical" href="/gallery/first-light/">`);
+  }
+  writeFileSync(join(moved, "index.html"), "<h1>home</h1>");
+
+  test("the redirect page is found for the encoded request a browser sends", async () => {
+    for (const encoded of ["/first-light-1961/", `/l%22etoile-1976/`, "/don%E2%80%99t-write-everything-down/"]) {
+      const { res } = await ask(encoded, moved);
+      expect(res.status).toBe(200);
+      expect(await res.text()).toContain("/gallery/first-light/");
+    }
+    // Without the trailing slash it is a folder with an index, so it moves to
+    // the address that has one — the same 301 any folder gets.
+    const { res } = await ask("/l%22etoile-1976", moved);
+    expect(res.status).toBe(301);
+    expect(res.headers.get("location")).toBe("/l%22etoile-1976/");
+  });
+});

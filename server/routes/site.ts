@@ -1,10 +1,11 @@
 import { createPageStorage } from "../storage";
 import { yes } from "../markdown";
 import { getUser } from "../auth";
-import { parsePage, pageHtml } from "../page";
+import { parsePage, pageHtml, itemPage } from "../page";
 import { logView } from "../log";
 import { decodePath, conditional } from "../utils";
-import { NOT_FOUND } from "../search";
+import { NOT_FOUND, aliasTarget } from "../search";
+import { itemAt, collectionPath } from "../collection";
 import { ROOT_FILES } from "../base";
 import { APP_PATH, IS_S3 } from "../config";
 import { existsSync } from "fs";
@@ -62,6 +63,44 @@ const notFound = async (req: Request) => {
   return new Response(html, { status: 404, headers: { "Content-Type": HTML } });
 };
 
+// No page of that name. Before it is a miss, two more things it could be: an
+// item of a collection, or an address that has moved.
+//
+// An item is looked up by its folder and slug — one collection, the one the
+// address names — and never by searching every collection for something that
+// looks close. A miss here is a miss: the site that inspired this feature
+// served the wrong painting with a 200 for years because a lookup that failed
+// fell back to an item instead of a 404.
+const INDEX = "/index";
+
+const collected = async (req: Request, name: string, decoded: string) => {
+  // An item's address is a folder with an index, so the same three addresses
+  // reach it that reach any folder: /works/x, /works/x/ and /works/x/index.html
+  // — and the last is the file the export writes, so a published copy and a
+  // served one answer the same set.
+  const found = await itemAt(pages, name)
+    ?? (name.endsWith(INDEX) ? await itemAt(pages, name.slice(0, -INDEX.length)) : null);
+  if (found) {
+    const user = await getUser(req);
+    const { html } = await pageHtml(itemPage(found), {
+      origin: siteOrigin(req),
+      // There is no markdown behind an item, so the edit link opens the file
+      // it is written in: the folder's collection.
+      editHref: user ? `/edit?path=${encodeURIComponent(collectionPath(found.collection.folder))}` : "",
+      item: found,
+    });
+    if (user) return new Response(html, { headers: { "Content-Type": HTML, "Cache-Control": "private, no-cache" } });
+    return conditional(req, html, { "Content-Type": HTML, "Cache-Control": CACHE });
+  }
+
+  // An address a page or an item used to live at, compared decoded: a legacy
+  // slug may hold a quote or a curly apostrophe, which arrives percent-encoded.
+  const moved = await aliasTarget(pages, decoded);
+  if (moved) return new Response(null, { status: 301, headers: { Location: encodeURI(moved) } });
+
+  return notFound(req);
+};
+
 const renderPage = async (req: Request) => {
   const url = new URL(req.url);
   const decoded = decodePath(url.pathname);
@@ -75,7 +114,7 @@ const renderPage = async (req: Request) => {
   // A page, or the index of the folder of that name: /blog, /blog/ and
   // /blog/index.html all reach pages/blog/index.md.
   const key = await pages.exists(`${name}.md`) ? `${name}.md` : `${name}/index.md`;
-  if (!await pages.exists(key)) return notFound(req);
+  if (!await pages.exists(key)) return collected(req, name, decoded);
 
   const page = parsePage(key, await pages.read(key));
   const user = await getUser(req);

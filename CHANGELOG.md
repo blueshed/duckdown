@@ -2,6 +2,54 @@
 
 ## Unreleased
 
+- **Collections: a folder of items, written once.** A `collection.json` beside
+  a folder's `index.md` lists groups of items — a picture, a title, a caption
+  and whatever fields you like — and duckdown gives each one a page at
+  `/<folder>/<slug>/`, rendered through `templates/item.html` by the same code
+  that renders every other page. For the site with four hundred paintings and
+  no wish to write four hundred markdown files.
+
+- **Overviews that write themselves.** `{{items}}` in a page or a template is
+  the collection's groups, each a grid of thumbnails linking to the item
+  pages; `{{items by=<field>}}` regroups the same items by any field they
+  carry (an item whose value is `skip` stays out), and `{{groups}}` is the
+  section menu, the group being read marked. Each takes a collection's name
+  first (`{{items works by=prints}}`), so an overview can live outside the
+  folder it shows — one collection, as many views of it as the site wants.
+  Headings carry their value as an `id`, so a template can link back to the
+  place a reader came from.
+
+- **The item template.** `{{item-<field>}}` fills with anything the item says,
+  escaped and empty when unset, beside `{{item-src}}`, `{{item-thumb}}`,
+  `{{prev}}`, `{{next}}` and `{{group}}`. Prev and next follow the file's own
+  order right through the groups, and wrap.
+
+- **Pictures may live outside the site.** `"images"` in the collection says
+  where they are — a bucket, a CDN — and names the thumbnail by a rule
+  (`_tn` before the extension, optionally a different folder and format)
+  rather than item by item. Without it they resolve under `static/images/`.
+
+- **Slugs are addresses, not titles.** An item's slug comes from its title
+  folded to `[a-z0-9-]`: quotes, backticks, curly apostrophes and accents
+  never reach a URL, because a slug that kept one would arrive percent-encoded
+  and never match. A miss is a 404 and never the nearest item to it. An item
+  whose address is already a page is named in the editor's message line and in
+  `bun run export`, where `--strict` fails on it.
+
+- **Old addresses keep working.** `aliases` — a field on an item, repeatable
+  front matter on a page — makes a request for an address that has moved a
+  301 to where the thing lives now, matched on the decoded path so a legacy
+  slug full of punctuation still answers. `bun run export` writes each one as
+  a small redirect page, so a published site keeps them too.
+
+- Items are pages to everything else: one entry each in `/search.json` (the
+  caption as the words), a line each in `sitemap.xml`, and a file each in
+  `dist/`, all from the one walk the index already made.
+
+- The seed site gains a gallery, a guide page about collections, and
+  `.collection`, `.group`, `.item`, `.thumb` styles in the base stylesheet,
+  drawn from `--thumb` and `--thumb-gap` so a theme reaches them.
+
 - **The scaffold writes `.railway/railway.ts`, not `railway.json`.** Build,
   start, healthcheck and the two variables the exporter needs
   (`DUCKDOWN_PATH`, `DUCKDOWN_ORIGIN`) are now one file a review can see,

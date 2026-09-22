@@ -6,6 +6,7 @@ import { RUN, SITE } from "./helpers";
 import { exportSite, outPath, brokenLinks, main } from "../server/export";
 import { LocalStorage } from "../server/storage";
 import { searchChanged } from "../server/search";
+import { collectionsChanged } from "../server/collection";
 
 const out = (name: string) => join(RUN, `export-${name}`);
 const read = (dir: string, path: string) => readFileSync(join(dir, path), "utf8");
@@ -268,5 +269,112 @@ describe("the export's report of broken links", () => {
       rmSync(page); log.mockRestore(); error.mockRestore();
     }
     expect(await exportSite({ out: out("mended"), strict: true, say: quiet }).then((c) => c.broken)).toBe(0);
+  });
+});
+
+describe("collections", () => {
+  test("every item is a page in dist/, and the overview links to it", async () => {
+    const dir = out("collection");
+    const count = await exportSite({ out: dir, origin: "https://example.com", say: quiet });
+
+    // The item, at its one canonical address, through the same pageHtml the
+    // site and the preview use: a feature that skipped the export wouldn't be
+    // a duckdown feature.
+    const item = read(dir, "gallery/first-light/index.html");
+    expect(item).toContain("<title>First Light</title>");
+    expect(item).toContain('<link rel="canonical" href="https://example.com/gallery/first-light/">');
+    expect(item).toContain('<a class="next" rel="next" href="/gallery/second-wind/">Second Wind</a>');
+    expect(item).not.toContain("user-edit");           // no editor behind a folder of files
+    expect(item).not.toMatch(/\{\{[\w-]+\}\}/);
+
+    expect(read(dir, "gallery/index.html")).toContain('<a class="item" href="/gallery/first-light/">');
+    expect(read(dir, "by-year.html")).toContain("<h2>1961 - Early work</h2>");
+
+    // Items are pages to search and to the sitemap, from the same walk.
+    const index = JSON.parse(read(dir, "search.json"));
+    expect(index.some((e: { url: string }) => e.url === "/gallery/study-in-green/")).toBe(true);
+    expect(read(dir, "sitemap.xml")).toContain("https://example.com/gallery/study-in-green/");
+
+    // The thumbnails a collection points at are links like any other, so a
+    // missing one is reported rather than published.
+    expect(count.broken).toBe(0);
+    expect(count.problems).toBe(0);
+  });
+
+  test("an alias is a redirect page a static host can serve", async () => {
+    const dir = out("aliases");
+    await exportSite({ out: dir, origin: "https://example.com", say: quiet });
+    const moved = read(dir, "first-light-1961/index.html");
+    expect(moved).toContain('<link rel="canonical" href="/gallery/first-light/">');
+    expect(moved).toContain('<meta http-equiv="refresh" content="0; url=/gallery/first-light/">');
+    // And this server finds it: /first-light-1961 redirects to the folder,
+    // whose index.html is the page above.
+    expect(existsSync(join(dir, "first-light-1961", "index.html"))).toBe(true);
+  });
+
+  test("a legacy address full of punctuation is written under the name a request decodes to", async () => {
+    const dir = out("legacy");
+    const file = join(SITE, "pages", "gallery", "collection.json");
+    const before = readFileSync(file, "utf8");
+    const changed = JSON.parse(before);
+    changed.groups[0].items[0].aliases.push(`/l"etoile-1976`, "/don’t-write-everything-down");
+    try {
+      writeFileSync(file, JSON.stringify(changed));
+      collectionsChanged();
+      searchChanged();
+      await exportSite({ out: dir, origin: "https://example.com", say: quiet });
+      // The name on disk is the decoded one, which is what serve.ts looks for
+      // after decodePath — so the round trip works without re-encoding twice.
+      expect(read(dir, `l"etoile-1976/index.html`)).toContain("/gallery/first-light/");
+      expect(read(dir, "don’t-write-everything-down/index.html")).toContain("/gallery/first-light/");
+    } finally {
+      writeFileSync(file, before);
+      collectionsChanged();
+      searchChanged();
+    }
+  });
+
+  test("an alias that is already a page leaves the page alone and says so", async () => {
+    const dir = out("alias-clash");
+    const said: string[] = [];
+    const file = join(SITE, "pages", "gallery", "collection.json");
+    const before = readFileSync(file, "utf8");
+    const changed = JSON.parse(before);
+    changed.groups[0].items[0].aliases.push("/gallery");   // the folder's own index
+    try {
+      writeFileSync(file, JSON.stringify(changed));
+      collectionsChanged();
+      const count = await exportSite({ out: dir, origin: "https://example.com", say: (l) => said.push(l) });
+      expect(read(dir, "gallery/index.html")).toContain('class="collection"');   // still the overview
+      expect(said.join("\n")).toContain("alias /gallery is already a page");
+      expect(count.problems).toBe(1);
+    } finally {
+      writeFileSync(file, before);
+      collectionsChanged();
+    }
+  });
+
+  test("a collection that can't have its addresses is reported, and --strict stops the build", async () => {
+    const log = spyOn(console, "error").mockImplementation(() => {});
+    const said: string[] = [];
+    const file = join(SITE, "pages", "gallery", "collection.json");
+    const before = readFileSync(file, "utf8");
+    const changed = JSON.parse(before);
+    changed.groups[0].items.push({ title: "Notes" });
+    try {
+      writeFileSync(join(SITE, "pages", "gallery", "notes.md"), "title: Notes\n\n# Notes");
+      writeFileSync(file, JSON.stringify(changed));
+      collectionsChanged();
+      const count = await exportSite({ out: out("clash"), origin: "", say: (l) => said.push(l) });
+      expect(count.problems).toBe(1);
+      expect(said.join("\n")).toContain("already a page");
+      await expect(exportSite({ out: out("clash"), origin: "", say: quiet, strict: true }))
+        .rejects.toThrow("collection problem(s), and --strict is on");
+    } finally {
+      rmSync(join(SITE, "pages", "gallery", "notes.md"));
+      writeFileSync(file, before);
+      collectionsChanged();
+      log.mockRestore();
+    }
   });
 });

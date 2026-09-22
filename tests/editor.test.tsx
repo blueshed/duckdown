@@ -963,3 +963,34 @@ describe("the app", () => {
     history.replaceState(null, "", "/edit");
   });
 });
+
+describe("Preview, on a folder with a collection", () => {
+  const frame = (host: HTMLElement) => host.querySelector("iframe") as HTMLIFrameElement;
+
+  test("the overview renders, and a collection that can't have its addresses speaks", async () => {
+    batch(() => {
+      filePath.set("gallery/index.md");
+      editorContent.set("title: Gallery\n\n# Gallery\n\n{{items}}");
+    });
+    const { host, dispose } = render(() => <Preview />);
+    await waitFor(() => frame(host).srcdoc.includes("First Light"));
+    expect(frame(host).srcdoc).toContain('<a class="item" href="/gallery/first-light/">');
+    expect(notice.get()).toBe("");
+
+    // Failures speak: a problem with collection.json is nothing the page's
+    // own text can cause, so the preview carries it and the Notice shows it.
+    const restore = intercept(() => Response.json({
+      html: "<p>still here</p>", layout: "site.html", includes: [],
+      problems: ['gallery/collection.json: "Notes" wants /gallery/notes/, which is already a page'],
+    }));
+    try {
+      editorContent.set("title: Gallery\n\n# Gallery again\n\n{{items}}");
+      await waitFor(() => notice.get());
+      expect(notice.get()).toContain("wants /gallery/notes/");
+      expect(frame(host).srcdoc).toContain("still here");   // the preview still shows
+    } finally {
+      restore();
+    }
+    dispose();
+  });
+});

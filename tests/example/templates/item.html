@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{title}}</title>
+  {{description}}
+  <link rel="canonical" href="{{url}}">
+  <link href="/static/site.css" rel="stylesheet">
+  <link href="/static/theme.css" rel="stylesheet">
+  {{css}}
+</head>
+<body>
+  {{include topbar}}
+  <p class="back"><a href="/by-year.html#{{item-year}}">← {{group}}</a></p>
+  <figure class="work">
+    <img src="{{item-src}}" alt="{{item-title}}">
+    <figcaption>{{item-caption}}</figcaption>
+  </figure>
+  <nav class="item-nav" aria-label="This collection">{{prev}}{{next}}</nav>
+  {{groups}}
+  {{edit}}
+  <script src="/static/search.js" defer></script>
+</body>
+</html>
