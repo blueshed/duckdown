@@ -47,8 +47,9 @@ duckdown/
 │   ├── pid.ts              # Pid file: written at startup, removed on exit; stopServer()
 │   ├── stop.ts             # bun run stop
 │   ├── log.ts              # The view log: what was read, never who
-│   ├── search.ts           # The index readers search, cached like the nav
+│   ├── search.ts           # The index readers search, cached like the nav; page and item aliases
 │   ├── sitemap.ts          # sitemap.xml from that index
+│   ├── collection.ts       # collection.json: a folder of items, each one a page
 │   ├── base.ts             # Where the base files are (server/base/) and the root files
 │   ├── base/               # site.css, search.js: served and exported when a site has none of its own
 │   ├── init.ts             # scaffold(root, {vendored}): what both ways in write (see below)
@@ -94,12 +95,13 @@ duckdown/
 │           ├── Notice.tsx    # Shows the failure message (role=alert)
 │           └── Icon.tsx      # Lucide icons (lucide-static SVG strings)
 ├── tests/                  # see Testing below
-│   ├── example/            # Seed site data (pages, static, templates)
+│   ├── example/            # Seed site data (pages, static, templates, a gallery collection)
 │   ├── setup.ts            # Preload: env + happy-dom, before any module loads
 │   ├── helpers.ts          # The in-process server, signIn(), waitFor()
 │   ├── server.test.ts      # HTTP against the in-process server
 │   ├── export.test.ts      # bun run export, onto a scratch folder
-│   ├── search.test.ts      # plainText, the index, and its cache
+│   ├── search.test.ts      # plainText, the index, its cache, and the aliases from that walk
+│   ├── collection.test.ts  # collection.json: slugs, overviews, aliases, collisions
 │   ├── editor.test.tsx     # The editor's code in happy-dom, against that server
 │   ├── units.test.ts       # pid, config, storage, auth, error handler
 │   ├── s3.test.ts          # S3Storage via Bun's S3 client + fake-s3.ts
@@ -303,9 +305,48 @@ When a content feature changes (syntax, front matter, themes, navigation, the ed
 
 Styling is templates and stylesheets, and nothing else. `templates/site.html` links `static/site.css` (duckdown's base, everything drawn from CSS variables) and `static/theme.css` (this site's look, saying only what differs). There is no `theme:` key, no class on `<body>`, and no per-folder cascade: every page is styled because the template links the files, so a page can't opt in and can't forget to. Style new things through the variables so `theme.css` reaches them. For one page, `css:` links a stylesheet after the template's own; for a kind of page, `layout:` picks a template that links what that kind needs.
 
-Search happens in the browser. `search.ts` builds one entry per readable page and one per section of it — url (a section's ends `#id`, read out of the rendered HTML so it can't disagree with the page), title, section, description, date, and that section's words — and the whole thing goes over as `/search.json` (served) or `dist/search.json` (published). Nothing on the server searches: a few dozen pages is a few dozen kilobytes, and a linear scan of that in the browser beats asking anyone. Drafts are left out, because a result that 404s is worse than no result, and `server/base/search.js` is ordinary site code a site can fork by having its own. It ranks title > heading > description > body, shows at most three sections of a page, and links `url#id:~:text=…` (a text fragment, with `-` encoded), which a browser may honour, ignore, or (some Chromium builds) honour by giving up on the id as well — so `search.js` scrolls to the heading itself on `load` when the reader is still at the top. Every field matches at the start of a word, and `.search-results` scrolls inside its panel. The sitemap doesn't take its addresses from the sections: `buildSite()` returns the entries and a page list, from one walk and one cache. The index is cached exactly like the nav, and `routes/pages.ts` drops both on a write.
+Search happens in the browser. `search.ts` builds one entry per readable page and one per section of it — url (a section's ends `#id`, read out of the rendered HTML so it can't disagree with the page), title, section, description, date, and that section's words — and the whole thing goes over as `/search.json` (served) or `dist/search.json` (published). Nothing on the server searches: a few dozen pages is a few dozen kilobytes, and a linear scan of that in the browser beats asking anyone. Drafts are left out, because a result that 404s is worse than no result, and `server/base/search.js` is ordinary site code a site can fork by having its own. It ranks title > heading > description > body, shows at most three sections of a page, and links `url#id:~:text=…` (a text fragment, with `-` encoded), which a browser may honour, ignore, or (some Chromium builds) honour by giving up on the id as well — so `search.js` scrolls to the heading itself on `load` when the reader is still at the top. Every field matches at the start of a word, and `.search-results` scrolls inside its panel. The sitemap doesn't take its addresses from the sections: `buildSite()` returns the entries and a page list, from one walk and one cache. The index is cached exactly like the nav, and `routes/pages.ts` drops both on a write. That one walk also collects the aliases — an address a page or an item used to answer at — so `aliasTarget()` costs nothing extra and expires with the index.
 
 What the site knows about itself lives in `nav.ts`: the nav, each folder's `{{pages}}` listing, and `{{sitemap}}` (the same walk, recursive: `folderEntries()` is what both are made from, so they agree on drafts, `-` folders and order). In production both are built once and dropped by `pagesChanged()` whenever the pages route writes or deletes, because every write goes through the server — a new write path to pages must call it too. With `DEBUG=1` they're built per request instead, so pages written straight to disk (by hand, or by a session using the authoring skill) show up at once.
+
+`collection.ts` is a folder of pages duckdown writes: `pages/<folder>/collection.json`
+lists groups (and subgroups) of items, and every item is a page at
+`/<folder>/<slug>/`. It is read through the storage layer like everything
+else, so it works on disk and in a bucket, and it is cached exactly like the
+nav — `routes/pages.ts` calls `collectionsChanged()` beside `pagesChanged()`
+and `searchChanged()`, because collection.json lives under `pages/` and is
+written through that same route. With `DEBUG=1` it is read per request.
+
+Items flow through the same three callers as every page. `itemAt(pages, name)`
+splits an address into a folder and a slug, asks that one collection, and
+answers null for anything it doesn't hold — never a nearest match, which is
+what served the wrong painting on the site this came from. `routes/site.ts`
+calls it when no `.md` answers, `export.ts` calls it while walking (a
+`collection.json` in the walk renders every item into `dist/`), and both then
+go through `itemPage()` + `pageHtml()` with the item in `PageOptions.item`.
+`search.ts` meets the same file in its own walk and emits an entry and a
+`PageRef` per item, so items are in `/search.json` and `sitemap.xml` for free.
+The preview renders an overview like any page and returns
+`collectionProblems()` beside the html, which is how the editor's Notice hears
+that a slug collides with a page.
+
+Slugs are addresses, not titles: `slugify()` folds accents and keeps
+`[a-z0-9-]`, `SLUG` is the shape every slug has, duplicates take `-1`/`-2` in
+file order and a title with nothing usable in it takes `item-<n>`. Aliases —
+`aliases` on an item, repeatable front matter on a page — are collected by
+`buildSite()` and matched by `aliasTarget()` on the **decoded** path
+(`decodePath()` runs first), because a legacy address may hold a quote or a
+curly apostrophe; the site answers 301, and the export writes a redirect page
+under the decoded name.
+
+`{{items}}`, `{{items <collection>}}`, `{{items by=<field>}}` and `{{groups}}`
+are filled by `fillCollections()`, over the page's body (outside `<code>`, like
+`{{pages}}`) and again over the template, before `{{content}}`;
+`{{item-<field>}}`, `{{prev}}`, `{{next}}` and `{{group}}` are filled from the
+item the same way `{{x-…}}` is filled from the page. Templates stay flat:
+placeholders and generated HTML, never a loop. `SKIP` ("skip") is the one value
+duckdown reads rather than shows — out of `{{items by=…}}`, and empty in
+`{{item-<field>}}` so a template's `href="…#{{item-index}}"` lands at the top.
 
 The editor edits three folders, each its own route built by `fileRoutes()`
 (`routes/files.ts`): `pages/`, `templates/` and `static/`. Each is rooted in its
@@ -324,8 +365,9 @@ Every branch is a `when()` built as it's shown, and they're mutually exclusive,
 so at most one is an element at a time.
 
 `export.ts` is the third caller of `pageHtml()`, after the site route and the
-preview: it walks `pages/`, renders each page and writes it at its one
-canonical address (`/` and `/blog/` as `index.html`, `about.md` as
+preview: it walks `pages/`, renders each page — and each item of any
+`collection.json` it meets, plus a redirect page per alias — and writes it at
+its one canonical address (`/` and `/blog/` as `index.html`, `about.md` as
 `about.html`), then copies `static/`. Drafts are left out rather than hidden,
 `{{edit}}` is empty, and `{{url}}` takes its origin from `DUCKDOWN_ORIGIN`
 because there is no request to read it from. It reads through the storage

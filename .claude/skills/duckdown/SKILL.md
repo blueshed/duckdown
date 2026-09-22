@@ -1,10 +1,10 @@
 ---
 name: duckdown
-description: Write and organise the content of a Duckdown site — markdown pages and their front matter (title, nav, toc, layout, css), callouts, [[wiki links]], folders and the navigation, styling through CSS variables, images, templates, who can sign in, and getting a change published. Use this whenever the user wants to add, edit, move or restyle pages on a duckdown site, write a post or a guide, change how the site looks, get something into the navigation, put images on a page, or add an editor — even when they don't say "duckdown", if the files live in a duckdown content folder (pages/, static/, templates/, users.json). Not for changing duckdown's own server or editor code.
+description: Write and organise the content of a Duckdown site — markdown pages and their front matter (title, nav, toc, layout, css, aliases), callouts, [[wiki links]], folders and the navigation, collections (a gallery or catalogue written once in collection.json), styling through CSS variables, images, templates, who can sign in, and getting a change published. Use this whenever the user wants to add, edit, move or restyle pages on a duckdown site, write a post or a guide, change how the site looks, get something into the navigation, put images on a page, build a gallery or catalogue, keep an old address working, or add an editor — even when they don't say "duckdown", if the files live in a duckdown content folder (pages/, static/, templates/, users.json). Not for changing duckdown's own server or editor code.
 license: MIT
 metadata:
   author: blueshed
-  version: "0.0.2"
+  version: "0.0.3"
 ---
 
 # Writing a Duckdown site
@@ -21,6 +21,8 @@ It's the folder `DUCKDOWN_PATH` names in `.env`:
 
 ```
 pages/        the site: every .md is a page, every folder can have an index.md
+              a folder may also hold collection.json — a gallery or catalogue,
+              every item a page, written once (see Collections in reference.md)
 static/       served as-is at /static/ — site.css, theme.css, images/, favicon.ico
 templates/    site.html wraps every page and links the stylesheets;
               layout: picks another
@@ -43,13 +45,15 @@ users.json    who can sign in (password hashes)
    - `toc: true` for a contents list; every heading gets a `#` link
    - `{{pages}}` in a folder's `index.md` lists the pages beside it, newest first by `date:`
    - `draft: true` keeps a page off the site until it's ready (you can still read it signed in)
+   - `aliases: /old-address` keeps an address that has moved working, as a 301
 
 ## What catches people out
 
-- **A plain block of front matter may only use the keys duckdown reads** — `title`, `nav`, `toc`, `layout`, `css`, `description`, `date`, `draft`, or an `x-…` of your own. For any other key, fence it with `---` … `---`. (That's why prose starting "Update: closed Monday" keeps its first line.)
+- **A plain block of front matter may only use the keys duckdown reads** — `title`, `nav`, `toc`, `layout`, `css`, `description`, `date`, `order`, `draft`, `aliases`, or an `x-…` of your own. For any other key, fence it with `---` … `---`. (That's why prose starting "Update: closed Monday" keeps its first line.)
 - **Only a folder's `index.md` is in the navigation**, labelled by its `nav:` (else its `title:`). To put "About" in the nav, write `pages/about/index.md`, not `pages/about.md`. Folders starting with `-` or `.` stay out of it, though their pages are still served. Drafts stay out too.
 - **Styling is templates and stylesheets, nothing else.** `templates/site.html` links `static/site.css` (duckdown's base, drawn from variables) and `static/theme.css` (this site's look, which only says what differs — `:root { --accent: … }`). To restyle the site, edit `theme.css`. For one page, `css: poster` links `/static/poster.css` after them. For a *kind* of page, give it a template with `layout:` and let that template link what it needs.
 - **In development (`DEBUG=1`) the navigation is rebuilt on every request**, so a folder's `index.md` written straight to disk shows up at once. In production it's cached and rebuilt when a page is saved or deleted through the editor, so files put there another way need a restart (`bun run stop`, then start again).
+- **A folder of like things doesn't need a file each.** `pages/<folder>/collection.json` lists items — a picture, a title, a caption, and whatever fields you like — and duckdown gives each one a page at `/<folder>/<slug>/`, a search entry, a sitemap line and a place in `{{items}}`, the overview that writes itself. Its pictures may live outside the site (a bucket, a CDN); `{{items by=<field>}}` regroups the same items by any field; `aliases` keeps old addresses answering. The whole of it is in **Collections** in [reference.md](reference.md).
 - **A page is searchable because it is readable** — `/search.json` carries every non-draft page's words, and the browser matches against it. Nothing to register, no index to rebuild by hand. A `draft:` page is left out, so it can't be found until it's published.
 - **Whether a change is live depends on how the site is deployed**, and there are two ways. On a **served** site duckdown is running and a save at `/edit` is live at once. On a **published** site the pages were rendered to files by `bun run export` and a host is handing those out — editing markdown changes nothing anybody can see until the site is exported and deployed again. Look for a `DEPLOY.md`: a published site has one, and it says how. Never tell someone their change is live without knowing which kind of site it is.
 - **`users.json` holds password hashes**, never passwords: a plain one won't sign in. Make a hash with `bun -e 'console.log(await Bun.password.hash("their-password"))'`.
@@ -76,4 +80,4 @@ whole of it. Don't invent a deployment step that isn't written down.
 
 ## Everything else
 
-Read [reference.md](reference.md) for the details; it opens with a contents list. It covers front matter keys, the markdown syntax (callouts, wiki links, contents lists, raw HTML), how the navigation is built, styling and every CSS variable (with dark mode), the template's placeholders, static files and images, users, the editor, publishing, and troubleshooting.
+Read [reference.md](reference.md) for the details; it opens with a contents list. It covers front matter keys, the markdown syntax (callouts, wiki links, contents lists, raw HTML), how the navigation is built, collections (collection.json, {{items}}, item templates, aliases), styling and every CSS variable (with dark mode), the template's placeholders, static files and images, users, the editor, publishing, and troubleshooting.

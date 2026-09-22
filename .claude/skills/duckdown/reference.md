@@ -5,14 +5,15 @@
 3. [Front matter](#front-matter)
 4. [Markdown](#markdown) — headings and contents lists, callouts, wiki links, images, raw HTML
 5. [Navigation](#navigation)
-6. [Styling](#styling) — the variables, dark mode, one page, a kind of page
-7. [The site template](#the-site-template)
-8. [Static files and images](#static-files-and-images)
-9. [Users](#users)
-10. [The editor](#the-editor)
-11. [Search](#search)
-12. [Publishing](#publishing)
-13. [Troubleshooting](#troubleshooting)
+6. [Collections](#collections) — a folder of items written once, in collection.json
+7. [Styling](#styling) — the variables, dark mode, one page, a kind of page
+8. [The site template](#the-site-template)
+9. [Static files and images](#static-files-and-images)
+10. [Users](#users)
+11. [The editor](#the-editor)
+12. [Search](#search)
+13. [Publishing](#publishing)
+14. [Troubleshooting](#troubleshooting)
 
 ## The content folder
 
@@ -29,9 +30,12 @@
 ├── pages/
 │   ├── index.md          /              (also /index.html)
 │   ├── about.md          /about.html    (and /about)
-│   └── blog/
-│       ├── index.md      /blog/          — in the nav
-│       └── first-post.md /blog/first-post.html
+│   ├── blog/
+│   │   ├── index.md      /blog/          — in the nav
+│   │   └── first-post.md /blog/first-post.html
+│   └── gallery/
+│       ├── index.md      /gallery/
+│       └── collection.json  a folder of items: each one a page at /gallery/<slug>/
 ├── static/
 │   ├── site.css          duckdown's base, drawn from CSS variables
 │   ├── theme.css         this site's own look, linked after it
@@ -65,6 +69,7 @@
 | `date` | Orders a folder's `{{pages}}` listing, newest first, and is shown beside the link (ISO: `2026-09-19`) |
 | `order` | In a folder's `index.md` only: a whole number, for where that folder sits among its siblings in the navigation and `{{sitemap}}` |
 | `draft` | `true` keeps the page off the site, the nav and listings; signed in to the editor, you still see it |
+| `aliases` | An address this page used to answer at; a request for it is a 301 to this page. Repeat the line for more than one |
 
 - A plain block may hold **only those keys**, or one starting `x-` (your own). At the first line that isn't one, the block ends and everything from there is content — so prose opening `Update: closed on Monday` keeps its first line, and a mistyped key appears on the page instead of vanishing.
 - For other keys, fence the block and put anything in it:
@@ -178,6 +183,178 @@ The template receives it as:
 <li><a href="/blog/index.html" aria-current="true">Blog</a></li>
 </ul></nav>
 ```
+
+## Collections
+
+Some folders aren't pages you write one at a time: a gallery of four hundred
+works, a catalogue, a discography. A **collection** is `collection.json` beside
+a folder's `index.md`. Duckdown reads it and gives every item a page at
+`/<folder>/<slug>/`, an entry in search and the sitemap, a line in the export,
+and a place in the overview `{{items}}` builds.
+
+```json
+{
+  "layout": "item",
+  "images": { "src": "/static/images/gallery/", "suffix": "_tn" },
+  "labels": { "year": { "1961": "Early work" } },
+  "groups": [
+    {
+      "name": "paintings",
+      "label": "Paintings",
+      "items": [
+        {
+          "src": "one.svg",
+          "title": "First Light",
+          "caption": "First Light, 1961. Ink on paper, 40 x 40 cm.",
+          "year": "1961",
+          "aliases": ["/first-light-1961"]
+        }
+      ],
+      "groups": [{ "name": "studies", "label": "Studies", "items": [] }]
+    },
+    { "name": "prints", "label": "Prints", "items": [] }
+  ]
+}
+```
+
+| Key | What it does |
+|-----|--------------|
+| `layout` | The template every item wears (`templates/item.html`). Defaults to `item` |
+| `images` | Where the pictures are: a base URL, or `{ "src", "thumb", "suffix", "extension" }`. Defaults to `/static/images/` |
+| `labels` | Per field, a label for a value: an overview's heading reads `1961 - Early work` |
+| `groups` | The sections, in order: `name`, optional `label`, `items`, and optionally `groups` of their own |
+
+An item says `src` (the picture's filename), `title`, `caption`, optionally
+`slug` and `aliases`, and any other key you like — `year`, `medium`,
+`catalogue`. Those extra keys are its **fields**: you group by them and read
+them in the template. Anything the file isn't shaped like is skipped rather
+than believed, and said in the server log.
+
+### Order, slugs and addresses
+
+- The order of the items in the file, right through the groups, is the order
+  `{{prev}}` and `{{next}}` follow. It **wraps**: the last item's next is the
+  first.
+- An item's slug comes from its title, folded to `[a-z0-9-]`: `L"Etoile 1976` →
+  `l-etoile-1976`, `Café Ölé` → `cafe-ole`. Quotes, backticks and curly
+  apostrophes never survive into an address, because a slug that kept one would
+  arrive percent-encoded and never match. A title with nothing usable in it
+  gets `item-<n>` by position; two of the same name get `-1`, `-2`, in file
+  order. An item may state its own `slug`, which must be of that shape.
+- `/gallery/first-light`, `/gallery/first-light/` and
+  `/gallery/first-light/index.html` all reach the item, as they would a folder.
+  An address the collection doesn't hold is a plain 404 — never the nearest
+  item to it.
+- If an item's address is already a page in that folder, the **page wins** and
+  the item can't be reached. Duckdown says so in the editor's message line and
+  in `bun run export` (where `--strict` fails on it), naming the item.
+
+### Pictures
+
+`src` is a filename; where the pictures live is said once for the collection.
+A gallery's originals are usually far too big for the site's own `static/`, so
+they can sit in a bucket or on a CDN:
+
+```json
+"images": {
+  "src": "https://pictures.example.com/original/",
+  "thumb": "https://pictures.example.com/thumbnails/",
+  "suffix": "_tn",
+  "extension": ".png"
+}
+```
+
+`thumb` defaults to `src`; `suffix` goes before the extension (`Anna.jpg` →
+`Anna_tn.jpg`) and is `_tn` unless you say otherwise; `extension` replaces the
+original's, for a collection whose thumbnails are all `.png`. A plain string in
+place of the object is just `src`. An item with no `src` has no picture and no
+thumbnail, rather than a link to a folder.
+
+### Overviews
+
+| Placeholder | What it becomes |
+|-------------|-----------------|
+| `{{items}}` | The collection's groups, each a grid of thumbnails linking to the item pages |
+| `{{items by=<field>}}` | One grid per distinct value of that field, in the order the values first appear |
+| `{{items <collection>}}`, `{{items <collection> by=<field>}}` | The same for another folder's collection |
+| `{{groups}}`, `{{groups <collection>}}` | The section menu: each group linking to its first item, the current one marked |
+
+An item whose field is the string `skip` is left out of `{{items by=…}}`
+altogether — that's how a work stays out of the prints list without leaving the
+collection. Without a collection's name, the tag means the page's own folder's
+collection (on an item's page, the item's own).
+
+All of them work in a page's markdown and in a template, and stay as written
+inside a code span or fence so a page can document them. A tag naming a folder
+with no `collection.json` fills as nothing and says so in the log.
+
+Each heading carries the value as its `id` — `id="1961"`, `id="paintings"` — so
+a template can link back to the place a reader came from. A value with spaces
+in it is slugified for the `id`, so keep linked values simple.
+
+### The item template
+
+`templates/item.html` is an ordinary template with these as well:
+
+| Placeholder | Becomes |
+|-------------|---------|
+| `{{item-<field>}}` | Anything the item says, by name: `{{item-title}}`, `{{item-caption}}`, `{{item-year}}`. Escaped, empty when unset or `skip` |
+| `{{item-src}}`, `{{item-thumb}}` | The picture and its thumbnail, as full URLs |
+| `{{item-href}}` | The item's own address |
+| `{{prev}}`, `{{next}}` | Links to the items either side, wrapping |
+| `{{group}}` | The label of the group this item is in |
+
+```html
+<p class="back"><a href="/by-year.html#{{item-year}}">← {{group}}</a></p>
+<figure class="work">
+  <img src="{{item-src}}" alt="{{item-title}}">
+  <figcaption>{{item-caption}}</figcaption>
+</figure>
+<nav class="item-nav">{{prev}}{{next}}</nav>
+{{groups}}
+```
+
+`{{title}}`, `{{description}}`, `{{url}}`, `{{nav}}`, `{{edit}}` and the rest
+fill as on any page — an item **is** a page. Its title is the item's, its
+description the caption, and `{{edit}}` opens the `collection.json` it is
+written in. It has no `{{content}}` of its own: everything it says is a field.
+If an item needs prose, it wants to be a page instead.
+
+### Old addresses
+
+`aliases` on an item, or in a page's front matter, keeps an address that has
+moved working: a request for it is a **301** to where the thing lives now.
+
+```json
+{ "title": "First Light", "aliases": ["/first-light-1961", "/old/first-light"] }
+```
+
+```markdown
+title: Moved
+aliases: /old-place
+aliases: /older-place.html
+```
+
+They are matched on the **decoded** address, so an old slug holding a quote or
+a curly apostrophe still answers. `bun run export` writes each alias as a small
+redirect page (canonical link plus meta refresh) under the decoded name, so a
+published site keeps them too; an alias that is already a page is left alone
+and said.
+
+### Styling
+
+`{{items}}` emits `.collection`, `.group`, `.items`, `.item`, `.thumb` and
+`.item-title`; `{{groups}}` emits `.groups`; the seed's item template uses
+`.work` and `.item-nav`. All of it is drawn from the variables, so `theme.css`
+reaches it:
+
+```css
+:root {
+  --thumb: 12rem;      /* how big a thumbnail is */
+  --thumb-gap: 1.5rem; /* how far apart */
+}
+```
+
 
 ## Styling
 
@@ -404,6 +581,9 @@ Where the output goes is the site's own business, not duckdown's: look for a
 | An SVG ignores the stylesheet's colours | It's shown with `<img>` or `![…]`, which CSS can't reach into: use it as a mask (above) |
 | An SVG shows nothing at all | It isn't valid XML — check with `xmllint --noout file.svg`; a `--` inside a comment is the usual culprit |
 | A folder's page isn't found | Give the folder an `index.md`: `/blog` is served by `pages/blog/index.md` |
+| An item of a collection is "not found" | Its slug isn't what you think: it comes from the title, cleaned to `[a-z0-9-]`. Open `{{items}}` and follow the link, or give the item a `slug` |
+| An item's page is a page you wrote | A page in that folder has the same address, and a page always wins. Duckdown names the item in the preview and in `bun run export` |
+| `{{items}}` shows nothing | No `collection.json` in that folder (the server log says so), or every item's field is `skip` |
 | A `[[wiki link]]` goes to the wrong place | It's relative to the page's folder: start it with `/` to go from the top |
 | Nobody can sign in | `users.json` needs hashes, not passwords; or it's missing (see the server log) |
 | Edits don't show on the running site (duckdown repo) | The site runs from `.dev-site`, not the seed `tests/example` |
