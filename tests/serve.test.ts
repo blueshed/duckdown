@@ -78,6 +78,26 @@ describe("serveDist", () => {
     expect((await serveDist(new Request("http://site/"), dist)).status).toBe(200);
   });
 
+  test("with DUCKDOWN_ORIGIN, another host moves to it, path and query kept", async () => {
+    const origin = "https://www.blueshed.co.uk";
+    const at = (host: string, path = "/", forwarded?: string) => serveDist(
+      new Request(`http://${host}${path}`, { headers: forwarded ? { host, "x-forwarded-host": forwarded } : { host } }),
+      dist, () => {}, origin);
+    // The apex, arriving direct or through a proxy that says who asked.
+    const moved = await at("blueshed.co.uk", "/blog/?page=2");
+    expect(moved.status).toBe(301);
+    expect(moved.headers.get("location")).toBe("https://www.blueshed.co.uk/blog/?page=2");
+    expect((await at("railway.internal", "/", "blueshed.co.uk")).headers.get("location")).toBe("https://www.blueshed.co.uk/");
+    // The origin itself, and localhost, are served.
+    expect((await at("www.blueshed.co.uk")).status).toBe(200);
+    expect((await at("localhost:8080")).status).toBe(200);
+    // Health never moves: the platform asks on whatever host it likes.
+    expect(await (await at("blueshed.co.uk", "/health")).text()).toBe("OK");
+    // Without an origin, any host is served; a Request with no Host header uses its URL's.
+    expect((await ask("/")).res.status).toBe(200);
+    expect((await serveDist(new Request("http://blueshed.co.uk/"), dist, () => {}, origin)).status).toBe(301);
+  });
+
   test("listens on the port it is given", async () => {
     const server = listen(dist, 0);
     try {

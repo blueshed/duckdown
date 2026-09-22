@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.1 — 2026-09-22
+
+- **One address for the published site.** With `DUCKDOWN_ORIGIN` set, a
+  request that arrives under another host (the apex, when the origin is
+  `www`) is a 301 to the origin, path and query kept. Point both names at the
+  service and the apex redirects for free; `localhost` and `/health` are
+  never moved.
+
 ## 0.3.0 — 2026-09-22
 
 - A URL with a malformed escape is a 400, not a 500 with a stack.

@@ -28,9 +28,18 @@ async function file(dir: string, path: string): Promise<Bun.BunFile | null> {
 // What one request gets. `html` says whether the answer is a page: only pages
 // are views (a stylesheet or an image fetched by one is not a reader arriving),
 // which is what the served site counts too.
-async function route(req: Request, dir: string): Promise<{ res: Response; html: boolean }> {
+async function route(req: Request, dir: string, origin: string): Promise<{ res: Response; html: boolean }> {
   const url = new URL(req.url);
   if (url.pathname === "/health") return { res: new Response("OK"), html: false };
+
+  // One address. With DUCKDOWN_ORIGIN set, a request for the same site under
+  // another name (the apex when the origin is www) moves to the origin, path
+  // and query kept. Absolute, deliberately — the point is to leave this host.
+  // localhost is left alone so a local run of the published site still works.
+  const elsewhere = otherHost(req, url, origin);
+  if (elsewhere) {
+    return { res: new Response(null, { status: MOVED, headers: { Location: `${elsewhere}${url.pathname}${url.search}` } }), html: false };
+  }
 
   const path = decodePath(url.pathname);
   if (path === null) return { res: new Response("Bad Request", { status: 400 }), html: false };
@@ -61,21 +70,38 @@ async function route(req: Request, dir: string): Promise<{ res: Response; html: 
   };
 }
 
+// The origin to move to when the request came in under another host, or
+// null when it should be served here: no origin configured, the host matches,
+// or it's localhost. Behind Railway's proxy the reader's host is
+// x-forwarded-host; the Host header is what the proxy said to us.
+function otherHost(req: Request, url: URL, origin: string): string | null {
+  if (!origin) return null;
+  const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? url.host;
+  const target = new URL(origin);
+  if (host === target.host || host.startsWith("localhost")) return null;
+  return target.origin;
+}
+
 // One line per page view, as the served site prints: what was read and how
 // much, and nothing that identifies a reader. `bun run views` reads these.
 export async function serveDist(
   req: Request,
   dir: string,
   log: (req: Request, status: number, startedAt: number) => void = logView,
+  origin = "",
 ): Promise<Response> {
   const startedAt = performance.now();
-  const { res, html } = await route(req, resolve(dir));
+  const { res, html } = await route(req, resolve(dir), origin);
   if (html) log(req, res.status, startedAt);
   return res;
 }
 
-export function listen(dir = process.env.SITE_DIR || "./dist", port = parseInt(process.env.PORT || "8080")) {
-  const server = Bun.serve({ port, fetch: (req) => serveDist(req, dir) });
+export function listen(
+  dir = process.env.SITE_DIR || "./dist",
+  port = parseInt(process.env.PORT || "8080"),
+  origin = process.env.DUCKDOWN_ORIGIN || "",
+) {
+  const server = Bun.serve({ port, fetch: (req) => serveDist(req, dir, logView, origin) });
   console.log(`serving ${resolve(dir)} on http://localhost:${server.port}/`);
   return server;
 }
