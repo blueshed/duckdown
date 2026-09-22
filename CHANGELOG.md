@@ -1,5 +1,41 @@
 # Changelog
 
+## Unreleased
+
+- **The editor edits a collection.** A folder's `collection.json` is in the
+  tree beside its pages now, with a grid icon, and opening a folder's index
+  page brings its collection up beneath it: groups of pictures with a title
+  and a caption each, instead of JSON with the commas in the right places.
+  Titles and captions are edited in place, works reorder by dragging (within
+  a group or into another) or with up and down, groups reorder, rename, gain
+  subgroups and go. Every other key an item carries — a year, a `slug`, its
+  `aliases` — survives a change exactly as it was found.
+
+- **A picture, dropped.** Drop one on a group or choose it, and duckdown
+  writes the original where that collection's `images` says pictures live,
+  writes a 128px thumbnail beside it under the collection's own `suffix` and
+  `extension`, and adds the work. Dropping a picture on a work's own picture
+  replaces it in place under the same file name, so the work keeps its
+  address and everything linking to it goes on working; the pane cache-busts
+  the thumbnail with `?v=`. A collection whose pictures live off the site says
+  so and offers no way to add one — the editor writes this site's
+  `static/images/` and nothing else.
+
+- **Every change writes the file**, through the same `/edit/pages/` route as
+  any other save, so the nav, the search index and the collection cache all
+  drop and the preview redraws. There is still no undo in duckdown: removing a
+  work or a group asks first, and that is the safety net. Turn on a bucket's
+  versioning, or keep the site in git.
+
+- **A local write is atomic.** Files are written beside themselves and renamed
+  into place, so a reader asking for a page mid-save is never handed half of
+  one. It was always possible; a pane that writes on every change made it
+  something you could watch happen.
+
+- **The editor at phone width.** Below 768px its three columns stack — the
+  tree on top, capped and scrolling, the panes below, and the preview standing
+  down — instead of a 240px tree beside two columns one word wide.
+
 ## 0.4.0 — 2026-09-22
 
 - **Collections: a folder of items, written once.** A `collection.json` beside

@@ -342,6 +342,40 @@ redirect page (canonical link plus meta refresh) under the decoded name, so a
 published site keeps them too; an alias that is already a page is left alone
 and said.
 
+### Editing one in the editor
+
+A collection doesn't have to be edited as JSON. In `/edit`, `collection.json`
+sits in the tree beside the pages of its folder, with a grid icon; open a
+folder's index page and its collection opens beneath it by itself. What the
+pane does:
+
+- **Titles and captions** are edited in place. Every other key on an item — a
+  year, an index, `slug`, `aliases` — is kept exactly where it was found, and
+  so is everything around the groups (`layout`, `images`, `labels`).
+- **Order**: drag a work by its picture, within its group or into another, or
+  use the up and down controls. Groups move with theirs.
+- **Groups**: add one, add a subgroup inside one, rename it (the heading edits
+  `label` when the group has one, `name` when it hasn't), or remove it.
+- **Pictures**: drop one on a group, or click *Drop a picture here* to choose
+  it. The original is written where `images` says its pictures live and a
+  128px thumbnail beside it, named by the collection's own `suffix` and
+  `extension` — the new work then needs a title and a caption. Dropping a
+  picture **on a work's picture** replaces it in place, under the same file
+  name, so the work keeps its address and every link to it goes on working.
+- A collection whose pictures live off the site (a bucket, a CDN) says so and
+  offers no way to add one: the editor can only write the site's own
+  `static/images/`. Name the item and put the file there yourself.
+
+Every change writes the whole file at once and the preview redraws with it.
+**There is no undo in duckdown** — not here, not anywhere else: removing a
+work or a group asks first, and that is the whole of the safety net. On S3,
+turn on the bucket's versioning and a bad afternoon is recoverable; on disk,
+keep the site in git.
+
+One thing to know before renaming: an item's address comes from its title, so
+renaming a work moves its page. Add the old address to the item's `aliases` in
+the file if anything links to it.
+
 ### Styling
 
 `{{items}}` emits `.collection`, `.group`, `.items`, `.item`, `.thumb` and
@@ -489,18 +523,19 @@ A page's `layout:` chooses the template (`layout: post` → `templates/post.html
 ## The editor
 
 - At `/edit`. Signing in lands there; `/login` when already signed in goes straight there; the home page's "Login to edit" link does the same.
-- **The tree** (left): the site's folders and pages, and nothing else — everything a page is composed with lives outside `pages/`. Click to open, `..` to go up. Two buttons in the header make a **new page** and a **new folder** (`folder/index.md`, titled with the folder's name). Neither ever overwrites — each says when a name is taken.
+- **The tree** (left): the site's folders and pages, and nothing else — everything a page is composed with lives outside `pages/`. Click to open, `..` to go up. A folder's `collection.json` is listed there too, with a grid icon, and opens as the collection pane rather than as JSON. Two buttons in the header make a **new page** and a **new folder** (`folder/index.md`, titled with the folder's name). Neither ever overwrites — each says when a name is taken.
 - **Editing** (middle): Save or ⌘⏎. The button lights up while there are unsaved changes, flashes green for "Saved", and red for "Not saved" (the notice says why). The bin deletes the page, after asking.
 - **Resources** (right sidebar, from the header): what a page is composed with, in three tabs.
   - *images* — browse and upload, and copy a markdown link for one.
   - *css* — the stylesheets in `static/`, the ones a page names with `css:`. Themes aren't here: they belong to a folder, and the tree is where the folders are.
   - *templates* — the files in `templates/`, and a button for a new one.
 - **Editing a resource** (a stylesheet or a template, from the sidebar): it opens in a pane *below* the page, with the same header — name, unsaved dot, delete, Save, and a close button. The page stays where it is, so you can click through pages and watch one stylesheet against each. It's transient: closing the pane leaves nothing behind.
+- **Editing a collection** (from the tree, or offered under a folder's index page): the same pane, holding the folder's works rather than a file's text — see [Editing one in the editor](#editing-one-in-the-editor). It shares the slot with a resource: the column holds the page and one thing beneath it, so opening a stylesheet closes the collection and the other way about.
 - **The middle column holds whatever is open**, and each pane closes, the page included. Two split it; one fills it. With no page open, a stylesheet or template has the column to itself — which is how you write one from scratch.
 - **Preview** (right): what you'd see. With a page open, the page as the site will show it, rendered by the same code — its own template and the stylesheets it links, the navigation, the `{{pages}}` listing, wiki links resolved from the page's folder — sandboxed, so no scripts run. A template open in the pane below is used in place of the saved one when it's the one this page wears, so you watch the page change as you write it; a stylesheet goes straight into the preview's head as you type, after the saved one, so it wins.
 - **With no page open**, whatever you're composing with gets a sample page of its own: for a stylesheet, a bit of everything `site.css` styles; for a template, a sample page put through it, with the site's real navigation. So a template or a stylesheet can be written with nothing else on screen.
 - **Header**: *Resources* (the sidebar), *View* (the page on the site), *Logout*.
-- **Deleting always asks first**, wherever it is — a stylesheet or a template is as easy to lose as a page, and there's no undo behind any of them.
+- **Deleting always asks first**, wherever it is — a page, a stylesheet, a template, a work in a collection. **There is no undo in duckdown**: asking is the whole of the safety net, and what is gone is gone. On S3, turn on the bucket's versioning; on disk, keep the site in git.
 - Anything that fails shows in a red notice at the foot of the screen until dismissed.
 
 ## Search
