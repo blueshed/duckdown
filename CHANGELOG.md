@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- **A published site can be looked at before its domain exists.** The
+  service's own `railway.app` address, like `localhost`, is served whatever
+  `DUCKDOWN_ORIGIN` says — no more being redirected to the old site while
+  the new one is still being checked — and every answer there carries
+  `X-Robots-Tag: noindex` with `/robots.txt` closed, so nothing is indexed
+  under the wrong name. Set `DUCKDOWN_ORIGIN` to the real domain from the
+  first deploy; canonical links are right from day one.
+
 ## 0.4.0 — 2026-09-22
 
 - **Collections: a folder of items, written once.** A `collection.json` beside

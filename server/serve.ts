@@ -32,11 +32,19 @@ async function route(req: Request, dir: string, origin: string): Promise<{ res: 
   const url = new URL(req.url);
   if (url.pathname === "/health") return { res: new Response("OK"), html: false };
 
+  // A place to look is not a place to be: on localhost or the platform's own
+  // address the site is served whatever the origin says, so it can be seen
+  // before its domain exists — but told to no crawler, since that name is
+  // never the site's. The rest of the robots answer is in serveDist.
+  const host = hostOf(req, url);
+  if (looking(host) && url.pathname === "/robots.txt") {
+    return { res: new Response("User-agent: *\nDisallow: /\n", { headers: { "Content-Type": "text/plain; charset=utf-8" } }), html: false };
+  }
+
   // One address. With DUCKDOWN_ORIGIN set, a request for the same site under
   // another name (the apex when the origin is www) moves to the origin, path
   // and query kept. Absolute, deliberately — the point is to leave this host.
-  // localhost is left alone so a local run of the published site still works.
-  const elsewhere = otherHost(req, url, origin);
+  const elsewhere = otherHost(host, origin);
   if (elsewhere) {
     return { res: new Response(null, { status: MOVED, headers: { Location: `${elsewhere}${url.pathname}${url.search}` } }), html: false };
   }
@@ -70,15 +78,27 @@ async function route(req: Request, dir: string, origin: string): Promise<{ res: 
   };
 }
 
+// The name the reader asked for. Behind Railway's proxy that is
+// x-forwarded-host; the Host header is what the proxy said to us.
+function hostOf(req: Request, url: URL): string {
+  return req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? url.host;
+}
+
+// A host to look at the site on, never to publish it at: a local run, or the
+// address the platform gives every service. Served whatever DUCKDOWN_ORIGIN
+// says — a site deployed before its domain exists can still be seen — and
+// marked noindex, so nothing is ever indexed under the wrong name.
+export function looking(host: string): boolean {
+  return host.startsWith("localhost") || host.startsWith("127.0.0.1") || /\.up\.railway\.app$/.test(host.replace(/:\d+$/, ""));
+}
+
 // The origin to move to when the request came in under another host, or
 // null when it should be served here: no origin configured, the host matches,
-// or it's localhost. Behind Railway's proxy the reader's host is
-// x-forwarded-host; the Host header is what the proxy said to us.
-function otherHost(req: Request, url: URL, origin: string): string | null {
+// or it's one to look at the site on.
+function otherHost(host: string, origin: string): string | null {
   if (!origin) return null;
-  const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? url.host;
   const target = new URL(origin);
-  if (host === target.host || host.startsWith("localhost")) return null;
+  if (host === target.host || looking(host)) return null;
   return target.origin;
 }
 
@@ -92,6 +112,7 @@ export async function serveDist(
 ): Promise<Response> {
   const startedAt = performance.now();
   const { res, html } = await route(req, resolve(dir), origin);
+  if (looking(hostOf(req, new URL(req.url)))) res.headers.set("X-Robots-Tag", "noindex");
   if (html) log(req, res.status, startedAt);
   return res;
 }

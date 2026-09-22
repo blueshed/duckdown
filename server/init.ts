@@ -137,7 +137,8 @@ DUCKDOWN_ORIGIN=
   // review can see (`railway config plan` / `apply`, the Railway CLI) — not
   // set by hand in the dashboard, and not railway.json, which can't hold
   // variables. `source` and `DUCKDOWN_ORIGIN` are placeholders: real ones
-  // before the first deploy.
+  // before the first deploy — the real domain even before it points here,
+  // because the service's own railway.app address is served regardless.
   text(join(".railway", "railway.ts"), `import { defineRailway, github, project, service } from "railway/iac";
 
 // This repository manages only its own resources in the environment.
@@ -162,7 +163,9 @@ export default defineRailway(() => {
       DUCKDOWN_PATH: "./site",
       // What to call the site in each page's canonical link and sitemap.xml:
       // the exporter has no request to take an origin from. Set it to the
-      // real domain before the first deploy.
+      // real domain before the first deploy, even while that domain still
+      // points elsewhere: the site is always viewable on its railway.app
+      // address (served, marked noindex), and any other host moves to this.
       DUCKDOWN_ORIGIN: "https://example.com",
       // A line per page view in the logs: what is read and how much, never who.
       DUCKDOWN_LOG: "1",

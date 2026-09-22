@@ -3,7 +3,7 @@ import { describe, test, expect } from "bun:test";
 import { mkdirSync, writeFileSync } from "fs";
 import { join } from "path";
 import { RUN } from "./helpers";
-import { serveDist, listen } from "../server/serve";
+import { serveDist, listen, looking } from "../server/serve";
 
 const dist = join(RUN, "dist-served");
 const files: Record<string, string> = {
@@ -96,6 +96,28 @@ describe("serveDist", () => {
     // Without an origin, any host is served; a Request with no Host header uses its URL's.
     expect((await ask("/")).res.status).toBe(200);
     expect((await serveDist(new Request("http://blueshed.co.uk/"), dist, () => {}, origin)).status).toBe(301);
+  });
+
+  test("a Railway address or localhost is a place to look: served whatever the origin, noindex, robots closed", async () => {
+    const origin = "https://www.antonydonaldson.com";
+    const at = (host: string, path = "/", o = origin) => serveDist(
+      new Request(`http://${host}${path}`, { headers: { host } }), dist, () => {}, o);
+    // Before cutover the domain still points at the old site: the new one is seen here.
+    const seen = await at("tony-site-production.up.railway.app", "/blog/");
+    expect(seen.status).toBe(200);
+    expect(await seen.text()).toBe("<h1>blog</h1>");
+    expect(seen.headers.get("x-robots-tag")).toBe("noindex");
+    expect(await (await at("tony-site-production.up.railway.app", "/robots.txt")).text()).toBe("User-agent: *\nDisallow: /\n");
+    expect((await at("localhost:8080", "/nope")).headers.get("x-robots-tag")).toBe("noindex");  // every answer, a 404 too
+    expect((await at("127.0.0.1:8080")).status).toBe(200);
+    // The origin's own host is indexable and keeps the site's robots.txt (or a miss).
+    const own = await at("www.antonydonaldson.com");
+    expect(own.headers.get("x-robots-tag")).toBeNull();
+    expect((await at("www.antonydonaldson.com", "/robots.txt")).status).toBe(404);
+    // With no origin at all the platform address is still marked, and another host still moves.
+    expect((await at("x.up.railway.app", "/", "")).headers.get("x-robots-tag")).toBe("noindex");
+    expect((await at("antonydonaldson.com")).status).toBe(301);
+    expect(looking("up.railway.app.evil.com")).toBe(false);
   });
 
   test("listens on the port it is given", async () => {
