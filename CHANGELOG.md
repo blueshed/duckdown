@@ -52,6 +52,12 @@
   is no upgrade path from it; fork on GitHub for that.
 
 
+- **`{{include name}}`** pulls `templates/name.html` into a template, resolved
+  once before the rest — an include can use `{{nav}}` and a page's `{{x-...}}`
+  keys, and an include inside an include is left as written. The seed's
+  `templates/site.html` uses it for its top bar (`templates/topbar.html`),
+  instead of pasting the nav and the search form into every template.
+
 ## 0.2.0 — 2026-09-21
 
 ### Search, in the browser

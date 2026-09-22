@@ -24,7 +24,7 @@ export const handleMark = {
     const page = parsePage(path, source);
     // No edit link: the preview shows the page a reader gets, and a link into
     // the editor from inside the editor helps nobody.
-    const { html, layout } = await pageHtml(page, { origin: siteOrigin(req), draft, through });
-    return Response.json({ html, layout, meta: page.meta });
+    const { html, layout, includes } = await pageHtml(page, { origin: siteOrigin(req), draft, through });
+    return Response.json({ html, layout, includes, meta: page.meta });
   },
 };

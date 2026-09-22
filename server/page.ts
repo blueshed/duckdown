@@ -39,6 +39,50 @@ function fill(html: string, name: string, value: () => string): string {
   return html.replace(new RegExp(`\\{\\{${name}\\}\\}`, "g"), value);
 }
 
+// {{include name}} pulls templates/name.html into a template — the seed's
+// search form and nav wrapper, shared by site.html and post.html, instead of
+// pasted into each. Resolved once, over the template as chosen, before
+// anything else is filled: an include can use {{nav}}, {{x-anything}} and the
+// rest, because those substitutions run over the merged result afterward. Not
+// resolved inside what it pulls in — an {{include}} inside an included file
+// is left as written, so a template can document the tag without writing a
+// loop. A name that isn't plain, or names a file that isn't there, fills as
+// nothing: a broken include should not take the whole page down, but it
+// should not fail silently either, so it is logged (failures speak).
+async function resolveIncludes(body: string, draft?: DraftTemplate): Promise<{ html: string; includes: string[] }> {
+  const includes: string[] = [];
+  const names = new Set([...body.matchAll(/\{\{include ([^}]*)\}\}/g)].map((m) => m[1]!.trim()));
+  if (!names.size) return { html: body, includes };
+
+  const resolved = new Map<string, string>();
+  for (const name of names) {
+    const file = `${name}.html`;
+    if (!plainName(name)) {
+      console.error(`{{include ${name}}}: not a plain name — filled as nothing`);
+      resolved.set(name, "");
+      continue;
+    }
+    // The same draft mechanism templateFor uses for the page's own template:
+    // an unsaved templates/topbar.html shows in the preview of any page whose
+    // template includes it, not only the page wearing it as a layout.
+    if (draft?.name === file) {
+      resolved.set(name, draft.body);
+      includes.push(file);
+      continue;
+    }
+    const key = `${TEMPLATES_PATH}${file}`;
+    if (await site.exists(key)) {
+      resolved.set(name, await site.read(key));
+      includes.push(file);
+    } else {
+      console.error(`{{include ${name}}}: templates/${file} doesn't exist — filled as nothing`);
+      resolved.set(name, "");
+    }
+  }
+  const html = body.replace(/\{\{include ([^}]*)\}\}/g, (_, name: string) => resolved.get(name.trim()) ?? "");
+  return { html, includes };
+}
+
 export type Page = {
   key: string;      // where it lives: "blog/a-post.md"
   file: string;     // the same without .md, which is what links are built from
@@ -70,7 +114,7 @@ export type PageOptions = {
 // The whole document: the page's markdown inside the template it asks for,
 // with everything the site knows about it filled in. The editor's preview goes
 // through here too, which is what makes it a preview rather than a likeness.
-export async function pageHtml(page: Page, o: PageOptions): Promise<{ html: string; layout: string }> {
+export async function pageHtml(page: Page, o: PageOptions): Promise<{ html: string; layout: string; includes: string[] }> {
   const { file, meta } = page;
   const nav = markCurrent(await siteNav(pages), file);
   const description = meta.description?.[0] ?? "";
@@ -89,10 +133,11 @@ export async function pageHtml(page: Page, o: PageOptions): Promise<{ html: stri
   const template = o.through === undefined
     ? await templateFor(meta.layout?.[0], o.draft)
     : { name: "", body: o.through };
+  const { html: withIncludes, includes } = await resolveIncludes(template.body, o.draft);
   // The page's own x- keys, for a template that varies by page (a cover image,
   // a buy link) without a copy per page. Escaped like the title, empty when
   // the page doesn't say, and before {{content}} so page text is never filled.
-  let html = template.body.replace(/\{\{(x-[\w-]+)\}\}/g, (_, key: string) => escapeHtml(meta[key.toLowerCase()]?.[0] ?? ""));
+  let html = withIncludes.replace(/\{\{(x-[\w-]+)\}\}/g, (_, key: string) => escapeHtml(meta[key.toLowerCase()]?.[0] ?? ""));
   for (const [name, value] of [
     ["title", () => escapeHtml(meta.title?.[0] || "duckie")],
     ["url", () => escapeHtml(o.origin + canonicalPath(page.key))],
@@ -116,5 +161,9 @@ export async function pageHtml(page: Page, o: PageOptions): Promise<{ html: stri
     html = fill(html, name, value);
   }
 
-  return { html, layout: template.name };
+  // What the page wears, for the editor: the template it settled on, and any
+  // include that came from a real file, so ResourcePane can say a draft
+  // template will show — whether the page wears it directly or through one
+  // of these.
+  return { html, layout: template.name, includes };
 }

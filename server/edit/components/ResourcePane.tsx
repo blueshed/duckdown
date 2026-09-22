@@ -1,7 +1,7 @@
 import { createElement, computed, when } from "@blueshed/railroad";
 import { PaneHeader } from "./PaneHeader";
 import {
-  resource, resourceDraft, resourceDirty, pageLayout,
+  resource, resourceDraft, resourceDirty, pageLayout, pageIncludes,
   closeResource, saveResource, deleteResource,
 } from "../store";
 
@@ -14,11 +14,14 @@ export function ResourcePane() {
 
   // Editing a template the page isn't wearing changes nothing you can see, and
   // silence about that is the confusing part. Say it once and edit anyway —
-  // you may well be writing the template you are about to switch to.
+  // you may well be writing the template you are about to switch to. Worn
+  // includes a template reached through {{include}}, not only the one the
+  // page's layout: names directly.
   const elsewhere = computed(() => {
     const open = resource.get();
     const worn = pageLayout.get();
-    return open?.section === "templates" && worn !== "" && open.path !== worn;
+    if (open?.section !== "templates" || worn === "") return false;
+    return open.path !== worn && !pageIncludes.get().includes(open.path);
   });
 
   return (

@@ -17,7 +17,8 @@ A new site starts with these, and `templates/site.html` links both:
 <link href="/static/theme.css" rel="stylesheet">
 ```
 
-`site.css` is duckdown's base. It draws everything — text, links, code, tables,
+`site.css` is duckdown's base, and you needn't keep a copy: until you make
+a file of that name in `static/`, duckdown serves its own, so upgrades reach you. It draws everything — text, links, code, tables,
 callouts, the navigation — from a handful of CSS variables, so you rarely have
 to touch it.
 
@@ -76,6 +77,11 @@ name with no file links nothing rather than breaking the page.
 
 ## A whole kind of page
 
+A template can also take values from the page. Put `{{x-cover}}` in it, write
+`x-cover: /static/images/one.jpg` in a page's front matter, and the page's value
+goes in — escaped, and empty when the page doesn't say. One template can serve
+a whole shelf of pages that differ in a picture and a link.
+
 When a *kind* of page wants its own shape, give it a template. Copy
 `templates/site.html`, change what you need, link whatever stylesheets that
 kind should have, and name it from the pages' front matter:
@@ -88,6 +94,20 @@ layout: post
 [[/blog/a-post-with-its-own-layout|This post]] uses `templates/post.html`,
 which drops the site navigation and adds the date at the foot. See
 [[pages#a-pages-own-layout|A page's own layout]].
+
+## Sharing a piece of markup
+
+Two templates that share a header, a footer, or a sidebar don't have to paste
+it into each. Put the markup in its own file — `templates/topbar.html` here,
+holding the navigation and the search form — and write `{{include topbar}}`
+where a template wants it. This page's own site wears `templates/site.html`,
+which does exactly that: try View source and look for `<div class="topbar">`.
+
+What the include pulls in can use `{{nav}}` and a page's `{{x-anything}}`
+keys, because those are filled in afterward, over the whole merged page. An
+include inside an include is left exactly as written — no loops. In the
+editor, an unsaved `templates/topbar.html` shows in the preview of every page
+whose template includes it, not only one that wears it directly.
 
 ## In the editor
 

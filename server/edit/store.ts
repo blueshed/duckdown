@@ -22,6 +22,10 @@ export const resourceRevision = signal(0); // bumped when the folders change
 // resolved it: a page's layout: may name one that isn't there, and then it is
 // wearing site.html whatever it asked for.
 export const pageLayout = signal("");
+// Every templates/*.html the page's template pulled in with {{include}},
+// alongside pageLayout: a draft template shows in the preview whether the
+// page wears it directly or reaches it through one of these.
+export const pageIncludes = signal<string[]>([]);
 export const resourceDirty = computed(() => resourceDraft.get() !== resourceSaved.get());
 
 const at = (path: string) => `/edit/pages/${urlPath(path)}`;
@@ -180,6 +184,7 @@ export function closeFile() {
     fileContent.set("");
     editorContent.set("");
     pageLayout.set("");
+    pageIncludes.set([]);
   });
 }
 

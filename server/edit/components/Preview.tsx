@@ -1,12 +1,12 @@
 import { createElement, signal, computed, effect } from "@blueshed/railroad";
 import { apiJson } from "../api";
-import { editorContent, filePath, pageLayout, resource, resourceDraft } from "../store";
+import { editorContent, filePath, pageLayout, pageIncludes, resource, resourceDraft } from "../store";
 import { PreviewFrame } from "./PreviewFrame";
 
 // The server renders the whole document, the way the site will: the page's
 // markdown inside its template, with the nav, its stylesheets and the rest
 // filled in. `layout` says which template it used.
-type Rendered = { html: string; layout: string };
+type Rendered = { html: string; layout: string; includes: string[] };
 
 export function Preview() {
   const page = signal("");
@@ -21,6 +21,7 @@ export function Preview() {
     if (!data) return;
     page.set(data.html);
     pageLayout.set(data.layout);
+    pageIncludes.set(data.includes);
   };
 
   // Debounced preview update — tracks the page's text, which page it is, and

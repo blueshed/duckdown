@@ -911,3 +911,78 @@ describe("{{sitemap}}", () => {
     expect(await (await fetch(`${BASE}/`)).text()).not.toMatch(/<ul class="nav">[\s\S]*sitemap[\s\S]*<\/ul>/);
   });
 });
+
+describe("{{include}}", () => {
+  const dir = () => join(SITE, "templates");
+
+  test("pulls in a template file, which can itself use {{nav}} and the rest", async () => {
+    writeFileSync(join(dir(), "bar.html"), '<div class="bar">{{nav}}</div>');
+    writeFileSync(join(dir(), "shell.html"), "<body>{{include bar}}{{content}}</body>");
+    writeFileSync(join(SITE, "pages", "shelled.md"), "title: Shelled\nlayout: shell\n\nhi");
+    try {
+      const html = await (await fetch(`${BASE}/shelled.html`)).text();
+      expect(html).toContain('<div class="bar"><nav><ul class="nav">');
+      expect(html).toContain("<p>hi</p>");
+    } finally {
+      rmSync(join(dir(), "bar.html"));
+      rmSync(join(dir(), "shell.html"));
+      rmSync(join(SITE, "pages", "shelled.md"));
+    }
+  });
+
+  test("is not resolved inside what it pulls in: an include is left as written there", async () => {
+    writeFileSync(join(dir(), "inner.html"), "<p>{{include never}}</p>");
+    writeFileSync(join(dir(), "outer.html"), "<body>{{include inner}}{{content}}</body>");
+    writeFileSync(join(SITE, "pages", "nested-include.md"), "title: N\nlayout: outer\n\nx");
+    try {
+      const html = await (await fetch(`${BASE}/nested-include.html`)).text();
+      expect(html).toContain("<p>{{include never}}</p>");
+    } finally {
+      rmSync(join(dir(), "inner.html"));
+      rmSync(join(dir(), "outer.html"));
+      rmSync(join(SITE, "pages", "nested-include.md"));
+    }
+  });
+
+  test("a name that isn't plain is refused, fills as nothing, and is logged", async () => {
+    writeFileSync(join(dir(), "sneaky.html"), "<body>[{{include ../secret}}]{{content}}</body>");
+    writeFileSync(join(SITE, "pages", "sneaky-page.md"), "title: S\nlayout: sneaky\n\nx");
+    const error = spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const html = await (await fetch(`${BASE}/sneaky-page.html`)).text();
+      expect(html).toContain("[]");
+      expect(error).toHaveBeenCalled();
+      expect(String(error.mock.calls[0]![0])).toContain("not a plain name");
+    } finally {
+      rmSync(join(dir(), "sneaky.html"));
+      rmSync(join(SITE, "pages", "sneaky-page.md"));
+      error.mockRestore();
+    }
+  });
+
+  test("a missing file fills as nothing, and is logged, without failing the page", async () => {
+    writeFileSync(join(dir(), "hopeful.html"), "<body>[{{include gone}}]{{content}}</body>");
+    writeFileSync(join(SITE, "pages", "hopeful-page.md"), "title: H\nlayout: hopeful\n\nx");
+    const error = spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const res = await fetch(`${BASE}/hopeful-page.html`);
+      expect(res.status).toBe(200);
+      const html = await res.text();
+      expect(html).toContain("[]");
+      expect(String(error.mock.calls[0]![0])).toContain("templates/gone.html");
+    } finally {
+      rmSync(join(dir(), "hopeful.html"));
+      rmSync(join(SITE, "pages", "hopeful-page.md"));
+      error.mockRestore();
+    }
+  });
+
+  test("an unsaved include is used in place of the saved one, reported so the editor can say which files a page wears", async () => {
+    const mark = (source: string, path: string, draft?: { name: string; body: string }) =>
+      fetch(`${BASE}/edit/mark/?path=${encodeURIComponent(path)}`,
+        authed({ method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ source, draft }) }));
+    const data = await (await mark("# Hi", "index.md", { name: "topbar.html", body: "<p>draft topbar</p>" })).json();
+    expect(data.html).toContain("<p>draft topbar</p>");
+    expect(data.includes).toEqual(["topbar.html"]);
+  });
+});

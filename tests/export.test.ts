@@ -104,6 +104,17 @@ describe("exportSite", () => {
   });
 });
 
+describe("the seed's shared top bar", () => {
+  test("the exported pages still carry the search form, via {{include topbar}}", async () => {
+    const dir = out("topbar");
+    await exportSite({ out: dir, say: quiet });
+    const home = read(dir, "index.html");
+    expect(home).toContain('<div class="topbar">');
+    expect(home).toContain('class="search"');
+    rmSync(dir, { recursive: true, force: true });
+  });
+});
+
 describe("an export of nothing", () => {
   const empty = join(RUN, "nothing-here");
 

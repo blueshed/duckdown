@@ -48,7 +48,8 @@
 - `pages/index.md` is `/`, and a folder is served by its index: `/blog`, `/blog/` and `/blog/index.html` all reach `pages/blog/index.md`. The shortest is the page's canonical address — what the nav links to and what the page declares — so write links that way. A page of the same name wins over a folder (`blog.md` before `blog/index.md`).
 - Names may contain spaces (`About us.md` is `/About%20us.html`), but lowercase-with-dashes names make tidier URLs.
 - A folder whose name starts with `-` (say `-drafts/`) is left out of the navigation; its pages are still served to anyone with the URL. Names starting with `.` aren't listed in the editor.
-- A page that doesn't exist is a plain 404.
+- A page that doesn't exist is a plain 404 — unless the site has `pages/404.md`, which is then the answer (with a 404 status). `bun run export` writes it as `404.html`, the file a static host serves for a miss. It stays out of the navigation, `{{pages}}` listings, search and the sitemap. The seed has one to copy.
+- `robots.txt` and `favicon.ico` in `static/` are also answered at the site's root (`/robots.txt`), where crawlers look, and exported there too, as well as at `/static/…`.
 
 ## Front matter
 
@@ -112,7 +113,7 @@ The five markers are `[!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]` and `[!CA
 | `[[images#adding-images]]` | A heading on another page |
 | `[[#callouts]]` | A heading on this page |
 
-`.md` on the end is optional. Without a `|label`, the link reads as you wrote it (`[[/index]]` shows "/index"). Links aren't checked: one to a page that doesn't exist is a 404. (Inside a table cell, write the `|` as `\|`, as above.)
+`.md` on the end is optional. Without a `|label`, the link reads as you wrote it (`[[/index]]` shows "/index"). On a served site links aren't checked: one to a page that doesn't exist is a 404. (`bun run export` does check them.) (Inside a table cell, write the `|` as `\|`, as above.)
 
 ### Images
 
@@ -152,6 +153,8 @@ HTML in a page is passed through as written, scripts included, on the published 
 ### Listing a folder
 
 `{{pages}}` in a page lists the pages beside it — newest first by `date:`, each with its `description:` — as `<ul class="pages">`. A folder's `index.md`, drafts, files starting with `-` and anything that isn't `.md` are left out. It's how a blog index keeps itself.
+
+`{{sitemap}}` is the same made recursive, for a page a reader can read: every page on the site as nested `<ul class="sitemap">`, the site's front page first, each folder labelled by its index's `title:` and linked to it, pages newest first as `{{pages}}` has them, and folders after them by name. Drafts, `404.md`, folders starting with `-` or `.`, and folders with nothing to show are left out. Like `{{pages}}` it stays as written inside code, so a page can document it, and it works in an export. Put it in a `pages/sitemap.md` (which stays out of the nav, since only folders' indexes are in it) and link that from the 404 page.
 
 ### Not supported
 
@@ -243,7 +246,7 @@ In the editor, a stylesheet opens from **Resources → css** in a pane below wha
 
 ## The site template
 
-`templates/site.html` wraps every page. Each placeholder is replaced once (the first time it appears):
+`templates/site.html` wraps every page. Each placeholder is replaced wherever it appears:
 
 | Placeholder | Becomes |
 |-------------|---------|
@@ -254,7 +257,13 @@ In the editor, a stylesheet opens from **Resources → css** in a pane below wha
 | `{{nav}}` | The navigation (above), or nothing |
 | `{{css}}` | `<link>` for the page's `css:`, or nothing |
 | `{{edit}}` | An "Edit this page" link to the editor — only for whoever is signed in |
+| `{{x-anything}}` | The page's own `x-anything:` front-matter value, escaped, or nothing when the page doesn't set it |
+| `{{include name}}` | `templates/name.html`, pulled in — see below |
 | `{{content}}` | The page's rendered markdown |
+
+A page can pass values to its template with `x-` keys: a template with `<img src="{{x-cover}}">` and `<a href="{{x-buy}}">` serves every album, each page saying `x-cover: /static/images/one.jpg` and `x-buy: …`, instead of one template copied per page. Text written in a page is never filled in, only the template's.
+
+`{{include name}}` pulls `templates/name.html` into a template — the seed's own top bar (the nav and the search form) is `templates/site.html` saying `{{include topbar}}` rather than every template pasting the markup in. It's resolved once, before everything else is filled, so what it pulls in can use `{{nav}}`, a page's `{{x-anything}}`, and the rest; what it pulls in is not itself scanned for another `{{include}}` — a template can print the tag in a code span to document it without duckdown expanding it there. A name that isn't a plain word, or names a file that isn't there, fills as nothing. In the editor, an unsaved `templates/name.html` shows in the preview of any page whose template includes it, the same as it would if the page wore it directly.
 
 A page's `layout:` chooses the template (`layout: post` → `templates/post.html`), falling back to `site.html`; the name must be a plain word. Values go in escaped, and a `$` in a page is safe. Without a template, duckdown uses a bare built-in one (title and content only).
 
@@ -277,7 +286,8 @@ A page's `layout:` chooses the template (`layout: post` → `templates/post.html
 
 ## Static files and images
 
-- Everything in `static/` is served at `/static/…`, typed by its extension.
+- Everything in `static/` is served at `/static/…`, typed by its extension, with an ETag so a browser that has a file is told so, and kept for five minutes.
+- `static/site.css` and `static/search.js` are duckdown's base. A site needn't keep copies: with no file of that name they are served and exported from duckdown itself, so upgrading duckdown upgrades them. To change one, make a file of that name — it wins, and is yours from then on; put a site's own look in `theme.css` instead and keep upgrading.
 - Keep images in `static/images/`, in folders if you like; refer to them from pages as `/static/images/…`.
 - The editor's **Resources** sidebar, *images* tab, lists them with thumbnails, makes folders (the folder button) and uploads files (**Upload**, several at once). Clicking one shows it, with **Copy Markdown** for the `![name](/static/images/…)` line, names encoded.
 
@@ -316,15 +326,28 @@ A page's `layout:` chooses the template (`layout: post` → `templates/post.html
 
 ## Search
 
-Readers search in the browser. duckdown builds one entry per page — `url`,
-`title`, `description`, and the page's words with the markdown taken out — and
+Readers search in the browser. duckdown builds one entry per page and one per
+section of it — `url`, `title`, `section`, `description`, `date` and the words
+of that section, cut at each heading — and
 hands the lot over at `/search.json`; `bun run export` writes the same thing to
 `dist/search.json`, so search works on a published site with no server.
 
 - **Every non-draft page is in it**, found the same way the navigation walks
   the folders. There is nothing to register and no index to rebuild by hand.
+- **A result takes the reader to the place.** A section's `url` ends `#its-id`,
+  the id the page's own heading has (read out of the rendered page, so they
+  can't disagree), and the seed's `search.js` shows "Page – Section", shows at
+  most three sections of one page, and adds a text fragment (`:~:text=`) so a
+  browser that supports it scrolls to and marks the words. Some browsers that
+  can't find the words also give up on the heading, so `search.js` (which is on
+  every page) scrolls to the heading itself once the page has loaded, if
+  nothing else has. Words match where a word starts, so `train` is not found in
+  `constraints`. Long pages want real headings, and the result list scrolls
+  inside its panel.
 - **Drafts are left out.** A result leading to a 404 is worse than no result.
-- **`title` ranks above `description`, which ranks above the body**, and every
+  So is the 404 page.
+- **`title` ranks above a section's heading, which ranks above `description`,
+  which ranks above the body**, and every
   word of the query has to appear somewhere. A page with a good `title:` and
   `description:` is a page that can be found — which is the practical reason to
   write a description.
@@ -353,11 +376,14 @@ DUCKDOWN_ORIGIN=https://example.com bun run export     # into ./dist
 
 - Every page at its one canonical address: `/` and `/blog/` as `index.html`,
   `about.md` as `about.html`. Nothing written twice.
-- `static/` copied alongside, bytes and all.
+- `static/` copied alongside, bytes and all, with the base files (`site.css`, `search.js`) the site has no copy of; `robots.txt` and `favicon.ico` also at the root.
+- `sitemap.xml` at the root, from the same list of pages as search (no drafts, no 404 page), with `<lastmod>` from a page's `date:`. It needs `DUCKDOWN_ORIGIN`, being absolute addresses; the export says so when it is missing. The served site answers `/sitemap.xml` too. To point crawlers at it, add `Sitemap: https://example.com/sitemap.xml` to `robots.txt`.
+- Links are checked: every relative `href` and `src` that points at nothing in the site is reported as `page -> link`. It reports and carries on; `bun run export --strict` (or `DUCKDOWN_STRICT=1`) makes it a failure, for a deploy that should stop. Other sites, `#fragments` and the editor's own addresses are left alone.
+- An export that finds no pages at all — `DUCKDOWN_PATH` unset or wrong, an empty bucket — fails, and leaves `dist/` as it was, rather than publish an empty site and go green.
 - Drafts left out rather than hidden — there's no login to hide them behind.
 - `{{edit}}` empty, and `{{url}}` from `DUCKDOWN_ORIGIN`, because there's no
   request to take an origin from. Without it the canonical links are relative.
-- `dist/` is cleared first, so a page deleted since the last export doesn't
+- `dist/` is cleared once there is something to replace it with, so a page deleted since the last export doesn't
   survive in the output.
 - It reads through the storage layer, so it will export a live bucket as
   readily as a folder — a served site can be snapshotted without moving its

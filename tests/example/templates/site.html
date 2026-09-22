@@ -11,19 +11,7 @@
   {{css}}
 </head>
 <body>
-  <div class="topbar">
-    {{nav}}
-    <form class="search" role="search">
-      <button type="button" class="search-toggle" aria-label="Search" aria-expanded="false">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-             stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.9-3.9"></path></svg>
-      </button>
-      <div class="search-panel">
-        <input type="search" placeholder="Search this site" aria-label="Search this site" autocomplete="off">
-        <div class="search-results" role="region" aria-live="polite"></div>
-      </div>
-    </form>
-  </div>
+  {{include topbar}}
   {{content}}
   {{edit}}
   <script src="/static/search.js" defer></script>

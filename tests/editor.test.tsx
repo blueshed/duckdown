@@ -8,7 +8,7 @@ import { notice, speak, hush } from "../server/edit/notice";
 import {
   filePath, fileContent, editorContent, showImages, browserRevision,
   loadFile, createFile, saveFile, deleteFile, closeFile, reloadBrowser, toggleImages, closeImages,
-  resource, resourceDraft, resourceSaved, resourceDirty, pageLayout, openResource, closeResource,
+  resource, resourceDraft, resourceSaved, resourceDirty, pageLayout, pageIncludes, openResource, closeResource,
   saveResource, deleteResource, createResource,
 } from "../server/edit/store";
 import { Icon } from "../server/edit/components/Icon";
@@ -506,6 +506,22 @@ describe("ResourcePane", () => {
     await openResource({ section: "templates", path: "post.html" });
     await settle();
     expect(note()).toBeNull();
+    dispose();
+  });
+
+  test("says nothing for a template reached only through {{include}}, not as the page's own layout", async () => {
+    pageLayout.set("site.html");
+    pageIncludes.set(["topbar.html"]);
+    await openResource({ section: "templates", path: "topbar.html" });
+    const { host, dispose } = render(() => <ResourcePane />);
+    await settle();
+    expect(host.querySelector(".pane-note")).toBeNull();
+
+    // A template neither worn nor included still gets the note.
+    pageIncludes.set([]);
+    await openResource({ section: "templates", path: "topbar.html" });
+    await waitFor(() => host.querySelector(".pane-note"));
+    expect(host.querySelector(".pane-note")!.textContent).toContain("uses site.html");
     dispose();
   });
 
