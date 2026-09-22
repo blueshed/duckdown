@@ -1,6 +1,6 @@
 import { createElement, signal, computed, effect } from "@blueshed/railroad";
 import { apiJson } from "../api";
-import { editorContent, filePath, pageLayout, pageIncludes, resource, resourceDraft } from "../store";
+import { editorContent, filePath, pageLayout, pageIncludes, resource, resourceDraft, collectionRevision } from "../store";
 import { speak } from "../notice";
 import { PreviewFrame } from "./PreviewFrame";
 
@@ -38,6 +38,7 @@ export function Preview() {
   effect(() => {
     const source = editorContent.get();
     filePath.get(); // track file changes too
+    collectionRevision.get(); // and a write from the collection pane: {{items}} comes from it
     const open = resource.get();
     // A stylesheet is handled below without a round trip; a template is not,
     // because only the server can put the page through it.

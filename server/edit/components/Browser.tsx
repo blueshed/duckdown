@@ -3,7 +3,7 @@ import type { FileEntry, FolderEntry, Listing } from "../../storage";
 import { Icon } from "./Icon";
 import { NewDialog, type NewKind } from "./NewDialog";
 import { apiJson, urlPath } from "../api";
-import { loadFile, createFile, browserRevision } from "../store";
+import { loadFile, createFile, browserRevision, openCollection, COLLECTION_FILE } from "../store";
 
 export const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name);
 
@@ -17,11 +17,19 @@ export function Browser() {
     path.set(folder);
     const data = await apiJson<Listing>(`list /${folder}`, `/edit/pages/${urlPath(folder)}`);
     if (!data) return;
-    // Pages. Everything a page is composed with — templates, stylesheets,
-    // images — lives outside pages/ and is reached from Resources.
-    files.set(data.files.filter((f) => f.name.endsWith(".md")).sort(byName));
+    // Pages, and the one other file that lives in pages/: a folder's
+    // collection.json, which is pages too — a hundred of them, written once.
+    // Everything a page is composed with — templates, stylesheets, images —
+    // lives outside pages/ and is reached from Resources.
+    files.set(data.files
+      .filter((f) => f.name.endsWith(".md") || f.name === COLLECTION_FILE)
+      .sort(byName));
     folders.set(data.folders.sort(byName));
   };
+
+  // A collection opens as a pane, not as the JSON it is written in.
+  const open = (file: FileEntry) =>
+    file.name === COLLECTION_FILE ? openCollection(path.peek()) : loadFile(file.path);
 
   // Resolves to a message (the name is taken) to keep the dialog open with.
   const onCreate = async (name: string): Promise<string | void> => {
@@ -66,8 +74,9 @@ export function Browser() {
           </li>
         ))}
         {list(files, (f) => f.path, (f$) => (
-          <li onclick={() => loadFile(f$.peek().path)}>
-            <Icon name="file-text" size={12} /> {f$.map((f) => f.name)}
+          <li onclick={() => open(f$.peek())}>
+            <Icon name={f$.peek().name === COLLECTION_FILE ? "layout-grid" : "file-text"} size={12} />
+            {" "}{f$.map((f) => f.name)}
           </li>
         ))}
       </ul>

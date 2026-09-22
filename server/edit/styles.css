@@ -631,3 +631,182 @@ button.danger-subtle:hover {
   flex-direction: column;
 }
 
+/* --- The collection pane ---
+   A folder's collection.json, shown as what it is: groups of pictures with a
+   title and a caption each. It sits where a resource sits, below the page, and
+   scrolls inside itself — the pane's height is the column's, whatever the
+   collection's length. Everything here wraps: at 320px the tools drop below
+   the fields rather than pushing the pane sideways. */
+
+.panel-collection {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.collection-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 12px;
+}
+
+.collection-group {
+  margin-bottom: 16px;
+}
+
+.collection-group .collection-group {
+  margin-left: 8px;
+  padding-left: 8px;
+  border-left: 2px solid var(--border);
+}
+
+.group-head {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-bottom: 8px;
+}
+
+.group-name,
+.item-title,
+.item-caption {
+  min-width: 0;
+  padding: 4px 6px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  outline: none;
+}
+
+.group-name {
+  flex: 1;
+  font-weight: 600;
+}
+
+.group-name:hover,
+.item-title:hover,
+.item-caption:hover {
+  border-color: var(--border);
+}
+
+.group-name:focus,
+.item-title:focus,
+.item-caption:focus {
+  border-color: var(--accent);
+  background: var(--surface);
+}
+
+.collection-items {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.collection-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+}
+
+/* The picture is the control that replaces it: click it, or drop one on it. */
+.item-thumb {
+  position: relative;
+  flex: 0 0 64px;
+  width: 64px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  background: var(--bg);
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.item-thumb img {
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.item-swap {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  display: flex;
+  padding: 2px;
+  border-radius: 3px;
+  background: var(--surface);
+  color: var(--text-dim);
+  opacity: 0;
+}
+
+.item-thumb:hover .item-swap,
+.item-thumb:focus .item-swap {
+  opacity: 1;
+}
+
+.item-fields {
+  flex: 1 1 120px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.item-caption {
+  resize: vertical;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.item-src {
+  font-family: "SF Mono", "Fira Code", monospace;
+  font-size: 11px;
+  color: var(--text-dim);
+  overflow-wrap: anywhere;
+}
+
+.item-tools {
+  display: flex;
+  gap: 2px;
+  margin-left: auto;
+}
+
+.item-drop {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 10px;
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  color: var(--text-dim);
+  font-size: 12px;
+  text-align: center;
+  cursor: pointer;
+}
+
+.item-drop:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.collection-tools {
+  display: flex;
+  gap: 8px;
+}
+
+.hidden-file {
+  display: none;
+}
+
