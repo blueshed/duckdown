@@ -36,18 +36,22 @@
 
   const words = (s) => s.toLowerCase().split(/\s+/).filter(Boolean);
 
-  // Every word has to appear somewhere, and where it appears decides the
-  // order: a word in the title is what you meant; a word in the body might be
-  // an aside. A title match also has to start a word, so "art" finds
+  // An entry is a page, or one section of it (its `section` is the heading and
+  // its url ends #id). Every word has to appear somewhere, and where it
+  // appears decides the order: a word in the title is what you meant; one in
+  // a section's heading is nearly that; one in the body might be an aside. A
+  // title or heading match also has to start a word, so "art" finds
   // "Articles" and not "Stuttgart".
   function score(entry, terms) {
     const title = entry.title.toLowerCase();
+    const section = (entry.section || "").toLowerCase();
     const description = entry.description.toLowerCase();
     const text = entry.text.toLowerCase();
     let total = 0;
     for (const term of terms) {
-      const inTitle = new RegExp(`\\b${term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`).test(title);
-      if (inTitle) total += 10;
+      const starts = new RegExp(`\\b${term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`);
+      if (starts.test(title)) total += 10;
+      else if (starts.test(section)) total += 8;
       else if (description.includes(term)) total += 4;
       else if (text.includes(term)) total += 1;
       else return 0;                       // every word, or it isn't a match
@@ -64,6 +68,32 @@
     return (from ? "… " : "") + entry.text.slice(from, from + 160).trim() + "…";
   }
 
+  // Where the words are, so the browser can scroll to them and mark them:
+  // a text fragment, ":~:text=". It is a few words from the first hit, from the
+  // start of its word (a fragment has to begin at one), as they are written in
+  // the text and not as lowercased for matching. A browser that doesn't know
+  // fragments ignores everything after ":~:" and still lands on the heading.
+  // "-" is fragment syntax, so it is encoded as well as what encodeURIComponent does.
+  function link(entry, terms) {
+    const at = entry.text.toLowerCase().indexOf(terms[0]);
+    const base = entry.url.includes("#") ? entry.url : `${entry.url}#`;
+    if (at < 0) return entry.url;
+    const start = entry.text.lastIndexOf(" ", at) + 1;
+    const phrase = entry.text.slice(start).split(" ").slice(0, 5).join(" ");
+    return `${base}:~:text=${encodeURIComponent(phrase).replace(/-/g, "%2D")}`;
+  }
+
+  // At most three sections of a page, best first, so one long page can't fill
+  // the list; a page's own entry counts as one.
+  function group(hits) {
+    const seen = new Map();
+    return hits.filter((entry) => {
+      const page = entry.url.split("#")[0];
+      seen.set(page, (seen.get(page) || 0) + 1);
+      return seen.get(page) <= 3;
+    });
+  }
+
   function show(results, query) {
     output.innerHTML = "";
     if (!query) return;
@@ -73,11 +103,12 @@
       return;
     }
     const list = document.createElement("ul");
-    for (const entry of results.slice(0, 8)) {
+    for (const entry of group(results).slice(0, 8)) {
       const li = document.createElement("li");
       const a = document.createElement("a");
-      a.href = entry.url;
-      a.textContent = entry.title;
+      a.href = link(entry, words(query));
+      // "Page – Section", unless the section is the page's own title.
+      a.textContent = entry.section && entry.section !== entry.title ? `${entry.title} – ${entry.section}` : entry.title;
       const p = document.createElement("p");
       p.textContent = extract(entry, words(query));
       li.append(a, p);
@@ -101,6 +132,12 @@
 
   toggle.addEventListener("click", () => open(!form.hasAttribute("data-open")));
   input.addEventListener("input", search);
+  // Following a result closes the panel — after the click has done its work:
+  // taking the link out of the page during its own click can cancel it. On the
+  // page the hit is on this is a fragment navigation, which still scrolls.
+  output.addEventListener("click", (e) => {
+    if (e.target.closest("a")) setTimeout(() => open(false));
+  });
   form.addEventListener("submit", (e) => e.preventDefault());
   // Escape shuts it, and so does clicking anywhere else on the page.
   form.addEventListener("keydown", (e) => {

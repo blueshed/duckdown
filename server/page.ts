@@ -1,7 +1,7 @@
 import { TEMPLATES_PATH } from "./config";
 import { createPageStorage, createStorage } from "./storage";
 import { renderMarkdown, folderOf } from "./markdown";
-import { siteNav, markCurrent, folderListing } from "./nav";
+import { siteNav, markCurrent, folderListing, siteMap } from "./nav";
 import { escapeHtml, outsideCode, canonicalPath, dateHtml } from "./utils";
 
 const site = createStorage();
@@ -77,17 +77,22 @@ export async function pageHtml(page: Page, o: PageOptions): Promise<{ html: stri
 
   // {{pages}} in a page lists the pages beside it (a blog index writes itself),
   // except in code, where it stays as written so a page can document the tag.
+  // {{sitemap}} is the same for the whole site, nested by folder.
   let body = page.content;
-  if (body.includes("{{pages}}")) {
-    const list = await folderListing(pages, folderOf(file));
+  for (const [tag, list] of [["pages", () => folderListing(pages, folderOf(file))], ["sitemap", () => siteMap(pages)]] as const) {
+    if (!body.includes(`{{${tag}}}`)) continue;
+    const html = await list();
     body = outsideCode(body, (part) =>
-      part.replace(/<p>\{\{pages\}\}<\/p>|\{\{pages\}\}/g, () => list));
+      part.replace(new RegExp(`<p>\\{\\{${tag}\\}\\}</p>|\\{\\{${tag}\\}\\}`, "g"), () => html));
   }
 
   const template = o.through === undefined
     ? await templateFor(meta.layout?.[0], o.draft)
     : { name: "", body: o.through };
-  let html = template.body;
+  // The page's own x- keys, for a template that varies by page (a cover image,
+  // a buy link) without a copy per page. Escaped like the title, empty when
+  // the page doesn't say, and before {{content}} so page text is never filled.
+  let html = template.body.replace(/\{\{(x-[\w-]+)\}\}/g, (_, key: string) => escapeHtml(meta[key.toLowerCase()]?.[0] ?? ""));
   for (const [name, value] of [
     ["title", () => escapeHtml(meta.title?.[0] || "duckie")],
     ["url", () => escapeHtml(o.origin + canonicalPath(page.key))],

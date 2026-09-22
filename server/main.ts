@@ -12,6 +12,7 @@ import { handleMark } from "./routes/mark";
 import { handleBrowse } from "./routes/browse";
 import { handleStatic } from "./routes/static";
 import { handleSearch } from "./routes/search";
+import { handleSitemap } from "./routes/sitemap";
 import { handleSite } from "./routes/site";
 import { handleError } from "./routes/error";
 
@@ -44,6 +45,7 @@ export const server = Bun.serve({
     "/edit/mark/": handleMark,
     "/edit/browse/*": handleBrowse,
     "/search.json": handleSearch,
+    "/sitemap.xml": handleSitemap,
     "/static/*": handleStatic,
   },
 

@@ -9,10 +9,38 @@
   exported duckdown's own, and the seed carries no copy either.
 - Static files and signed-out pages carry an ETag and answer 304.
 
-- **The base (`site.css`, `search.js`) is no longer copied into a site.** It
-  lives in `server/base/`; a site with no file of that name is served and
-  exported duckdown's own, and the seed carries no copy either.
-- Static files and signed-out pages carry an ETag and answer 304.
+- **A site's own 404 page, and the root files crawlers ask for.** `pages/404.md`
+  answers a miss (served and exported as `404.html`); `robots.txt` and
+  `favicon.ico` in `static/` answer at the root. The seed's `robots.txt` used to
+  ban every crawler.
+- A content folder that goes missing is said once in the log, not silently
+  404ed forever.
+
+- **The export checks its work.** An export of no pages fails and leaves
+  `dist/` alone, naming the folder it read; internal links that lead nowhere
+  are reported, and `--strict` or `DUCKDOWN_STRICT=1` fails the build on them.
+  `robots.txt`, `favicon.ico` and `sitemap.xml` are written at the root of
+  `dist/` too (`sitemap.xml` needs `DUCKDOWN_ORIGIN`, for absolute addresses).
+
+- **`duckdown-serve`.** The published flavour's server moves into duckdown
+  (`server/serve.ts`), tested, and logging page views only, not stylesheets
+  and images. Published start command:
+  `bun run node_modules/duckdown/server/serve.ts` (`SITE_DIR`, `PORT`).
+
+- **Templates can read a page's `x-` keys** (`{{x-cover}}`), escaped, empty
+  when the page doesn't set them, filled before `{{content}}` so a page's own
+  text is never scanned for them.
+- **`{{sitemap}}`**: every page, nested by folder, for a page a reader can read
+  (the seed has `pages/sitemap.md`, linked from its 404 page).
+
+- **Search finds the place, not just the page.** `/search.json` (and
+  `dist/search.json`) now has one entry per page *and per section*, cut at
+  each heading: `url` ends `#id`, and each entry has a `section`. `search.js`
+  shows "Page – Section", at most three sections of a page, and links with a
+  text fragment so the browser scrolls to and marks the words. A forked, older
+  `search.js` still works against the new index: it ignores `section`, and its
+  links now carry the `#id`.
+
 
 ## 0.2.0 — 2026-09-21
 

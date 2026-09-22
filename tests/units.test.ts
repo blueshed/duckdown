@@ -412,3 +412,37 @@ describe("utils", () => {
       .toBe("<p>LIST</p><code>{{pages}}</code><p>LIST</p>");
   });
 });
+
+describe("decoding a URL path", () => {
+  test("decodePath undoes escapes and answers null for a malformed one", async () => {
+    const { decodePath, BadRequest } = await import("../server/utils");
+    expect(decodePath("/About%20us.md")).toBe("/About us.md");
+    expect(decodePath("/%E0%A4%A")).toBeNull();
+    const res = handleError(new BadRequest("Bad Request"));
+    expect(res.status).toBe(400);
+    expect(await res.text()).toBe("Bad Request");
+  });
+});
+
+describe("the default site folder", () => {
+  test("is the seed, or ./site in a site that depends on duckdown", async () => {
+    const { defaultSitePath } = await import("../server/config");
+    expect(defaultSitePath((p) => p === "./tests/example")).toBe("./tests/example"); // duckdown's own checkout
+    expect(defaultSitePath((p) => p === "./site")).toBe("./site");                   // a site with duckdown installed
+    expect(defaultSitePath(() => true)).toBe("./tests/example");
+    expect(defaultSitePath(() => false)).toBe("./tests/example");                    // nothing: say so later, with the folder's name
+  });
+});
+
+describe("sitemap", () => {
+  test("escapes addresses and gives lastmod only to a date", async () => {
+    const { sitemapXml } = await import("../server/sitemap");
+    const xml = sitemapXml([
+      { url: "/a & b/c d.html", date: "2026-09-21" },
+      { url: "/soon.html", date: "sometime soon" },
+    ], "https://example.com");
+    expect(xml).toContain("<loc>https://example.com/a%20&amp;%20b/c%20d.html</loc><lastmod>2026-09-21</lastmod>");
+    expect(xml).toContain("<loc>https://example.com/soon.html</loc></url>");
+    expect(xml).toStartWith('<?xml version="1.0"');
+  });
+});

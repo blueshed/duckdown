@@ -1,4 +1,5 @@
 import { resolve } from "path";
+import { existsSync } from "fs";
 
 // Storage mode: "local" or "s3"
 // Detected from DUCKDOWN_BUCKET — if set, use S3; otherwise, local filesystem.
@@ -16,7 +17,12 @@ export const BUCKET_ENDPOINT = process.env.DUCKDOWN_ENDPOINT || "";
 export const BUCKET_REGION = process.env.DUCKDOWN_REGION || "us-east-1";
 
 // Local storage
-export const APP_PATH = resolve(process.env.DUCKDOWN_PATH || "./tests/example");
+// Unset, it is duckdown's own seed, or ./site in a site that depends on
+// duckdown (which has no tests/example): the folder both mean.
+export function defaultSitePath(exists: (p: string) => boolean = existsSync): string {
+  return !exists("./tests/example") && exists("./site") ? "./site" : "./tests/example";
+}
+export const APP_PATH = resolve(process.env.DUCKDOWN_PATH || defaultSitePath());
 // Local dev: if APP_PATH doesn't exist yet, start it as a copy of this seed
 // site, so editing never touches the seed (e.g. DUCKDOWN_SEED=./tests/example).
 export const SEED_PATH = process.env.DUCKDOWN_SEED ? resolve(process.env.DUCKDOWN_SEED) : "";

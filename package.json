@@ -19,7 +19,8 @@
   ],
   "bin": {
     "duckdown": "./server/main.ts",
-    "duckdown-export": "./server/export.ts"
+    "duckdown-export": "./server/export.ts",
+    "duckdown-serve": "./server/serve.ts"
   },
   "files": [
     "server",
@@ -42,7 +43,8 @@
     "check": "bunx tsc --noEmit",
     "test": "bun test --coverage",
     "setup": "bun run create/setup.ts",
-    "export": "bun run server/export.ts"
+    "export": "bun run server/export.ts",
+    "serve": "bun run server/serve.ts"
   },
   "bun-create": {
     "postinstall": "bun run create/setup.ts"

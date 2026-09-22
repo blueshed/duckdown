@@ -1,64 +1,93 @@
 import type { Storage } from "./storage";
 import { DEBUG } from "./config";
-import { parseFrontMatter, yes } from "./markdown";
+import { renderMarkdown, yes } from "./markdown";
 import { canonicalPath } from "./utils";
 
-// What a reader can search: one entry per page, with enough of its words to
-// find it by. Small enough to send whole — a few dozen pages is tens of
-// kilobytes, less over the wire — so the browser does the matching and the
-// server does no searching at all. Nothing here is a search engine.
+// The site's own page for a miss: a page, but not one to search for, list or map.
+export const NOT_FOUND = "404.md";
+
+// What a reader can search: one entry per page and one per section of it, so a
+// result can take the reader to the place and not just the page. Small enough
+// to send whole — a few dozen pages is tens of kilobytes, less over the wire —
+// so the browser does the matching and the server does no searching at all.
+// Nothing here is a search engine.
 export type Entry = {
-  url: string;
-  title: string;
-  description: string;
-  text: string;
+  url: string;          // the page's address; a section's ends in #its-id
+  title: string;        // the page's
+  section: string;      // the heading, or "" for the page's own entry
+  description: string;  // the page entry only
+  date: string;
+  text: string;         // this section's words
 };
 
-// Markdown reduced to the words in it. Not a renderer: a heading's `##`, a
-// link's brackets and a fence's contents are all noise to someone looking for
-// a phrase, and code blocks are mostly punctuation that would swamp the index.
-export function plainText(markdown: string): string {
-  return markdown
-    .replace(/```[\s\S]*?```/g, " ")            // fenced code
-    .replace(/~~~[\s\S]*?~~~/g, " ")
-    .replace(/<[^>]+>/g, " ")                   // raw html
-    .replace(/!\[[^\]]*\]\([^)]*\)/g, " ")      // images, alt and all
-    .replace(/\[\[([^\]|#]+)(?:#[^\]|]*)?(?:\|([^\]]+))?\]\]/g, (_, target, label) => label || target)
-    .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")    // links keep their label
-    .replace(/`([^`]*)`/g, "$1")                // inline code
-    .replace(/^\s*>\s?\[![A-Z]+\]\s*$/gim, " ") // callout markers
-    .replace(/^\s{0,3}#{1,6}\s+/gm, "")         // heading marks
-    .replace(/^\s{0,3}>\s?/gm, "")              // quote marks
-    .replace(/^\s{0,3}[-*+]\s+/gm, "")          // bullets
-    .replace(/^\s{0,3}\|.*$/gm, " ")            // tables: mostly pipes
-    .replace(/[*_~]/g, "")                      // emphasis
+// A page a reader can reach, for whatever wants pages rather than sections
+// (the sitemap).
+export type PageRef = { url: string; date: string };
+
+// What the browser is sent, and the pages it came from: one walk, both.
+export type Built = { entries: Entry[]; pages: PageRef[] };
+
+const ENTITIES: Record<string, string> = { "&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": '"', "&#39;": "'", "&#x27;": "'" };
+
+// Rendered HTML reduced to the words in it. Code blocks are punctuation that
+// would swamp the index, and a contents list only repeats the headings.
+function words(html: string): string {
+  return html
+    .replace(/<pre[\s\S]*?<\/pre>/g, " ")
+    .replace(/<nav class="toc"[\s\S]*?<\/nav>/g, " ")
+    .replace(/<\/?(?:p|div|li|ul|ol|h[1-6]|br|hr|tr|td|th|table|thead|tbody|blockquote|nav|section)\b[^>]*>/g, " ")   // a block ends a word
+    .replace(/<[^>]+>/g, "")                                                                                      // an inline tag doesn't
+    .replace(/&(?:amp|lt|gt|quot|#39|#x27);/g, (e) => ENTITIES[e]!)
     .replace(/\s+/g, " ")
     .trim();
 }
 
+// The rendered page cut at each heading. The ids are read out of the HTML the
+// page is served with, never re-derived, so a link can't disagree with the
+// page it points into. What comes before the first heading has no id.
+function sections(html: string): { id: string; heading: string; body: string }[] {
+  const found = [...html.matchAll(/<h[1-6] id="([^"]+)">([\s\S]*?)<\/h[1-6]>/g)];
+  const cut = [{ id: "", heading: "", body: html.slice(0, found[0]?.index ?? html.length) }];
+  found.forEach((m, i) => {
+    const start = m.index + m[0].length;
+    cut.push({ id: m[1]!, heading: words(m[2]!), body: html.slice(start, found[i + 1]?.index ?? html.length) });
+  });
+  return cut;
+}
+
 // Every page a reader could reach, in the order they were found. Drafts are
 // left out — they are 404 to everyone but the editor, and a search result
-// leading to a 404 is worse than no result.
-export async function buildIndex(pages: Storage, prefix = ""): Promise<Entry[]> {
+// leading to a 404 is worse than no result — and so is the 404 page.
+export async function buildSite(pages: Storage, prefix = ""): Promise<Built> {
   const { files, folders } = await pages.list(prefix);
-  const out: Entry[] = [];
+  const out: Built = { entries: [], pages: [] };
 
   for (const f of files) {
     const key = f.path.replace(/^\//, "");
-    if (!key.endsWith(".md")) continue;
-    const { meta, body } = parseFrontMatter(await pages.read(key));
+    if (!key.endsWith(".md") || key === NOT_FOUND) continue;
+    const { content, meta } = renderMarkdown(await pages.read(key), key.replace(/\.md$/, ""));
     if (yes(meta.draft)) continue;
-    out.push({
-      url: canonicalPath(key),
-      title: meta.title?.[0] ?? key.replace(/\.md$/, ""),
-      description: meta.description?.[0] ?? "",
-      text: plainText(body),
-    });
+    const url = canonicalPath(key);
+    const title = meta.title?.[0] ?? key.replace(/\.md$/, "");
+    const date = meta.date?.[0] ?? "";
+    out.pages.push({ url, date });
+    for (const { id, heading, body } of sections(content)) {
+      out.entries.push({
+        url: id ? `${url}#${id}` : url,
+        title,
+        section: heading,
+        description: id ? "" : meta.description?.[0] ?? "",
+        date,
+        text: words(body),
+      });
+    }
   }
 
   for (const folder of folders.sort((a, b) => a.name.localeCompare(b.name))) {
     if (folder.name.startsWith(".")) continue;
-    out.push(...await buildIndex(pages, folder.path.replace(/^\//, "")));
+    const inside = await buildSite(pages, folder.path.replace(/^\//, ""));
+    out.entries.push(...inside.entries);
+    out.pages.push(...inside.pages);
   }
 
   return out;
@@ -66,16 +95,19 @@ export async function buildIndex(pages: Storage, prefix = ""): Promise<Entry[]> 
 
 // Kept until a page changes, like the nav and the folder listings, and rebuilt
 // per request in development where pages are often written straight to disk.
-let index: Promise<Entry[]> | null = null;
+let built: Promise<Built> | null = null;
 
-export function searchIndex(pages: Storage, debug = DEBUG): Promise<Entry[]> {
-  if (debug) return buildIndex(pages);
-  return (index ??= buildIndex(pages).catch((e) => {
-    index = null;
+function site(pages: Storage, debug: boolean): Promise<Built> {
+  if (debug) return buildSite(pages);
+  return (built ??= buildSite(pages).catch((e) => {
+    built = null;
     throw e;
   }));
 }
 
+export const searchIndex = async (pages: Storage, debug = DEBUG): Promise<Entry[]> => (await site(pages, debug)).entries;
+export const pageList = async (pages: Storage, debug = DEBUG): Promise<PageRef[]> => (await site(pages, debug)).pages;
+
 export function searchChanged(): void {
-  index = null;
+  built = null;
 }

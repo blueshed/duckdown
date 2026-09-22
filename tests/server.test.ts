@@ -295,8 +295,10 @@ describe("search", () => {
     const entries = await res.json();
     const home = entries.find((e: any) => e.url === "/");
     expect(home.title).toBe("duckdown");
-    expect(home.text).toContain("Write markdown");
-    expect(home.text).not.toContain("["); // the words, not the marks
+    // The page's words are in its sections, each at its own #id.
+    const intro = entries.find((e: any) => e.url.startsWith("/#") && e.text.includes("Write markdown"));
+    expect(intro.title).toBe("duckdown");
+    expect(intro.text).not.toContain("["); // the words, not the marks
 
     // No result may lead anywhere a reader can't go: nothing guards this file,
     // and a search result that 404s is worse than no result.
@@ -699,5 +701,213 @@ describe("path traversal", () => {
 
   test("blocks traversal in static", async () => {
     expect([404, 500]).toContain((await fetch(`${BASE}/static/../../../etc/passwd`)).status);
+  });
+});
+
+describe("a URL that won't decode", () => {
+  test("is a 400 on the site and on /static/, not a 500 with a stack in the log", async () => {
+    const error = spyOn(console, "error").mockImplementation(() => {});
+    try {
+      for (const path of ["/%E0%A4%A", "/static/%E0%A4%A", "/blog/%E0%A4%A"]) {
+        const res = await fetch(`${BASE}${path}`);
+        expect(res.status).toBe(400);
+        expect(await res.text()).toBe("Bad Request");
+      }
+      expect(error).not.toHaveBeenCalled();
+    } finally {
+      error.mockRestore();
+    }
+  });
+});
+
+describe("the site's own 404 page", () => {
+  const file = join(SITE, "pages", "404.md");
+
+  test("is what a miss answers, with a 404 status, and so is a draft to a stranger", async () => {
+    for (const path of ["/no-such-page.html", "/secret/index.html"]) {
+      const res = await fetch(`${BASE}${path}`);
+      expect(res.status).toBe(404);
+      expect(res.headers.get("content-type")).toContain("text/html");
+      expect(await res.text()).toContain("There is nothing at that address");
+    }
+  });
+
+  test("is a plain line when the site has none", async () => {
+    const saved = readFileSync(file, "utf8");
+    rmSync(file);
+    try {
+      const res = await fetch(`${BASE}/no-such-page.html`);
+      expect(res.status).toBe(404);
+      expect(await res.text()).toBe("Not Found");
+    } finally {
+      writeFileSync(file, saved);
+    }
+  });
+
+  test("is not a page to search for, list or map", async () => {
+    const found = await (await fetch(`${BASE}/search.json`)).json();
+    expect(found.some((e: any) => e.url === "/404.html")).toBe(false);
+    expect(await (await fetch(`${BASE}/sitemap.xml`)).text()).not.toContain("404");
+    expect(await (await fetch(`${BASE}/`)).text()).not.toContain("404.html");
+  });
+});
+
+describe("files a crawler asks for at the root", () => {
+  test("robots.txt and favicon.ico are answered from static/", async () => {
+    const robots = await fetch(`${BASE}/robots.txt`);
+    expect(robots.status).toBe(200);
+    expect(robots.headers.get("content-type")).toContain("text/plain");
+    expect(await robots.text()).toContain("Allow: /");
+    expect((await fetch(`${BASE}/favicon.ico`)).status).toBe(200);
+  });
+
+  test("a site with none gets the 404 page, not an error", async () => {
+    const file = join(SITE, "static", "robots.txt");
+    const saved = readFileSync(file);
+    rmSync(file);
+    try {
+      expect((await fetch(`${BASE}/robots.txt`)).status).toBe(404);
+    } finally {
+      writeFileSync(file, saved);
+    }
+  });
+});
+
+describe("sitemap.xml", () => {
+  test("every page a reader can reach, at absolute addresses, with the date when there is one", async () => {
+    const res = await fetch(`${BASE}/sitemap.xml`);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("xml");
+    const xml = await res.text();
+    expect(xml).toContain(`<loc>${BASE}/</loc>`);
+    expect(xml).toContain(`<loc>${BASE}/blog/a-post-with-its-own-layout.html</loc><lastmod>2026-09-21</lastmod>`);
+    expect(xml).not.toContain("secret"); // a draft
+  });
+});
+
+describe("validators", () => {
+  test("a static file carries an ETag, and a browser that has it is told 304", async () => {
+    const first = await fetch(`${BASE}/static/site.css`);
+    const tag = first.headers.get("etag")!;
+    expect(tag).toBeTruthy();
+    expect(first.headers.get("cache-control")).toBe("public, max-age=300");
+    const again = await fetch(`${BASE}/static/site.css`, { headers: { "If-None-Match": tag } });
+    expect(again.status).toBe(304);
+    expect(await again.text()).toBe("");
+  });
+
+  test("a page is kept for a stranger and never for whoever is signed in", async () => {
+    const stranger = await fetch(`${BASE}/`);
+    const tag = stranger.headers.get("etag")!;
+    expect(tag).toBeTruthy();
+    expect((await fetch(`${BASE}/`, { headers: { "If-None-Match": tag } })).status).toBe(304);
+
+    await signIn();
+    const editor = await fetch(`${BASE}/`, authed());
+    expect(editor.headers.get("cache-control")).toBe("private, no-cache");
+    expect(editor.headers.get("etag")).toBeNull();
+    expect(await editor.text()).toContain("Edit this page");
+  });
+});
+
+describe("the base a site needn't keep a copy of", () => {
+  for (const [name, type] of [["site.css", "text/css"], ["search.js", "javascript"]] as const) {
+    test(`${name} comes from duckdown, unless the site has a file of that name`, async () => {
+      // The seed carries no copy: it reads the base the way any site does.
+      const res = await fetch(`${BASE}/static/${name}`);
+      expect(res.status).toBe(200);
+      expect(res.headers.get("content-type")).toContain(type);
+      expect(await res.text()).not.toContain("the site's own");
+
+      const file = join(SITE, "static", name);
+      writeFileSync(file, "/* the site's own */");
+      try {
+        expect(await (await fetch(`${BASE}/static/${name}`)).text()).toBe("/* the site's own */");
+      } finally {
+        rmSync(file);
+      }
+    });
+  }
+});
+
+describe("a template reading the page's own x- keys", () => {
+  test("fills them escaped, empty when unset, and never inside the page's own text", async () => {
+    writeFileSync(join(SITE, "templates", "album.html"),
+      '<body data-cover="{{x-cover}}" data-buy="{{x-buy}}">{{x-Cover}}|{{content}}</body>');
+    writeFileSync(join(SITE, "pages", "album.md"),
+      'title: An album\nlayout: album\nx-cover: a "quoted" <b>\n\nWrite {{x-cover}} in prose.\n');
+    try {
+      const html = await (await fetch(`${BASE}/album.html`)).text();
+      expect(html).toContain('data-cover="a &quot;quoted&quot; &lt;b&gt;"');
+      expect(html).toContain('data-buy=""');
+      expect(html).toContain("a &quot;quoted&quot; &lt;b&gt;|");            // the key is not case-sensitive
+      expect(html).toContain("Write {{x-cover}} in prose.");                 // page text is never filled
+    } finally {
+      rmSync(join(SITE, "templates", "album.html"));
+      rmSync(join(SITE, "pages", "album.md"));
+    }
+  });
+});
+
+describe("a site folder that goes missing", () => {
+  test("is said once in the log, not once per request, and again if it goes a second time", async () => {
+    const error = spyOn(console, "error").mockImplementation(() => {});
+    const gone = `${SITE}-moved`;
+    renameSync(SITE, gone);
+    try {
+      for (const path of ["/a.html", "/b.html"]) expect((await fetch(`${BASE}${path}`)).status).toBe(404);
+      expect(error).toHaveBeenCalledTimes(1);
+      expect(String(error.mock.calls[0]![0])).toContain(`${SITE} is gone`);
+    } finally {
+      renameSync(gone, SITE);
+      error.mockRestore();
+    }
+    // Back, and a miss is an ordinary one; gone again, and it is said again.
+    const again = spyOn(console, "error").mockImplementation(() => {});
+    try {
+      expect((await fetch(`${BASE}/a.html`)).status).toBe(404);
+      expect(again).not.toHaveBeenCalled();
+      renameSync(SITE, gone);
+      await fetch(`${BASE}/a.html`);
+      expect(again).toHaveBeenCalledTimes(1);
+    } finally {
+      renameSync(gone, SITE);
+      again.mockRestore();
+    }
+  });
+
+  test("is quiet while the folder is there", async () => {
+    const { noticeMissingRoot } = await import("../server/routes/site");
+    const error = spyOn(console, "error").mockImplementation(() => {});
+    try {
+      noticeMissingRoot(() => true);   // present: quiet, and rearms
+      expect(error).not.toHaveBeenCalled();
+    } finally {
+      error.mockRestore();
+    }
+  });
+});
+
+describe("{{sitemap}}", () => {
+  test("lists every page nested by folder, and is left as written in code", async () => {
+    const html = await (await fetch(`${BASE}/sitemap.html`)).text();
+    expect(html).toContain('<ul class="sitemap">');
+    expect(html).toContain('<a href="/blog/a-post-with-its-own-layout.html">');
+    expect(html).not.toContain("{{sitemap}}\n");
+
+    writeFileSync(join(SITE, "pages", "about-tags.md"), "title: Tags\n\nWrite `{{sitemap}}` in a page.\n");
+    try {
+      const code = await (await fetch(`${BASE}/about-tags.html`)).text();
+      expect(code).toContain("<code>{{sitemap}}</code>");
+      expect(code).not.toContain('class="sitemap"');
+    } finally {
+      rmSync(join(SITE, "pages", "about-tags.md"));
+    }
+  });
+
+  test("the 404 page links to it, and it is not in the navigation", async () => {
+    const lost = await (await fetch(`${BASE}/nope.html`)).text();
+    expect(lost).toContain('href="/sitemap.html"');
+    expect(await (await fetch(`${BASE}/`)).text()).not.toMatch(/<ul class="nav">[\s\S]*sitemap[\s\S]*<\/ul>/);
   });
 });

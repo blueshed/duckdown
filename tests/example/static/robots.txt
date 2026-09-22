@@ -1,5 +1,7 @@
-# See http://www.robotstxt.org/wc/norobots.html for documentation on how to use the robots.txt file
-#
-# To ban all spiders from the entire site uncomment the next two lines:
+# Crawlers ask for /robots.txt at the root, and duckdown answers it from here.
+# Everything is allowed. To ban all spiders, replace the Allow line with:
+#   Disallow: /
+# To point them at the sitemap, add its full address, which only you know:
+#   Sitemap: https://example.com/sitemap.xml
 User-agent: *
-Disallow: /
+Allow: /
