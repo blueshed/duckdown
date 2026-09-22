@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.0 — 2026-09-22
 
 - A URL with a malformed escape is a 400, not a 500 with a stack.
 
