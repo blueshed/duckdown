@@ -14,7 +14,7 @@ export interface MarkdownResult {
 // these (or an x- extension of your own), so a page that opens "Update: closed
 // Monday" keeps its first line instead of losing it to metadata. For any other
 // key, fence the block with --- … --- , which takes whatever you put in it.
-const KEYS = ["title", "nav", "toc", "layout", "css", "description", "draft", "date", "order"];
+const KEYS = ["title", "nav", "toc", "layout", "css", "description", "draft", "date", "order", "aliases"];
 const isKey = (key: string) => KEYS.includes(key) || key.startsWith("x-");
 
 export function parseFrontMatter(source: string): { meta: Record<string, string[]>; body: string } {

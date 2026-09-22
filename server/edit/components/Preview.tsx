@@ -1,15 +1,19 @@
 import { createElement, signal, computed, effect } from "@blueshed/railroad";
 import { apiJson } from "../api";
 import { editorContent, filePath, pageLayout, pageIncludes, resource, resourceDraft } from "../store";
+import { speak } from "../notice";
 import { PreviewFrame } from "./PreviewFrame";
 
 // The server renders the whole document, the way the site will: the page's
 // markdown inside its template, with the nav, its stylesheets and the rest
-// filled in. `layout` says which template it used.
-type Rendered = { html: string; layout: string; includes: string[] };
+// filled in. `layout` says which template it used, and `problems` is anything
+// wrong with the folder's collection.json — nothing a page's text can cause,
+// so it is said once and not on every keystroke.
+type Rendered = { html: string; layout: string; includes: string[]; problems?: string[] };
 
 export function Preview() {
   const page = signal("");
+  let said = "";
 
   const update = async (source: string, draft: { name: string; body: string } | undefined) => {
     const path = encodeURIComponent(filePath.peek() || "");
@@ -22,6 +26,9 @@ export function Preview() {
     page.set(data.html);
     pageLayout.set(data.layout);
     pageIncludes.set(data.includes);
+    const problems = (data.problems ?? []).join(" ");
+    if (problems && problems !== said) speak(problems);
+    said = problems;
   };
 
   // Debounced preview update — tracks the page's text, which page it is, and

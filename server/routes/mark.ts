@@ -1,7 +1,12 @@
 import type { BunRequest } from "bun";
 import { requireAuth } from "../auth";
 import { parsePage, pageHtml, type DraftTemplate } from "../page";
+import { createPageStorage } from "../storage";
+import { folderOf } from "../markdown";
+import { collectionProblems } from "../collection";
 import { siteOrigin } from "./site";
+
+const pages = createPageStorage();
 
 type MarkRequest = { source: string; draft?: DraftTemplate; through?: string };
 
@@ -25,6 +30,10 @@ export const handleMark = {
     // No edit link: the preview shows the page a reader gets, and a link into
     // the editor from inside the editor helps nobody.
     const { html, layout, includes } = await pageHtml(page, { origin: siteOrigin(req), draft, through });
-    return Response.json({ html, layout, includes, meta: page.meta });
+    // If this page's folder has a collection, anything wrong with it comes
+    // back here: a slug that collides with a page, or a file that won't parse.
+    // Failures speak, and the editor is where the person who can fix it is.
+    const problems = await collectionProblems(pages, folderOf(path));
+    return Response.json({ html, layout, includes, meta: page.meta, problems });
   },
 };

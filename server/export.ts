@@ -17,14 +17,27 @@ import { mkdirSync, rmSync, writeFileSync } from "fs";
 import { dirname, join } from "path";
 import { ORIGIN, STATIC_PATH, IS_S3, BUCKET, BUCKET_PREFIX, APP_PATH } from "./config";
 import { createPageStorage, createStaticStorage, type Storage } from "./storage";
-import { parsePage, pageHtml } from "./page";
+import { parsePage, pageHtml, itemPage } from "./page";
 import { buildSite } from "./search";
-import { canonicalPath, decodePath } from "./utils";
+import { COLLECTION_FILE, collectionProblems, loadCollection } from "./collection";
+import { canonicalPath, decodePath, escapeHtml } from "./utils";
 import { yes } from "./markdown";
 import { BASE_FILES, ROOT_FILES, baseFile } from "./base";
 import { sitemapXml } from "./sitemap";
 
-export type Exported = { pages: number; drafts: number; files: number; broken: number };
+export type Exported = { pages: number; drafts: number; files: number; broken: number; problems: number };
+
+// An address that has moved, as a file a static host can serve: it says so to
+// a crawler (canonical) and takes a reader there (meta refresh). There is no
+// server to answer 301 with, so this is the published flavour's version of it.
+export function redirectHtml(to: string): string {
+  const href = escapeHtml(encodeURI(to));
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">`
+    + `<title>Moved</title><link rel="canonical" href="${href}">`
+    + `<meta http-equiv="refresh" content="0; url=${href}">`
+    + `</head><body><p>This page is now at <a href="${href}">${href}</a>.</p></body></html>\n`;
+}
+
 
 // `&amp;` and `&#x27;` in an attribute are one character each. A link scan
 // that doesn't undo them calls "Hart&#x27;sLeap.jpg" a missing file.
@@ -106,15 +119,32 @@ export async function exportSite(o: {
   // that isn't there, a bucket that is empty) must not take a good dist with
   // it, nor report success and let a deploy go green on an empty site.
   const rendered = new Map<string, string>();
-  const count: Exported = { pages: 0, drafts: 0, files: 0, broken: 0 };
+  const count: Exported = { pages: 0, drafts: 0, files: 0, broken: 0, problems: 0 };
+  const problems: string[] = [];
+  const moved: { from: string; to: string }[] = [];
 
   for (const key of await walk(pages)) {
+    // A folder's collection is a folder of pages: every item rendered at its
+    // own address, through the same pageHtml the site and the preview use. A
+    // feature that skipped the export wouldn't be a duckdown feature.
+    if (key === COLLECTION_FILE || key.endsWith(`/${COLLECTION_FILE}`)) {
+      const folder = key.slice(0, Math.max(key.length - COLLECTION_FILE.length - 1, 0));
+      problems.push(...await collectionProblems(pages, folder));
+      const collection = (await loadCollection(pages, folder))!;
+      for (const item of collection.items) {
+        const { html } = await pageHtml(itemPage({ collection, item }), { origin, editHref: "", item: { collection, item } });
+        rendered.set(outPath(item.key), html);
+        for (const alias of item.aliases) moved.push({ from: alias, to: item.href });
+      }
+      continue;
+    }
     if (!key.endsWith(".md")) continue;   // pages/ holds pages
     const page = parsePage(key, await pages.read(key));
     if (yes(page.meta.draft)) { count.drafts++; continue; }
     // No edit link: there is no editor behind a folder of files.
     const { html } = await pageHtml(page, { origin, editHref: "" });
     rendered.set(outPath(key), html);
+    for (const alias of page.meta.aliases ?? []) moved.push({ from: alias, to: canonicalPath(key) });
   }
   if (!rendered.size) {
     const where = IS_S3 ? `s3://${BUCKET}/${BUCKET_PREFIX}` : APP_PATH;
@@ -131,6 +161,21 @@ export async function exportSite(o: {
   const write = (path: string, body: string | Uint8Array) => { put(path, body); written.add(path); };
 
   for (const [path, html] of rendered) write(path, html);
+
+  // Old addresses, as redirect pages. Written under the name the request
+  // arrives as once it is decoded, so `/l"etoile-1976` is a folder called
+  // `l"etoile-1976` holding an index.html: this server finds it, and so does
+  // any host that maps a path to a file. A name a page already holds is left
+  // alone and said — the page is the thing at that address.
+  for (const { from, to } of moved) {
+    const path = outPath(`${from.replace(/^\/+/, "").replace(/\/+$/, "").replace(/\.html$/, "")}/index.md`);
+    if (rendered.has(path)) {
+      problems.push(`alias ${from} is already a page — left as it is`);
+      continue;
+    }
+    write(path, redirectHtml(to));
+    count.files++;
+  }
 
   const statics = new Set<string>();
   for (const key of await walk(files)) {
@@ -166,6 +211,10 @@ export async function exportSite(o: {
   const broken = brokenLinks(rendered, written);
   count.broken = broken.length;
   for (const line of broken) say(`broken link: ${line}`);
+  // A collection that can't have the addresses it asks for, said here as well
+  // as in the log: the export is where a site owner finds out before a reader.
+  count.problems = problems.length;
+  for (const line of problems) say(`collection: ${line}`);
 
   say(`${count.pages} page(s) and ${count.files} file(s) written to ${out}/`);
   if (count.drafts) say(`${count.drafts} draft(s) left out.`);
@@ -174,7 +223,9 @@ export async function exportSite(o: {
       + "Set it to the site's address (https://example.com) to make them absolute.\n"
       + "It also decides whether sitemap.xml is written: it needs absolute addresses.");
   }
-  if (broken.length && o.strict) throw new Error(`${broken.length} broken link(s), and --strict is on.`);
+  if ((broken.length || problems.length) && o.strict) {
+    throw new Error(`${broken.length} broken link(s) and ${problems.length} collection problem(s), and --strict is on.`);
+  }
   return count;
 }
 

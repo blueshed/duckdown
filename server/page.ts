@@ -2,6 +2,7 @@ import { TEMPLATES_PATH } from "./config";
 import { createPageStorage, createStorage } from "./storage";
 import { renderMarkdown, folderOf } from "./markdown";
 import { siteNav, markCurrent, folderListing, siteMap } from "./nav";
+import { fillCollections, itemValue, type ItemContext } from "./collection";
 import { escapeHtml, outsideCode, canonicalPath, dateHtml } from "./utils";
 
 const site = createStorage();
@@ -99,6 +100,20 @@ export function parsePage(key: string, source: string): Page {
   return { key, file, content, meta };
 }
 
+// An item of a collection, as a page: it has no markdown of its own, because
+// everything it says is a field the template asks for by name. Its key is the
+// folder-with-an-index its address resolves to, so canonicalPath, the nav's
+// marking and the export's outPath all treat it as the page it is.
+export function itemPage(context: ItemContext): Page {
+  const { collection, item } = context;
+  return {
+    key: item.key,
+    file: item.key.replace(/\.md$/, ""),
+    content: "",
+    meta: { title: [item.title], description: [item.caption], layout: [collection.layout] },
+  };
+}
+
 export type PageOptions = {
   origin: string;        // scheme and host, for the canonical URL
   editHref?: string;     // where {{edit}} points, when there is somewhere
@@ -109,6 +124,11 @@ export type PageOptions = {
   // template", which is how a template can be previewed with no page open.
   draft?: DraftTemplate;
   through?: string;
+  // This page is an item of a collection: what {{item-…}}, {{prev}}, {{next}}
+  // and {{group}} are filled from. The site route, the preview and the export
+  // each look the item up and hand it over here, so all three render it the
+  // same way they render a page written by hand.
+  item?: ItemContext;
 };
 
 // The whole document: the page's markdown inside the template it asks for,
@@ -129,6 +149,10 @@ export async function pageHtml(page: Page, o: PageOptions): Promise<{ html: stri
     body = outsideCode(body, (part) =>
       part.replace(new RegExp(`<p>\\{\\{${tag}\\}\\}</p>|\\{\\{${tag}\\}\\}`, "g"), () => html));
   }
+  // {{items}} and {{groups}} are the same idea over a collection.json: an
+  // overview page writes itself from the folder's data, here or in a template.
+  const collection = { pages, folder: folderOf(file), context: o.item };
+  body = await fillCollections(body, collection);
 
   const template = o.through === undefined
     ? await templateFor(meta.layout?.[0], o.draft)
@@ -138,6 +162,13 @@ export async function pageHtml(page: Page, o: PageOptions): Promise<{ html: stri
   // a buy link) without a copy per page. Escaped like the title, empty when
   // the page doesn't say, and before {{content}} so page text is never filled.
   let html = withIncludes.replace(/\{\{(x-[\w-]+)\}\}/g, (_, key: string) => escapeHtml(meta[key.toLowerCase()]?.[0] ?? ""));
+  // A template may carry the collection's own tags too: {{groups}} for the
+  // section menu, and — on the template an item wears — {{item-<field>}} for
+  // anything the item says, {{prev}}, {{next}} and {{group}}. Escaped and
+  // empty when unset, like the x- keys, and before {{content}} for the same
+  // reason: a placeholder written in a page's text is never filled.
+  html = await fillCollections(html, collection);
+  html = html.replace(/\{\{(item-[\w-]+|prev|next|group)\}\}/g, (_, name: string) => itemValue(name, o.item));
   for (const [name, value] of [
     ["title", () => escapeHtml(meta.title?.[0] || "duckie")],
     ["url", () => escapeHtml(o.origin + canonicalPath(page.key))],

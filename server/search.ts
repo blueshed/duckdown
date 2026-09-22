@@ -1,6 +1,7 @@
 import type { Storage } from "./storage";
 import { DEBUG } from "./config";
 import { renderMarkdown, yes } from "./markdown";
+import { COLLECTION_FILE, aliasKey, loadCollection } from "./collection";
 import { canonicalPath } from "./utils";
 
 // The site's own page for a miss: a page, but not one to search for, list or map.
@@ -24,8 +25,14 @@ export type Entry = {
 // (the sitemap).
 export type PageRef = { url: string; date: string };
 
-// What the browser is sent, and the pages it came from: one walk, both.
-export type Built = { entries: Entry[]; pages: PageRef[] };
+// An address a page or an item used to answer at, and the one it answers at
+// now: the served site turns the first into a 301 to the second, and the
+// export writes a redirect page there. The key is already through aliasKey().
+export type Alias = { from: string; to: string };
+
+// What the browser is sent, the pages it came from, and the addresses that
+// move: one walk, all three.
+export type Built = { entries: Entry[]; pages: PageRef[]; aliases: Alias[] };
 
 const ENTITIES: Record<string, string> = { "&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": '"', "&#39;": "'", "&#x27;": "'" };
 
@@ -58,9 +65,9 @@ function sections(html: string): { id: string; heading: string; body: string }[]
 // Every page a reader could reach, in the order they were found. Drafts are
 // left out — they are 404 to everyone but the editor, and a search result
 // leading to a 404 is worse than no result — and so is the 404 page.
-export async function buildSite(pages: Storage, prefix = ""): Promise<Built> {
+export async function buildSite(pages: Storage, prefix = "", debug = DEBUG): Promise<Built> {
   const { files, folders } = await pages.list(prefix);
-  const out: Built = { entries: [], pages: [] };
+  const out: Built = { entries: [], pages: [], aliases: [] };
 
   for (const f of files) {
     const key = f.path.replace(/^\//, "");
@@ -71,6 +78,7 @@ export async function buildSite(pages: Storage, prefix = ""): Promise<Built> {
     const title = meta.title?.[0] ?? key.replace(/\.md$/, "");
     const date = meta.date?.[0] ?? "";
     out.pages.push({ url, date });
+    for (const alias of meta.aliases ?? []) out.aliases.push({ from: aliasKey(alias), to: url });
     for (const { id, heading, body } of sections(content)) {
       out.entries.push({
         url: id ? `${url}#${id}` : url,
@@ -83,11 +91,26 @@ export async function buildSite(pages: Storage, prefix = ""): Promise<Built> {
     }
   }
 
+  // A folder's collection.json is a folder of pages too: one entry per item,
+  // its caption as the words, so a work is as findable as anything written by
+  // hand — and its address is in the sitemap for the same reason.
+  if (files.some((f) => f.name === COLLECTION_FILE)) {
+    const collection = await loadCollection(pages, prefix, debug);
+    for (const item of collection?.items ?? []) {
+      out.pages.push({ url: item.href, date: "" });
+      out.entries.push({
+        url: item.href, title: item.title, section: "", description: item.caption, date: "", text: item.caption,
+      });
+      for (const alias of item.aliases) out.aliases.push({ from: aliasKey(alias), to: item.href });
+    }
+  }
+
   for (const folder of folders.sort((a, b) => a.name.localeCompare(b.name))) {
     if (folder.name.startsWith(".")) continue;
-    const inside = await buildSite(pages, folder.path.replace(/^\//, ""));
+    const inside = await buildSite(pages, folder.path.replace(/^\//, ""), debug);
     out.entries.push(...inside.entries);
     out.pages.push(...inside.pages);
+    out.aliases.push(...inside.aliases);
   }
 
   return out;
@@ -98,8 +121,8 @@ export async function buildSite(pages: Storage, prefix = ""): Promise<Built> {
 let built: Promise<Built> | null = null;
 
 function site(pages: Storage, debug: boolean): Promise<Built> {
-  if (debug) return buildSite(pages);
-  return (built ??= buildSite(pages).catch((e) => {
+  if (debug) return buildSite(pages, "", debug);
+  return (built ??= buildSite(pages, "", debug).catch((e) => {
     built = null;
     throw e;
   }));
@@ -107,6 +130,13 @@ function site(pages: Storage, debug: boolean): Promise<Built> {
 
 export const searchIndex = async (pages: Storage, debug = DEBUG): Promise<Entry[]> => (await site(pages, debug)).entries;
 export const pageList = async (pages: Storage, debug = DEBUG): Promise<PageRef[]> => (await site(pages, debug)).pages;
+
+// Where an old address goes now, or null when it is simply a miss. Built from
+// the same walk as the index, so it costs nothing extra and expires with it.
+export async function aliasTarget(pages: Storage, path: string, debug = DEBUG): Promise<string | null> {
+  const key = aliasKey(path);
+  return (await site(pages, debug)).aliases.find((a) => a.from === key)?.to ?? null;
+}
 
 export function searchChanged(): void {
   built = null;
