@@ -276,6 +276,7 @@ thumbnail, rather than a link to a folder.
 |-------------|-----------------|
 | `{{items}}` | The collection's groups, each a grid of thumbnails linking to the item pages |
 | `{{items by=<field>}}` | One grid per distinct value of that field, in the order the values first appear |
+| `{{items by=<field> sort=asc}}` (or `desc`) | The same, with the groups ordered by value: years as numbers, the rest as words. Items inside a group keep the file's order |
 | `{{items <collection>}}`, `{{items <collection> by=<field>}}` | The same for another folder's collection |
 | `{{groups}}`, `{{groups <collection>}}` | The section menu: each group linking to its first item, the current one marked |
 

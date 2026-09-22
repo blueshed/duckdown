@@ -18,6 +18,8 @@
   folder it shows — one collection, as many views of it as the site wants.
   Headings carry their value as an `id`, so a template can link back to the
   place a reader came from.
+  `sort=asc` or `sort=desc` orders the groups by value — years as numbers —
+  for a file written newest first that wants its overview oldest first.
 
 - **The item template.** `{{item-<field>}}` fills with anything the item says,
   escaped and empty when unset, beside `{{item-src}}`, `{{item-thumb}}`,

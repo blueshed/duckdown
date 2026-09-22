@@ -355,8 +355,18 @@ function groupSection(group: Group, level: number): string {
 // {{items by=<field>}} — one grid per distinct value of that field instead, in
 // the order the values first appear, and an item whose value is "skip" is left
 // out. That is how one collection is both /works (by year) and /prints (by the
-// year it was printed), without a second copy of anything.
-export function itemsHtml(collection: Collection, by?: string): string {
+// year it was printed), without a second copy of anything. `sort=asc` or
+// `sort=desc` orders the groups by value instead — years as numbers, the rest
+// as words — for a file written newest first that wants its overview oldest
+// first. Items inside a group keep the file's order either way.
+export function sortValues(values: string[], sort?: string): string[] {
+  if (sort !== "asc" && sort !== "desc") return values;
+  const numeric = values.every((v) => /^-?\d+(\.\d+)?$/.test(v));
+  const sorted = [...values].sort((a, b) => numeric ? Number(a) - Number(b) : a.localeCompare(b));
+  return sort === "desc" ? sorted.reverse() : sorted;
+}
+
+export function itemsHtml(collection: Collection, by?: string, sort?: string): string {
   if (!by) {
     const sections = collection.groups.map((g) => groupSection(g, 2)).filter(Boolean);
     return sections.length ? `<div class="collection">\n${sections.join("\n")}\n</div>` : "";
@@ -371,7 +381,7 @@ export function itemsHtml(collection: Collection, by?: string): string {
   }
   if (!order.length) return "";
   const labels = collection.labels[by] ?? {};
-  const sections = order.map((value) => {
+  const sections = sortValues(order, sort).map((value) => {
     const label = labels[value];
     const heading = label ? `${value} - ${label}` : value;
     return `<section class="group" id="${escapeHtml(fragmentId(value))}">\n`
@@ -491,7 +501,7 @@ export async function fillCollections(
       continue;
     }
     const current = collection === o.context?.collection ? o.context.item.group : undefined;
-    done.set(whole, tag === "items" ? itemsHtml(collection, options.by) : groupsHtml(collection, current));
+    done.set(whole, tag === "items" ? itemsHtml(collection, options.by, options.sort) : groupsHtml(collection, current));
   }
 
   const fill = (part: string) => part

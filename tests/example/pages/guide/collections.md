@@ -123,6 +123,12 @@ outside the folder it shows. `/by-year.html` in this site is one page carrying:
 {{items gallery by=year}}
 ```
 
+The groups come in the order their values first appear in the file. To
+order them by value instead — years as numbers, anything else as words —
+say so: `{{items by=year sort=asc}}` puts the oldest first, `sort=desc`
+the newest. Items inside a group keep the file's order either way.
+
+
 `{{groups}}` is the section menu — each group linking to its first item. On an
 item's page the group being read is marked. It takes a collection name too
 (`{{groups gallery}}`), so a home page can carry it.

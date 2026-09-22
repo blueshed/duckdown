@@ -4,7 +4,7 @@ import { describe, test, expect, spyOn } from "bun:test";
 import type { Storage, Listing } from "../server/storage";
 import {
   SLUG, slugify, fragmentId, aliasKey, thumbName, parseCollection, parseArgs,
-  itemsHtml, groupsHtml, neighbour, itemValue, fillCollections,
+  itemsHtml, groupsHtml, neighbour, itemValue, fillCollections, sortValues,
   loadCollection, collectionsChanged, collectionPath, collisions, collectionProblems, itemAt,
 } from "../server/collection";
 
@@ -257,6 +257,17 @@ describe("itemsHtml", () => {
     expect(html).not.toContain("Rushes");                         // index: skip
   });
 
+  test("sort=asc or desc orders the groups by value: years as numbers, the rest as words", () => {
+    const ids = (html: string) => [...html.matchAll(/<section class="group" id="([^"]+)">/g)].map((m) => m[1]);
+    expect(ids(itemsHtml(site(), "index", "asc"))).toEqual(["1962", "1967"]);
+    expect(ids(itemsHtml(site(), "index", "desc"))).toEqual(["1967", "1962"]);
+    expect(ids(itemsHtml(site(), "index", "sideways"))).toEqual(ids(itemsHtml(site(), "index")));  // not a sort: file order
+    expect(sortValues(["1990", "2026", "1960"], "asc")).toEqual(["1960", "1990", "2026"]);
+    expect(sortValues(["10", "9", "100"], "asc")).toEqual(["9", "10", "100"]);        // numbers, not strings
+    expect(sortValues(["b", "10", "a"], "desc")).toEqual(["b", "a", "10"]);           // one word makes it words
+    expect(sortValues(["b", "a"])).toEqual(["b", "a"]);
+  });
+
   test("nothing to show is nothing at all, not an empty grid", () => {
     const empty = parseCollection("works", json({ groups: [group("1960", [])] }));
     expect(itemsHtml(empty)).toBe("");
@@ -358,6 +369,8 @@ describe("fillCollections", () => {
     const html = await fillCollections("<p>{{items works by=index}}</p>", { pages: pages(), folder: "", debug: true });
     expect(html).toContain('<section class="group" id="1962">');
     expect(html).not.toContain("<p><div");   // the wrapping paragraph goes with it
+    const sorted = await fillCollections("{{items works by=index sort=desc}}", { pages: pages(), folder: "", debug: true });
+    expect(sorted.indexOf('id="1967"')).toBeLessThan(sorted.indexOf('id="1962"'));
   });
 
   test("with no name it is the page's own folder's collection", async () => {
