@@ -3,10 +3,11 @@
 import { describe, test, expect, spyOn } from "bun:test";
 import type { Storage, Listing } from "../server/storage";
 import {
-  SLUG, slugify, fragmentId, aliasKey, thumbName, parseCollection, parseArgs,
+  SLUG, slugify, fragmentId, aliasKey, parseCollection, parseArgs,
   itemsHtml, groupsHtml, neighbour, itemValue, fillCollections, sortValues,
   loadCollection, collectionsChanged, collectionPath, collisions, collectionProblems, itemAt,
 } from "../server/collection";
+import { thumbName } from "../server/images";
 
 // An in-memory Storage over { "gallery/collection.json": "…" }.
 function memory(files: Record<string, string>): Storage {

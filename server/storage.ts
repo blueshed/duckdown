@@ -1,5 +1,5 @@
-import { resolve, join, extname, dirname, relative, sep } from "path";
-import { readdir, stat, readFile, writeFile, unlink, mkdir } from "fs/promises";
+import { resolve, join, extname, dirname, basename, relative, sep } from "path";
+import { readdir, stat, readFile, writeFile, unlink, mkdir, rename } from "fs/promises";
 import { existsSync, cpSync } from "fs";
 import { S3Client } from "bun";
 import {
@@ -107,11 +107,19 @@ export class LocalStorage implements Storage {
     return new Uint8Array(await readFile(fullPath));
   }
 
+  // Written beside the file and moved onto it, because a write is not the
+  // only thing happening: a reader — the site, the editor's preview — can ask
+  // for the same key mid-write and would otherwise be handed half a file. The
+  // collection pane writes on every change, so "a few times a day" becomes
+  // "while you are watching". Rename within a folder is atomic; the temporary
+  // name starts with a dot, so nothing lists it if a crash leaves one behind.
   async write(key: string, body: string | Uint8Array): Promise<void> {
     const fullPath = safePath(this.root, key);
     const dir = dirname(fullPath);
     if (!existsSync(dir)) await mkdir(dir, { recursive: true });
-    await writeFile(fullPath, body);
+    const temp = join(dir, `.${basename(fullPath)}.${Math.random().toString(36).slice(2)}.tmp`);
+    await writeFile(temp, body);
+    await rename(temp, fullPath);
   }
 
   async remove(key: string): Promise<void> {
