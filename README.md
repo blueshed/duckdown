@@ -16,7 +16,7 @@ never depends on which you chose.
 mkdir my-site && cd my-site
 bun init -y
 bun add github:blueshed/duckdown#v0.2.0     # the tag is the version
-bunx duckdown init                          # makes site/, .env, .gitignore, railway.json, the skill
+bunx duckdown init                          # makes site/, .env, .gitignore, .railway/railway.ts, the skill
 bun install
 bun run dev
 ```

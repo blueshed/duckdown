@@ -51,7 +51,7 @@ users.json    who can sign in (password hashes)
 - **Styling is templates and stylesheets, nothing else.** `templates/site.html` links `static/site.css` (duckdown's base, drawn from variables) and `static/theme.css` (this site's look, which only says what differs — `:root { --accent: … }`). To restyle the site, edit `theme.css`. For one page, `css: poster` links `/static/poster.css` after them. For a *kind* of page, give it a template with `layout:` and let that template link what it needs.
 - **In development (`DEBUG=1`) the navigation is rebuilt on every request**, so a folder's `index.md` written straight to disk shows up at once. In production it's cached and rebuilt when a page is saved or deleted through the editor, so files put there another way need a restart (`bun run stop`, then start again).
 - **A page is searchable because it is readable** — `/search.json` carries every non-draft page's words, and the browser matches against it. Nothing to register, no index to rebuild by hand. A `draft:` page is left out, so it can't be found until it's published.
-- **Whether a change is live depends on how the site is deployed**, and there are two ways. On a **served** site duckdown is running and a save at `/edit` is live at once. On a **published** site the pages were rendered to files by `bun run export` and a host is handing those out — editing markdown changes nothing anybody can see until the site is exported and deployed again. Look for a `DEPLOY.md`: a published site has one, and it says how. Never tell someone their change is live without knowing which kind of site it is.
+- **Whether a change is live depends on how the site is deployed**, and there are two ways. On a **served** site duckdown is running and a save at `/edit` is live at once. On a **published** site the pages were rendered to files by `bun run export` and a host is handing those out — editing markdown changes nothing anybody can see until the site is exported and deployed again. The site's own README.md or CLAUDE.md says how it's deployed — read whichever it has, not a `DEPLOY.md`, which not every site keeps. Never tell someone their change is live without knowing which kind of site it is.
 - **`users.json` holds password hashes**, never passwords: a plain one won't sign in. Make a hash with `bun -e 'console.log(await Bun.password.hash("their-password"))'`.
 
 ## Check your work
@@ -71,8 +71,9 @@ DUCKDOWN_ORIGIN=https://example.com bun run export     # into ./dist
 Every page rendered the way the site renders it, at its one address, with
 `static/` alongside; drafts are left out, and so are pages that would 404. It also writes `sitemap.xml` (given `DUCKDOWN_ORIGIN`), reports internal links that lead nowhere (`--strict` makes that a failure), and refuses to publish an empty site.
 A **published** site is handed out by `bun run node_modules/duckdown/server/serve.ts` (`SITE_DIR`, `PORT`) or any static host. Where `dist/` then goes is the site's
-own business — its `DEPLOY.md` says, and on some sites a `git push` does the
-whole of it. Don't invent a deployment step that isn't written down.
+own business — its README.md or CLAUDE.md says, whichever it has, and on some
+sites a `git push` does the whole of it. Don't invent a deployment step that
+isn't written down.
 
 ## Everything else
 

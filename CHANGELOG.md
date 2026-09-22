@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+- **The scaffold writes `.railway/railway.ts`, not `railway.json`.** Build,
+  start, healthcheck and the two variables the exporter needs
+  (`DUCKDOWN_PATH`, `DUCKDOWN_ORIGIN`) are now one file a review can see,
+  applied with `railway config plan` / `apply`, instead of a `railway.json`
+  that could only hold the first three and left the variables to be set by
+  hand in the dashboard. A scaffolded site also gets a `railway` devDependency,
+  for the file's own `railway/iac` import.
+- The authoring skill no longer sends a session to a site's `DEPLOY.md`: it
+  reads whichever of README.md or CLAUDE.md the site has, since a scaffolded
+  site has never had a `DEPLOY.md` to find.
+
 ## 0.3.1 — 2026-09-22
 
 - **One address for the published site.** With `DUCKDOWN_ORIGIN` set, a

@@ -90,6 +90,9 @@ Your new site is ready. [Login to edit](/login).
   } else if (!pkg.dependencies?.duckdown && !pkg.devDependencies?.duckdown) {
     (pkg.dependencies ??= {}).duckdown = `github:blueshed/duckdown#v${version}`;
   }
+  // .railway/railway.ts (below) imports from "railway/iac"; without the
+  // package installed that import can't resolve when the CLI reads the file.
+  (pkg.devDependencies ??= {}).railway ??= "^3.11.0";
   for (const [key, command] of Object.entries(scripts(vendored))) {
     if (vendored || pkg.scripts[key] === undefined) pkg.scripts[key] = command;
     else if (pkg.scripts[key] !== command) result.skipped.push(`package.json script "${key}" (the site's own)`);
@@ -129,14 +132,46 @@ DUCKDOWN_ORIGIN=
     result.wrote.push(".gitignore");
   }
 
-  // The published flavour on Railway: export at build, hand the files out, and
-  // let /health say it is up without reading any content. Variables aren't in
-  // this file; CLAUDE.md lists the two to set.
-  text("railway.json", JSON.stringify({
-    $schema: "https://railway.com/railway.schema.json",
-    build: { buildCommand: "bun run export" },
-    deploy: { startCommand: "bun run start", healthcheckPath: "/health", restartPolicyType: "ON_FAILURE" },
-  }, null, 2) + "\n");
+  // The published flavour on Railway, as infrastructure-as-code: build, start,
+  // healthcheck and the two variables the exporter needs, all in one file a
+  // review can see (`railway config plan` / `apply`, the Railway CLI) — not
+  // set by hand in the dashboard, and not railway.json, which can't hold
+  // variables. `source` and `DUCKDOWN_ORIGIN` are placeholders: real ones
+  // before the first deploy.
+  text(join(".railway", "railway.ts"), `import { defineRailway, github, project, service } from "railway/iac";
+
+// This repository manages only its own resources in the environment.
+export const partial = "${name}";
+
+// A published site: duckdown renders site/ to files at build time and hands
+// them out with its own serve.ts, so the service holds no secret and there is
+// nothing in it to leak. A custom domain is managed by hand, never by this
+// file, and never listed here.
+export default defineRailway(() => {
+  const web = service("${name}", {
+    // Fill in this repository's path on GitHub and the branch that deploys.
+    source: github("your-org/${name}", { branch: "main" }),
+    healthcheck: "/health",
+    build: "${scripts(vendored).build}",
+    start: "${scripts(vendored).start}",
+
+    variables: {
+      // Where the pages are. Without it the exporter falls back to a folder
+      // that doesn't exist here, writes no pages, and the deploy goes green
+      // with every page a 404.
+      DUCKDOWN_PATH: "./site",
+      // What to call the site in each page's canonical link and sitemap.xml:
+      // the exporter has no request to take an origin from. Set it to the
+      // real domain before the first deploy.
+      DUCKDOWN_ORIGIN: "https://example.com",
+      // A line per page view in the logs: what is read and how much, never who.
+      DUCKDOWN_LOG: "1",
+    },
+  });
+
+  return project("${name}", { resources: [web] });
+});
+`);
 
   // The authoring skill and the desktop app's preview config. From this
   // package, so a site's copy is as new as the duckdown it was made with; to
@@ -166,12 +201,18 @@ bun run start     # hand out dist/ on PORT
 
 ## Deploying (Railway)
 
-\`railway.json\` says how: export at build, \`bun run start\`, healthcheck \`/health\`.
-Set these variables on the service:
+Everything Railway holds for the service — build, start, healthcheck and the
+variables, \`DUCKDOWN_PATH\` and \`DUCKDOWN_ORIGIN\` included — is declared in
+\`.railway/railway.ts\` and applied with the Railway CLI:
 
-- \`DUCKDOWN_PATH=./site\` — where the pages are. Unset, an export of nothing
-  fails, and says so.
-- \`DUCKDOWN_ORIGIN=https://your-domain\` — canonical links and sitemap.xml.
+\`\`\`sh
+railway config plan     # a dry run: changes nothing
+railway config apply    # only after reading the plan
+\`\`\`
+
+**Read the plan every time — what the file does not say is removed.** Fill in
+the repository's path on GitHub and the real domain before the first deploy;
+a custom domain is managed by hand, never by this file.
 
 ## Todo
 
