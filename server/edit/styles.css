@@ -810,3 +810,35 @@ button.danger-subtle:hover {
   display: none;
 }
 
+/* --- Narrow screens ---
+   Three columns want about 900px between them; below that they stack. The
+   tree goes on top, capped and scrolling, the panes take the rest, and the
+   preview stands down — there is no room to show the page beside the thing
+   you are changing it with, and View opens the site itself. Without this the
+   editor at phone width is a 240px tree and two columns of one word each. */
+@media (max-width: 767px) {
+  #app {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 11rem) minmax(0, 1fr);
+  }
+
+  .panel-browser {
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .column-middle {
+    border-right: 0;
+  }
+
+  .column-preview {
+    display: none;
+  }
+
+  /* The resources chooser is a drawer over everything; at this width it is
+     the whole of it. */
+  .sidebar {
+    width: 100%;
+  }
+}
+
