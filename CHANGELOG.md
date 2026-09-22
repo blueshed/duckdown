@@ -45,6 +45,12 @@
   find the words); the result list scrolls inside its panel instead of growing
   the page. Words now match where they start (`train` is not in `constraints`).
 
+- **Two ways in, one scaffold.** `bun add github:blueshed/duckdown#<tag>` then
+  `bunx duckdown init` (new), or `bun create` as before, both through
+  `scaffold()`. `init` never overwrites and says what it skipped. `bun create`
+  now keeps `server/` and the test suite, since the code is the owner's - there
+  is no upgrade path from it; fork on GitHub for that.
+
 
 ## 0.2.0 — 2026-09-21
 

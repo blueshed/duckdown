@@ -1,81 +1,43 @@
 #!/usr/bin/env bun
 
-// Post-create setup: run after `bun create blueshed/duckdown my-site`
-// Tidies the cloned repo into a fresh site.
+// Post-create setup: run after `bun create blueshed/duckdown my-site`.
+//
+// This is the way in for someone who wants the code: server/ stays, and it is
+// theirs — and so is the test suite, held at 100% coverage, which is exactly
+// what they need on the day they start changing things. There is no upgrade
+// path: bun create strips the history, so to follow upstream fork duckdown on
+// GitHub instead. To depend on duckdown rather than own it: `bun add` it and
+// run `bunx duckdown init`. The scaffold is the same either way (server/init.ts).
 
-import { rmSync, mkdirSync, writeFileSync, existsSync, copyFileSync } from "fs";
+import { rmSync } from "fs";
 import { join } from "path";
+import { scaffold } from "../server/init";
 
 // Only when run (bun create's postinstall), never on import: tests call
 // setup() on a scratch folder, since it deletes things.
 if (import.meta.main) await setup(process.cwd());
 
-export async function setup(root: string): Promise<void> {
+export async function setup(root: string) {
   const name = root.split("/").pop() || "my-site";
-
   console.log(`Setting up ${name}...`);
 
-  // Create a fresh site folder, before the seed site (tests/example) goes
-  const siteDir = join(root, "site");
-  if (!existsSync(siteDir)) {
-    mkdirSync(join(siteDir, "pages"), { recursive: true });
-    mkdirSync(join(siteDir, "static", "images"), { recursive: true });
-    mkdirSync(join(siteDir, "templates"), { recursive: true });
-
-    // Default pages
-    writeFileSync(join(siteDir, "pages", "index.md"), `title: ${name}
-
-# Welcome to ${name}
-
-Your new site is ready. [Login to edit](/login).
-`);
-
-    // The seed's two stylesheets: site.css is the base, drawn from variables,
-    // and theme.css is this site's own look. The template links both, so a
-    // new site can say what it wants in theme.css and leave the base alone.
-    for (const sheet of ["site.css", "theme.css"]) {
-      copyFileSync(join(root, "tests", "example", "static", sheet), join(siteDir, "static", sheet));
-    }
-
-    // The seed's template, not a second copy of it: the two drifted, and a
-    // canonical link had to be added in both places last time.
-    copyFileSync(join(root, "tests", "example", "templates", "site.html"), join(siteDir, "templates", "site.html"));
-
-    // Default users — password hashed, never stored in plaintext
-    const adminHash = await Bun.password.hash("admin");
-    writeFileSync(join(siteDir, "users.json"), JSON.stringify({ admin: adminHash }, null, 2) + "\n");
-  }
-
-  // Write .env pointing to the site folder
-  writeFileSync(join(root, ".env"), `DUCKDOWN_PATH=./site
-PORT=8080
-DEBUG=1
-
-# S3 storage (uncomment to use)
-# DUCKDOWN_BUCKET=my-bucket
-# DUCKDOWN_PREFIX=
-# DUCKDOWN_ENDPOINT=http://localhost:9000
-# DUCKDOWN_REGION=us-east-1
-# S3_ACCESS_KEY_ID=minio
-# S3_SECRET_ACCESS_KEY=minio123
-`);
-
-  // Remove what belongs to developing duckdown itself. A new site keeps the
-  // rest of .claude: the authoring skill, for writing the site's content, and
-  // launch.json, for the desktop app's preview. Railroad's skills are for
-  // working on the editor, so they go.
-  for (const path of [
-    "tests", "feature.md", "todo.jsonl", "bunfig.toml", "create",
-    join(".claude", "skills", "railroad"), join(".claude", "skills", "bun-route"),
-  ]) {
+  // What is about developing duckdown as a project, not the code or its tests:
+  // its feature checklist, its ledger, and this script.
+  for (const path of ["feature.md", "todo.jsonl", "create"]) {
     rmSync(join(root, path), { recursive: true, force: true });
   }
+
+  const { wrote, skipped } = await scaffold(root, { vendored: true, name });
+  for (const path of wrote) console.log(`  wrote ${path}`);
+  for (const path of skipped) console.log(`  kept ${path}`);
 
   console.log(`
   ${name} is ready!
 
-  bun run dev        # Start development server
-  bun run start      # Start production server
+  bun run dev        # Start the editor and the site
+  bun run test       # duckdown's own tests, in ./tests
+  bun run export     # Write the site to ./dist
+  bun run start      # Hand out ./dist
 
   Site content: ./site/
   Editor:       http://localhost:8080/edit

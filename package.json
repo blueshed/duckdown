@@ -18,12 +18,14 @@
     "jsx"
   ],
   "bin": {
-    "duckdown": "./server/main.ts",
+    "duckdown": "./server/cli.ts",
     "duckdown-export": "./server/export.ts",
     "duckdown-serve": "./server/serve.ts"
   },
   "files": [
     "server",
+    ".claude/skills/duckdown",
+    ".claude/launch.json",
     "create",
     "tests/example",
     "CHANGELOG.md",
