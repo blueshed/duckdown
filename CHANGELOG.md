@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+- A URL with a malformed escape is a 400, not a 500 with a stack.
+
+- **The base (`site.css`, `search.js`) is no longer copied into a site.** It
+  lives in `server/base/`; a site with no file of that name is served and
+  exported duckdown's own, and the seed carries no copy either.
+- Static files and signed-out pages carry an ETag and answer 304.
+
+- **The base (`site.css`, `search.js`) is no longer copied into a site.** It
+  lives in `server/base/`; a site with no file of that name is served and
+  exported duckdown's own, and the seed carries no copy either.
+- Static files and signed-out pages carry an ETag and answer 304.
+
 ## 0.2.0 — 2026-09-21
 
 ### Search, in the browser

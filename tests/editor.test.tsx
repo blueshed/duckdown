@@ -359,9 +359,9 @@ describe("resources", () => {
 
   test("a resource opens below the page, and the page stays where it is", async () => {
     expect(await loadFile("index.md")).toBe(true);
-    expect(await openResource({ section: "static", path: "site.css" })).toBe(true);
+    expect(await openResource({ section: "static", path: "theme.css" })).toBe(true);
 
-    expect(resource.peek()?.path).toBe("site.css");
+    expect(resource.peek()?.path).toBe("theme.css");
     expect(resourceDraft.peek()).toContain("--accent");
     expect(filePath.peek()).toBe("index.md");   // the content is untouched
     expect(showImages.peek()).toBe(false);      // the chooser got out of the way
@@ -369,13 +369,13 @@ describe("resources", () => {
   });
 
   test("editing marks it unsaved; saving writes it and clears that", async () => {
-    await openResource({ section: "static", path: "site.css" });
+    await openResource({ section: "static", path: "theme.css" });
     resourceDraft.set(resourceDraft.peek() + "\n/* from the pane */\n");
     expect(resourceDirty.peek()).toBe(true);
 
     expect(await saveResource()).toBe(true);
     expect(resourceDirty.peek()).toBe(false);
-    const onDisk = await (await fetch(`${BASE}/edit/static/site.css`, { headers: { Accept: "text/plain" } })).text();
+    const onDisk = await (await fetch(`${BASE}/edit/static/theme.css`, { headers: { Accept: "text/plain" } })).text();
     expect(onDisk).toContain("from the pane");
   });
 
@@ -385,7 +385,7 @@ describe("resources", () => {
   });
 
   test("closing leaves nothing behind, and a missing one opens nothing", async () => {
-    await openResource({ section: "static", path: "site.css" });
+    await openResource({ section: "static", path: "theme.css" });
     closeResource();
     expect(resource.peek()).toBeNull();
     expect(resourceDraft.peek()).toBe("");
@@ -430,7 +430,7 @@ describe("ResourceList", () => {
   test("the css tab lists the stylesheets in static/, and nothing else", async () => {
     await loadFile("guide/index.md");
     const { host, dispose } = render(() => <ResourceList section="static" />);
-    await waitFor(() => rows(host).includes("site.css"));
+    await waitFor(() => rows(host).includes("theme.css"));
     expect(host.querySelector(".pane-path")!.textContent).toBe("/static");
     expect(rows(host)).toContain("theme.css");   // the site's own look
     expect(rows(host)).not.toContain("favicon.ico");
@@ -439,7 +439,7 @@ describe("ResourceList", () => {
 
   test("makes one from its header, and keeps the dialog open to say the name is taken", async () => {
     const { host, dispose } = render(() => <ResourceList section="static" />);
-    await waitFor(() => rows(host).includes("site.css"));
+    await waitFor(() => rows(host).includes("theme.css"));
 
     const name = async (text: string) => {
       click(host.querySelector('[aria-label="New stylesheet"]')!);
@@ -450,8 +450,8 @@ describe("ResourceList", () => {
       return dialog;
     };
 
-    const taken = await name("site");
-    await waitFor(() => taken.textContent!.includes("site.css already exists"));
+    const taken = await name("theme");
+    await waitFor(() => taken.textContent!.includes("theme.css already exists"));
     click(button(taken, "Cancel")!);
 
     await name("from-the-list");
@@ -825,7 +825,7 @@ describe("ImageBrowser", () => {
     expect(tab("images").className).toBe("section on");
 
     click(tab("css"));
-    await waitFor(() => rows(host).includes("site.css"));
+    await waitFor(() => rows(host).includes("theme.css"));
     expect(tab("css").className).toBe("section on");
     expect(tab("images").className).toBe("section");
     expect(host.querySelector(".upload-area")).toBeNull(); // the images tab stepped aside
