@@ -69,7 +69,8 @@ DUCKDOWN_ORIGIN=https://example.com bun run export     # into ./dist
 ```
 
 Every page rendered the way the site renders it, at its one address, with
-`static/` alongside; drafts are left out. Where `dist/` then goes is the site's
+`static/` alongside; drafts are left out, and so are pages that would 404. It also writes `sitemap.xml` (given `DUCKDOWN_ORIGIN`), reports internal links that lead nowhere (`--strict` makes that a failure), and refuses to publish an empty site.
+A **published** site is handed out by `bun run node_modules/duckdown/server/serve.ts` (`SITE_DIR`, `PORT`) or any static host. Where `dist/` then goes is the site's
 own business — its `DEPLOY.md` says, and on some sites a `git push` does the
 whole of it. Don't invent a deployment step that isn't written down.
 

@@ -6,6 +6,26 @@ Write markdown, see it live, publish your site.
 
 ## Quick Start
 
+There are two ways in. They share one scaffold and differ in one thing: where
+duckdown's code lives. Your content (`site/`: pages, templates, static files)
+never depends on which you chose.
+
+**Install it** — the default. duckdown is a dependency; an upgrade is a tag bump.
+
+```sh
+mkdir my-site && cd my-site
+bun init -y
+bun add github:blueshed/duckdown#v0.2.0     # the tag is the version
+bunx duckdown init                          # makes site/, .env, .gitignore, railway.json, the skill
+bun install
+bun run dev
+```
+
+`bunx duckdown init` never overwrites: a `site/`, a `.env` or a script that is
+already there is left alone, and it says what it skipped.
+
+**Create it** — when you want to own the code, or need a different duckdown.
+
 ```sh
 bun create blueshed/duckdown my-site
 cd my-site
@@ -14,9 +34,28 @@ bun run dev
 ```
 
 `bun create` prints `$ bun run create/setup.ts` and, on Bun 1.4.2, doesn't run
-it. Until that's fixed upstream, run it yourself — it makes `site/`, writes
-`.env`, and clears away what belongs to developing duckdown. Skip it and the
-server won't start, and will tell you why.
+it. Until that's fixed upstream, run it yourself — it makes `site/` and `.env`
+the same way `init` does. The code is `./server/` and the tests are `./tests/`,
+still held at 100% coverage: yours to change, with the suite that guards them.
+There is no upgrade path — `bun create` strips the history. If you want to own
+the code *and* merge upstream, fork duckdown on GitHub instead.
+
+|  | **install** | **create** |
+|---|---|---|
+| duckdown's code | `node_modules/duckdown/server/` | `./server/` |
+| Scripts run | `node_modules/duckdown/server/main.ts`… | `server/main.ts`… |
+| Upgrading | change the tag, `bun install` | none: it's your code |
+| duckdown's tests | not included | `./tests/`, at 100% |
+| The authoring skill | copied once; refresh with `cp -r node_modules/duckdown/.claude/skills/duckdown .claude/skills/` | in the clone |
+
+Moving between them is one paragraph, not a command. To take ownership: copy
+`node_modules/duckdown/server` to `./server` and point the scripts at it. To go
+back: delete `./server` and add the dependency. The content never moves.
+
+`site.css` and `search.js` — duckdown's base — aren't copied into either kind
+of site. A site with no file of that name is served and exported duckdown's
+own, so upgrading upgrades them; make your own `site/static/site.css` to fork
+one. Put a site's look in `theme.css` and keep the upgrades.
 
 Open [http://localhost:8080](http://localhost:8080) to see your site.
 Login at [http://localhost:8080/login](http://localhost:8080/login) with `admin` / `admin`.
@@ -86,6 +125,10 @@ below your page.
 │   ├── markdown.ts      # Front-matter + Bun.markdown
 │   ├── page.ts          # A page, rendered: markdown in its template
 │   ├── log.ts           # The view log (counts, never identifies)
+│   ├── init.ts          # The scaffold both ways in share
+│   ├── cli.ts           # `duckdown` (the server) and `duckdown init`
+│   ├── serve.ts         # Hands out an exported site
+│   ├── base/            # site.css and search.js, for a site with no copy
 │   ├── routes/          # Route handlers
 │   └── edit/            # Editor UI (Railroad + JSX)
 ├── tests/
@@ -103,7 +146,10 @@ bun run start      # Production
 bun run stop       # Stop the server started from this folder
 bun run test       # Run tests (100% coverage required)
 bun run check      # TypeScript check
-bun run export     # Write the whole site to ./dist as plain files
+bun run export     # Write the whole site to ./dist as plain files (--strict: a broken link fails)
+bun run serve      # Hand out ./dist: the published flavour's server (SITE_DIR, PORT)
+bun run setup      # What bun create runs after cloning
+bun run s3:up      # Start MinIO (dev:s3 does this for you); s3:down stops it, s3:logs follows it
 bun run dev:s3     # Start MinIO + run with S3 storage
 ```
 
@@ -119,6 +165,15 @@ That writes the whole site to `dist/`: every page rendered by the same code
 that serves it, with its template, navigation and stylesheets, at its one
 canonical address — `/` and `/blog/` as `index.html`, `about.md` as
 `about.html`. Then `static/` alongside. Ready for any static host.
+
+Beside the pages it writes `sitemap.xml` (from `DUCKDOWN_ORIGIN`), `robots.txt` and
+`favicon.ico` at the root, and `404.html` from `pages/404.md`. It reports
+internal links that lead nowhere (`--strict` fails on them), and an export that
+finds no pages fails rather than publish an empty site.
+
+To hand `dist/` out: `bun run node_modules/duckdown/server/serve.ts` (or the
+`duckdown-serve` bin), with `SITE_DIR` and `PORT`. It logs page views the way
+the served site does, and nothing else.
 
 Drafts are left out rather than hidden behind a login, `{{edit}}` is empty, and
 `{{url}}` takes its origin from `DUCKDOWN_ORIGIN` because there's no request to

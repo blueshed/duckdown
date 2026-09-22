@@ -180,6 +180,8 @@ nav: Blog
 
 That's a blog index that writes itself: drafts stay out, and a new post appears the moment you save it.
 
+`{{sitemap}}` is the same made recursive: every page on the site, nested by folder, each folder under its index's title. It is what the [[/sitemap|site map]] page here is made of, and a good thing for a 404 page to offer.
+
 ## A page's own layout
 
 `layout: post` wraps a page in `templates/post.html` instead of the usual
@@ -209,6 +211,11 @@ found is the front matter: a word in the `title:` ranks above one in the
 `description:`, which ranks above one in the body, and every word of the query
 has to appear somewhere.
 
+A result takes the reader to the place, not just the page: every heading is a
+section of its own in the index, so searching for a song lands on that song's
+heading, with the words highlighted in browsers that can do it. That is one more
+reason to give a long page real headings.
+
 So a `description:` earns its keep twice: search engines quote it, and it's
 what a reader sees under your page in the results here.
 
@@ -225,3 +232,10 @@ The navigation marks the page you're on, or the section it's in.
 ## Maths and highlighted code
 
 Duckdown doesn't render maths or colour code blocks, and it doesn't carry the libraries that do. Both are a `<script>` in `templates/site.html` away — KaTeX or MathJax for maths, highlight.js or Prism for code — and your pages stay plain markdown. The editor's preview runs no scripts, so you'll see the result on the site rather than in the preview.
+
+## When a page is missing
+
+Write `pages/404.md` and it is what a reader gets for an address that isn't
+there, with a 404 status. `bun run export` writes it as `404.html`, which is the
+file a static host serves for a miss. It stays out of the navigation, the search
+and the sitemap. This site has one: ask for any address that isn't a page.

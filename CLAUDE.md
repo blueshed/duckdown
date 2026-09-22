@@ -22,6 +22,7 @@ Bun.serve({
     "/edit/static/*":    handleStaticFiles,
     "/edit/mark/":       handleMark,
     "/search.json":      handleSearch,       // the index; the browser matches
+    "/sitemap.xml":      handleSitemap,      // the same index, for crawlers
     "/edit/browse/*":    handleBrowse,
     "/static/*":         handleStatic,
   },
@@ -47,6 +48,12 @@ duckdown/
 │   ├── stop.ts             # bun run stop
 │   ├── log.ts              # The view log: what was read, never who
 │   ├── search.ts           # The index readers search, cached like the nav
+│   ├── sitemap.ts          # sitemap.xml from that index
+│   ├── base.ts             # Where the base files are (server/base/) and the root files
+│   ├── base/               # site.css, search.js: served and exported when a site has none of its own
+│   ├── init.ts             # scaffold(root, {vendored}): what both ways in write (see below)
+│   ├── cli.ts              # bin `duckdown`: the server, or `duckdown init`
+│   ├── serve.ts            # The published flavour's server: a dist/ folder, nothing else
 │   ├── scaffold.ts         # Says so when `bun create` left a half-scaffold
 │   ├── page.ts             # A page, rendered: markdown in its template
 │   ├── export.ts           # bun run export — the whole site as files
@@ -59,6 +66,7 @@ duckdown/
 │   │   ├── browse.ts       # /edit/browse/* — image browser + upload
 │   │   ├── static.ts       # /static/* — site static files
 │   │   ├── search.ts       # /search.json — the whole index, for the browser
+│   │   ├── sitemap.ts      # /sitemap.xml
 │   │   ├── site.ts         # fetch fallback — the site, through page.ts
 │   │   └── error.ts        # error handler — log it, answer 500 with a line to show
 │   └── edit/               # Editor client (served at /edit)
@@ -97,10 +105,11 @@ duckdown/
 │   ├── s3.test.ts          # S3Storage via Bun's S3 client + fake-s3.ts
 │   ├── markdown.test.ts    # Front-matter, rendering, nav, themes
 │   ├── process.test.ts     # Real subprocesses: pid lock, SIGTERM, seeding
-│   ├── setup-script.test.ts # create/setup.ts on a scratch folder
+│   ├── serve.test.ts       # serveDist(): traversal, redirects, 404.html, what is logged
+│   ├── setup-script.test.ts # both scaffold modes on scratch folders, and `bun run export` in each
 │   └── compose.yml         # MinIO for manual S3 runs (bun run dev:s3)
 ├── bunfig.toml             # Test preload + the 100% coverage threshold
-├── create/                 # `bun create blueshed/duckdown` scaffolder
+├── create/                 # `bun create blueshed/duckdown`: calls the scaffold, keeps code and tests
 ├── package.json
 ├── tsconfig.json
 ├── .env                    # Local dev config
@@ -232,6 +241,9 @@ bun run dev        # Development with HMR
 bun run start      # Production
 bun run stop       # Stop the server this folder's pid file names
 bun run dev:s3     # Start MinIO + run with S3 storage
+bun run s3:up      # Start MinIO alone (s3:down stops it, s3:logs follows it)
+bun run serve      # Hand out ./dist: the published flavour's server (SITE_DIR, PORT)
+bun run setup      # What bun create runs after cloning
 bun run test       # Run tests; fails below 100% line/function coverage
 bun run check      # TypeScript check
 bun run export     # Write the whole site to ./dist as plain files
@@ -291,9 +303,9 @@ When a content feature changes (syntax, front matter, themes, navigation, the ed
 
 Styling is templates and stylesheets, and nothing else. `templates/site.html` links `static/site.css` (duckdown's base, everything drawn from CSS variables) and `static/theme.css` (this site's look, saying only what differs). There is no `theme:` key, no class on `<body>`, and no per-folder cascade: every page is styled because the template links the files, so a page can't opt in and can't forget to. Style new things through the variables so `theme.css` reaches them. For one page, `css:` links a stylesheet after the template's own; for a kind of page, `layout:` picks a template that links what that kind needs.
 
-Search happens in the browser. `search.ts` builds one entry per readable page — url, title, description, and the page's words with the markdown taken out — and the whole thing goes over as `/search.json` (served) or `dist/search.json` (published). Nothing on the server searches: a few dozen pages is a few dozen kilobytes, and a linear scan of that in the browser beats asking anyone. Drafts are left out, because a result that 404s is worse than no result, and the seed's `static/search.js` is ordinary site code a site can rewrite. The index is cached exactly like the nav, and `routes/pages.ts` drops both on a write.
+Search happens in the browser. `search.ts` builds one entry per readable page and one per section of it — url (a section's ends `#id`, read out of the rendered HTML so it can't disagree with the page), title, section, description, date, and that section's words — and the whole thing goes over as `/search.json` (served) or `dist/search.json` (published). Nothing on the server searches: a few dozen pages is a few dozen kilobytes, and a linear scan of that in the browser beats asking anyone. Drafts are left out, because a result that 404s is worse than no result, and `server/base/search.js` is ordinary site code a site can fork by having its own. It ranks title > heading > description > body, shows at most three sections of a page, and links `url#id:~:text=…` (a text fragment, with `-` encoded), which a browser may honour, ignore, or (some Chromium builds) honour by giving up on the id as well — so `search.js` scrolls to the heading itself on `load` when the reader is still at the top. Every field matches at the start of a word, and `.search-results` scrolls inside its panel. The sitemap doesn't take its addresses from the sections: `buildSite()` returns the entries and a page list, from one walk and one cache. The index is cached exactly like the nav, and `routes/pages.ts` drops both on a write.
 
-What the site knows about itself lives in `nav.ts`: the nav, and each folder's `{{pages}}` listing. In production both are built once and dropped by `pagesChanged()` whenever the pages route writes or deletes, because every write goes through the server — a new write path to pages must call it too. With `DEBUG=1` they're built per request instead, so pages written straight to disk (by hand, or by a session using the authoring skill) show up at once.
+What the site knows about itself lives in `nav.ts`: the nav, each folder's `{{pages}}` listing, and `{{sitemap}}` (the same walk, recursive: `folderEntries()` is what both are made from, so they agree on drafts, `-` folders and order). In production both are built once and dropped by `pagesChanged()` whenever the pages route writes or deletes, because every write goes through the server — a new write path to pages must call it too. With `DEBUG=1` they're built per request instead, so pages written straight to disk (by hand, or by a session using the authoring skill) show up at once.
 
 The editor edits three folders, each its own route built by `fileRoutes()`
 (`routes/files.ts`): `pages/`, `templates/` and `static/`. Each is rooted in its
@@ -326,6 +338,21 @@ can't go in `pageHtml`.
 A folder is served by its `index.md` (`/blog`, `/blog/`, `/blog/index.html`), and `draft: true` is 404 unless the reader is signed in. `plainName()` guards both `layout:` and `css:`: a page names a file in a folder it must not climb out of.
 
 Paths: storage keys are real names. The server decodes the URL path (`after()`); the editor builds URLs with `urlPath()` (each segment encoded). Never interpolate a name into a URL raw.
+
+## Two ways in, one scaffold
+
+`server/init.ts` exports `scaffold(root, { vendored })`, which writes everything a site needs around the code: `site/` (index, theme.css, the seed's template, users.json), `.env`, `.gitignore` lines, `railway.json`, the authoring skill, `launch.json`, a CLAUDE.md, and package.json's scripts. **Install** (`bun add` then `bunx duckdown init`, via `cli.ts`) runs it with `vendored: false`; **create** (`create/setup.ts`) with `vendored: true`. The only difference in what it writes is the scripts' paths (`scripts()`): `node_modules/duckdown/server/…` or `server/…`. It never overwrites and returns what it wrote and what it left alone. Create mode keeps `server/`, `tests/` and `bunfig.toml`: an owner starts with the suite. There is no upgrade path from create; the README says to fork on GitHub for that.
+
+## What a site gets without asking
+
+- **The base.** `site.css` and `search.js` are duckdown's, not the site's: `staticFile()` (routes/static.ts) and the exporter fall back to `base.ts`'s copy when the site has no file of that name, so a site that never forked one is upgraded by upgrading duckdown. They live in `server/base/`, which exists whether duckdown is installed or vendored by `bun create`, so one fallback serves both; the seed carries no copy, and the editor lists only files a site owns. `create/setup.ts` doesn't copy them.
+- **A 404 page.** `pages/404.md` answers a miss with a 404 status (`notFound()` in routes/site.ts) and exports as `404.html`. `NOT_FOUND` in search.ts keeps it out of search, `{{pages}}` and the sitemap. A content folder that vanishes while the server runs is said once in the log, at the first miss.
+- **Root files.** `ROOT_FILES` (robots.txt, favicon.ico) in `base.ts`: a list of two, answered at the root from `static/` and written to the root of `dist/`. Not a mechanism.
+- **Sitemap.** `sitemapXml()` over `searchIndex()`, served at `/sitemap.xml` and written by the exporter when `DUCKDOWN_ORIGIN` is set (it needs absolute addresses).
+- **Validators.** `conditional()` in utils.ts: an ETag from the bytes, 304 on a match. Static files and signed-out pages use it; a signed-in page (it has the edit link) is `private, no-cache`.
+- **Template values.** `{{x-anything}}` in a template is the page's own `x-` key, escaped, empty when unset, filled before `{{content}}`.
+- **Bad URLs.** `decodePath()` answers null for a malformed escape; `after()` throws `BadRequest`, which `handleError` answers 400 without a stack. The site route and `serve.ts` answer 400 themselves.
+- **The export's checks.** It renders everything before it deletes `dist/`, and fails when there is nothing to write (naming where it looked). `brokenLinks()` reports each relative link that leads nowhere; `--strict` or `DUCKDOWN_STRICT=1` fails on them. `main()` returns the exit code so the `import.meta.main` line stays one line (coverage counts a multi-line block that a test can't run).
 
 ## Testing
 
