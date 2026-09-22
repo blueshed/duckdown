@@ -516,6 +516,14 @@ th {
   margin-top: 0.5rem;
 }
 
+/* The panel is absolute, so eight results grew the page and pushed the input
+   away from them. Let the list scroll instead, inside the panel. */
+.search-results {
+  max-height: min(60vh, 28rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
 .search-results ul {
   margin: 0;
   padding: 0;

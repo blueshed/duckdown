@@ -109,3 +109,71 @@ describe("search.js", () => {
     expect(form.hasAttribute("data-open")).toBe(true);
   });
 });
+
+describe("search.js, on a word's start", () => {
+  test("a word is found where it starts, in the body as in the title, and not inside another", async () => {
+    start([
+      entry({ url: "/reviews.html#bbc", title: "Reviews", section: "BBC", text: "the constraints of domesticity, and some restraint" }),
+      entry({ url: "/jadd.html#train", title: "Jadd", section: "Train song", text: "wheels beating" }),
+      entry({ url: "/notes.html", title: "Notes", description: "a trainspotter's diary", text: "" }),
+      entry({ url: "/other.html", title: "Other", text: "the last Train home" }),
+    ]);
+    const found = hrefs(await search("train"));
+    expect(found).not.toContain(expect.stringContaining("/reviews.html"));       // "constraints" and "restraint" only contain it
+    expect(found[0]).toBe("/jadd.html#train");                                    // the heading first
+    expect(found).toContain("/notes.html");                                       // "trainspotter" starts with it
+    expect(found).toContain("/other.html#:~:text=Train%20home");                  // and the fragment starts at that word
+  });
+});
+
+describe("search.js, arriving at a result", () => {
+  // The page loads at `hash` with the reader at `y`; the heading is `top` pixels
+  // down the window. Did the script scroll it into view?
+  function arrival(o: { hash?: string; y?: number; top?: number; present?: boolean; loading?: boolean }): boolean {
+    location.hash = o.hash ?? "#train-song";
+    Object.defineProperty(window, "scrollY", { value: o.y ?? 0, configurable: true });
+    document.body.innerHTML = o.present === false ? "<p>nothing</p>" : '<h2 id="train-song">Train song</h2>';
+    let scrolled = false;
+    const heading = document.getElementById("train-song");
+    if (heading) {
+      heading.getBoundingClientRect = () => ({ top: o.top ?? 3000 }) as DOMRect;
+      heading.scrollIntoView = () => void (scrolled = true);
+    }
+    if (o.loading) Object.defineProperty(document, "readyState", { value: "loading", configurable: true });
+    (0, eval)(script);
+    if (o.loading) {
+      expect(scrolled).toBe(false);                    // not until the images are in and the heading has stopped moving
+      window.dispatchEvent(new Event("load"));
+    }
+    return scrolled;
+  }
+
+  test("scrolls to the heading when the browser hasn't, even on a page with no search form", () => {
+    expect(arrival({})).toBe(true);
+  });
+
+  test("waits for the page to load when it hasn't yet", () => {
+    expect(arrival({ loading: true })).toBe(true);
+  });
+
+  test("does nothing when the page has already scrolled (the text fragment worked), or the heading is in view, or there is no hash", () => {
+    expect(arrival({ y: 3042 })).toBe(false);
+    expect(arrival({ top: 16 })).toBe(false);
+    expect(arrival({ hash: "" })).toBe(false);
+  });
+
+  test("scrolls up to a heading above the window too", () => {
+    expect(arrival({ top: -400 })).toBe(true);
+  });
+
+  test("does nothing for an id that isn't on the page, and says so for one that won't decode", () => {
+    expect(arrival({ present: false })).toBe(false);
+    const warn = spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      expect(arrival({ hash: "#%E0%A4%A" })).toBe(false);
+      expect(String(warn.mock.calls[0]![0])).toContain("won't decode");
+    } finally {
+      warn.mockRestore();
+    }
+  });
+});

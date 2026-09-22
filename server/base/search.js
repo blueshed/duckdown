@@ -8,6 +8,30 @@
 // includes it, and duckdown's job ends at handing you the index.
 
 (() => {
+  // Arriving from a result. A result links to #id:~:text=…; the browser strips
+  // the directive from location.hash and, where it can't find the words, some
+  // browsers also give up on the id, and the reader lands at the top of a page
+  // three thousand pixels above the heading. So this does the id's job itself:
+  // once the page has loaded (images moving the heading are in place), and only
+  // if nothing has scrolled it and the heading isn't in view already. Where the
+  // text fragment worked the page has scrolled, and this does nothing.
+  function arrive() {
+    if (!location.hash || window.scrollY !== 0) return;
+    let id;
+    try {
+      id = decodeURIComponent(location.hash.slice(1));
+    } catch (e) {
+      console.warn("search.js: a fragment that won't decode", location.hash, e);
+      return;
+    }
+    const target = document.getElementById(id);
+    if (!target) return;
+    const top = target.getBoundingClientRect().top;
+    if (top < 0 || top >= window.innerHeight) target.scrollIntoView();
+  }
+  if (document.readyState === "complete") arrive();
+  else window.addEventListener("load", arrive);
+
   const form = document.querySelector(".search");
   if (!form) return;
 
@@ -36,6 +60,14 @@
 
   const words = (s) => s.toLowerCase().split(/\s+/).filter(Boolean);
 
+  // Each word of the query with the pattern that finds it at the start of a
+  // word, made once per search and not once per entry. "train" is not in
+  // "constraints", in the body any more than in the title.
+  const parseQuery = (query) => words(query).map((term) => ({
+    term,
+    starts: new RegExp(`\\b${term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`),
+  }));
+
   // An entry is a page, or one section of it (its `section` is the heading and
   // its url ends #id). Every word has to appear somewhere, and where it
   // appears decides the order: a word in the title is what you meant; one in
@@ -48,12 +80,11 @@
     const description = entry.description.toLowerCase();
     const text = entry.text.toLowerCase();
     let total = 0;
-    for (const term of terms) {
-      const starts = new RegExp(`\\b${term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`);
+    for (const { starts } of terms) {
       if (starts.test(title)) total += 10;
       else if (starts.test(section)) total += 8;
-      else if (description.includes(term)) total += 4;
-      else if (text.includes(term)) total += 1;
+      else if (starts.test(description)) total += 4;
+      else if (starts.test(text)) total += 1;
       else return 0;                       // every word, or it isn't a match
     }
     return total;
@@ -62,7 +93,7 @@
   // The words around the first hit, so a result says why it is a result.
   function extract(entry, terms) {
     if (entry.description) return entry.description;
-    const at = entry.text.toLowerCase().indexOf(terms[0]);
+    const at = entry.text.toLowerCase().search(terms[0].starts);
     if (at < 0) return "";
     const from = Math.max(0, at - 60);
     return (from ? "… " : "") + entry.text.slice(from, from + 160).trim() + "…";
@@ -75,10 +106,10 @@
   // fragments ignores everything after ":~:" and still lands on the heading.
   // "-" is fragment syntax, so it is encoded as well as what encodeURIComponent does.
   function link(entry, terms) {
-    const at = entry.text.toLowerCase().indexOf(terms[0]);
+    const at = entry.text.toLowerCase().search(terms[0].starts);
     const base = entry.url.includes("#") ? entry.url : `${entry.url}#`;
     if (at < 0) return entry.url;
-    const start = entry.text.lastIndexOf(" ", at) + 1;
+    const start = at;   // already the start of a word, which is where a fragment has to begin
     const phrase = entry.text.slice(start).split(" ").slice(0, 5).join(" ");
     return `${base}:~:text=${encodeURIComponent(phrase).replace(/-/g, "%2D")}`;
   }
@@ -103,14 +134,15 @@
       return;
     }
     const list = document.createElement("ul");
+    const wanted = parseQuery(query);
     for (const entry of group(results).slice(0, 8)) {
       const li = document.createElement("li");
       const a = document.createElement("a");
-      a.href = link(entry, words(query));
+      a.href = link(entry, wanted);
       // "Page – Section", unless the section is the page's own title.
       a.textContent = entry.section && entry.section !== entry.title ? `${entry.title} – ${entry.section}` : entry.title;
       const p = document.createElement("p");
-      p.textContent = extract(entry, words(query));
+      p.textContent = extract(entry, wanted);
       li.append(a, p);
       list.append(li);
     }
@@ -121,9 +153,9 @@
     const query = input.value.trim();
     if (!query) return show([], "");
     if (!index) await load();
-    const terms = words(query);
+    const wanted = parseQuery(query);
     const hits = index
-      .map((entry) => ({ entry, rank: score(entry, terms) }))
+      .map((entry) => ({ entry, rank: score(entry, wanted) }))
       .filter((hit) => hit.rank > 0)
       .sort((a, b) => b.rank - a.rank)
       .map((hit) => hit.entry);
@@ -132,12 +164,6 @@
 
   toggle.addEventListener("click", () => open(!form.hasAttribute("data-open")));
   input.addEventListener("input", search);
-  // Following a result closes the panel — after the click has done its work:
-  // taking the link out of the page during its own click can cancel it. On the
-  // page the hit is on this is a fragment navigation, which still scrolls.
-  output.addEventListener("click", (e) => {
-    if (e.target.closest("a")) setTimeout(() => open(false));
-  });
   form.addEventListener("submit", (e) => e.preventDefault());
   // Escape shuts it, and so does clicking anywhere else on the page.
   form.addEventListener("keydown", (e) => {
@@ -145,5 +171,11 @@
   });
   document.addEventListener("click", (e) => {
     if (!form.contains(e.target)) open(false);
+  });
+  // Following a result closes the panel — after the click has done its work:
+  // taking the link out of the page during its own click can cancel it. On the
+  // page the hit is on this is a fragment navigation, which still scrolls.
+  output.addEventListener("click", (e) => {
+    if (e.target.closest("a")) setTimeout(() => open(false));
   });
 })();

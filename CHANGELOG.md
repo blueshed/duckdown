@@ -40,6 +40,10 @@
   text fragment so the browser scrolls to and marks the words. A forked, older
   `search.js` still works against the new index: it ignores `section`, and its
   links now carry the `#id`.
+- `search.js` also scrolls to the heading itself on load when the browser
+  didn't honour the text fragment (some give up on the id too, when they can't
+  find the words); the result list scrolls inside its panel instead of growing
+  the page. Words now match where they start (`train` is not in `constraints`).
 
 
 ## 0.2.0 — 2026-09-21
