@@ -1,8 +1,9 @@
 import { describe, test, expect, beforeAll, spyOn } from "bun:test";
 import { mkdirSync, writeFileSync, readFileSync, renameSync, existsSync, rmSync } from "fs";
 import { join } from "path";
-import { BASE, SITE, signIn, authed } from "./helpers";
+import { BASE, SITE, signIn, authed, keepSite } from "./helpers";
 
+keepSite();
 beforeAll(signIn);
 
 // Quiet a console method for one test, returning the spy to assert on.

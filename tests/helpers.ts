@@ -1,10 +1,34 @@
 // Shared by the test files: the one server under test (in this process, so
 // its code counts towards coverage), and a signed-in cookie for it.
+import { afterAll, beforeAll } from "bun:test";
+import { cpSync, mkdtempSync, rmSync } from "fs";
+import { join } from "path";
 import { server } from "../server/main";
+import { pagesChanged } from "../server/nav";
+import { searchChanged } from "../server/search";
+import { collectionsChanged } from "../server/collection";
 
 export const BASE = server.url.href.replace(/\/$/, "");
 export const SITE = process.env.DUCKDOWN_PATH!;
 export const RUN = process.env.DUCKIE_TEST_RUN!;
+
+// Every test file shares the one scratch site, and the files run one after
+// another in whatever order the filesystem lists them. A file that writes pages
+// through the server calls this, so the next file starts from the seed rather
+// than from its drafts and broken links: the site is copied before the file's
+// tests and put back after them, and what the server had cached is dropped.
+export function keepSite(): void {
+  const kept = mkdtempSync(join(RUN, "kept-site-"));
+  beforeAll(() => cpSync(SITE, kept, { recursive: true }));
+  afterAll(() => {
+    rmSync(SITE, { recursive: true, force: true });
+    cpSync(kept, SITE, { recursive: true });
+    rmSync(kept, { recursive: true, force: true });
+    pagesChanged();
+    searchChanged();
+    collectionsChanged();
+  });
+}
 
 let cookie = "";
 

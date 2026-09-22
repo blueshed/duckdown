@@ -2,7 +2,7 @@
 // process (signed in). Failures are staged with intercept().
 import { describe, test, expect, beforeAll, afterAll, afterEach, spyOn, mock } from "bun:test";
 import { createElement, mount, batch } from "@blueshed/railroad";
-import { BASE, signIn, waitFor } from "./helpers";
+import { BASE, signIn, waitFor, keepSite } from "./helpers";
 import { api, apiJson, urlPath } from "../server/edit/api";
 import { notice, news, speak, tell, hush } from "../server/edit/notice";
 import {
@@ -32,6 +32,7 @@ import { parseCollection } from "../server/collection";
 const nativeFetch = globalThis.fetch;
 let signedIn: typeof fetch;
 
+keepSite();
 beforeAll(async () => {
   const cookie = await signIn();
   // The editor asks for "/edit/pages/…": send that to the server under test.

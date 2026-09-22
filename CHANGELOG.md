@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- **An exported alias ending `.html` answers.** `/old.html` is written as
+  `dist/old.html`, the file a static host (and `serve.ts`) opens for it; it was
+  written as `old/index.html`, which nothing asked for.
+- **An alias can't write outside `dist/`.** One with a `.` or `..` segment is
+  left out of the export and reported as a problem (so `--strict` fails on it).
+
 ## 0.5.1 — 2026-09-23
 
 - **A site published at its railway.app address is indexable there.** The

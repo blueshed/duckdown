@@ -93,6 +93,19 @@ export function outPath(key: string): string {
   return (url.endsWith("/") ? `${url}index.html` : url).slice(1);
 }
 
+// The file an old address is written as, or null when it isn't one. It is
+// the name a request for it looks up, decoded: `/old.html` is the file
+// old.html, because that is what a static host (and serve.ts) opens for it,
+// and `/old` or `/old/` is a folder with an index. A `.` or `..` segment is
+// no address a browser sends — it would put the file beside dist/, not in it.
+export function aliasFile(from: string): string | null {
+  const trimmed = from.replace(/^\/+/, "");
+  if (trimmed.split("/").some((segment) => segment === "." || segment === "..")) return null;
+  if (trimmed.endsWith(".html")) return trimmed;
+  const folder = trimmed.replace(/\/+$/, "");
+  return folder ? `${folder}/index.html` : "index.html";
+}
+
 export async function exportSite(o: {
   out: string;
   origin?: string;
@@ -170,7 +183,11 @@ export async function exportSite(o: {
   // any host that maps a path to a file. A name a page already holds is left
   // alone and said — the page is the thing at that address.
   for (const { from, to } of moved) {
-    const path = outPath(`${from.replace(/^\/+/, "").replace(/\/+$/, "").replace(/\.html$/, "")}/index.md`);
+    const path = aliasFile(from);
+    if (path === null) {
+      problems.push(`alias ${from} climbs out of the site with . or .. — left out`);
+      continue;
+    }
     if (rendered.has(path)) {
       problems.push(`alias ${from} is already a page — left as it is`);
       continue;

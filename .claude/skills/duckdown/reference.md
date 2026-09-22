@@ -472,8 +472,10 @@ aliases: /older-place.html
 They are matched on the **decoded** address, so an old slug holding a quote or
 a curly apostrophe still answers. `bun run export` writes each alias as a small
 redirect page (canonical link plus meta refresh) under the decoded name, so a
-published site keeps them too; an alias that is already a page is left alone
-and said.
+published site keeps them too: `/older-place.html` as the file
+`older-place.html`, `/old-place` as `old-place/index.html`. An alias that is
+already a page is left alone and said, and one with a `.` or `..` segment is
+left out and said.
 
 ### Editing one in the editor
 
