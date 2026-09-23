@@ -3,6 +3,9 @@ import { DEBUG } from "./config";
 import { escapeHtml, outsideCode } from "./utils";
 import { parseFrontMatter, renderMarkdown } from "./markdown";
 import { type Images, DEFAULT_IMAGES, ownImages, imageUrl, thumbName } from "./images";
+import { SLUG, slugify, unique, slugger, itemHref } from "./slugs";
+
+export { SLUG, slugify, aliasKey } from "./slugs";
 
 // A collection is a folder of pages duckdown writes for you. The DATA is
 // `collection.json`: the fields every item has, and groups of items. The
@@ -83,37 +86,13 @@ export const collectionPath = (folder: string) => `${folder ? `${folder}/` : ""}
 
 // --- Slugs -------------------------------------------------------------
 
-// The only shape a slug ever has. Item addresses are built from titles, and a
-// title may hold quotes, backticks, curly apostrophes and accents; a slug that
-// kept any of those would be percent-encoded in the browser's request and
-// compared against its unencoded self, which is how a gallery ends up serving
-// the wrong painting with a 200. So: fold the accents, keep letters and
-// digits, and let everything else be a dash.
-export const SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/;
-
-export function slugify(text: string): string {
-  return text
-    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")   // Café Ölé → Cafe Ole
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
+// What a slug is, and how an item gets one, live in slugs.ts: the editor's
+// collection pane works them out too, and the two must never disagree.
 
 // A value used as a fragment (#1967, #London): itself when it can be one, and
 // a slug when it can't, so a heading's id and a template's href agree.
 export function fragmentId(value: string): string {
   return /^[A-Za-z][\w.:-]*$/.test(value) ? value : slugify(value) || "x";
-}
-
-// --- Addresses ---------------------------------------------------------
-
-// An address reduced to the one form aliases are compared in: decoded (the
-// caller's job, decodePath), rooted, and without the trailing slash or .html
-// that name the same place. A legacy address may hold anything a URL can
-// carry — `/l"etoile-1976` — which is exactly why it is compared decoded.
-export function aliasKey(path: string): string {
-  const trimmed = path.replace(/\.html$/, "").replace(/\/+$/, "");
-  return trimmed.startsWith("/") ? trimmed || "/" : `/${trimmed}`;
 }
 
 // --- Reading the file --------------------------------------------------
@@ -220,14 +199,8 @@ export function parseCollection(folder: string, source: string): Collection {
     problems,
   };
 
-  const slugs = new Set<string>();
+  const slugOf = slugger();
   const ids = new Set<string>();
-  const unique = (base: string, taken: Set<string>) => {
-    let name = base;
-    for (let i = 1; taken.has(name); i++) name = `${base}-${i}`;
-    taken.add(name);
-    return name;
-  };
 
   const readGroup = (rawGroup: Raw): Group => {
     const name = text(rawGroup.name) ?? "";
@@ -264,21 +237,14 @@ export function parseCollection(folder: string, source: string): Collection {
     const title = fields.title ?? "";
     // A slug the file states has to be a slug; one that isn't is said so and
     // cleaned rather than served, because a bad address is the whole bug.
-    let slug = "";
-    if (fields.slug !== undefined) {
-      if (SLUG.test(fields.slug)) slug = fields.slug;
-      else {
-        problems.push(`${collectionPath(folder)}: slug "${fields.slug}" isn't [a-z0-9-] — using "${slugify(fields.slug)}"`);
-        slug = slugify(fields.slug);
-      }
+    if (fields.slug !== undefined && !SLUG.test(fields.slug)) {
+      problems.push(`${collectionPath(folder)}: slug "${fields.slug}" isn't [a-z0-9-] — using "${slugify(fields.slug)}"`);
     }
-    // Nothing usable in the title (a work called "…"): a number by position,
-    // which is stable as long as the item stays where it is.
-    slug = unique(slug || slugify(title) || `item-${collection.items.length + 1}`, slugs);
+    const slug = slugOf(fields.slug ?? null, title);
     const src = fields[collection.image] ?? "";
     const item: Item = {
       slug,
-      href: `/${folder ? `${folder}/` : ""}${slug}/`,
+      href: itemHref(folder, slug),
       key: `${folder ? `${folder}/` : ""}${slug}/index.md`,
       title,
       caption: fields.caption ?? "",

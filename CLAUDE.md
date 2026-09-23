@@ -51,6 +51,7 @@ duckdown/
 │   ├── sitemap.ts          # sitemap.xml from that index
 │   ├── collection.ts       # collection.json (the data) + its each: page (the page every item gets)
 │   ├── images.ts           # Where a collection's pictures are, and what a thumbnail is called (both ends read it)
+│   ├── slugs.ts            # An item's slug and address, and how aliases compare (both ends read it)
 │   ├── base.ts             # Where the base files are (server/base/) and the root files
 │   ├── base/               # site.css, search.js: served and exported when a site has none of its own
 │   ├── init.ts             # scaffold(root, {vendored}): what both ways in write (see below)
@@ -77,7 +78,7 @@ duckdown/
 │       ├── app.tsx          # Railroad app root
 │       ├── store.ts         # Signals + actions (shared state)
 │       ├── api.ts           # fetch wrapper: failures speak; a 401 goes to /login
-│       ├── notice.ts        # the one failure message (speak / hush)
+│       ├── notice.ts        # the one line: a failure (speak), news (tell), hush
 │       ├── styles.css       # Editor styles (light/dark theme-aware)
 │       ├── login.html       # Login page (HTMLRewriter; styled by /edit/styles.css)
 │       └── components/
@@ -93,9 +94,9 @@ duckdown/
 │           ├── PreviewFrame.tsx # The sandboxed iframe, in one place
 │           ├── TemplatePreview.tsx # A sample page through the draft template
 │           ├── PaneHeader.tsx   # The one header both panes wear
-│           ├── NewDialog.tsx    # Name a new page, folder, stylesheet, template
+│           ├── NewDialog.tsx    # Name a new page, folder, collection, stylesheet, template
 │           ├── ConfirmDialog.tsx # Confirm action dialog
-│           ├── Notice.tsx    # Shows the failure message (role=alert)
+│           ├── Notice.tsx    # Shows that line (role=alert for a failure, status for news)
 │           └── Icon.tsx      # Lucide icons (lucide-static SVG strings)
 ├── tests/                  # see Testing below
 │   ├── example/            # Seed site data (pages, static, templates, a gallery collection)
@@ -298,7 +299,7 @@ privacy notice and a retention policy.
 
 ## Failures speak
 
-Nothing fails silently. In the editor, every request goes through `api(what, url, init?, allow?)`: a failed one speaks — `speak()` in `edit/notice.ts` shows it (the `Notice` alert) and logs it — naming what was attempted ("Couldn't save hello.md: 500 …"); `allow` lists statuses the caller handles itself (New's 412). A request that never arrives resolves to `Response.error()`, so callers check `res.ok` and need no `catch`. `app.tsx` speaks for anything uncaught. On the server, `routes/error.ts` logs what a handler throws and answers 500 with a line (the detail only in development). No bare `catch {}`: if a failure is deliberately survived (a theme that won't load), log why.
+Nothing fails silently. In the editor, every request goes through `api(what, url, init?, allow?)`: a failed one speaks — `speak()` in `edit/notice.ts` shows it (the `Notice` alert) and logs it — naming what was attempted ("Couldn't save hello.md: 500 …"); `allow` lists statuses the caller handles itself (New's 412). A request that never arrives resolves to `Response.error()`, so callers check `res.ok` and need no `catch`. `app.tsx` speaks for anything uncaught. The same line carries news — `tell()`, not red, `role=status` — for the rare thing the editor did on your behalf that you'd want to know (a renamed work kept its old address); it is not a second channel for failures. On the server, `routes/error.ts` logs what a handler throws and answers 500 with a line (the detail only in development). No bare `catch {}`: if a failure is deliberately survived (a theme that won't load), log why.
 
 ## Pages: markdown and themes
 
@@ -347,8 +348,12 @@ The preview renders an overview like any page and returns
 `collectionProblems()` beside the html, which is how the editor's Notice hears
 that a slug collides with a page.
 
-`CollectionPane.tsx` edits that file as what it is: groups of pictures with a
-title and a caption each. It keeps the **raw** JSON, not the parsed
+`CollectionPane.tsx` edits that file as what it is: groups of items, each an
+input per field the file declares (`fields`, as the server parses them: a line
+for text and number — values stay strings, a number may say `skip` — a box for
+long) and the `image` field as the picture; a file with no `fields` is edited as
+`src`/`title`/`caption`, and one with no image field adds items as empty rows.
+It keeps the **raw** JSON, not the parsed
 `Collection` — a parsed one has slugs and resolved URLs in it, and writing
 that back would be writing duckdown's reading of the file rather than the file
 — so every key it doesn't show survives a change untouched. Each change
@@ -357,14 +362,24 @@ through one promise chain, which is the write path that drops all three caches;
 `collectionChanged()` then has the preview render again. The one thing it can't
 do through the folders the editor already has is put a picture where `images`
 says pictures go: `routes/collection.ts` does that (`POST` writes the original
-and a 128px thumbnail named by `thumbName()`, `GET` answers `{images, uploads,
-problems}`), and `server/images.ts` holds `imageUrl()`/`thumbName()` so the
+and a 128px thumbnail named by `thumbName()`, `GET` answers `{fields, images,
+uploads, problems}`), and `server/images.ts` holds `imageUrl()`/`thumbName()` so the
 pane and the renderer resolve the same two URLs. A collection whose `images`
 base is outside `static/images/` is read-only for pictures and says so.
 `LocalStorage.write()` writes beside the file and renames onto it, because a
 pane that writes on every change makes a torn read something you watch happen.
+A committed field edit that moves an item's address (a title is its slug) adds
+the old address to that item's `aliases` — only an address the file had when
+the pane opened it, never one a live item now answers at — and takes off an
+alias that is its address again; the news is told once the write lands. The
+pane works the addresses out with `server/slugs.ts`, the server's own rule.
+"New collection" in the tree (`createCollection()` in store.ts) writes
+`collection.json`, an `item.md` each: page and, if the folder has none, an
+`index.md` with `{{items}}`, each create-only, then opens the index with the
+pane below it.
 
-Slugs are addresses, not titles: `slugify()` folds accents and keeps
+Slugs are addresses, not titles (`server/slugs.ts`, read by the server and
+the pane alike): `slugify()` folds accents and keeps
 `[a-z0-9-]`, `SLUG` is the shape every slug has, duplicates take `-1`/`-2` in
 file order and a title with nothing usable in it takes `item-<n>`. Aliases —
 `aliases` on an item, repeatable front matter on a page — are collected by

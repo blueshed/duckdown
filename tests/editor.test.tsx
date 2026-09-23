@@ -4,13 +4,13 @@ import { describe, test, expect, beforeAll, afterAll, afterEach, spyOn, mock } f
 import { createElement, mount, batch } from "@blueshed/railroad";
 import { BASE, signIn, waitFor } from "./helpers";
 import { api, apiJson, urlPath } from "../server/edit/api";
-import { notice, speak, hush } from "../server/edit/notice";
+import { notice, news, speak, tell, hush } from "../server/edit/notice";
 import {
   filePath, fileContent, editorContent, showImages, browserRevision,
   loadFile, createFile, saveFile, deleteFile, closeFile, reloadBrowser, toggleImages, closeImages,
   resource, resourceDraft, resourceSaved, resourceDirty, pageLayout, pageIncludes, openResource, closeResource,
   saveResource, deleteResource, createResource,
-  collection, openCollection, closeCollection,
+  collection, openCollection, closeCollection, createCollection,
 } from "../server/edit/store";
 import { Icon } from "../server/edit/components/Icon";
 import { Notice } from "../server/edit/components/Notice";
@@ -24,7 +24,8 @@ import { Header } from "../server/edit/components/Header";
 import { ImageBrowser } from "../server/edit/components/ImageBrowser";
 import { ResourceList } from "../server/edit/components/ResourceList";
 import { ResourcePane } from "../server/edit/components/ResourcePane";
-import { CollectionPane } from "../server/edit/components/CollectionPane";
+import { CollectionPane, itemAddresses } from "../server/edit/components/CollectionPane";
+import { parseCollection } from "../server/collection";
 
 // --- Harness ---
 
@@ -55,6 +56,10 @@ function intercept(respond: (url: string, init?: RequestInit) => Response | Prom
 let quiet: ReturnType<typeof spyOn>;
 beforeAll(() => { quiet = spyOn(console, "error").mockImplementation(() => {}); });
 afterAll(() => quiet.mockRestore());
+// And the news they cause (tell() logs to console.info).
+let told: ReturnType<typeof spyOn>;
+beforeAll(() => { told = spyOn(console, "info").mockImplementation(() => {}); });
+afterAll(() => told.mockRestore());
 
 afterEach(() => {
   batch(() => {
@@ -286,6 +291,20 @@ describe("Notice", () => {
     expect(alert.textContent).toContain("Couldn't save a.md: 500 boom");
     click(host.querySelector('[aria-label="Dismiss"]')!);
     expect(host.querySelector(".notice")).toBeNull();
+    dispose();
+  });
+
+  test("news is said in the same place, as a status rather than an alert, until a failure replaces it", () => {
+    const { host, dispose } = render(() => <Notice />);
+    tell("First is now /gallery/first-light/; the old address still leads there.");
+    const status = host.querySelector(".notice")!;
+    expect(status.getAttribute("role")).toBe("status");
+    expect(status.className).toBe("notice news");
+    expect(told).toHaveBeenCalledWith("First is now /gallery/first-light/; the old address still leads there.");
+    speak("Couldn't save a.md: 500 boom");
+    expect(host.querySelector(".notice")!.getAttribute("role")).toBe("alert");
+    expect(host.querySelector(".notice")!.className).toBe("notice");
+    expect(news.get()).toBe(false);
     dispose();
   });
 });
@@ -594,6 +613,62 @@ describe("Browser", () => {
     dispose();
   });
 
+  test("New collection makes a folder that is one, opens its index with the pane below, and a name taken says so", async () => {
+    // A dot folder, so the site's walks (nav, search, export) never meet it.
+    const FOLDER = ".browser-shots";
+    const { host, dispose } = render(() => <Browser />);
+    await waitFor(() => rows(host).includes("index.md"));
+    const create = async () => {
+      click(host.querySelector('[aria-label="New collection"]')!);
+      const dialog = host.querySelector("dialog")!;
+      await waitFor(() => dialog.open);
+      expect(dialog.querySelector("h3")!.textContent).toBe("New collection");
+      type(dialog.querySelector("input")!, FOLDER);
+      submit(dialog.querySelector("form")!);
+      return dialog;
+    };
+
+    await create();
+    await waitFor(() => filePath.get() === `${FOLDER}/index.md`);
+    await waitFor(() => collection.get()?.folder === FOLDER);
+    expect(host.querySelector("dialog")).toBeNull();
+    expect(editorContent.get()).toBe(`title: ${FOLDER}\n\n{{items}}\n`);
+
+    const read = async (name: string) => (await fetch(`/edit/pages/${FOLDER}/${name}`)).text();
+    const data = await read("collection.json");
+    expect(JSON.parse(data)).toEqual({
+      fields: [
+        { name: "src", kind: "image", label: "Picture" },
+        { name: "title", label: "Title" },
+        { name: "caption", kind: "long", label: "Caption" },
+      ],
+      images: { src: `/static/images/${FOLDER}/` },
+      groups: [{ name: FOLDER, items: [] }],
+    });
+    expect(data).toStartWith('{\n  "fields": [');   // written the way the pane writes it
+    expect(await read("item.md")).toStartWith(`each: ${FOLDER}\n`);
+
+    // Two works in it, and each is a page with its picture, title, caption
+    // and the way to the next — the each: page doing its job.
+    const made = JSON.parse(data);
+    made.groups[0].items = [
+      { src: "one.svg", title: "First Light", caption: "Ink on paper." },
+      { src: "two.svg", title: "Second Wind", caption: "Oil on board." },
+    ];
+    await fetch(`/edit/pages/${FOLDER}/collection.json`, { method: "PUT", body: JSON.stringify(made) });
+    const page = await (await nativeFetch(`${BASE}/${FOLDER}/first-light/`)).text();
+    expect(page).toMatch(/<h1[^>]*>.*First Light.*<\/h1>/);
+    expect(page).toContain(`src="/static/images/${FOLDER}/one.svg"`);
+    expect(page).toContain("Ink on paper.");
+    expect(page).toContain(`href="/${FOLDER}/second-wind/"`);
+
+    const taken = await create();
+    await waitFor(() => taken.textContent!.includes(`${FOLDER}/collection.json already exists`));
+    click(button(taken, "Cancel")!);
+    closeCollection();
+    dispose();
+  });
+
   test("a listing that fails speaks and leaves the list as it was", async () => {
     const restore = intercept(() => new Response("boom", { status: 500 }));
     try {
@@ -602,6 +677,48 @@ describe("Browser", () => {
       expect(notice.get()).toBe("Couldn't list /: 500 boom");
       expect(rows(host)).toEqual([]);
       dispose();
+    } finally {
+      restore();
+    }
+  });
+});
+
+describe("createCollection", () => {
+  afterEach(() => { closeCollection(); closeResource(); });
+  const read = async (key: string) => (await fetch(`/edit/pages/${key}`)).text();
+
+  test("keeps a folder's own index, says when item.md is already a page, and takes the slot below the page", async () => {
+    await fetch("/edit/pages/.made/index.md", { method: "PUT", body: "title: Mine\n" });
+    await fetch("/edit/pages/.made/item.md", { method: "PUT", body: "title: Not an each: page\n" });
+    // With a resource open below, opening the index doesn't offer the
+    // collection — but a collection just asked for takes the slot anyway.
+    await openResource({ section: "static", path: "poster.css" });
+
+    expect(await createCollection("", "/.made/")).toBeUndefined();
+    expect(notice.get()).toBe(`.made/item.md was already a page, so .made's works have no pages of their own yet — `
+      + `give one page in .made the line "each: .made"`);
+    expect(await read(".made/index.md")).toBe("title: Mine\n");
+    expect(await read(".made/item.md")).toBe("title: Not an each: page\n");
+    expect(filePath.get()).toBe(".made/index.md");
+    expect(collection.get()).toEqual({ folder: ".made" });
+    expect(resource.get()).toBeNull();
+  });
+
+  test("inside a folder, under a name with a space in it", async () => {
+    expect(await createCollection(".made", "Old Shots")).toBeUndefined();
+    const data = JSON.parse(await read(".made/Old%20Shots/collection.json"));
+    expect(data.images.src).toBe("/static/images/.made/Old%20Shots/");
+    expect(data.groups[0].name).toBe("Old Shots");
+    expect(await read(".made/Old%20Shots/item.md")).toStartWith("each: .made/Old Shots\n");
+    expect(collection.get()).toEqual({ folder: ".made/Old Shots" });
+  });
+
+  test("a name that is no folder, and a failure it doesn't expect", async () => {
+    expect(await createCollection("", "/")).toBe("A collection is a folder: give it a name");
+    const restore = intercept(() => new Response("boom", { status: 500 }));
+    try {
+      expect(await createCollection("", ".never")).toBe("Couldn't create .never/collection.json");
+      expect(notice.get()).toBe("Couldn't create .never/collection.json: 500 boom");
     } finally {
       restore();
     }
@@ -953,7 +1070,7 @@ describe("CollectionPane", () => {
   };
   const values = (host: ParentNode, selector: string) =>
     [...host.querySelectorAll(selector)].map((el) => (el as HTMLInputElement).value);
-  const titles = (host: ParentNode) => values(host, ".item-title");
+  const titles = (host: ParentNode) => values(host, `[data-field="title"]`);
   const names = (host: ParentNode) => values(host, ".group-name");
   const tool = (row: Element, label: string) => row.querySelector(`[aria-label="${label}"]`)!;
   const items = (host: ParentNode) => [...host.querySelectorAll(".collection-item")];
@@ -992,12 +1109,12 @@ describe("CollectionPane", () => {
       .toBe(`/static/images/${FOLDER}/one_tn.svg`);
     expect(items(host)[0]!.querySelector(".item-src")!.textContent).toBe("one.svg");
 
-    edit(host.querySelector(".item-title")!, "First Light");
+    edit(host.querySelector(`[data-field="title"]`)!, "First Light");
     const file = await storedWhen((f) => f.groups[0].items[0].title === "First Light");
     expect(file.groups[0].items[0].year).toBe("1961");     // a field the pane doesn't show is kept
     expect(file.layout).toBe("item");                      // and so is everything around the groups
 
-    edit(host.querySelector(".item-caption")!, "Ink on paper");
+    edit(host.querySelector(`[data-field="caption"]`)!, "Ink on paper");
     await storedWhen((f) => f.groups[0].items[0].caption === "Ink on paper");
     dispose();
   });
@@ -1189,7 +1306,7 @@ describe("CollectionPane", () => {
     const save = button(host, "Save")!;
     const restore = intercept(() => new Response("read-only", { status: 403 }));
     try {
-      edit(host.querySelector(".item-title")!, "Nope");
+      edit(host.querySelector(`[data-field="title"]`)!, "Nope");
       await waitFor(() => notice.get());
       expect(notice.get()).toBe(`Couldn't save ${FOLDER}/collection.json: 403 read-only`);
       await waitFor(() => host.querySelector(".pane-header .dot") !== null);
@@ -1200,6 +1317,189 @@ describe("CollectionPane", () => {
     await waitFor(() => save.textContent!.includes("Saved"));
     await storedWhen((f) => f.groups[0].items[0].title === "Nope");
     dispose();
+  });
+
+  // --- the fields the file declares ---
+
+  async function openWith(body: () => unknown, rows: number) {
+    fresh();
+    await write(body());
+    openCollection(FOLDER);
+    const { host, dispose } = render(() => <CollectionPane />);
+    await waitFor(() => host.querySelectorAll(".collection-item").length === rows);
+    return { host, dispose: () => { dispose(); closeCollection(); } };
+  }
+  const field = (row: Element, name: string) => row.querySelector(`[data-field="${name}"]`) as HTMLInputElement;
+
+  test("shows an input per declared field, labelled as the file labels it, and the image field is the picture", async () => {
+    const { host, dispose } = await openWith(() => ({
+      fields: [
+        "title",
+        { name: "photo", kind: "image", label: "Photo" },
+        { name: "year", kind: "number", label: "Year" },
+        { name: "notes", kind: "long", label: "Notes" },
+      ],
+      images: { src: `/static/images/${FOLDER}/` },
+      groups: [{ name: "works", items: [{ photo: "one.svg", title: "One", year: 1961, index: "a", notes: "" }] }],
+    }), 1);
+    const row = items(host)[0]!;
+    expect([...row.querySelectorAll("[data-field]")].map((el) => el.getAttribute("data-field")))
+      .toEqual(["title", "year", "notes"]);
+    // Each input sits in its label, shown on screen: a bare string is a text
+    // field labelled by its name, and a declared label is used as it is.
+    const label = (name: string) => field(row, name).closest("label")!.querySelector(".item-label")!.textContent;
+    expect(label("title")).toBe("title");
+    expect(label("year")).toBe("Year");
+    expect(label("notes")).toBe("Notes");
+    expect(field(row, "notes").tagName).toBe("TEXTAREA");
+    // A number field is a line of text: it may say "skip", and 1961 is shown as the site reads it.
+    expect(field(row, "year").tagName).toBe("INPUT");
+    expect(field(row, "year").type).toBe("text");
+    expect(field(row, "year").value).toBe("1961");
+    expect(row.querySelector("img")!.getAttribute("src")).toBe(`/static/images/${FOLDER}/one_tn.svg`);
+    expect(row.querySelector(".item-src")!.textContent).toBe("one.svg");
+    expect(row.querySelector('[data-field="caption"]')).toBeNull();
+
+    edit(field(row, "year"), "skip");
+    const file = await storedWhen((f) => f.groups[0].items[0].year === "skip");
+    expect(file.groups[0].items[0].index).toBe("a");   // undeclared, unshown, kept
+
+    // A new picture goes in the image field, and the item says every field.
+    choose(host.querySelector(".item-drop input")!, picture("Two Birds.svg"));
+    const added = (await storedWhen((f) => f.groups[0].items.length === 2)).groups[0].items[1];
+    expect(added).toEqual({ photo: "Two Birds.svg", title: "Two Birds", year: "", notes: "" });
+
+    // And a picture is replaced under the name the image field gives it.
+    await waitFor(() => items(host).length === 2);
+    choose(items(host)[0]!.querySelector(".item-thumb input")!, picture("ignored.svg"));
+    await waitFor(() => items(host)[0]!.querySelector("img")!.getAttribute("src")!.includes("?v="));
+    expect((await stored()).groups[0].items[0].photo).toBe("one.svg");
+    dispose();
+  });
+
+  test("a collection with no picture field is words only, and adds an item as a row of empty fields", async () => {
+    const { host, dispose } = await openWith(() => ({
+      fields: ["title", { name: "year", kind: "number" }],
+      groups: [{ name: "events", items: [{ title: "Opening", year: "2024" }] }],
+    }), 1);
+    expect(host.querySelector(".item-thumb")).toBeNull();
+    expect(host.querySelector(".item-src")).toBeNull();
+    expect(host.querySelector("div.item-drop")).toBeNull();
+
+    click(button(host, "Add item")!);
+    const file = await storedWhen((f) => f.groups[0].items.length === 2);
+    expect(file.groups[0].items[1]).toEqual({ title: "", year: "" });
+    await waitFor(() => items(host).length === 2);
+    dispose();
+  });
+
+  // --- n99: a renamed work keeps its old address ---
+
+  test("renaming a work keeps the address it was published at, says so once, and renaming back takes it off", async () => {
+    const { host, dispose } = await open();
+    const title = (i: number) => field(items(host)[i]!, "title");
+
+    edit(title(0), "First Light");
+    let file = await storedWhen((f) => f.groups[0].items[0].aliases);
+    expect(file.groups[0].items[0].aliases).toEqual([`/${FOLDER}/first/`]);
+    expect(notice.get()).toBe(`First Light is now /${FOLDER}/first-light/; the old address still leads there.`);
+    expect(news.get()).toBe(true);
+    hush();
+
+    // Renamed again in the same sitting: /first-light/ was never an address
+    // anyone linked to, so /first/ is still the only one kept, and nothing is said.
+    edit(title(0), "Dawn");
+    file = await storedWhen((f) => f.groups[0].items[0].title === "Dawn");
+    expect(file.groups[0].items[0].aliases).toEqual([`/${FOLDER}/first/`]);
+    await settle(30);
+    expect(notice.get()).toBe("");
+
+    // Back to its old name: the alias would be its own address, so it goes.
+    edit(title(0), "First");
+    file = await storedWhen((f) => f.groups[0].items[0].title === "First");
+    expect("aliases" in file.groups[0].items[0]).toBe(false);
+
+    // A caption is not an address.
+    edit(field(items(host)[0]!, "caption"), "Ink");
+    file = await storedWhen((f) => f.groups[0].items[0].caption === "Ink");
+    expect("aliases" in file.groups[0].items[0]).toBe(false);
+    dispose();
+  });
+
+  test("an alias the file already has is kept beside the new one, and a work taking another's address is not given it", async () => {
+    fresh();
+    const body = seed();
+    (body.groups[0]!.items[1] as Record<string, unknown>).aliases = ["/second-1962", 7];
+    await write(body);
+    openCollection(FOLDER);
+    const { host, dispose } = render(() => <CollectionPane />);
+    await waitFor(() => items(host).length === 4);
+
+    // "Second" becomes "Study": it comes first in the file, so it takes
+    // /study/, and the study moves to /study-1/. The study's old address now
+    // answers with the other work — an item wins over an alias — so that is
+    // not kept; the second work's old one is, beside what it had.
+    edit(field(items(host)[1]!, "title"), "Study");
+    const file = await storedWhen((f) => f.groups[0].items[1].aliases?.length === 3);
+    expect(file.groups[0].items[1].aliases).toEqual(["/second-1962", 7, `/${FOLDER}/second/`]);
+    expect(file.groups[0].groups[0].items[0].aliases).toBeUndefined();
+    dispose();
+    closeCollection();
+  });
+
+  test("a work added in this sitting was never published, so renaming it keeps nothing", async () => {
+    const { host, dispose } = await open();
+    choose(host.querySelector(".item-drop input")!, picture("Fifth.svg"));
+    await waitFor(() => items(host).length === 5);
+    edit(field(items(host)[2]!, "title"), "Fifth Work");
+    const file = await storedWhen((f) => f.groups[0].items[2]?.title === "Fifth Work");
+    expect(file.groups[0].items[2].aliases).toBeUndefined();
+    dispose();
+  });
+
+  test("a rename whose write fails keeps nothing until Save writes it, and says so then", async () => {
+    const { host, dispose } = await open();
+    const restore = intercept(() => new Response("read-only", { status: 403 }));
+    try {
+      edit(field(items(host)[0]!, "title"), "Moved");
+      await waitFor(() => notice.get());
+      expect(notice.get()).toBe(`Couldn't save ${FOLDER}/collection.json: 403 read-only`);
+    } finally {
+      restore();
+    }
+    click(button(host, "Save")!);
+    await waitFor(() => news.get());
+    expect(notice.get()).toBe(`Moved is now /${FOLDER}/moved/; the old address still leads there.`);
+    expect((await stored()).groups[0].items[0].aliases).toEqual([`/${FOLDER}/first/`]);
+    dispose();
+  });
+
+  test("works out every address exactly as the site does", () => {
+    const raw = {
+      groups: [
+        {
+          name: "a",
+          items: [
+            { title: "Café Ölé" },
+            { title: "Cafe Ole" },               // the same slug: -1
+            { title: "…" },                      // nothing usable: by position
+            { title: "x", slug: "Not A Slug" },  // stated, cleaned
+            { title: "y", slug: "own-slug" },
+            { title: 1961 },                     // a number is read as text
+            null,                                // not an item at all
+            { slug: 7 },
+          ],
+          groups: [{ name: "b", items: [{ title: "Cafe Ole" }, {}] }],
+        },
+        "not a group",
+        { name: "c", items: [{ title: "Own Slug" }] },
+      ],
+    };
+    const site = parseCollection("works", JSON.stringify(raw)).items.map((item) => item.href);
+    expect(itemAddresses(raw as never, "works").map((a) => a.href)).toEqual(site);
+    expect(site).toContain("/works/cafe-ole-1/");
+    expect(site).toContain("/works/item-3/");
+    expect(itemAddresses({}, "").length).toBe(0);
   });
 
   test("the pane follows the folder, and deletes the file it has open", async () => {

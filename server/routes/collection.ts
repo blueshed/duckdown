@@ -13,9 +13,13 @@ import { after } from "../utils";
 // collection.json through /edit/pages/, which is a file like any other.
 //
 // GET answers what the pane needs to know about the collection it has open —
-// where its images are, whether they are somewhere this editor can write, and
-// anything wrong with the file — so a slug that collides with a page reaches
-// the Notice whether or not a preview is on screen.
+// the fields the file declares (null when it declares none), where its images
+// are, whether they are somewhere this editor can write, and anything wrong
+// with the file — so a slug that collides with a page reaches the Notice
+// whether or not a preview is on screen. The fields come from here rather than
+// from the pane's own reading of the JSON so that both ends read them one way:
+// a second image field, or one with no usable name, is what the site says it
+// is, not what the pane guessed.
 
 const pages = createPageStorage();
 const images = createImageStorage();
@@ -64,6 +68,7 @@ export const handleCollectionFiles = {
     const collection = await loadCollection(pages, folder);
     if (!collection) return missing(folder);
     return Response.json({
+      fields: collection.declared ? collection.fields : null,
       images: collection.images,
       uploads: imagesKey(collection.images.src) !== null && imagesKey(collection.images.thumb) !== null,
       problems: await collectionProblems(pages, folder),

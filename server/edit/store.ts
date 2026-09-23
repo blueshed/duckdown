@@ -1,5 +1,6 @@
 import { signal, batch, computed } from "@blueshed/railroad";
 import { api, urlPath } from "./api";
+import { speak } from "./notice";
 
 // App state as signals
 export const filePath = signal<string | null>(null);
@@ -195,6 +196,59 @@ export async function createFile(path: string, name: string): Promise<string | v
   if (!res.ok) return `Couldn't create ${fp}`;
   await loadFile(fp);
   reloadBrowser();
+}
+
+// A collection starts as the smallest thing that is one: the data, the page
+// every item gets, and an overview — so the first picture dropped in the pane
+// is at once a work with a page of its own and a thumbnail on its folder's
+// index. Each file is create-only, like a page: a folder that already has a
+// collection says so, and one that already has an index keeps it.
+const FIELDS = [
+  { name: "src", kind: "image", label: "Picture" },
+  { name: "title", label: "Title" },
+  { name: "caption", kind: "long", label: "Caption" },
+];
+
+const eachPage = (folder: string) => `each: ${folder}
+
+# {{item-title}}
+
+![{{item-title}}]({{item-src}})
+
+{{item-caption}}
+
+{{prev}} {{next}}
+`;
+
+export async function createCollection(parent: string, name: string): Promise<string | void> {
+  const own = name.replace(/^\/+|\/+$/g, "");
+  if (!own) return "A collection is a folder: give it a name";
+  const folder = parent ? `${parent}/${own}` : own;
+  const key = collectionKey(folder);
+  const data = {
+    fields: FIELDS,
+    images: { src: `/static/images/${urlPath(folder)}/` },
+    groups: [{ name: own, items: [] }],
+  };
+  const create = (path: string, body: string) =>
+    api(`create ${path}`, at(path), { method: "PUT", headers: { "If-None-Match": "*" }, body }, [412]);
+
+  const res = await create(key, `${JSON.stringify(data, null, 2)}\n`);
+  if (res.status === 412) return `${key} already exists`;
+  if (!res.ok) return `Couldn't create ${key}`;
+  // Failures speak: without an each: page the works are shown but have no
+  // pages, and the one person who can see why is the one who just made it.
+  const item = `${folder}/item.md`;
+  if ((await create(item, eachPage(folder))).status === 412) {
+    speak(`${item} was already a page, so ${folder}'s works have no pages of their own yet — `
+      + `give one page in ${folder} the line "each: ${folder}"`);
+  }
+  await create(`${folder}/index.md`, `title: ${own}\n\n{{items}}\n`);
+  reloadBrowser();
+  await loadFile(`${folder}/index.md`);
+  // Its index offers the collection already, unless something else was open
+  // below the page; this is what was asked for, so it takes the slot.
+  if (collection.peek()?.folder !== folder) openCollection(folder);
 }
 
 export async function saveFile(): Promise<boolean> {
