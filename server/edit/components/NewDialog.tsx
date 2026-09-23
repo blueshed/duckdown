@@ -1,10 +1,11 @@
 import { createElement, signal, when } from "@blueshed/railroad";
 
-export type NewKind = "page" | "folder" | "stylesheet" | "template";
+export type NewKind = "page" | "folder" | "collection" | "stylesheet" | "template";
 
 const PLACEHOLDER: Record<NewKind, string> = {
   page: "my-page.md",
   folder: "folder-name",
+  collection: "gallery",
   stylesheet: "poster.css",
   template: "post.html",
 };

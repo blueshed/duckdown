@@ -5,16 +5,19 @@ import { PaneHeader } from "./PaneHeader";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { Icon } from "./Icon";
 import { api, apiJson, urlPath } from "../api";
-import { speak } from "../notice";
+import { speak, tell } from "../notice";
 import {
   collection, collectionKey, closeCollection, collectionChanged, reloadBrowser,
 } from "../store";
 import { type Images, ownImages, imageUrl, thumbName } from "../../images";
+import { slugger, aliasKey, itemHref } from "../../slugs";
+import type { Field } from "../../collection";
 
-// A folder's collection.json, edited as what it is: groups of pictures with a
-// title and a caption each. The alternative — and what a site lived with until
-// now — is typing JSON with the commas in the right places, which is fine for
-// three items and hopeless for four hundred.
+// A folder's collection.json, edited as what it is: groups of items, each a
+// picture and the fields the file declares — a title, a caption, a year. The
+// alternative — and what a site lived with until now — is typing JSON with the
+// commas in the right places, which is fine for three items and hopeless for
+// four hundred.
 //
 // It opens in the slot a resource uses, below the page, because a collection
 // belongs to the folder whose index page is its overview: you edit the works
@@ -26,14 +29,23 @@ import { type Images, ownImages, imageUrl, thumbName } from "../../images";
 // a bucket's versioning is the only way back.
 
 // The file as it is written, not as collection.ts reads it: the pane keeps
-// every key it doesn't understand (a year, an index, aliases, prints) exactly
-// where it found it, and touches only the three it shows.
-type RawItem = Record<string, unknown> & { src?: unknown; title?: unknown; caption?: unknown };
+// every key it doesn't understand (an index, prints, anything undeclared)
+// exactly where it found it, and touches only the fields it shows.
+type RawItem = Record<string, unknown> & { title?: unknown; aliases?: unknown };
 type RawGroup = Record<string, unknown> & { name?: unknown; label?: unknown; items?: RawItem[]; groups?: RawGroup[] };
 type RawFile = Record<string, unknown> & { groups?: RawGroup[] };
 
-type Info = { images: Images; uploads: boolean; problems: string[] };
+// `fields` is null when the file declares none.
+type Info = { fields: Field[] | null; images: Images; uploads: boolean; problems: string[] };
 type Upload = { name: string; src: string; thumb: string; v: string };
+
+// What a file that declares no fields is edited as: a picture in src, a title
+// and a caption — what every collection was before fields were declared.
+export const PLAIN: Field[] = [
+  { name: "src", kind: "image", label: "Picture" },
+  { name: "title", kind: "text", label: "Title" },
+  { name: "caption", kind: "long", label: "Caption" },
+];
 
 // A group by its position: [1] is the second group, [1, 0] the first subgroup
 // of it. Positions, not names, because two groups may be called the same thing
@@ -41,6 +53,64 @@ type Upload = { name: string; src: string; thumb: string; v: string };
 type Path = number[];
 
 const said = (value: unknown) => (typeof value === "string" ? value : "");
+// A value as the site reads it: a year written as 1961 rather than "1961" is
+// still a year.
+const asText = (value: unknown): string | null =>
+  typeof value === "string" ? value : typeof value === "number" ? String(value) : null;
+// The entries of a list the site will read, which are the objects in it.
+const objects = <T,>(value: unknown): T[] =>
+  (Array.isArray(value) ? value.filter((v) => typeof v === "object" && v !== null) : []) as T[];
+
+// Every item's address, in the order the site hands them out — each group's
+// items, then its subgroups — through the same slugger the server uses. The
+// item is the object in the file, so a before and an after taken from the one
+// file line up item for item.
+export function itemAddresses(file: RawFile, folder: string): { item: RawItem; href: string }[] {
+  const slugOf = slugger();
+  const out: { item: RawItem; href: string }[] = [];
+  const walk = (groups: unknown) => {
+    for (const group of objects<RawGroup>(groups)) {
+      for (const item of objects<RawItem>(group.items)) {
+        out.push({ item, href: itemHref(folder, slugOf(asText(item.slug), asText(item.title) ?? "")) });
+      }
+      walk(group.groups);
+    }
+  };
+  walk(file.groups);
+  return out;
+}
+
+// A work renamed is a work moved: its slug comes from its title, so the
+// address it was published at would 404. Every item whose address changed
+// between `before` and now keeps the old one as an alias — when the site had
+// served it (it is in `published`, the addresses the file had when the pane
+// opened it: a work added in this session, or a title half-way through being
+// changed, was never an address anyone linked to) and when no item answers at
+// it now (an item wins over an alias, so that alias would be dead). Renaming
+// back takes the alias off again. Answers a line to say for each alias made.
+export function keepAddresses(
+  before: { item: RawItem; href: string }[], file: RawFile, folder: string, published: Set<string>,
+): string[] {
+  const after = itemAddresses(file, folder);
+  const live = new Set(after.map((a) => aliasKey(a.href)));
+  const at = (key: string, alias: unknown) => typeof alias === "string" && aliasKey(alias) === key;
+  const lines: string[] = [];
+  after.forEach(({ item, href }, k) => {
+    const was = before[k]!.href;
+    if (was === href) return;
+    const had = Array.isArray(item.aliases) ? item.aliases as unknown[] : [];
+    const now = aliasKey(href);
+    const kept = had.filter((alias) => !at(now, alias));
+    const old = aliasKey(was);
+    if (published.has(old) && !live.has(old) && !kept.some((alias) => at(old, alias))) {
+      kept.push(was);
+      lines.push(`${asText(item.title) || "That item"} is now ${href}; the old address still leads there.`);
+    }
+    if (kept.length) item.aliases = kept;
+    else delete item.aliases;
+  });
+  return lines;
+}
 
 export function groupAt(file: RawFile | null, path: Path): RawGroup | null {
   let groups = file?.groups ?? [];
@@ -77,7 +147,10 @@ export function CollectionPane() {
   const name = signal("");
   const model = signal<RawFile | null>(null);
   const images = signal<Images>(ownImages());
+  const fields = signal<Field[]>(PLAIN);
   const uploads = signal(true);
+  // The addresses the file had when it was opened: the ones worth keeping.
+  let published = new Set<string>();
   const dirty = signal(false);
   const busy = signal(false);
   const trouble = signal("");
@@ -99,6 +172,7 @@ export function CollectionPane() {
     if (!info) return;
     batch(() => {
       images.set(info.images);
+      fields.set(info.fields ?? PLAIN);
       uploads.set(info.uploads);
     });
     // Failures speak: a slug that collides with a page is a work nobody can
@@ -109,8 +183,9 @@ export function CollectionPane() {
   };
 
   const load = async () => {
-    // Where the pictures are first, so no item is ever drawn against the
-    // wrong base and no thumbnail is fetched from an address it never had.
+    // Where the pictures are and what the fields are first, so no item is
+    // ever drawn against the wrong base or with the wrong inputs, and no
+    // thumbnail is fetched from an address it never had.
     await check();
     const res = await api(`open ${key()}`, fileUrl());
     if (!res.ok) return;
@@ -120,6 +195,7 @@ export function CollectionPane() {
       if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
         throw new Error("it isn't an object");
       }
+      published = new Set(itemAddresses(parsed as RawFile, folder).map((a) => aliasKey(a.href)));
       model.set(parsed as RawFile);
     } catch (e) {
       // Not editable here, and saying nothing would leave an empty pane
@@ -132,6 +208,10 @@ export function CollectionPane() {
   // One write at a time: two changes in quick succession both send the whole
   // file, and the one that arrives last should be the one written last.
   let queue: Promise<unknown> = Promise.resolve();
+  // What the next write that lands should tell you it did (an old address
+  // kept). Said once the file is written, not when it is asked for: a rename
+  // that never reached the server kept nothing, and Save says it when it does.
+  let kept: string[] = [];
   const put = async () => {
     const res = await api(`save ${key()}`, fileUrl(), {
       method: "PUT",
@@ -139,8 +219,9 @@ export function CollectionPane() {
     });
     if (!res.ok) return;           // api has spoken; the pane stays dirty
     dirty.set(false);
+    if (kept.length) tell(kept.splice(0).join(" "));
     collectionChanged();           // the preview renders the overview again
-    await check();
+    await check();                 // and a problem the change made outranks the news
   };
   const write = () => (queue = queue.then(put));
 
@@ -191,24 +272,43 @@ export function CollectionPane() {
 
   const bust = (src: string, v: string) => busts.update((b) => ({ ...b, [src]: v }));
 
+  // The field that is the picture — "" when the file declares none, and then
+  // an item is words only — and the ones that are typed.
+  const imageField = () => fields.peek().find((f) => f.kind === "image")?.name ?? "";
+  const typed = () => fields.peek().filter((f) => f.kind !== "image");
+
+  // A new item says every declared field, empty, so the file shows what an
+  // item is made of; a title starts as the picture's name.
+  const blank = (picture: string): RawItem => {
+    const item: RawItem = {};
+    const image = imageField();
+    if (image) item[image] = picture;
+    for (const f of typed()) item[f.name] = f.name === "title" ? titleFrom(picture) : "";
+    return item;
+  };
+
+  const pushItem = (path: Path, item: RawItem) =>
+    change((next) => {
+      const group = groupAt(next, path);
+      if (group) (group.items ??= []).push(item);
+    });
+
   const addItem = async (path: Path, file: File | undefined) => {
     if (!file) return;
     const up = await send(file, null);
     if (!up) return;
     bust(up.name, up.v);
-    await change((next) => {
-      const group = groupAt(next, path);
-      if (group) (group.items ??= []).push({ src: up.name, title: titleFrom(up.name), caption: "" });
-    });
+    await pushItem(path, blank(up.name));
   };
 
   // In place, under the same file name: collection.json doesn't change, so the
   // item keeps its address and every link to it goes on working.
   const swapItem = async (path: Path, i: number, file: File | undefined) => {
     if (!file) return;
-    const src = said(groupAt(model.peek(), path)?.items?.[i]?.src);
+    const image = imageField();
+    const src = said(groupAt(model.peek(), path)?.items?.[i]?.[image]);
     if (!src) {
-      speak("That item has no picture to replace — its src is empty.");
+      speak(`That item has no picture to replace — its ${image} is empty.`);
       return;
     }
     const up = await send(file, src);
@@ -225,10 +325,15 @@ export function CollectionPane() {
 
   // --- the shape of the file -------------------------------------------
 
+  // A committed edit — the input's change, not each keystroke — so the address
+  // an item had before is the one it was published at, not half a title.
   const setField = (path: Path, i: number, field: string, value: string) =>
     change((next) => {
       const item = groupAt(next, path)?.items?.[i];
-      if (item) item[field] = value;
+      if (!item) return;
+      const before = itemAddresses(next, folder);
+      item[field] = value;
+      kept.push(...keepAddresses(before, next, folder, published));
     });
 
   const moveItem = (from: { path: Path; i: number }, to: { path: Path; i: number }) =>
@@ -296,10 +401,32 @@ export function CollectionPane() {
 
   type Row = { i: number; item: RawItem };
 
+  // One input per declared field, labelled as the file labels it — on the
+  // screen, not just to a screen reader: "1961" and "Ink" in two unlabelled
+  // boxes is a guessing game. A line for text and numbers, a box for long
+  // text. Every value stays a string — a number field may say "skip", which
+  // an <input type=number> would refuse.
+  const fieldInput = (path: Path, row$: ReadonlySignal<Row>, field: Field) => {
+    const value = row$.map((r) => asText(r.item[field.name]) ?? "");
+    const commit = (e: Event) =>
+      setField(path, row$.peek().i, field.name, (e.target as HTMLInputElement).value);
+    return (
+      <label class="item-field">
+        <span class="item-label">{field.label}</span>
+        {field.kind === "long"
+          ? <textarea class="item-input item-long" data-field={field.name} rows={2}
+              value={value} onchange={commit} />
+          : <input class="item-input" data-field={field.name}
+              value={value} onchange={commit} />}
+      </label>
+    );
+  };
+
   const itemRow = (path: Path, row$: ReadonlySignal<Row>) => {
     const here = () => ({ path, i: row$.peek().i });
+    const image = imageField();
     const input = chooser((file) => swapItem(path, row$.peek().i, file));
-    const src = () => said(row$.peek().item.src);
+    const src = () => said(row$.peek().item[image]);
 
     return (
       <li class="collection-item" draggable="true"
@@ -317,31 +444,28 @@ export function CollectionPane() {
           moveItem(from, here());
         }}
       >
-        <div class="item-thumb" role="button" tabindex="0"
-          aria-label="Replace this picture (same file name)"
-          title="Replace this picture (same file name)"
-          onclick={() => input.click()}
-          onkeydown={(e: KeyboardEvent) => {
-            if (e.key === "Enter" || e.key === " ") { e.preventDefault(); input.click(); }
-          }}
-          ondragover={(e: DragEvent) => e.preventDefault()}
-          ondrop={(e: DragEvent) => {
-            e.preventDefault();
-            swapItem(path, row$.peek().i, e.dataTransfer?.files?.[0]);
-          }}
-        >
-          <img alt="" loading="lazy" src={computed(() => thumbUrl(said(row$.get().item.src)))} />
-          <span class="item-swap"><Icon name="refresh-cw" size={12} /></span>
-          {input}
-        </div>
+        {image ? (
+          <div class="item-thumb" role="button" tabindex="0"
+            aria-label="Replace this picture (same file name)"
+            title="Replace this picture (same file name)"
+            onclick={() => input.click()}
+            onkeydown={(e: KeyboardEvent) => {
+              if (e.key === "Enter" || e.key === " ") { e.preventDefault(); input.click(); }
+            }}
+            ondragover={(e: DragEvent) => e.preventDefault()}
+            ondrop={(e: DragEvent) => {
+              e.preventDefault();
+              swapItem(path, row$.peek().i, e.dataTransfer?.files?.[0]);
+            }}
+          >
+            <img alt="" loading="lazy" src={computed(() => thumbUrl(said(row$.get().item[image])))} />
+            <span class="item-swap"><Icon name="refresh-cw" size={12} /></span>
+            {input}
+          </div>
+        ) : null}
         <div class="item-fields">
-          <input class="item-title" placeholder="Title" aria-label="Title"
-            value={row$.map((r) => said(r.item.title))}
-            onchange={(e: Event) => setField(path, row$.peek().i, "title", (e.target as HTMLInputElement).value)} />
-          <textarea class="item-caption" placeholder="Caption" aria-label="Caption" rows={2}
-            value={row$.map((r) => said(r.item.caption))}
-            onchange={(e: Event) => setField(path, row$.peek().i, "caption", (e.target as HTMLTextAreaElement).value)} />
-          <span class="item-src">{row$.map((r) => said(r.item.src))}</span>
+          {typed().map((field) => fieldInput(path, row$, field))}
+          {image ? <span class="item-src">{row$.map((r) => said(r.item[image]))}</span> : null}
         </div>
         <div class="item-tools">
           <button class="icon-btn" aria-label="Move up" title="Move up"
@@ -391,7 +515,9 @@ export function CollectionPane() {
           {list(items, (x) => x.i, (row$) => itemRow(path, row$))}
         </ul>
 
-        {when(uploads, () => (
+        {/* An item begins as its picture — or, in a collection with no
+            picture field, as a row of empty fields. */}
+        {imageField() ? when(uploads, () => (
           <div class="item-drop" onclick={() => input.click()}
             ondragover={(e: DragEvent) => e.preventDefault()}
             ondrop={(e: DragEvent) => {
@@ -402,7 +528,11 @@ export function CollectionPane() {
             {when(busy, () => <span>Adding…</span>, () => <span>Drop a picture here, or choose one</span>)}
             {input}
           </div>
-        ))}
+        )) : (
+          <button class="item-drop" onclick={() => pushItem(path, blank(""))}>
+            <Icon name="plus" size={13} /> Add item
+          </button>
+        )}
 
         {list(subs, (x) => x.i, (sub$) => groupBlock([...path, sub$.peek().i]))}
       </section>

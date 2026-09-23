@@ -396,6 +396,9 @@ describe("a collection's pictures", () => {
     expect(data.images.thumb).toBe("/static/images/gallery/"); // said once, meant for both
     expect(data.uploads).toBe(true);
     expect(data.problems).toEqual([]);
+    // The fields as the site reads them, so the pane shows what the site renders.
+    expect(data.fields.map((f: { name: string }) => f.name)).toEqual(["src", "title", "caption", "year"]);
+    expect(data.fields[0]).toEqual({ name: "src", kind: "image", label: "Picture" });
   });
 
   test("a folder with no collection.json says so, trailing slash or not", async () => {
@@ -462,6 +465,7 @@ describe("a collection's pictures", () => {
     await collectionAt(".away", { images: "https://pictures.example.com/works/", groups: [] });
     const info = await (await fetch(`${BASE}/edit/collection/.away`, authed())).json();
     expect(info.uploads).toBe(false);
+    expect(info.fields).toBeNull();   // it declares none: the pane shows what it always did
 
     const res = await send(".away", new Blob([PNG]), "a.png");
     expect(res.status).toBe(409);

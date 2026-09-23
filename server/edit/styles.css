@@ -295,6 +295,11 @@ button.danger-subtle:hover {
   animation: notice-in 0.2s ease-out;
 }
 
+/* Something done on your behalf, not something gone wrong. */
+.notice.news {
+  background: #3634a3;
+}
+
 .notice button {
   padding: 4px;
   border: none;
@@ -632,10 +637,10 @@ button.danger-subtle:hover {
 }
 
 /* --- The collection pane ---
-   A folder's collection.json, shown as what it is: groups of pictures with a
-   title and a caption each. It sits where a resource sits, below the page, and
-   scrolls inside itself — the pane's height is the column's, whatever the
-   collection's length. Everything here wraps: at 320px the tools drop below
+   A folder's collection.json, shown as what it is: groups of items, each a
+   picture and an input per field the file declares. It sits where a
+   resource sits, below the page, and scrolls inside itself — the pane's
+   height is the column's, whatever the collection's length. Everything here wraps: at 320px the tools drop below
    the fields rather than pushing the pane sideways. */
 
 .panel-collection {
@@ -669,8 +674,7 @@ button.danger-subtle:hover {
 }
 
 .group-name,
-.item-title,
-.item-caption {
+.item-input {
   min-width: 0;
   padding: 4px 6px;
   border: 1px solid transparent;
@@ -687,14 +691,12 @@ button.danger-subtle:hover {
 }
 
 .group-name:hover,
-.item-title:hover,
-.item-caption:hover {
+.item-input:hover {
   border-color: var(--border);
 }
 
 .group-name:focus,
-.item-title:focus,
-.item-caption:focus {
+.item-input:focus {
   border-color: var(--accent);
   background: var(--surface);
 }
@@ -762,7 +764,24 @@ button.danger-subtle:hover {
   gap: 4px;
 }
 
-.item-caption {
+/* A field is its label and its input on one line: the label a narrow,
+   quiet column, so a row of fields reads as a small form. */
+.item-field {
+  display: grid;
+  grid-template-columns: 4.5rem minmax(0, 1fr);
+  align-items: baseline;
+  gap: 4px;
+}
+
+.item-label {
+  overflow: hidden;
+  color: var(--text-dim);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.item-long {
   resize: vertical;
   font-size: 12px;
   line-height: 1.4;
@@ -801,6 +820,12 @@ button.danger-subtle:hover {
   color: var(--text);
 }
 
+/* The same place, as a button, in a collection with no picture field. */
+button.item-drop {
+  width: 100%;
+  background: transparent;
+}
+
 .collection-tools {
   display: flex;
   gap: 8px;
@@ -820,6 +845,13 @@ button.danger-subtle:hover {
   #app {
     grid-template-columns: 1fr;
     grid-template-rows: auto minmax(0, 11rem) minmax(0, 1fr);
+  }
+
+  /* The bar's four things want 339px at the desktop's spacing, which at
+     320px widens the whole page into a sideways scroll. */
+  .header {
+    gap: 8px;
+    padding: 8px 12px;
   }
 
   .panel-browser {

@@ -3,7 +3,9 @@ import type { FileEntry, FolderEntry, Listing } from "../../storage";
 import { Icon } from "./Icon";
 import { NewDialog, type NewKind } from "./NewDialog";
 import { apiJson, urlPath } from "../api";
-import { loadFile, createFile, browserRevision, openCollection, COLLECTION_FILE } from "../store";
+import {
+  loadFile, createFile, createCollection, browserRevision, openCollection, COLLECTION_FILE,
+} from "../store";
 
 export const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name);
 
@@ -34,9 +36,12 @@ export function Browser() {
   // Resolves to a message (the name is taken) to keep the dialog open with.
   const onCreate = async (name: string): Promise<string | void> => {
     const dir = `/${path.peek() ? path.peek() + "/" : ""}`;
-    const error = newKind.peek() === "folder"
-      ? await createFile(`${dir}${name}/index.md`, name)
-      : await createFile(`${dir}${name.endsWith(".md") ? name : `${name}.md`}`, name);
+    const kind = newKind.peek();
+    const error = kind === "collection"
+      ? await createCollection(path.peek(), name)
+      : kind === "folder"
+        ? await createFile(`${dir}${name}/index.md`, name)
+        : await createFile(`${dir}${name.endsWith(".md") ? name : `${name}.md`}`, name);
     if (error) return error;
     newKind.set(null);
   };
@@ -56,6 +61,9 @@ export function Browser() {
         </button>
         <button class="icon-btn" aria-label="New folder" title="New folder" onclick={() => newKind.set("folder")}>
           <Icon name="folder-plus" />
+        </button>
+        <button class="icon-btn" aria-label="New collection" title="New collection" onclick={() => newKind.set("collection")}>
+          <Icon name="layout-grid" />
         </button>
       </div>
       <ul class="file-list">
