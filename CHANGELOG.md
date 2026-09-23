@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.6.0 — 2026-09-23
 
 - **Nothing the editor writes is lost.** Before a save replaces a file, or a
   delete removes one, what was there is kept in the site's `.history/` folder
@@ -17,6 +17,12 @@
   and arrows in its header, through every change since it opened. Each step
   is written, like any other change. Removing a group still asks, and now says
   undo brings it back.
+- **Upgrading from 0.5:** the history is kept in `.history/` inside the
+  content folder, which a site kept in git should ignore. Running `bunx
+  duckdown init` again adds `site/.history/` to `.gitignore` (it only ever
+  adds); a content folder with another name needs its own line, e.g.
+  `site-new/.history/`. Git remains the history for anything written outside
+  the editor.
 - **An exported alias ending `.html` answers.** `/old.html` is written as
   `dist/old.html`, the file a static host (and `serve.ts`) opens for it; it was
   written as `old/index.html`, which nothing asked for.
