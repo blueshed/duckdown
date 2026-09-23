@@ -1,7 +1,7 @@
 import type { Storage } from "./storage";
 import { DEBUG } from "./config";
 import { renderMarkdown, yes } from "./markdown";
-import { COLLECTION_FILE, aliasKey, loadCollection } from "./collection";
+import { COLLECTION_FILE, aliasKey, loadCollection, itemBody, itemMeta } from "./collection";
 import { canonicalPath } from "./utils";
 
 // The site's own page for a miss: a page, but not one to search for, list or map.
@@ -73,7 +73,8 @@ export async function buildSite(pages: Storage, prefix = "", debug = DEBUG): Pro
     const key = f.path.replace(/^\//, "");
     if (!key.endsWith(".md") || key === NOT_FOUND) continue;
     const { content, meta } = renderMarkdown(await pages.read(key), key.replace(/\.md$/, ""));
-    if (yes(meta.draft)) continue;
+    // An each: page is found by its collection, below, and is its items.
+    if (yes(meta.draft) || meta.each) continue;
     const url = canonicalPath(key);
     const title = meta.title?.[0] ?? key.replace(/\.md$/, "");
     const date = meta.date?.[0] ?? "";
@@ -91,15 +92,19 @@ export async function buildSite(pages: Storage, prefix = "", debug = DEBUG): Pro
     }
   }
 
-  // A folder's collection.json is a folder of pages too: one entry per item,
-  // its caption as the words, so a work is as findable as anything written by
+  // A folder's collection.json with an each: page beside it is a folder of
+  // pages too: one entry per item, the words its page shows (its caption when
+  // the page shows none), so a work is as findable as anything written by
   // hand — and its address is in the sitemap for the same reason.
   if (files.some((f) => f.name === COLLECTION_FILE)) {
     const collection = await loadCollection(pages, prefix, debug);
-    for (const item of collection?.items ?? []) {
+    for (const item of collection?.each ? collection.items : []) {
+      const context = { collection: collection!, item };
+      const meta = itemMeta(context);
       out.pages.push({ url: item.href, date: "" });
       out.entries.push({
-        url: item.href, title: item.title, section: "", description: item.caption, date: "", text: item.caption,
+        url: item.href, title: meta.title![0]!, section: "", description: meta.description![0]!, date: "",
+        text: words(itemBody(context)) || item.caption,
       });
       for (const alias of item.aliases) out.aliases.push({ from: aliasKey(alias), to: item.href });
     }

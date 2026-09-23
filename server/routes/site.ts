@@ -117,6 +117,10 @@ const renderPage = async (req: Request) => {
   if (!await pages.exists(key)) return collected(req, name, decoded);
 
   const page = parsePage(key, await pages.read(key));
+  // An each: page is what every item of its collection is made from, not a
+  // page of its own: its address is a miss (or an item that happens to share
+  // its name).
+  if (page.meta.each) return collected(req, name, decoded);
   const user = await getUser(req);
   // A draft is for whoever is signed in to the editor, and nobody else.
   if (yes(page.meta.draft) && !user) return notFound(req);

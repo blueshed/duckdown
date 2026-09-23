@@ -2,7 +2,7 @@ import { TEMPLATES_PATH } from "./config";
 import { createPageStorage, createStorage } from "./storage";
 import { renderMarkdown, folderOf } from "./markdown";
 import { siteNav, markCurrent, folderListing, siteMap } from "./nav";
-import { fillCollections, itemValue, type ItemContext } from "./collection";
+import { fillCollections, fillItem, itemMeta, itemBody, type ItemContext } from "./collection";
 import { escapeHtml, outsideCode, canonicalPath, dateHtml } from "./utils";
 
 const site = createStorage();
@@ -100,18 +100,14 @@ export function parsePage(key: string, source: string): Page {
   return { key, file, content, meta };
 }
 
-// An item of a collection, as a page: it has no markdown of its own, because
-// everything it says is a field the template asks for by name. Its key is the
-// folder-with-an-index its address resolves to, so canonicalPath, the nav's
-// marking and the export's outPath all treat it as the page it is.
+// An item of a collection, as a page: the collection's each: page, filled for
+// this item — its body, its front matter, and the template its layout: names.
+// Its key is the folder-with-an-index its address resolves to, so
+// canonicalPath, the nav's marking and the export's outPath all treat it as
+// the page it is.
 export function itemPage(context: ItemContext): Page {
-  const { collection, item } = context;
-  return {
-    key: item.key,
-    file: item.key.replace(/\.md$/, ""),
-    content: "",
-    meta: { title: [item.title], description: [item.caption], layout: [collection.layout] },
-  };
+  const { item } = context;
+  return { key: item.key, file: item.key.replace(/\.md$/, ""), content: itemBody(context), meta: itemMeta(context) };
 }
 
 export type PageOptions = {
@@ -150,8 +146,10 @@ export async function pageHtml(page: Page, o: PageOptions): Promise<{ html: stri
       part.replace(new RegExp(`<p>\\{\\{${tag}\\}\\}</p>|\\{\\{${tag}\\}\\}`, "g"), () => html));
   }
   // {{items}} and {{groups}} are the same idea over a collection.json: an
-  // overview page writes itself from the folder's data, here or in a template.
-  const collection = { pages, folder: folderOf(file), context: o.item };
+  // overview page writes itself from the data, here or in a template. A bare
+  // tag means the collection `collection:` names, else the page's own folder's.
+  const named = meta.collection?.[0]?.replace(/^\/+|\/+$/g, "");
+  const collection = { pages, folder: named ?? folderOf(file), context: o.item };
   body = await fillCollections(body, collection);
 
   const template = o.through === undefined
@@ -168,7 +166,7 @@ export async function pageHtml(page: Page, o: PageOptions): Promise<{ html: stri
   // empty when unset, like the x- keys, and before {{content}} for the same
   // reason: a placeholder written in a page's text is never filled.
   html = await fillCollections(html, collection);
-  html = html.replace(/\{\{(item-[\w-]+|prev|next|group)\}\}/g, (_, name: string) => itemValue(name, o.item));
+  html = fillItem(html, o.item);
   for (const [name, value] of [
     ["title", () => escapeHtml(meta.title?.[0] || "duckie")],
     ["url", () => escapeHtml(o.origin + canonicalPath(page.key))],

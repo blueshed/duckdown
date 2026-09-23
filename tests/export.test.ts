@@ -286,6 +286,8 @@ describe("collections", () => {
     expect(item).toContain('<a class="next" rel="next" href="/gallery/second-wind/">Second Wind</a>');
     expect(item).not.toContain("user-edit");           // no editor behind a folder of files
     expect(item).not.toMatch(/\{\{[\w-]+\}\}/);
+    expect(item).toContain("<figcaption>First Light, 1961. Ink on paper, 40 x 40 cm.</figcaption>");   // the each: page's body
+    expect(existsSync(join(dir, "gallery/item.html"))).toBe(false);                                     // and not a page itself
 
     expect(read(dir, "gallery/index.html")).toContain('<a class="item" href="/gallery/first-light/">');
     expect(read(dir, "by-year.html")).toContain("<h2>1961 - Early work</h2>");

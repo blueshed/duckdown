@@ -13,10 +13,7 @@
 <body>
   {{include topbar}}
   <p class="back"><a href="/by-year.html#{{item-year}}">← {{group}}</a></p>
-  <figure class="work">
-    <img src="{{item-src}}" alt="{{item-title}}">
-    <figcaption>{{item-caption}}</figcaption>
-  </figure>
+  {{content}}
   <nav class="item-nav" aria-label="This collection">{{prev}}{{next}}</nav>
   {{groups}}
   {{edit}}

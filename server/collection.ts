@@ -1,13 +1,17 @@
 import type { Storage } from "./storage";
 import { DEBUG } from "./config";
-import { escapeHtml } from "./utils";
+import { escapeHtml, outsideCode } from "./utils";
+import { parseFrontMatter, renderMarkdown } from "./markdown";
 import { type Images, DEFAULT_IMAGES, ownImages, imageUrl, thumbName } from "./images";
 
-// A collection is a folder of pages duckdown writes for you: `collection.json`
-// beside a folder's index.md lists groups of items, and each item becomes a
-// page at /<folder>/<slug>/ rendered through a template. It is for the site
-// that has four hundred paintings and no wish to write four hundred markdown
-// files, each the same but for a filename and a caption.
+// A collection is a folder of pages duckdown writes for you. The DATA is
+// `collection.json`: the fields every item has, and groups of items. The
+// PRESENTATION is pages, like everything else: an `each:` page beside it
+// (works/item.md, `each: works`) is the page every item gets, at
+// /<folder>/<slug>/, and any page with {{items}} is an overview. It is for the
+// site that has four hundred paintings and no wish to write four hundred
+// markdown files, each the same but for a filename and a caption — and that
+// shows them more than one way, which is why the data can't own a template.
 //
 // The data is read through the storage layer like everything else, so a
 // collection works on disk and in a bucket, and the images it names may live
@@ -16,9 +20,23 @@ import { type Images, DEFAULT_IMAGES, ownImages, imageUrl, thumbName } from "./i
 
 // --- Shape on disk -----------------------------------------------------
 
-// Every key duckdown itself reads. Anything else on an item is one of its
-// fields, addressable as {{item-<field>}} and groupable with {{items by=…}}.
-const RESERVED = ["aliases"];
+// Keys an item may carry that aren't fields: duckdown reads them itself.
+const RESERVED = ["aliases", "slug"];
+
+// What an item is made of, declared once at the top of the file:
+// `fields: [{ "name": "title" }, { "name": "src", "kind": "image" }, …]`.
+// The kind is what the editor offers for it; `image` is also the one field
+// {{item-thumb}} and the overview's thumbnails are made from.
+export const KINDS = ["text", "long", "image", "number"] as const;
+export type Field = { name: string; kind: typeof KINDS[number]; label: string };
+
+// Values every item answers to whatever its fields: {{item-slug}} and the rest.
+const BUILT_IN = ["slug", "href", "thumb"];
+
+// The page every item gets: an `each:` page's front matter and rendered
+// markdown, with its {{item-…}} still in it. `key` is "" for the one a 0.4
+// collection.json implies with its `layout`.
+export type EachPage = { key: string; meta: Record<string, string[]>; content: string };
 
 export type Group = {
   name: string;
@@ -43,7 +61,11 @@ export type Item = {
 
 export type Collection = {
   folder: string;                   // "works" ("" at the site root)
-  layout: string;                   // the template an item wears: "item"
+  fields: Field[];                  // declared, or read off the items (0.4)
+  declared: boolean;                // whether the file said them
+  image: string;                    // the field that is the picture
+  layout: string;                   // 0.4's item template; "" when unsaid
+  each: EachPage | null;            // the page each item gets, when there is one
   images: Images;
   labels: Record<string, Record<string, string>>;
   groups: Group[];
@@ -121,6 +143,34 @@ function asArray(value: unknown): Raw[] {
   return Array.isArray(value) ? value.filter((v): v is Raw => typeof v === "object" && v !== null) : [];
 }
 
+function fieldsOf(raw: unknown, problems: string[], where: string): Field[] | null {
+  if (raw === undefined) return null;
+  if (!Array.isArray(raw)) {
+    problems.push(`${where}: "fields" should be a list of { "name", "kind" }`);
+    return null;
+  }
+  const fields: Field[] = [];
+  for (const entry of raw) {
+    const said = (typeof entry === "string" ? { name: entry } : entry) as Raw | null;
+    const name = text(said?.name);
+    if (!name || !/^[\w-]+$/.test(name) || fields.some((f) => f.name === name)) {
+      problems.push(`${where}: field ${JSON.stringify(entry)} needs a name of its own, in letters, digits, - and _`);
+      continue;
+    }
+    let kind = text(said!.kind) ?? "text";
+    if (!(KINDS as readonly string[]).includes(kind)) {
+      problems.push(`${where}: field "${name}" is kind "${kind}", which isn't one of ${KINDS.join(", ")} — read as text`);
+      kind = "text";
+    }
+    if (kind === "image" && fields.some((f) => f.kind === "image")) {
+      problems.push(`${where}: "${name}" is a second image field — the first is the picture, this one is read as text`);
+      kind = "text";
+    }
+    fields.push({ name, kind: kind as Field["kind"], label: text(said!.label) ?? name });
+  }
+  return fields;
+}
+
 function labelsOf(raw: unknown): Record<string, Record<string, string>> {
   const out: Record<string, Record<string, string>> = {};
   if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return out;
@@ -152,10 +202,16 @@ export function parseCollection(folder: string, source: string): Collection {
     problems.push(`${collectionPath(folder)}: ${(e as Error).message}`);
   }
 
+  const where = collectionPath(folder);
   const picture = images(raw.images, problems);
+  const declared = fieldsOf(raw.fields, problems, where);
   const collection: Collection = {
     folder,
-    layout: typeof raw.layout === "string" ? raw.layout : "item",
+    fields: declared ?? [],
+    declared: declared !== null,
+    image: declared ? declared.find((f) => f.kind === "image")?.name ?? "" : "src",
+    layout: typeof raw.layout === "string" ? raw.layout : "",
+    each: null,
     images: picture,
     labels: labelsOf(raw.labels),
     groups: [],
@@ -187,12 +243,23 @@ export function parseCollection(folder: string, source: string): Collection {
     return group;
   };
 
+  // Keys the items use that the file doesn't declare, said once each with a
+  // count rather than once per item: four hundred lines is noise.
+  const undeclared = new Map<string, number>();
   const readItem = (rawItem: Raw, group: Group): Item => {
     const fields: Record<string, string> = {};
     for (const [key, value] of Object.entries(rawItem)) {
-      if (RESERVED.includes(key)) continue;
+      if (key === "aliases") continue;
       const said = text(value);
       if (said !== null) fields[key] = said;
+      if (RESERVED.includes(key)) continue;
+      if (!declared) {
+        if (!collection.fields.some((f) => f.name === key)) {
+          collection.fields.push({ name: key, kind: key === "src" ? "image" : "text", label: key });
+        }
+      } else if (!declared.some((f) => f.name === key)) {
+        undeclared.set(key, (undeclared.get(key) ?? 0) + 1);
+      }
     }
     const title = fields.title ?? "";
     // A slug the file states has to be a slug; one that isn't is said so and
@@ -208,7 +275,7 @@ export function parseCollection(folder: string, source: string): Collection {
     // Nothing usable in the title (a work called "…"): a number by position,
     // which is stable as long as the item stays where it is.
     slug = unique(slug || slugify(title) || `item-${collection.items.length + 1}`, slugs);
-    const src = fields.src ?? "";
+    const src = fields[collection.image] ?? "";
     const item: Item = {
       slug,
       href: `/${folder ? `${folder}/` : ""}${slug}/`,
@@ -227,6 +294,9 @@ export function parseCollection(folder: string, source: string): Collection {
   };
 
   for (const rawGroup of asArray(raw.groups)) collection.groups.push(readGroup(rawGroup));
+  for (const [key, count] of undeclared) {
+    problems.push(`${where}: ${count} item(s) say "${key}", which isn't one of the fields — declare it, or take it out`);
+  }
   return collection;
 }
 
@@ -239,12 +309,58 @@ const loaded = new Map<string, Promise<Collection | null>>();
 
 export function collectionsChanged(): void {
   loaded.clear();
+  warned.clear();
+}
+
+// Said once, not per request: a warning repeated on every page view is noise.
+const warned = new Set<string>();
+function warnOnce(line: string): void {
+  if (warned.has(line)) return;
+  warned.add(line);
+  console.warn(line);
+}
+
+// The each: page beside a collection: the page every item gets. Only this
+// folder is looked in, because an item's address is this folder and its
+// slug — one each: page, one set of addresses, and {{items}} knows where they
+// are. The folder's index.md is its overview, never its each: page.
+async function eachPageIn(pages: Storage, collection: Collection): Promise<EachPage | null> {
+  const { folder, problems } = collection;
+  const found: { key: string; meta: Record<string, string[]>; source: string }[] = [];
+  for (const file of (await pages.list(folder)).files.sort((a, b) => a.name.localeCompare(b.name))) {
+    if (!file.name.endsWith(".md") || file.name === "index.md") continue;
+    const key = file.path.replace(/^\//, "");
+    const source = await pages.read(key);
+    const { meta } = parseFrontMatter(source);
+    if (!meta.each) continue;
+    const named = meta.each[0]!.replace(/^\/+|\/+$/g, "");
+    if (named !== folder) {
+      problems.push(`${key} says each: ${meta.each[0]}, but an each: page makes pages for the collection in its own folder — ${folder || "/"}`);
+      continue;
+    }
+    found.push({ key, meta, source });
+  }
+  if (found.length > 1) {
+    problems.push(`${found.map((f) => f.key).join(" and ")} are each: pages for one collection — ${found[0]!.key} is used`);
+  }
+  const first = found[0];
+  if (first) return { key: first.key, meta: first.meta, content: renderMarkdown(first.source, first.key.replace(/\.md$/, "")).content };
+  // 0.4's shape: the template named in the data. Honoured for one release,
+  // as an each: page with nothing in it but that layout.
+  if (collection.layout) {
+    warnOnce(`${collectionPath(folder)}: "layout" in the data is going — write an each: page instead `
+      + `(${folder ? `${folder}/` : ""}item.md, saying "each: ${folder || "/"}" and "layout: ${collection.layout}")`);
+    return { key: "", meta: { layout: [collection.layout] }, content: "" };
+  }
+  return null;
 }
 
 async function read(pages: Storage, folder: string): Promise<Collection | null> {
   const key = collectionPath(folder);
   if (!await pages.exists(key)) return null;
   const collection = parseCollection(folder, await pages.read(key));
+  collection.each = await eachPageIn(pages, collection);
+  if (!collection.declared) warnOnce(`${key}: no "fields" — read off the items; declare them`);
   // Failures speak: a file the site can't read is a folder of missing pages,
   // and the log is where that gets noticed.
   for (const problem of collection.problems) console.error(problem);
@@ -275,7 +391,7 @@ export async function itemAt(pages: Storage, name: string, debug = DEBUG): Promi
   const slug = name.slice(cut + 1);
   if (!slug) return null;
   const collection = await loadCollection(pages, folder, debug);
-  const item = collection?.bySlug.get(slug);
+  const item = collection?.each ? collection.bySlug.get(slug) : undefined;
   return collection && item ? { collection, item } : null;
 }
 
@@ -289,8 +405,9 @@ export async function itemAt(pages: Storage, name: string, debug = DEBUG): Promi
 export async function collisions(pages: Storage, collection: Collection): Promise<string[]> {
   if (!collection.items.length) return [];
   const { files, folders } = await pages.list(collection.folder);
+  const each = collection.each?.key.split("/").pop();
   const taken = new Set([
-    ...files.filter((f) => f.name.endsWith(".md")).map((f) => f.name.replace(/\.md$/, "")),
+    ...files.filter((f) => f.name.endsWith(".md") && f.name !== each).map((f) => f.name.replace(/\.md$/, "")),
     ...folders.map((f) => f.name),
   ]);
   return collection.items
@@ -314,14 +431,18 @@ const img = (item: Item) => item.thumb
   ? `<img class="thumb" src="${escapeHtml(item.thumb)}" alt="${escapeHtml(item.title)}" loading="lazy">`
   : "";
 
-const thumbLink = (item: Item) =>
-  `<a class="item" href="${encodeURI(item.href)}">${img(item)}<span class="item-title">${escapeHtml(item.title)}</span></a>`;
+// A thumbnail links to its item's page — when items have pages. A collection
+// with no each: page is shown, not linked: a link that 404s is worse than none.
+const thumbLink = (item: Item, linked: boolean) => {
+  const inside = `${img(item)}<span class="item-title">${escapeHtml(item.title)}</span>`;
+  return linked ? `<a class="item" href="${encodeURI(item.href)}">${inside}</a>` : `<span class="item">${inside}</span>`;
+};
 
-const grid = (items: Item[]) =>
-  items.length ? `<div class="items">\n${items.map(thumbLink).join("\n")}\n</div>` : "";
+const grid = (items: Item[], linked: boolean) =>
+  items.length ? `<div class="items">\n${items.map((item) => thumbLink(item, linked)).join("\n")}\n</div>` : "";
 
-function groupSection(group: Group, level: number): string {
-  const inside = [grid(group.items), ...group.groups.map((sub) => groupSection(sub, level + 1))].filter(Boolean);
+function groupSection(group: Group, level: number, linked: boolean): string {
+  const inside = [grid(group.items, linked), ...group.groups.map((sub) => groupSection(sub, level + 1, linked))].filter(Boolean);
   if (!inside.length) return "";
   const tag = `h${Math.min(level, 6)}`;
   return `<section class="group" id="${escapeHtml(group.id)}">\n`
@@ -344,8 +465,9 @@ export function sortValues(values: string[], sort?: string): string[] {
 }
 
 export function itemsHtml(collection: Collection, by?: string, sort?: string): string {
+  const linked = collection.each !== null;
   if (!by) {
-    const sections = collection.groups.map((g) => groupSection(g, 2)).filter(Boolean);
+    const sections = collection.groups.map((g) => groupSection(g, 2, linked)).filter(Boolean);
     return sections.length ? `<div class="collection">\n${sections.join("\n")}\n</div>` : "";
   }
   const order: string[] = [];
@@ -356,13 +478,16 @@ export function itemsHtml(collection: Collection, by?: string, sort?: string): s
     if (!buckets.has(value)) { buckets.set(value, []); order.push(value); }
     buckets.get(value)!.push(item);
   }
-  if (!order.length) return "";
+  if (!order.length) {
+    unknownField(collection, by, `{{items by=${by}}}`);
+    return "";
+  }
   const labels = collection.labels[by] ?? {};
   const sections = sortValues(order, sort).map((value) => {
     const label = labels[value];
     const heading = label ? `${value} - ${label}` : value;
     return `<section class="group" id="${escapeHtml(fragmentId(value))}">\n`
-      + `<h2>${escapeHtml(heading)}</h2>\n${grid(buckets.get(value)!)}\n</section>`;
+      + `<h2>${escapeHtml(heading)}</h2>\n${grid(buckets.get(value)!, linked)}\n</section>`;
   });
   return `<div class="collection">\n${sections.join("\n")}\n</div>`;
 }
@@ -375,13 +500,13 @@ function groupItems(group: Group): Item[] {
   return [...group.items, ...group.groups.flatMap(groupItems)];
 }
 
-function groupLinks(groups: Group[], current?: Group): string {
+function groupLinks(groups: Group[], linked: boolean, current?: Group): string {
   const items = groups.map((group) => {
-    const first = groupItems(group)[0];
+    const first = linked ? groupItems(group)[0] : undefined;
     const mark = group === current ? ' aria-current="true"' : "";
     const label = escapeHtml(group.label);
     const link = first ? `<a href="${encodeURI(first.href)}"${mark}>${label}</a>` : `<span${mark}>${label}</span>`;
-    const inside = group.groups.length ? `\n${groupLinks(group.groups, current)}` : "";
+    const inside = group.groups.length ? `\n${groupLinks(group.groups, linked, current)}` : "";
     return `<li>${link}${inside}</li>`;
   });
   return `<ul>\n${items.join("\n")}\n</ul>`;
@@ -389,7 +514,7 @@ function groupLinks(groups: Group[], current?: Group): string {
 
 export function groupsHtml(collection: Collection, current?: Group): string {
   if (!collection.groups.length) return "";
-  return `<nav class="groups" aria-label="Sections">\n${groupLinks(collection.groups, current)}\n</nav>`;
+  return `<nav class="groups" aria-label="Sections">\n${groupLinks(collection.groups, collection.each !== null, current)}\n</nav>`;
 }
 
 // The item before and after, in the order the file lists them, wrapping: a
@@ -412,22 +537,59 @@ function link(item: Item | null, rel: "prev" | "next"): string {
 // as nothing and the link lands at the top of the overview instead.
 export const SKIP = "skip";
 
-// What an item page fills in that an ordinary page doesn't: {{item-<field>}}
-// for anything the item says (escaped, empty when unset, like an x- key),
-// {{prev}} and {{next}}, and {{group}} — the label of the group it sits in.
-export function itemValue(name: string, context?: { collection: Collection; item: Item }): string {
+// A field a page or template asks for that the collection doesn't declare is
+// a typo that would otherwise publish as nothing. Said once, in the log.
+function unknownField(collection: Collection, field: string, where: string): void {
+  if (!collection.declared || BUILT_IN.includes(field) || collection.fields.some((f) => f.name === field)) return;
+  warnOnce(`${where}: ${collectionPath(collection.folder)} has no field "${field}"`);
+}
+
+// An item's value as text, unescaped: {{item-<field>}} for anything the item
+// says (empty when unset, like an x- key; the picture field as its URL), and
+// {{group}} — the label of the group it sits in.
+export function itemText(name: string, { collection, item }: ItemContext): string {
+  if (name === "group") return item.group.label;
+  const field = name.slice("item-".length);
+  unknownField(collection, field, `{{${name}}}`);
+  if (field === collection.image) return item.src;
+  if (field === "thumb") return item.thumb;
+  if (field === "href") return item.href;
+  const value = item.fields[field] ?? "";
+  return value === SKIP ? "" : value;
+}
+
+// The same, escaped for HTML, plus {{prev}} and {{next}}, which are links.
+export function itemValue(name: string, context?: ItemContext): string {
   if (!context) return "";
   const { collection, item } = context;
   if (name === "prev") return link(neighbour(collection, item, -1), "prev");
   if (name === "next") return link(neighbour(collection, item, 1), "next");
-  if (name === "group") return escapeHtml(item.group.label);
-  const field = name.slice("item-".length);
-  if (field === "src") return escapeHtml(item.src);
-  if (field === "thumb") return escapeHtml(item.thumb);
-  if (field === "href") return escapeHtml(item.href);
-  const value = item.fields[field] ?? "";
-  return escapeHtml(value === SKIP ? "" : value);
+  return escapeHtml(itemText(name, context));
 }
+
+// Every item placeholder in some HTML: an each: page's body, or a template.
+// Markdown percent-encodes braces in a link or an image's address, so
+// `![x]({{item-src}})` arrives as %7B%7Bitem-src%7D%7D and is filled as well.
+const ITEM_TAG = /\{\{(item-[\w-]+|prev|next|group)\}\}|%7B%7B(item-[\w-]+)%7D%7D/g;
+export function fillItem(html: string, context?: ItemContext): string {
+  return html.replace(ITEM_TAG, (_, name?: string, encoded?: string) => itemValue((name ?? encoded)!, context));
+}
+
+// An item page's front matter: the each: page's, with {{item-…}} filled in its
+// title and description, and the item's own title and caption when it says
+// neither. Unescaped: the page escapes them where it prints them.
+export function itemMeta(context: ItemContext): Record<string, string[]> {
+  const meta = { ...context.collection.each?.meta };
+  const fill = (value: string) => value.replace(/\{\{(item-[\w-]+|group)\}\}/g, (_, name: string) => itemText(name, context));
+  meta.title = [meta.title ? fill(meta.title[0]!) : context.item.title];
+  meta.description = [meta.description ? fill(meta.description[0]!) : context.item.caption];
+  return meta;
+}
+
+// An item page's body: the each: page's markdown, filled for this item,
+// except inside <code> — where a guide prints the tag rather than using it.
+export const itemBody = (context: ItemContext) =>
+  outsideCode(context.collection.each?.content ?? "", (part) => fillItem(part, context));
 
 // --- The placeholders in a page or a template --------------------------
 

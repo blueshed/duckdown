@@ -1,9 +1,9 @@
 import type { BunRequest } from "bun";
 import { requireAuth } from "../auth";
-import { parsePage, pageHtml, type DraftTemplate } from "../page";
+import { parsePage, pageHtml, itemPage, type DraftTemplate } from "../page";
 import { createPageStorage } from "../storage";
 import { folderOf } from "../markdown";
-import { collectionProblems } from "../collection";
+import { collectionProblems, loadCollection, type ItemContext } from "../collection";
 import { siteOrigin } from "./site";
 
 const pages = createPageStorage();
@@ -27,13 +27,27 @@ export const handleMark = {
     const path = new URL(req.url).searchParams.get("path") ?? "";
     const { source, draft, through } = (await req.json()) as MarkRequest;
     const page = parsePage(path, source);
-    // No edit link: the preview shows the page a reader gets, and a link into
-    // the editor from inside the editor helps nobody.
-    const { html, layout, includes } = await pageHtml(page, { origin: siteOrigin(req), draft, through });
     // If this page's folder has a collection, anything wrong with it comes
     // back here: a slug that collides with a page, or a file that won't parse.
     // Failures speak, and the editor is where the person who can fix it is.
     const problems = await collectionProblems(pages, folderOf(path));
+    // An each: page previews as the page its first item gets, drawn from the
+    // unsaved source: what you are writing is every item page at once.
+    let shown = page;
+    let item: ItemContext | undefined;
+    if (page.meta.each) {
+      const collection = await loadCollection(pages, folderOf(path));
+      const first = collection?.items[0];
+      if (first) {
+        item = { collection: { ...collection!, each: { key: path, meta: page.meta, content: page.content } }, item: first };
+        shown = itemPage(item);
+      } else {
+        problems.push(collection ? "this collection has no items yet" : `there is no collection.json beside ${path}`);
+      }
+    }
+    // No edit link: the preview shows the page a reader gets, and a link into
+    // the editor from inside the editor helps nobody.
+    const { html, layout, includes } = await pageHtml(shown, { origin: siteOrigin(req), draft, through, item });
     return Response.json({ html, layout, includes, meta: page.meta, problems });
   },
 };

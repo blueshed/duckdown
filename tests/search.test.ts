@@ -247,6 +247,7 @@ describe("collections in the index", () => {
   const site = () => memory({
     "index.md": "title: Home\naliases: /front\n\n# Home",
     "works/index.md": "title: Works\n\n# Works",
+    "works/item.md": "each: works\n\n{{item-caption}}",
     "works/collection.json": JSON.stringify({
       groups: [{
         name: "1960",

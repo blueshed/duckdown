@@ -131,7 +131,8 @@ export async function exportSite(o: {
       const folder = key.slice(0, Math.max(key.length - COLLECTION_FILE.length - 1, 0));
       problems.push(...await collectionProblems(pages, folder));
       const collection = (await loadCollection(pages, folder))!;
-      for (const item of collection.items) {
+      // No each: page, no item pages: the data is shown only by its overviews.
+      for (const item of collection.each ? collection.items : []) {
         const { html } = await pageHtml(itemPage({ collection, item }), { origin, editHref: "", item: { collection, item } });
         rendered.set(outPath(item.key), html);
         for (const alias of item.aliases) moved.push({ from: alias, to: item.href });
@@ -140,6 +141,7 @@ export async function exportSite(o: {
     }
     if (!key.endsWith(".md")) continue;   // pages/ holds pages
     const page = parsePage(key, await pages.read(key));
+    if (page.meta.each) continue;   // written as its items, above
     if (yes(page.meta.draft)) { count.drafts++; continue; }
     // No edit link: there is no editor behind a folder of files.
     const { html } = await pageHtml(page, { origin, editHref: "" });

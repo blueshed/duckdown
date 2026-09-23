@@ -52,7 +52,7 @@ async function folderEntries(pages: Storage, folder: string): Promise<Listed[]> 
   for (const file of files) {
     if (!file.name.endsWith(".md") || file.name === "index.md" || file.name.startsWith("-") || file.path.replace(/^\//, "") === NOT_FOUND) continue;
     const { meta } = parseFrontMatter(await pages.read(file.path.replace(/^\//, "")));
-    if (yes(meta.draft)) continue;
+    if (yes(meta.draft) || meta.each) continue;   // an each: page is its items, not a page
     entries.push({
       href: encodeURI(`/${file.path.replace(/\.md$/, ".html").replace(/^\//, "")}`),
       title: meta.title?.[0] ?? file.name.replace(/\.md$/, ""),

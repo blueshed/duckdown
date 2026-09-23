@@ -6,6 +6,7 @@ import {
   SLUG, slugify, fragmentId, aliasKey, parseCollection, parseArgs,
   itemsHtml, groupsHtml, neighbour, itemValue, fillCollections, sortValues,
   loadCollection, collectionsChanged, collectionPath, collisions, collectionProblems, itemAt,
+  fillItem, itemMeta, itemBody,
 } from "../server/collection";
 import { thumbName } from "../server/images";
 
@@ -36,6 +37,10 @@ const json = (value: unknown) => JSON.stringify(value);
 
 const group = (name: string, items: unknown[], extra: Record<string, unknown> = {}) =>
   ({ name, items, ...extra });
+
+// A collection whose items have pages: an each: page beside it.
+const EACH = { key: "works/item.md", meta: {}, content: "" };
+const paged = <T extends { each: unknown }>(collection: T): T => Object.assign(collection, { each: EACH });
 
 const titled = (...titles: string[]) =>
   parseCollection("works", json({ groups: [group("all", titles.map((title) => ({ title })))] }));
@@ -208,7 +213,7 @@ describe("parseCollection", () => {
     const collection = parseCollection("works", json({
       layout: 7, labels: "no", groups: [group("all", ["not an object", { title: "Anna", aliases: "not a list" }]), "nope"],
     }));
-    expect(collection.layout).toBe("item");
+    expect(collection.layout).toBe("");                           // not a name: no layout
     expect(collection.labels).toEqual({});
     expect(collection.items).toHaveLength(1);
     expect(collection.items[0]!.aliases).toEqual([]);
@@ -229,7 +234,7 @@ describe("parseCollection", () => {
 });
 
 describe("itemsHtml", () => {
-  const site = () => parseCollection("works", json({
+  const site = () => paged(parseCollection("works", json({
     labels: { index: { "1967": "California" } },
     groups: [
       group("1960", [{ title: "Battersea", src: "b.jpg", index: "1962" }], {
@@ -238,7 +243,7 @@ describe("itemsHtml", () => {
       }),
       group("prints", [{ title: "Rushes", src: "r.jpg", index: "skip" }]),
     ],
-  }));
+  })));
 
   test("the groups in order, each a grid of thumbnails linking to the item pages", () => {
     const html = itemsHtml(site());
@@ -285,12 +290,12 @@ describe("itemsHtml", () => {
 });
 
 describe("groupsHtml", () => {
-  const site = () => parseCollection("works", json({
+  const site = () => paged(parseCollection("works", json({
     groups: [
       group("1960", [{ title: "Battersea" }], { groups: [group("London", [{ title: "Take Five" }])] }),
       group("prints", [{ title: "Rushes" }]),
     ],
-  }));
+  })));
 
   test("each group links to its first item, and the one being read is marked", () => {
     const collection = site();
@@ -442,6 +447,7 @@ describe("loadCollection", () => {
 describe("itemAt", () => {
   const pages = () => memory({
     "works/collection.json": json({ groups: [group("all", [{ title: "Battersea" }])] }),
+    "works/item.md": "each: works",
   });
 
   test("the folder and the slug the address names, and nothing like them", async () => {
@@ -490,5 +496,144 @@ describe("collisions", () => {
     } finally {
       log.mockRestore();
     }
+  });
+});
+
+// n100: the data says what an item is made of; pages say how it is shown.
+describe("fields", () => {
+  test("declared once: a name, a kind, a label — a bare name is a text field", () => {
+    const collection = parseCollection("works", json({
+      fields: ["title", { name: "picture", kind: "image", label: "Picture" }, { name: "caption", kind: "long" }],
+      groups: [group("all", [{ title: "Anna", picture: "anna.jpg" }])],
+    }));
+    expect(collection.declared).toBe(true);
+    expect(collection.fields).toEqual([
+      { name: "title", kind: "text", label: "title" },
+      { name: "picture", kind: "image", label: "Picture" },
+      { name: "caption", kind: "long", label: "caption" },
+    ]);
+    // The image field is the picture, whatever it is called.
+    expect(collection.image).toBe("picture");
+    expect(collection.items[0]!.thumb).toBe("/static/images/anna_tn.jpg");
+    expect(itemValue("item-picture", { collection, item: collection.items[0]! })).toBe("/static/images/anna.jpg");
+    expect(collection.problems).toEqual([]);
+  });
+
+  test("a declaration that doesn't hold together is said, field by field", () => {
+    const said = (fields: unknown) => parseCollection("works", json({ fields, groups: [] })).problems;
+    expect(said("title")[0]).toContain('"fields" should be a list');
+    expect(said([{ kind: "text" }, "a b", "x", "x"])).toHaveLength(3);                   // no name, not a name, twice
+    expect(said([{ name: "year", kind: "date" }])[0]).toContain('kind "date"');
+    expect(said([{ name: "a", kind: "image" }, { name: "b", kind: "image" }])[0]).toContain("second image field");
+  });
+
+  test("a key the items use and the file doesn't declare is said once, counted", () => {
+    const collection = parseCollection("works", json({
+      fields: ["title"],
+      groups: [group("all", [{ title: "A", year: "1961", slug: "a", aliases: ["/a"] }, { title: "B", year: "1962" }])],
+    }));
+    expect(collection.problems).toEqual(['works/collection.json: 2 item(s) say "year", which isn\'t one of the fields — declare it, or take it out']);
+  });
+
+  test("undeclared (0.4), the fields are read off the items, src the picture", () => {
+    const collection = parseCollection("works", json({ groups: [group("all", [{ title: "A", src: "a.jpg" }, { title: "B", year: "1" }])] }));
+    expect(collection.declared).toBe(false);
+    expect(collection.fields.map((f) => `${f.name}:${f.kind}`)).toEqual(["title:text", "src:image", "year:text"]);
+  });
+
+  test("asking for a field that isn't declared is a typo, said once in the log", () => {
+    const warn = spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      collectionsChanged();
+      const collection = paged(parseCollection("works", json({ fields: ["title", "year"], groups: [group("all", [{ title: "A" }])] })));
+      const context = { collection, item: collection.items[0]! };
+      expect(itemValue("item-yaer", context)).toBe("");
+      expect(itemValue("item-yaer", context)).toBe("");
+      expect(itemValue("item-year", context)).toBe("");     // declared, just unset: nothing to say
+      expect(itemValue("item-slug", context)).toBe("a");    // built in
+      expect(itemsHtml(collection, "yaer")).toBe("");
+      expect(itemsHtml(collection, "year")).toBe("");
+      expect(warn.mock.calls.map((c) => c[0])).toEqual([
+        '{{item-yaer}}: works/collection.json has no field "yaer"',
+        '{{items by=yaer}}: works/collection.json has no field "yaer"',
+      ]);
+    } finally {
+      warn.mockRestore();
+      collectionsChanged();
+    }
+  });
+});
+
+describe("each: pages", () => {
+  const data = json({ fields: ["title", "caption"], groups: [group("all", [{ title: "Anna", caption: "Ink" }, { title: "Bea" }])] });
+
+  test("the page beside the data is the page every item gets, rendered once", async () => {
+    const collection = (await loadCollection(memory({
+      "works/collection.json": data,
+      "works/index.md": "title: Works",
+      "works/item.md": "each: works\nlayout: work\ntitle: {{item-title}} — {{group}}\n\n*{{item-caption}}*",
+    }), "works", true))!;
+    expect(collection.each!.key).toBe("works/item.md");
+    expect(collection.each!.meta.layout).toEqual(["work"]);
+    const context = { collection, item: collection.items[0]! };
+    expect(itemBody(context)).toContain("<em>Ink</em>");
+    expect(itemMeta(context).title).toEqual(["Anna — all"]);
+    expect(itemMeta(context).description).toEqual(["Ink"]);                    // the caption, unsaid
+  });
+
+  test("an each: page names its own folder's collection, and there is one", async () => {
+    const collection = (await loadCollection(memory({
+      "works/collection.json": data,
+      "works/a.md": "each: /works/",
+      "works/b.md": "each: works",
+      "works/c.md": "each: prints",
+    }), "works", true))!;
+    expect(collection.each!.key).toBe("works/a.md");
+    expect(collection.problems.join("\n")).toContain("works/c.md says each: prints");
+    expect(collection.problems.join("\n")).toContain("works/a.md and works/b.md are each: pages");
+  });
+
+  test("no each: page, no item pages: the overview shows the works unlinked", async () => {
+    const store = memory({ "works/collection.json": data });
+    const collection = (await loadCollection(store, "works", true))!;
+    expect(collection.each).toBeNull();
+    expect(await itemAt(store, "works/anna", true)).toBeNull();
+    expect(itemsHtml(collection)).toContain('<span class="item">');
+    expect(itemsHtml(collection)).not.toContain("href");
+    expect(groupsHtml(collection)).toContain("<span>all</span>");
+  });
+
+  test("0.4's layout in the data still works, as an each: page of nothing, and says it is going", async () => {
+    const warn = spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      collectionsChanged();
+      const store = memory({ "works/collection.json": json({ layout: "item", groups: [group("all", [{ title: "Anna" }])] }) });
+      await loadCollection(store, "works", true);
+      const collection = (await loadCollection(store, "works", true))!;
+      expect(collection.each).toEqual({ key: "", meta: { layout: ["item"] }, content: "" });
+      expect(itemMeta({ collection, item: collection.items[0]! }).title).toEqual(["Anna"]);
+      expect(warn.mock.calls.map((c) => c[0])).toEqual([
+        'works/collection.json: "layout" in the data is going — write an each: page instead (works/item.md, saying "each: works" and "layout: item")',
+        'works/collection.json: no "fields" — read off the items; declare them',
+      ]);
+    } finally {
+      warn.mockRestore();
+      collectionsChanged();
+    }
+  });
+
+  test("the each: page's own name is not an item's collision", async () => {
+    const store = memory({ "works/collection.json": data, "works/anna.md": "each: works" });
+    expect(await collectionProblems(store, "works", true)).toEqual([]);
+  });
+
+  test("placeholders fill in a body too, and markdown's encoded ones in a link", () => {
+    const collection = paged(parseCollection("works", data));
+    const context = { collection, item: collection.items[0]! };
+    expect(fillItem('<a href="/works/#%7B%7Bitem-title%7D%7D">{{item-title}}</a>{{next}}', context))
+      .toBe('<a href="/works/#Anna">Anna</a><a class="next" rel="next" href="/works/bea/">Bea</a>');
+    expect(fillItem("{{item-title}}")).toBe("");
+    collection.each = { key: "works/item.md", meta: {}, content: "<p>{{item-title}}</p><code>{{item-title}}</code>" };
+    expect(itemBody(context)).toBe("<p>Anna</p><code>{{item-title}}</code>");
   });
 });

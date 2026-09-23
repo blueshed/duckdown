@@ -1,5 +1,10 @@
 {
-  "layout": "item",
+  "fields": [
+    { "name": "src", "kind": "image", "label": "Picture" },
+    { "name": "title", "label": "Title" },
+    { "name": "caption", "kind": "long", "label": "Caption" },
+    { "name": "year", "label": "Year" }
+  ],
   "images": { "src": "/static/images/gallery/", "suffix": "_tn" },
   "labels": { "year": { "1961": "Early work" } },
   "groups": [

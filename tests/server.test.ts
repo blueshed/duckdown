@@ -1128,6 +1128,27 @@ describe("a collection's items are pages", () => {
     expect(html).toContain('href="/by-year.html#"');
   });
 
+  test("the each: page is what the items are made of, not a page: its address is a miss", async () => {
+    for (const path of ["/gallery/item", "/gallery/item.html"]) {
+      expect((await fetch(`${BASE}${path}`)).status).toBe(404);
+    }
+    expect(await (await fetch(`${BASE}/gallery/`)).text()).not.toContain('href="/gallery/item.html"');
+  });
+
+  test("the preview of an each: page is its first item's page, from the unsaved source", async () => {
+    const mark = (source: string, path: string) =>
+      fetch(`${BASE}/edit/mark/?path=${encodeURIComponent(path)}`,
+        authed({ method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ source }) }));
+    const data = await (await mark("each: gallery\nlayout: item\ntitle: Work: {{item-title}}\n\nMade {{item-year}}.", "gallery/item.md")).json();
+    expect(data.html).toContain("<title>Work: First Light</title>");
+    expect(data.html).toContain("<p>Made 1961.</p>");
+    expect(data.layout).toBe("item.html");
+    expect(data.problems).toEqual([]);
+    // Nothing to fill it from is said, not shown as an empty page.
+    const lonely = await (await mark("each: blog\n\n{{item-title}}", "blog/item.md")).json();
+    expect(lonely.problems).toEqual(["there is no collection.json beside blog/item.md"]);
+  });
+
   test("an unknown item is a 404, never the nearest thing to it", async () => {
     // The whole point of looking an item up by folder and slug: a miss is a
     // miss. A fallback here is how a gallery serves the wrong painting with a
