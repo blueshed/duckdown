@@ -90,6 +90,9 @@ same code, so you can change your mind.
 - Client-side search: one JSON index, matched in the browser — no service, no
   dependency, and it works on a published site
 - Image browser with upload
+- **Collections**: a gallery or catalogue kept as data in one file, with a page
+  per item and as many overviews as you like, all written once in markdown —
+  and edited as works in the editor, not as JSON
 - Navigation generated from `index.md` files, and folder listings that keep themselves
 - JWT authentication
 - A view log that counts readers without identifying them — no IP, no user

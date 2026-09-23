@@ -57,6 +57,17 @@ This is the feature map. Bugs and tasks live in `todo.jsonl`.
 - [ ] Maths and highlighted code: not built in — add KaTeX or highlight.js to your template (todo 27)
 - [ ] Emoji support (twemoji)
 
+### Collections
+- [x] `collection.json`: the data — declared `fields`, `images`, `labels`, groups of items
+- [x] An each: page (`each: <folder>`) is the page every item gets, at `/<folder>/<slug>/`
+- [x] Overviews: `{{items}}`, `by=<field>`, `sort=asc|desc`, `template=<name>`, `{{groups}}`; `collection:` names the collection
+- [x] Clean slugs; a miss is a 404, never a nearest match
+- [x] `aliases` on items and pages: a 301, and a redirect page in the export
+- [x] Items in search, the sitemap and the export
+- [x] Pictures outside the site (a bucket, a CDN), thumbnails named by a rule
+- [x] Editor: start one, edit its fields as works, upload pictures with thumbnails, renaming keeps the old address
+- [ ] The 0.4 shape (`layout` in the data, no `fields`): still read, with a warning — remove in the release after 0.5
+
 ### Auth
 - [x] Login page (`GET/POST /login`) — HTML file + HTMLRewriter
 - [x] Signing in lands in the editor (`/edit`), or on `next`

@@ -1,5 +1,5 @@
 title: Collections
-description: One file describes a folder of items — a gallery, a catalogue, a discography — and duckdown gives each one a page.
+description: A folder of items — a gallery, a catalogue, a discography — kept as data in one file, and shown by pages you write once.
 toc: true
 
 # Collections

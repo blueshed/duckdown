@@ -614,7 +614,7 @@ A page's `layout:` chooses the template (`layout: post` → `templates/post.html
 ## The editor
 
 - At `/edit`. Signing in lands there; `/login` when already signed in goes straight there; the home page's "Login to edit" link does the same.
-- **The tree** (left): the site's folders and pages, and nothing else — everything a page is composed with lives outside `pages/`. Click to open, `..` to go up. A folder's `collection.json` is listed there too, with a grid icon, and opens as the collection pane rather than as JSON. Two buttons in the header make a **new page** and a **new folder** (`folder/index.md`, titled with the folder's name). Neither ever overwrites — each says when a name is taken.
+- **The tree** (left): the site's folders and pages, and nothing else — everything a page is composed with lives outside `pages/`. Click to open, `..` to go up. A folder's `collection.json` is listed there too, with a grid icon, and opens as the collection pane rather than as JSON. Three buttons in the header make a **new page**, a **new folder** (`folder/index.md`, titled with the folder's name) and a **new collection** (see [Editing one in the editor](#editing-one-in-the-editor)). None ever overwrites — each says when a name is taken.
 - **Editing** (middle): Save or ⌘⏎. The button lights up while there are unsaved changes, flashes green for "Saved", and red for "Not saved" (the notice says why). The bin deletes the page, after asking.
 - **Resources** (right sidebar, from the header): what a page is composed with, in three tabs.
   - *images* — browse and upload, and copy a markdown link for one.
@@ -627,7 +627,7 @@ A page's `layout:` chooses the template (`layout: post` → `templates/post.html
 - **With no page open**, whatever you're composing with gets a sample page of its own: for a stylesheet, a bit of everything `site.css` styles; for a template, a sample page put through it, with the site's real navigation. So a template or a stylesheet can be written with nothing else on screen.
 - **Header**: *Resources* (the sidebar), *View* (the page on the site), *Logout*.
 - **Deleting always asks first**, wherever it is — a page, a stylesheet, a template, a work in a collection. **There is no undo in duckdown**: asking is the whole of the safety net, and what is gone is gone. On S3, turn on the bucket's versioning; on disk, keep the site in git.
-- Anything that fails shows in a red notice at the foot of the screen until dismissed.
+- Anything that fails shows in a red notice at the foot of the screen until dismissed; news that isn't a failure (a renamed work keeping its old address) shows there in the accent colour.
 
 ## Search
 
@@ -711,7 +711,9 @@ invent a deployment step that isn't written down.
 | A folder's page isn't found | Give the folder an `index.md`: `/blog` is served by `pages/blog/index.md` |
 | An item of a collection is "not found" | Its slug isn't what you think: it comes from the title, cleaned to `[a-z0-9-]`. Open `{{items}}` and follow the link, or give the item a `slug` |
 | An item's page is a page you wrote | A page in that folder has the same address, and a page always wins. Duckdown names the item in the preview and in `bun run export` |
-| `{{items}}` shows nothing | No `collection.json` in that folder (the server log says so), or every item's field is `skip` |
+| `{{items}}` shows nothing | No `collection.json` in that folder (the server log says so) — on a page elsewhere, say `collection: <folder>` — or every item's field is `skip` |
+| The thumbnails aren't links, and every item is "not found" | The collection has no each: page: a page in its folder saying `each: <folder>` |
+| `{{item-year}}` is empty on every item | The field isn't declared, or is spelt differently — the log names it |
 | A `[[wiki link]]` goes to the wrong place | It's relative to the page's folder: start it with `/` to go from the top |
 | Nobody can sign in | `users.json` needs hashes, not passwords; or it's missing (see the server log) |
 | Edits don't show on the running site (duckdown repo) | The site runs from `.dev-site`, not the seed `tests/example` |

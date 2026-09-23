@@ -2,6 +2,43 @@
 
 ## Unreleased
 
+- **Collections are data and pages, kept apart.** `collection.json` is the
+  data only: it declares its `fields` (`name`, `kind` — text, long, image,
+  number — and a `label`) and lists the items, and duckdown says when an item
+  uses a key the fields don't declare. How it is shown is markdown, like
+  every other page:
+  - **An each: page** beside it — `item.md` saying `each: <folder>` and
+    `layout: <template>` — is the page every item gets at `/<folder>/<slug>/`.
+    Its body, `title:` and `description:` take `{{item-<field>}}`, `{{prev}}`,
+    `{{next}}`, `{{group}}`; it is never a page itself; the editor previews it
+    as the first item. No each: page, no item pages.
+  - **An overview** is any page with `{{items}}`. `collection: <name>` in its
+    front matter says which collection a bare tag means, and
+    `{{items template=<name>}}` draws each item with `templates/<name>.html` —
+    the overview's counterpart of the each: page's `layout:`.
+
+  A second way of showing the works is a second page, never a change to the
+  data. **Upgrading from 0.4:** move `"layout"` out of `collection.json` into
+  an each: page (`each: <folder>`, `layout: <that template>`) and declare the
+  fields. Until you do, a 0.4 file still renders exactly as before and the log
+  says so once; that goes in the release after this one.
+
+- **Start a collection from the editor.** A grid icon in the tree's header
+  asks for a folder name and writes the data (picture, title and caption
+  fields), an each: page and, if the folder has none, an `index.md` with
+  `{{items}}` — then opens it with the pane below, ready for pictures.
+
+- **The pane is a form of the declared fields**: one input per field, its label
+  the placeholder, a box for a `long` one; a picture goes into whichever field
+  is the `image`. A file with no `fields` gets title and caption, as before.
+
+- **Renaming a work keeps its old address.** A work's slug comes from its
+  title, so renaming it moves its page; the pane now adds the old address to
+  the work's `aliases` (a 301 to the new one) and says so. Only an address the
+  file had when the pane opened it — a work added in the same sitting was
+  never published — and renaming back takes it out again. The slug rule is one
+  module (`server/slugs.ts`) that the server and the editor both read.
+
 - **The editor edits a collection.** A folder's `collection.json` is in the
   tree beside its pages now, with a grid icon, and opening a folder's index
   page brings its collection up beneath it: groups of pictures with a title
