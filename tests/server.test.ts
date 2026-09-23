@@ -1161,13 +1161,13 @@ describe("a collection's items are pages", () => {
     const mark = (source: string, path: string) =>
       fetch(`${BASE}/edit/mark/?path=${encodeURIComponent(path)}`,
         authed({ method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ source }) }));
-    const data = await (await mark("each: gallery\nlayout: item\ntitle: Work: {{item-title}}\n\nMade {{item-year}}.", "gallery/item.md")).json();
+    const data = await (await mark("each: true\nlayout: item\ntitle: Work: {{item-title}}\n\nMade {{item-year}}.", "gallery/item.md")).json();
     expect(data.html).toContain("<title>Work: First Light</title>");
     expect(data.html).toContain("<p>Made 1961.</p>");
     expect(data.layout).toBe("item.html");
     expect(data.problems).toEqual([]);
     // Nothing to fill it from is said, not shown as an empty page.
-    const lonely = await (await mark("each: blog\n\n{{item-title}}", "blog/item.md")).json();
+    const lonely = await (await mark("each: true\n\n{{item-title}}", "blog/item.md")).json();
     expect(lonely.problems).toEqual(["there is no collection.json beside blog/item.md"]);
   });
 

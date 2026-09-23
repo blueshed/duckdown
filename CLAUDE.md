@@ -319,7 +319,7 @@ The data is `pages/<folder>/collection.json`: declared `fields` (`{name, kind,
 label}`, kinds `text`/`long`/`image`/`number`, one `image` field — the picture)
 and groups (and subgroups) of items; an item key the fields don't declare is a
 problem. The presentation is markdown: the **each: page** in the same folder
-(any `.md` but `index.md` whose front matter says `each: <folder>`) is the page
+(any `.md` but `index.md` whose front matter says `each: true`) is the page
 every item gets at `/<folder>/<slug>/` — found by `eachPageIn()` when the
 collection loads, rendered once and kept on `Collection.each`, never served,
 listed or searched as a page itself — and any page with `{{items}}` is an

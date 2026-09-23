@@ -7,7 +7,7 @@
   number — and a `label`) and lists the items, and duckdown says when an item
   uses a key the fields don't declare. How it is shown is markdown, like
   every other page:
-  - **An each: page** beside it — `item.md` saying `each: <folder>` and
+  - **An each: page** beside it — `item.md` saying `each: true` and
     `layout: <template>` — is the page every item gets at `/<folder>/<slug>/`.
     Its body, `title:` and `description:` take `{{item-<field>}}`, `{{prev}}`,
     `{{next}}`, `{{group}}`; it is never a page itself; the editor previews it
@@ -19,7 +19,7 @@
 
   A second way of showing the works is a second page, never a change to the
   data. **Upgrading from 0.4:** move `"layout"` out of `collection.json` into
-  an each: page (`each: <folder>`, `layout: <that template>`) and declare the
+  an each: page (`each: true`, `layout: <that template>`) and declare the
   fields. Until you do, a 0.4 file still renders exactly as before and the log
   says so once; that goes in the release after this one.
 

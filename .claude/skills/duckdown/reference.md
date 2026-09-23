@@ -70,7 +70,7 @@
 | `order` | In a folder's `index.md` only: a whole number, for where that folder sits among its siblings in the navigation and `{{sitemap}}` |
 | `draft` | `true` keeps the page off the site, the nav and listings; signed in to the editor, you still see it |
 | `aliases` | An address this page used to answer at; a request for it is a 301 to this page. Repeat the line for more than one |
-| `each` | This page is the page every item of a collection gets, not a page of its own: `each: gallery` beside `gallery/collection.json` (see Collections) |
+| `each` | This page is the page every item of a collection gets, not a page of its own: `each: true` in a folder that has a `collection.json` (see Collections) |
 | `collection` | The collection a bare `{{items}}` or `{{groups}}` on this page means, when it isn't the page's own folder's: `collection: gallery` |
 
 - A plain block may hold **only those keys**, or one starting `x-` (your own). At the first line that isn't one, the block ends and everything from there is content — so prose opening `Update: closed on Monday` keeps its first line, and a mistyped key appears on the page instead of vanishing.
@@ -203,6 +203,58 @@ works, a catalogue, a discography. A **collection** is two things, kept apart:
 Every item with a page also gets an entry in search and the sitemap and a file
 in the export.
 
+**Making one** is three files in the folder — write them in this order:
+
+```text
+pages/works/collection.json   the data: fields, then groups of items
+pages/works/item.md           each: true  — the page every item gets
+pages/works/index.md          {{items}}   — the overview
+```
+
+```json
+{
+  "fields": [
+    { "name": "src", "kind": "image" },
+    { "name": "title" },
+    { "name": "caption", "kind": "long" }
+  ],
+  "images": "/static/images/works/",
+  "groups": [
+    { "name": "Paintings", "items": [
+      { "src": "battersea.jpg", "title": "Battersea", "caption": "Wax crayon on paper, 1961." }
+    ] }
+  ]
+}
+```
+
+```markdown
+each: true
+title: {{item-title}}
+
+<figure>
+  <img src="{{item-src}}" alt="{{item-title}}">
+  <figcaption>{{item-caption}}</figcaption>
+</figure>
+
+{{prev}} {{next}}
+```
+
+```markdown
+title: Works
+
+# Works
+
+{{items}}
+```
+
+Then check it: `bun run export` names everything wrong with the file — a key
+the fields don't declare, a slug that collides with a page, an each: page that
+isn't in the collection's folder — and `--strict` fails on them. An
+`{{item-…}}` or `by=` naming a field that isn't declared is said in the log as
+the page renders.
+The thumbnails are `battersea_tn.jpg` beside the originals unless `images` says
+otherwise (see Pictures).
+
 ```json
 {
   "fields": [
@@ -299,12 +351,12 @@ rather than a link to a folder.
 
 ### The item page: an each: page
 
-`pages/gallery/item.md` (any name but `index.md`) says `each:` and the
-collection — which is its own folder's: an item lives at its folder and its
+`pages/gallery/item.md` (any name but `index.md`) says `each: true`, and
+serves the collection in its own folder: an item lives at its folder and its
 slug, so the each: page sits beside the data. A folder has one.
 
 ```markdown
-each: gallery
+each: true
 layout: item
 title: {{item-title}}
 
@@ -712,7 +764,7 @@ invent a deployment step that isn't written down.
 | An item of a collection is "not found" | Its slug isn't what you think: it comes from the title, cleaned to `[a-z0-9-]`. Open `{{items}}` and follow the link, or give the item a `slug` |
 | An item's page is a page you wrote | A page in that folder has the same address, and a page always wins. Duckdown names the item in the preview and in `bun run export` |
 | `{{items}}` shows nothing | No `collection.json` in that folder (the server log says so) — on a page elsewhere, say `collection: <folder>` — or every item's field is `skip` |
-| The thumbnails aren't links, and every item is "not found" | The collection has no each: page: a page in its folder saying `each: <folder>` |
+| The thumbnails aren't links, and every item is "not found" | The collection has no each: page: a page in its folder saying `each: true` |
 | `{{item-year}}` is empty on every item | The field isn't declared, or is spelt differently — the log names it |
 | A `[[wiki link]]` goes to the wrong place | It's relative to the page's folder: start it with `/` to go from the top |
 | Nobody can sign in | `users.json` needs hashes, not passwords; or it's missing (see the server log) |

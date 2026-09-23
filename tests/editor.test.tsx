@@ -646,7 +646,7 @@ describe("Browser", () => {
       groups: [{ name: FOLDER, items: [] }],
     });
     expect(data).toStartWith('{\n  "fields": [');   // written the way the pane writes it
-    expect(await read("item.md")).toStartWith(`each: ${FOLDER}\n`);
+    expect(await read("item.md")).toStartWith("each: true\n");
 
     // Two works in it, and each is a page with its picture, title, caption
     // and the way to the next — the each: page doing its job.
@@ -696,7 +696,7 @@ describe("createCollection", () => {
 
     expect(await createCollection("", "/.made/")).toBeUndefined();
     expect(notice.get()).toBe(`.made/item.md was already a page, so .made's works have no pages of their own yet — `
-      + `give one page in .made the line "each: .made"`);
+      + `give one page in .made the line "each: true"`);
     expect(await read(".made/index.md")).toBe("title: Mine\n");
     expect(await read(".made/item.md")).toBe("title: Not an each: page\n");
     expect(filePath.get()).toBe(".made/index.md");
@@ -709,7 +709,7 @@ describe("createCollection", () => {
     const data = JSON.parse(await read(".made/Old%20Shots/collection.json"));
     expect(data.images.src).toBe("/static/images/.made/Old%20Shots/");
     expect(data.groups[0].name).toBe("Old Shots");
-    expect(await read(".made/Old%20Shots/item.md")).toStartWith("each: .made/Old Shots\n");
+    expect(await read(".made/Old%20Shots/item.md")).toStartWith("each: true\n");
     expect(collection.get()).toEqual({ folder: ".made/Old Shots" });
   });
 

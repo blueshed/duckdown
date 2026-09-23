@@ -59,7 +59,7 @@ This is the feature map. Bugs and tasks live in `todo.jsonl`.
 
 ### Collections
 - [x] `collection.json`: the data — declared `fields`, `images`, `labels`, groups of items
-- [x] An each: page (`each: <folder>`) is the page every item gets, at `/<folder>/<slug>/`
+- [x] An each: page (`each: true`) is the page every item gets, at `/<folder>/<slug>/`
 - [x] Overviews: `{{items}}`, `by=<field>`, `sort=asc|desc`, `template=<name>`, `{{groups}}`; `collection:` names the collection
 - [x] Clean slugs; a miss is a 404, never a nearest match
 - [x] `aliases` on items and pages: a 301, and a redirect page in the export

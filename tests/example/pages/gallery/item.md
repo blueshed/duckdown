@@ -1,4 +1,4 @@
-each: gallery
+each: true
 layout: item
 
 <figure class="work">

@@ -10,7 +10,7 @@ export { SLUG, slugify, aliasKey } from "./slugs";
 // A collection is a folder of pages duckdown writes for you. The DATA is
 // `collection.json`: the fields every item has, and groups of items. The
 // PRESENTATION is pages, like everything else: an `each:` page beside it
-// (works/item.md, `each: works`) is the page every item gets, at
+// (works/item.md, `each: true`) is the page every item gets, at
 // /<folder>/<slug>/, and any page with {{items}} is an overview. It is for the
 // site that has four hundred paintings and no wish to write four hundred
 // markdown files, each the same but for a filename and a caption — and that
@@ -299,9 +299,12 @@ async function eachPageIn(pages: Storage, collection: Collection): Promise<EachP
     const source = await pages.read(key);
     const { meta } = parseFrontMatter(source);
     if (!meta.each) continue;
-    const named = meta.each[0]!.replace(/^\/+|\/+$/g, "");
-    if (named !== folder) {
-      problems.push(`${key} says each: ${meta.each[0]}, but an each: page makes pages for the collection in its own folder — ${folder || "/"}`);
+    // `each: true` — its folder is its collection, so there is nothing to
+    // name. The folder's own name is taken too; anything else is a page that
+    // thinks it can serve another folder's works, and is told it can't.
+    const said = meta.each[0]!.replace(/^\/+|\/+$/g, "");
+    if (!["true", "yes", "", folder].includes(said)) {
+      problems.push(`${key} says each: ${meta.each[0]} — an each: page makes pages for the collection in its own folder; write each: true`);
       continue;
     }
     found.push({ key, meta, source });
@@ -315,7 +318,7 @@ async function eachPageIn(pages: Storage, collection: Collection): Promise<EachP
   // as an each: page with nothing in it but that layout.
   if (collection.layout) {
     warnOnce(`${collectionPath(folder)}: "layout" in the data is going — write an each: page instead `
-      + `(${folder ? `${folder}/` : ""}item.md, saying "each: ${folder || "/"}" and "layout: ${collection.layout}")`);
+      + `(${folder ? `${folder}/` : ""}item.md, saying "each: true" and "layout: ${collection.layout}")`);
     return { key: "", meta: { layout: [collection.layout] }, content: "" };
   }
   return null;

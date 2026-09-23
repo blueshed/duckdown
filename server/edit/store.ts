@@ -209,9 +209,11 @@ const FIELDS = [
   { name: "caption", kind: "long", label: "Caption" },
 ];
 
-const eachPage = (folder: string) => `each: ${folder}
+// The heading is HTML rather than "# …": markdown would give every item's
+// heading the same id, made from the placeholder rather than the title.
+const eachPage = () => `each: true
 
-# {{item-title}}
+<h1>{{item-title}}</h1>
 
 ![{{item-title}}]({{item-src}})
 
@@ -239,9 +241,9 @@ export async function createCollection(parent: string, name: string): Promise<st
   // Failures speak: without an each: page the works are shown but have no
   // pages, and the one person who can see why is the one who just made it.
   const item = `${folder}/item.md`;
-  if ((await create(item, eachPage(folder))).status === 412) {
+  if ((await create(item, eachPage())).status === 412) {
     speak(`${item} was already a page, so ${folder}'s works have no pages of their own yet — `
-      + `give one page in ${folder} the line "each: ${folder}"`);
+      + `give one page in ${folder} the line "each: true"`);
   }
   await create(`${folder}/index.md`, `title: ${own}\n\n{{items}}\n`);
   reloadBrowser();

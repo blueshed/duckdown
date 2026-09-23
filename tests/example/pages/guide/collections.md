@@ -170,11 +170,11 @@ fence they're printed as written, which is how this page shows them.
 
 ## The item page
 
-`pages/gallery/item.md` is the page every work gets. It says `each:` and the
-collection — its own folder's — and the rest is an ordinary page:
+`pages/gallery/item.md` is the page every work gets. It says `each: true` —
+it serves the collection in its own folder — and the rest is an ordinary page:
 
 ```markdown
-each: gallery
+each: true
 layout: item
 
 <figure class="work">

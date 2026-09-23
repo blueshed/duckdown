@@ -465,7 +465,7 @@ describe("loadCollection", () => {
 describe("itemAt", () => {
   const pages = () => memory({
     "works/collection.json": json({ groups: [group("all", [{ title: "Battersea" }])] }),
-    "works/item.md": "each: works",
+    "works/item.md": "each: true",
   });
 
   test("the folder and the slug the address names, and nothing like them", async () => {
@@ -589,7 +589,7 @@ describe("each: pages", () => {
     const collection = (await loadCollection(memory({
       "works/collection.json": data,
       "works/index.md": "title: Works",
-      "works/item.md": "each: works\nlayout: work\ntitle: {{item-title}} — {{group}}\n\n*{{item-caption}}*",
+      "works/item.md": "each: true\nlayout: work\ntitle: {{item-title}} — {{group}}\n\n*{{item-caption}}*",
     }), "works", true))!;
     expect(collection.each!.key).toBe("works/item.md");
     expect(collection.each!.meta.layout).toEqual(["work"]);
@@ -599,15 +599,15 @@ describe("each: pages", () => {
     expect(itemMeta(context).description).toEqual(["Ink"]);                    // the caption, unsaid
   });
 
-  test("an each: page names its own folder's collection, and there is one", async () => {
+  test("an each: page serves its own folder's collection, and there is one", async () => {
     const collection = (await loadCollection(memory({
       "works/collection.json": data,
-      "works/a.md": "each: /works/",
-      "works/b.md": "each: works",
-      "works/c.md": "each: prints",
+      "works/a.md": "each: true",
+      "works/b.md": "each: /works/",       // its own folder, named: the same thing
+      "works/c.md": "each: prints",        // another folder's: it can't
     }), "works", true))!;
     expect(collection.each!.key).toBe("works/a.md");
-    expect(collection.problems.join("\n")).toContain("works/c.md says each: prints");
+    expect(collection.problems.join("\n")).toContain("works/c.md says each: prints — an each: page makes pages for the collection in its own folder; write each: true");
     expect(collection.problems.join("\n")).toContain("works/a.md and works/b.md are each: pages");
   });
 
@@ -631,7 +631,7 @@ describe("each: pages", () => {
       expect(collection.each).toEqual({ key: "", meta: { layout: ["item"] }, content: "" });
       expect(itemMeta({ collection, item: collection.items[0]! }).title).toEqual(["Anna"]);
       expect(warn.mock.calls.map((c) => c[0])).toEqual([
-        'works/collection.json: "layout" in the data is going — write an each: page instead (works/item.md, saying "each: works" and "layout: item")',
+        'works/collection.json: "layout" in the data is going — write an each: page instead (works/item.md, saying "each: true" and "layout: item")',
         'works/collection.json: no "fields" — read off the items; declare them',
       ]);
     } finally {
@@ -641,7 +641,7 @@ describe("each: pages", () => {
   });
 
   test("the each: page's own name is not an item's collision", async () => {
-    const store = memory({ "works/collection.json": data, "works/anna.md": "each: works" });
+    const store = memory({ "works/collection.json": data, "works/anna.md": "each: yes" });
     expect(await collectionProblems(store, "works", true)).toEqual([]);
   });
 
