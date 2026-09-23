@@ -357,6 +357,7 @@ A template the item pages wear might carry the rest:
 | `{{items}}` | The collection's groups, each a grid of thumbnails linking to the item pages |
 | `{{items by=<field>}}` | One grid per distinct value of that field, in the order the values first appear |
 | `{{items by=<field> sort=asc}}` (or `desc`) | The same, with the groups ordered by value: years as numbers, the rest as words. Items inside a group keep the file's order |
+| `{{items template=<name>}}` | Each item drawn with `templates/<name>.html` instead of the built-in thumbnail — combines with the rest: `{{items by=year template=tile}}` |
 | `{{items <collection>}}`, `{{items <collection> by=<field>}}` | The same for a collection named in the tag |
 | `{{groups}}`, `{{groups <collection>}}` | The section menu: each group linking to its first item, the current one marked |
 
@@ -370,6 +371,24 @@ collection: works
 
 {{items by=prints sort=asc}}
 ```
+
+**How an item looks in an overview is a template, as how it looks on its own
+page is.** The each: page's `layout:` names the template an item's page wears;
+`template=` names the one an item wears in a grid — `templates/tile.html`,
+filled for each item with the same placeholders:
+
+```html
+<a class="item" href="{{item-href}}">
+  <img class="thumb" src="{{item-thumb}}" alt="{{item-title}}" loading="lazy">
+  <span class="item-title">{{item-title}}</span>
+  <span class="item-caption">{{item-caption}}</span>
+</a>
+```
+
+Duckdown still does the going round — a template never loops — and the groups'
+sections and headings around the items stay its own. Without `template=`, an
+item is that thumbnail and title without the caption. A template that isn't
+there is said in the log and the built-in one stands in.
 
 An item whose field is the string `skip` is left out of `{{items by=…}}`
 altogether — that's how a work stays out of the prints list without leaving the

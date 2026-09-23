@@ -380,7 +380,11 @@ are filled by `fillCollections()`, over the page's body (outside `<code>`, like
 `fillItem()` in the each: page's body and in the template, and in its `title:`
 and `description:` unescaped (`itemText()`). Markdown percent-encodes braces in
 a link's address, so `fillItem()` fills `%7B%7Bitem-x%7D%7D` too. A field a
-page asks for that isn't declared is said once in the log. Templates stay flat:
+page asks for that isn't declared is said once in the log. `{{items
+template=<name>}}` draws each item with `templates/<name>.html` through that
+same `fillItem()` — the overview's counterpart of the each: page's `layout:`;
+`page.ts` supplies the reader (`itemTemplate()`, which honours an unsaved
+draft), because templates are the site's and `collection.ts` only sees pages. Templates stay flat:
 placeholders and generated HTML, never a loop. `SKIP` ("skip") is the one value
 duckdown reads rather than shows — out of `{{items by=…}}`, and empty in
 `{{item-<field>}}` so a template's `href="…#{{item-index}}"` lands at the top.

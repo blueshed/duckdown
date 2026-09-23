@@ -393,6 +393,24 @@ describe("fillCollections", () => {
     expect(await fillCollections("{{nav}}", { pages: pages(), folder: "works" })).toBe("{{nav}}");
   });
 
+  test("template= says how each item looks: a template filled per item, the groups around it as ever", async () => {
+    const template = async (name: string) => (name === "tile" ? '<b id="{{item-slug}}">{{item-title}} ({{item-index}})</b>' : null);
+    const html = await fillCollections("{{items works by=index template=tile}}", { pages: pages(), folder: "", debug: true, template });
+    expect(html).toContain('<section class="group" id="1962">');
+    expect(html).toContain('<div class="items">\n<b id="battersea">Battersea (1962)</b>\n</div>');
+    // A template that isn't there is said, and the built-in thumbnails stand in.
+    const log = spyOn(console, "error").mockImplementation(() => {});
+    try {
+      for (const o of [{ template }, {}]) {
+        const plain = await fillCollections("{{items works template=nope}}", { pages: pages(), folder: "", debug: true, ...o });
+        expect(plain).toContain('class="item"');
+      }
+      expect(log.mock.calls[0]![0]).toBe("{{items works template=nope}}: there is no templates/nope.html — the built-in thumbnails are used");
+    } finally {
+      log.mockRestore();
+    }
+  });
+
   test("a tag naming a folder with no collection is filled as nothing, and says so", async () => {
     const log = spyOn(console, "error").mockImplementation(() => {});
     try {

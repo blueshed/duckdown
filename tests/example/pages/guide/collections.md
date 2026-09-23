@@ -140,6 +140,21 @@ collection: gallery
 {{items by=year}}
 ```
 
+How each work looks in the grid is a template too, named in the tag — the
+overview's counterpart of the each: page's `layout:`. `/by-year.html` actually
+says `{{items by=year template=tile}}`, and `templates/tile.html` is filled once
+per work with the same placeholders an each: page takes:
+
+```html
+<a class="item" href="{{item-href}}">
+  <img class="thumb" src="{{item-thumb}}" alt="{{item-title}}" loading="lazy">
+  <span class="item-title">{{item-title}}</span>
+  <span class="item-caption">{{item-caption}}</span>
+</a>
+```
+
+Without `template=`, a work is a thumbnail and its title.
+
 The groups come in the order their values first appear in the file. To
 order them by value instead — years as numbers, anything else as words —
 say so: `{{items by=year sort=asc}}` puts the oldest first, `sort=desc`

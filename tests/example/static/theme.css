@@ -38,3 +38,13 @@
   animation: wobble 3s ease-in-out infinite;
   transform-origin: bottom center;
 }
+
+/* templates/tile.html gives a work its caption under the title; the base
+   styles the title, and this site says how the caption sits beneath it. */
+.item-caption {
+  display: block;
+  font-size: 0.8rem;
+  line-height: 1.3;
+  color: var(--muted);
+  opacity: 0.8;
+}

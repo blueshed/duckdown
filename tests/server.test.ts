@@ -1128,6 +1128,24 @@ describe("a collection's items are pages", () => {
     expect(html).toContain('href="/by-year.html#"');
   });
 
+  test("an overview names the template each item is drawn with, and the preview uses an unsaved one", async () => {
+    const html = await (await fetch(`${BASE}/by-year.html`)).text();
+    expect(html).toContain('<span class="item-caption">First Light, 1961. Ink on paper, 40 x 40 cm.</span>');   // templates/tile.html
+    const mark = (source: string, draft?: { name: string; body: string }) =>
+      fetch(`${BASE}/edit/mark/?path=by-year.md`,
+        authed({ method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ source, draft }) }));
+    const drafted = await (await mark("collection: gallery\n\n{{items template=tile}}", { name: "tile.html", body: "<i>{{item-title}}</i>" })).json();
+    expect(drafted.html).toContain("<i>First Light</i>");
+    // Not a plain name: no template, the built-in thumbnails.
+    const log = spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const climbed = await (await mark("collection: gallery\n\n{{items template=../users}}")).json();
+      expect(climbed.html).toContain('<a class="item" href="/gallery/first-light/">');
+    } finally {
+      log.mockRestore();
+    }
+  });
+
   test("the each: page is what the items are made of, not a page: its address is a miss", async () => {
     for (const path of ["/gallery/item", "/gallery/item.html"]) {
       expect((await fetch(`${BASE}${path}`)).status).toBe(404);

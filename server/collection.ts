@@ -438,11 +438,13 @@ const thumbLink = (item: Item, linked: boolean) => {
   return linked ? `<a class="item" href="${encodeURI(item.href)}">${inside}</a>` : `<span class="item">${inside}</span>`;
 };
 
-const grid = (items: Item[], linked: boolean) =>
-  items.length ? `<div class="items">\n${items.map((item) => thumbLink(item, linked)).join("\n")}\n</div>` : "";
+type Render = (item: Item) => string;
 
-function groupSection(group: Group, level: number, linked: boolean): string {
-  const inside = [grid(group.items, linked), ...group.groups.map((sub) => groupSection(sub, level + 1, linked))].filter(Boolean);
+const grid = (items: Item[], render: Render) =>
+  items.length ? `<div class="items">\n${items.map(render).join("\n")}\n</div>` : "";
+
+function groupSection(group: Group, level: number, render: Render): string {
+  const inside = [grid(group.items, render), ...group.groups.map((sub) => groupSection(sub, level + 1, render))].filter(Boolean);
   if (!inside.length) return "";
   const tag = `h${Math.min(level, 6)}`;
   return `<section class="group" id="${escapeHtml(group.id)}">\n`
@@ -464,10 +466,17 @@ export function sortValues(values: string[], sort?: string): string[] {
   return sort === "desc" ? sorted.reverse() : sorted;
 }
 
-export function itemsHtml(collection: Collection, by?: string, sort?: string): string {
+//
+// `template=<name>` says how each item looks: templates/<name>.html, filled for
+// every item with the same {{item-…}} an each: page takes — the overview's
+// counterpart of the each: page's layout. Without it, a thumbnail and a title.
+export function itemsHtml(collection: Collection, by?: string, sort?: string, template?: string): string {
   const linked = collection.each !== null;
+  const render: Render = template === undefined
+    ? (item) => thumbLink(item, linked)
+    : (item) => fillItem(template, { collection, item });
   if (!by) {
-    const sections = collection.groups.map((g) => groupSection(g, 2, linked)).filter(Boolean);
+    const sections = collection.groups.map((g) => groupSection(g, 2, render)).filter(Boolean);
     return sections.length ? `<div class="collection">\n${sections.join("\n")}\n</div>` : "";
   }
   const order: string[] = [];
@@ -487,7 +496,7 @@ export function itemsHtml(collection: Collection, by?: string, sort?: string): s
     const label = labels[value];
     const heading = label ? `${value} - ${label}` : value;
     return `<section class="group" id="${escapeHtml(fragmentId(value))}">\n`
-      + `<h2>${escapeHtml(heading)}</h2>\n${grid(buckets.get(value)!, linked)}\n</section>`;
+      + `<h2>${escapeHtml(heading)}</h2>\n${grid(buckets.get(value)!, render)}\n</section>`;
   });
   return `<div class="collection">\n${sections.join("\n")}\n</div>`;
 }
@@ -618,8 +627,11 @@ const WRAPPED = /<p>(\{\{(?:items|groups)(?:\s[^}]*)?\}\})<\/p>/g;
 // collection meant when a tag names none; on an item page it is that item's
 // collection. Tags inside <code> are left as written, so the guide can print
 // one instead of expanding it.
+// `template` reads a template by name for `template=`, or null when there is
+// none; the page supplies it, because templates are the site's, not pages'.
 export async function fillCollections(
-  html: string, o: { pages: Storage; folder: string; context?: ItemContext; debug?: boolean },
+  html: string,
+  o: { pages: Storage; folder: string; context?: ItemContext; debug?: boolean; template?: (name: string) => Promise<string | null> },
 ): Promise<string> {
   if (!html.includes("{{")) return html;
   const parts = html.split(/(<code[^>]*>[\s\S]*?<\/code>)/);
@@ -640,7 +652,16 @@ export async function fillCollections(
       continue;
     }
     const current = collection === o.context?.collection ? o.context.item.group : undefined;
-    done.set(whole, tag === "items" ? itemsHtml(collection, options.by, options.sort) : groupsHtml(collection, current));
+    if (tag === "groups") {
+      done.set(whole, groupsHtml(collection, current));
+      continue;
+    }
+    let template: string | undefined;
+    if (options.template !== undefined) {
+      template = await o.template?.(options.template) ?? undefined;
+      if (template === undefined) console.error(`{{${tag}${args}}}: there is no templates/${options.template}.html — the built-in thumbnails are used`);
+    }
+    done.set(whole, itemsHtml(collection, options.by, options.sort, template));
   }
 
   const fill = (part: string) => part

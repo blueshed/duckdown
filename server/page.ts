@@ -84,6 +84,15 @@ async function resolveIncludes(body: string, draft?: DraftTemplate): Promise<{ h
   return { html, includes };
 }
 
+// {{items template=tile}}: templates/tile.html, the look of one item in an
+// overview — or the unsaved copy, when that is the template open in the editor.
+async function itemTemplate(name: string, draft?: DraftTemplate): Promise<string | null> {
+  if (!plainName(name)) return null;
+  if (draft?.name === `${name}.html`) return draft.body;
+  const key = `${TEMPLATES_PATH}${name}.html`;
+  return await site.exists(key) ? site.read(key) : null;
+}
+
 export type Page = {
   key: string;      // where it lives: "blog/a-post.md"
   file: string;     // the same without .md, which is what links are built from
@@ -149,7 +158,7 @@ export async function pageHtml(page: Page, o: PageOptions): Promise<{ html: stri
   // overview page writes itself from the data, here or in a template. A bare
   // tag means the collection `collection:` names, else the page's own folder's.
   const named = meta.collection?.[0]?.replace(/^\/+|\/+$/g, "");
-  const collection = { pages, folder: named ?? folderOf(file), context: o.item };
+  const collection = { pages, folder: named ?? folderOf(file), context: o.item, template: (name: string) => itemTemplate(name, o.draft) };
   body = await fillCollections(body, collection);
 
   const template = o.through === undefined
