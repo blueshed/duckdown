@@ -748,6 +748,16 @@ DUCKDOWN_ORIGIN=https://example.com bun run export     # into ./dist
   readily as a folder — a served site can be snapshotted without moving its
   content first.
 
+**One address, either way.** Set `DUCKDOWN_ORIGIN` to the site's address
+(`https://www.example.com`) and both kinds of site keep to it: a request
+under another name — the bare domain when the address is www — is a 301 to
+it, path and query kept, and the platform's own `*.up.railway.app` address
+and localhost still show the site but answer `noindex` with `robots.txt`
+closed, so it is never indexed under a name that isn't its own. Unset, every
+name is served. On a served site, set it only once the domain's certificate
+is issued: before that, everything would move to an address that can't
+answer.
+
 Where the output goes is the site's own business, not duckdown's: its
 README.md or CLAUDE.md says how it's deployed — read whichever it has. Don't
 invent a deployment step that isn't written down.

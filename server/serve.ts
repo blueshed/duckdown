@@ -12,6 +12,9 @@
 import { join, normalize, resolve } from "path";
 import { logView } from "./log";
 import { decodePath } from "./utils";
+import { hostAnswer, hostOf, looking } from "./hosts";
+
+export { looking };
 
 // A page's canonical address is the short one — `/blog/`, not `/blog` — so
 // the other form is a redirect rather than a second copy of the page.
@@ -32,22 +35,11 @@ async function route(req: Request, dir: string, origin: string): Promise<{ res: 
   const url = new URL(req.url);
   if (url.pathname === "/health") return { res: new Response("OK"), html: false };
 
-  // A place to look is not a place to be: on localhost or the platform's own
-  // address the site is served whatever the origin says, so it can be seen
-  // before its domain exists — but told to no crawler, since that name is
-  // never the site's. The rest of the robots answer is in serveDist.
-  const host = hostOf(req, url);
-  if (looking(host, origin) && url.pathname === "/robots.txt") {
-    return { res: new Response("User-agent: *\nDisallow: /\n", { headers: { "Content-Type": "text/plain; charset=utf-8" } }), html: false };
-  }
-
-  // One address. With DUCKDOWN_ORIGIN set, a request for the same site under
-  // another name (the apex when the origin is www) moves to the origin, path
-  // and query kept. Absolute, deliberately — the point is to leave this host.
-  const elsewhere = otherHost(host, origin);
-  if (elsewhere) {
-    return { res: new Response(null, { status: MOVED, headers: { Location: `${elsewhere}${url.pathname}${url.search}` } }), html: false };
-  }
+  // A place to look is not a place to be (hosts.ts): on localhost or the
+  // platform's own address the site is served whatever the origin says, but
+  // told to no crawler; under any other name than the origin's it moves there.
+  const moved = hostAnswer(req, origin);
+  if (moved) return { res: moved, html: false };
 
   const path = decodePath(url.pathname);
   if (path === null) return { res: new Response("Bad Request", { status: 400 }), html: false };
@@ -78,35 +70,6 @@ async function route(req: Request, dir: string, origin: string): Promise<{ res: 
   };
 }
 
-// The name the reader asked for. Behind Railway's proxy that is
-// x-forwarded-host; the Host header is what the proxy said to us.
-function hostOf(req: Request, url: URL): string {
-  return req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? url.host;
-}
-
-// A host to look at the site on, never to publish it at: a local run, or the
-// address the platform gives every service. Served whatever DUCKDOWN_ORIGIN
-// says — a site deployed before its domain exists can still be seen — and
-// marked noindex, so nothing is ever indexed under the wrong name. Unless it
-// IS the name: a site whose origin is its railway.app address (no domain yet)
-// is published there, and hiding it would contradict its own sitemap. The
-// hostname is compared whole — localhost.example.com is somebody's site.
-export function looking(host: string, origin = ""): boolean {
-  if (origin && host === new URL(origin).host) return false;
-  const name = host.replace(/:\d+$/, "");
-  return name === "localhost" || name === "127.0.0.1" || /\.up\.railway\.app$/.test(name);
-}
-
-// The origin to move to when the request came in under another host, or
-// null when it should be served here: no origin configured, the host matches,
-// or it's one to look at the site on.
-function otherHost(host: string, origin: string): string | null {
-  if (!origin) return null;
-  const target = new URL(origin);
-  if (host === target.host || looking(host)) return null;
-  return target.origin;
-}
-
 // One line per page view, as the served site prints: what was read and how
 // much, and nothing that identifies a reader. `bun run views` reads these.
 export async function serveDist(
@@ -117,7 +80,7 @@ export async function serveDist(
 ): Promise<Response> {
   const startedAt = performance.now();
   const { res, html } = await route(req, resolve(dir), origin);
-  if (looking(hostOf(req, new URL(req.url)), origin)) res.headers.set("X-Robots-Tag", "noindex");
+  if (looking(hostOf(req), origin)) res.headers.set("X-Robots-Tag", "noindex");
   if (html) log(req, res.status, startedAt);
   return res;
 }

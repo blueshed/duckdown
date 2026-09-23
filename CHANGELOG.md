@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.6.1 — 2026-09-23
+
+- **A served site has one address too.** With `DUCKDOWN_ORIGIN` set, the
+  served site now does what the published one (`serve.ts`) already did: a
+  page asked for under another name — the apex when the origin is www — is a
+  301 to the origin, path and query kept; the platform's own
+  `*.up.railway.app` address and localhost still show the site but answer
+  `X-Robots-Tag: noindex` and a closed `robots.txt`. Before, a served site
+  with a domain answered in full under every name it had, each page calling
+  itself canonical there, so search engines saw it three times. Without
+  `DUCKDOWN_ORIGIN` nothing moves — but localhost's `robots.txt` is now the
+  closed one, as it already was for `bun run start`.
+- **Upgrading:** a served site with a domain sets `DUCKDOWN_ORIGIN` to it
+  (`https://www.example.com`) once the domain's certificate is issued — not
+  before, or every name moves to an address that can't answer yet.
+
 ## 0.6.0 — 2026-09-23
 
 - **Nothing the editor writes is lost.** Before a save replaces a file, or a

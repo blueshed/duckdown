@@ -58,6 +58,7 @@ duckdown/
 │   ├── init.ts             # scaffold(root, {vendored}): what both ways in write (see below)
 │   ├── cli.ts              # bin `duckdown`: the server, or `duckdown init`
 │   ├── serve.ts            # The published flavour's server: a dist/ folder, nothing else
+│   ├── hosts.ts            # One site, one address: which names move to DUCKDOWN_ORIGIN, which are noindex
 │   ├── scaffold.ts         # Says so when `bun create` left a half-scaffold
 │   ├── page.ts             # A page, rendered: markdown in its template
 │   ├── export.ts           # bun run export — the whole site as files
@@ -467,6 +468,7 @@ Paths: storage keys are real names. The server decodes the URL path (`after()`);
 - **The base.** `site.css` and `search.js` are duckdown's, not the site's: `staticFile()` (routes/static.ts) and the exporter fall back to `base.ts`'s copy when the site has no file of that name, so a site that never forked one is upgraded by upgrading duckdown. They live in `server/base/`, which exists whether duckdown is installed or vendored by `bun create`, so one fallback serves both; the seed carries no copy, and the editor lists only files a site owns. `create/setup.ts` doesn't copy them.
 - **A 404 page.** `pages/404.md` answers a miss with a 404 status (`notFound()` in routes/site.ts) and exports as `404.html`. `NOT_FOUND` in search.ts keeps it out of search, `{{pages}}` and the sitemap. A content folder that vanishes while the server runs is said once in the log, at the first miss.
 - **Root files.** `ROOT_FILES` (robots.txt, favicon.ico) in `base.ts`: a list of two, answered at the root from `static/` and written to the root of `dist/`. Not a mechanism.
+- **One address.** `hosts.ts` is what both servers ask of a request's name (`hostOf()`: x-forwarded-host first): `hostAnswer()` 301s another name to `DUCKDOWN_ORIGIN` and closes `robots.txt` on a place to look (`looking()`: localhost, 127.0.0.1, `*.up.railway.app`, never the origin's own host), and the caller adds `X-Robots-Tag: noindex` there to every answer. `serve.ts` asks it in `route()`, the served site in `siteHandler(origin)` (routes/site.ts) — pages only: the other routes answer under any name. Unset, nothing moves.
 - **Sitemap.** `sitemapXml()` over `searchIndex()`, served at `/sitemap.xml` and written by the exporter when `DUCKDOWN_ORIGIN` is set (it needs absolute addresses).
 - **Validators.** `conditional()` in utils.ts: an ETag from the bytes, 304 on a match. Static files and signed-out pages use it; a signed-in page (it has the edit link) is `private, no-cache`.
 - **Template values.** `{{x-anything}}` in a template is the page's own `x-` key, escaped, empty when unset, filled before `{{content}}`.

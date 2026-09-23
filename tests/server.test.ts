@@ -2,6 +2,7 @@ import { describe, test, expect, beforeAll, spyOn } from "bun:test";
 import { mkdirSync, writeFileSync, readFileSync, renameSync, existsSync, rmSync } from "fs";
 import { join } from "path";
 import { BASE, SITE, signIn, authed, keepSite } from "./helpers";
+import { siteHandler } from "../server/routes/site";
 
 keepSite();
 beforeAll(signIn);
@@ -921,8 +922,12 @@ describe("the site's own 404 page", () => {
 });
 
 describe("files a crawler asks for at the root", () => {
+  // Asked under the site's own name: on localhost (a place to look) robots.txt
+  // is closed whatever the site says — see "one site, one address" below.
+  const named = { headers: { "x-forwarded-host": "www.example.com" } };
+
   test("robots.txt and favicon.ico are answered from static/", async () => {
-    const robots = await fetch(`${BASE}/robots.txt`);
+    const robots = await fetch(`${BASE}/robots.txt`, named);
     expect(robots.status).toBe(200);
     expect(robots.headers.get("content-type")).toContain("text/plain");
     expect(await robots.text()).toContain("Allow: /");
@@ -934,10 +939,49 @@ describe("files a crawler asks for at the root", () => {
     const saved = readFileSync(file);
     rmSync(file);
     try {
-      expect((await fetch(`${BASE}/robots.txt`)).status).toBe(404);
+      expect((await fetch(`${BASE}/robots.txt`, named)).status).toBe(404);
     } finally {
       writeFileSync(file, saved);
     }
+  });
+});
+
+// The published server's rule, on the served site: with DUCKDOWN_ORIGIN set,
+// another name moves to it, and the platform's own address shows the site but
+// tells no crawler — so a served site isn't indexed under three names.
+describe("one site, one address", () => {
+  const origin = "https://www.example.com";
+  const at = (host: string, path = "/") =>
+    siteHandler(origin)(new Request(`${BASE}${path}`, { headers: { "x-forwarded-host": host } }));
+
+  test("another name moves to the origin, path and query kept", async () => {
+    const res = await at("example.com", "/guide/pages.html?x=1");
+    expect(res.status).toBe(301);
+    expect(res.headers.get("location")).toBe("https://www.example.com/guide/pages.html?x=1");
+  });
+
+  test("the origin is the site, indexable, with its own robots.txt", async () => {
+    const res = await at("www.example.com");
+    expect(res.status).toBe(200);
+    expect(res.headers.get("x-robots-tag")).toBeNull();
+    expect(await (await at("www.example.com", "/robots.txt")).text()).toContain("Allow: /");
+  });
+
+  test("the platform's address and localhost show the site, marked noindex, robots.txt closed", async () => {
+    for (const host of ["vashti-production.up.railway.app", "localhost:8080"]) {
+      const res = await at(host);
+      expect(res.status).toBe(200);
+      expect(res.headers.get("x-robots-tag")).toBe("noindex");
+      expect(await (await at(host, "/robots.txt")).text()).toBe("User-agent: *\nDisallow: /\n");
+    }
+    // A 404 there is marked too: every answer, not only pages.
+    expect((await at("vashti-production.up.railway.app", "/nope")).headers.get("x-robots-tag")).toBe("noindex");
+  });
+
+  test("with no origin nothing moves: every name is served", async () => {
+    const res = await siteHandler("")(new Request(`${BASE}/`, { headers: { "x-forwarded-host": "example.com" } }));
+    expect(res.status).toBe(200);
+    expect(res.headers.get("x-robots-tag")).toBeNull();
   });
 });
 

@@ -7,7 +7,8 @@ import { decodePath, conditional } from "../utils";
 import { NOT_FOUND, aliasTarget } from "../search";
 import { itemAt, collectionPath } from "../collection";
 import { ROOT_FILES } from "../base";
-import { APP_PATH, IS_S3 } from "../config";
+import { APP_PATH, IS_S3, ORIGIN } from "../config";
+import { hostAnswer, hostOf, looking } from "../hosts";
 import { existsSync } from "fs";
 import { staticFile, CACHE } from "./static";
 
@@ -21,19 +22,29 @@ const pages = createPageStorage();
 // headers win.
 export function siteOrigin(req: Request): string {
   const url = new URL(req.url);
-  const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || url.host;
+  const host = hostOf(req);
   const proto = req.headers.get("x-forwarded-proto") || url.protocol.replace(":", "");
   return `${proto}://${host}`;
 }
 
 // Every page view is counted the same way, whatever the answer was — a 404
 // that keeps being asked for is worth knowing about too.
-export const handleSite = async (req: Request) => {
+//
+// One site, one address, as the published server has it (hosts.ts): with
+// DUCKDOWN_ORIGIN set, a page asked for under another name — the apex when
+// the origin is www — moves there, and the platform's own address (or
+// localhost) still shows the site but tells no crawler, so a served site is
+// never indexed three times under three names. `origin` is the setting,
+// passed so a test can give one.
+export const siteHandler = (origin: string) => async (req: Request) => {
   const startedAt = performance.now();
-  const res = await renderPage(req);
+  const res = hostAnswer(req, origin) ?? await renderPage(req);
+  if (looking(hostOf(req), origin)) res.headers.set("X-Robots-Tag", "noindex");
   logView(req, res.status, startedAt);
   return res;
 };
+
+export const handleSite = siteHandler(ORIGIN);
 
 const HTML = "text/html; charset=utf-8";
 
