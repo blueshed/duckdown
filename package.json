@@ -56,7 +56,7 @@
     "lucide-static": "^1.47.0"
   },
   "devDependencies": {
-    "@happy-dom/global-registrator": "^20.11.1",
+    "@happy-dom/global-registrator": "^20.14.5",
     "@types/bun": "^1.4.2",
     "typescript": "^7.0.2"
   }
