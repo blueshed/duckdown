@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.5.1 — 2026-09-23
+
+- **A site published at its railway.app address is indexable there.** The
+  platform's own address is a place to look, marked noindex with robots.txt
+  closed — except when `DUCKDOWN_ORIGIN` is that address, which is how a site
+  with no domain yet is published. Before, such a site hid itself from every
+  crawler while its sitemap named the address. And `localhost` means the host
+  `localhost`: `localhost.example.com` is somebody's site, not a local run.
+- The skill lists `each` and `collection` among the front matter keys a plain
+  block may use.
+
 ## 0.5.0 — 2026-09-23
 
 - **Collections are data and pages, kept apart.** `collection.json` is the

@@ -118,6 +118,12 @@ describe("serveDist", () => {
     expect((await at("x.up.railway.app", "/", "")).headers.get("x-robots-tag")).toBe("noindex");
     expect((await at("antonydonaldson.com")).status).toBe(301);
     expect(looking("up.railway.app.evil.com")).toBe(false);
+    expect(looking("localhost.example.com")).toBe(false);         // the whole hostname, not its start
+    // A site with no domain yet publishes at its railway.app address: there
+    // it is the origin, indexable, and its own robots.txt answers.
+    const railway = "https://vashti-production.up.railway.app";
+    expect(looking("vashti-production.up.railway.app", railway)).toBe(false);
+    expect(looking("other.up.railway.app", railway)).toBe(true);
   });
 
   test("listens on the port it is given", async () => {
