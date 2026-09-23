@@ -49,7 +49,7 @@ duckdown/
 │   ├── log.ts              # The view log: what was read, never who
 │   ├── search.ts           # The index readers search, cached like the nav; page and item aliases
 │   ├── sitemap.ts          # sitemap.xml from that index
-│   ├── collection.ts       # collection.json: a folder of items, each one a page
+│   ├── collection.ts       # collection.json (the data) + its each: page (the page every item gets)
 │   ├── images.ts           # Where a collection's pictures are, and what a thumbnail is called (both ends read it)
 │   ├── base.ts             # Where the base files are (server/base/) and the root files
 │   ├── base/               # site.css, search.js: served and exported when a site has none of its own
@@ -312,21 +312,35 @@ Search happens in the browser. `search.ts` builds one entry per readable page an
 
 What the site knows about itself lives in `nav.ts`: the nav, each folder's `{{pages}}` listing, and `{{sitemap}}` (the same walk, recursive: `folderEntries()` is what both are made from, so they agree on drafts, `-` folders and order). In production both are built once and dropped by `pagesChanged()` whenever the pages route writes or deletes, because every write goes through the server — a new write path to pages must call it too. With `DEBUG=1` they're built per request instead, so pages written straight to disk (by hand, or by a session using the authoring skill) show up at once.
 
-`collection.ts` is a folder of pages duckdown writes: `pages/<folder>/collection.json`
-lists groups (and subgroups) of items, and every item is a page at
-`/<folder>/<slug>/`. It is read through the storage layer like everything
-else, so it works on disk and in a bucket, and it is cached exactly like the
-nav — `routes/pages.ts` calls `collectionsChanged()` beside `pagesChanged()`
-and `searchChanged()`, because collection.json lives under `pages/` and is
-written through that same route. With `DEBUG=1` it is read per request.
+`collection.ts` is a folder of pages duckdown writes, and it keeps **data** and
+**presentation** apart, because one collection is shown more than one way.
+The data is `pages/<folder>/collection.json`: declared `fields` (`{name, kind,
+label}`, kinds `text`/`long`/`image`/`number`, one `image` field — the picture)
+and groups (and subgroups) of items; an item key the fields don't declare is a
+problem. The presentation is markdown: the **each: page** in the same folder
+(any `.md` but `index.md` whose front matter says `each: <folder>`) is the page
+every item gets at `/<folder>/<slug>/` — found by `eachPageIn()` when the
+collection loads, rendered once and kept on `Collection.each`, never served,
+listed or searched as a page itself — and any page with `{{items}}` is an
+overview (`collection: <name>` names the collection its bare tags mean). No
+each: page, no item pages: overviews show unlinked thumbnails. A 0.4 file
+(`layout`, no `fields`) is read with its fields inferred and its layout as an
+empty each: page, and says so once; that goes in the release after 0.5. It is
+read through the storage layer like everything else, so it works on disk and
+in a bucket, and it is cached exactly like the nav — `routes/pages.ts` calls
+`collectionsChanged()` beside `pagesChanged()` and `searchChanged()`, because
+collection.json and its each: page live under `pages/` and are written through
+that same route. With `DEBUG=1` it is read per request.
 
 Items flow through the same three callers as every page. `itemAt(pages, name)`
 splits an address into a folder and a slug, asks that one collection, and
-answers null for anything it doesn't hold — never a nearest match, which is
-what served the wrong painting on the site this came from. `routes/site.ts`
-calls it when no `.md` answers, `export.ts` calls it while walking (a
-`collection.json` in the walk renders every item into `dist/`), and both then
-go through `itemPage()` + `pageHtml()` with the item in `PageOptions.item`.
+answers null for anything it doesn't hold (or when it has no each: page) —
+never a nearest match, which is what served the wrong painting on the site
+this came from. `routes/site.ts` calls it when no `.md` answers (an each: page
+answers as a miss), `export.ts` calls it while walking (a `collection.json` in
+the walk renders every item into `dist/`), and both then go through
+`itemPage()` + `pageHtml()` with the item in `PageOptions.item`: `itemBody()`
+is the each: page's html filled for the item, `itemMeta()` its front matter.
 `search.ts` meets the same file in its own walk and emits an entry and a
 `PageRef` per item, so items are in `/search.json` and `sitemap.xml` for free.
 The preview renders an overview like any page and returns
@@ -362,8 +376,11 @@ under the decoded name.
 `{{items}}`, `{{items <collection>}}`, `{{items by=<field>}}` and `{{groups}}`
 are filled by `fillCollections()`, over the page's body (outside `<code>`, like
 `{{pages}}`) and again over the template, before `{{content}}`;
-`{{item-<field>}}`, `{{prev}}`, `{{next}}` and `{{group}}` are filled from the
-item the same way `{{x-…}}` is filled from the page. Templates stay flat:
+`{{item-<field>}}`, `{{prev}}`, `{{next}}` and `{{group}}` are filled by
+`fillItem()` in the each: page's body and in the template, and in its `title:`
+and `description:` unescaped (`itemText()`). Markdown percent-encodes braces in
+a link's address, so `fillItem()` fills `%7B%7Bitem-x%7D%7D` too. A field a
+page asks for that isn't declared is said once in the log. Templates stay flat:
 placeholders and generated HTML, never a loop. `SKIP` ("skip") is the one value
 duckdown reads rather than shows — out of `{{items by=…}}`, and empty in
 `{{item-<field>}}` so a template's `href="…#{{item-index}}"` lands at the top.

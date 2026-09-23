@@ -70,6 +70,8 @@
 | `order` | In a folder's `index.md` only: a whole number, for where that folder sits among its siblings in the navigation and `{{sitemap}}` |
 | `draft` | `true` keeps the page off the site, the nav and listings; signed in to the editor, you still see it |
 | `aliases` | An address this page used to answer at; a request for it is a 301 to this page. Repeat the line for more than one |
+| `each` | This page is the page every item of a collection gets, not a page of its own: `each: gallery` beside `gallery/collection.json` (see Collections) |
+| `collection` | The collection a bare `{{items}}` or `{{groups}}` on this page means, when it isn't the page's own folder's: `collection: gallery` |
 
 - A plain block may hold **only those keys**, or one starting `x-` (your own). At the first line that isn't one, the block ends and everything from there is content — so prose opening `Update: closed on Monday` keeps its first line, and a mistyped key appears on the page instead of vanishing.
 - For other keys, fence the block and put anything in it:
@@ -187,14 +189,28 @@ The template receives it as:
 ## Collections
 
 Some folders aren't pages you write one at a time: a gallery of four hundred
-works, a catalogue, a discography. A **collection** is `collection.json` beside
-a folder's `index.md`. Duckdown reads it and gives every item a page at
-`/<folder>/<slug>/`, an entry in search and the sitemap, a line in the export,
-and a place in the overview `{{items}}` builds.
+works, a catalogue, a discography. A **collection** is two things, kept apart:
+
+- **The data**: `collection.json` in the folder — what every item is made of
+  (its `fields`), and the items themselves, in groups.
+- **The pages that show it**, written in markdown like any other page. An
+  **each: page** beside the data is the page every item gets, at
+  `/<folder>/<slug>/`. An **overview** is any page with `{{items}}` in it. One
+  collection can have several overviews — by section, by year, by print —
+  without a second copy of anything, which is why the data never names a
+  template.
+
+Every item with a page also gets an entry in search and the sitemap and a file
+in the export.
 
 ```json
 {
-  "layout": "item",
+  "fields": [
+    { "name": "src", "kind": "image", "label": "Picture" },
+    { "name": "title", "label": "Title" },
+    { "name": "caption", "kind": "long", "label": "Caption" },
+    { "name": "year", "label": "Year" }
+  ],
   "images": { "src": "/static/images/gallery/", "suffix": "_tn" },
   "labels": { "year": { "1961": "Early work" } },
   "groups": [
@@ -219,16 +235,27 @@ and a place in the overview `{{items}}` builds.
 
 | Key | What it does |
 |-----|--------------|
-| `layout` | The template every item wears (`templates/item.html`). Defaults to `item` |
+| `fields` | What an item is made of: `name`, `kind` (`text`, `long`, `image` or `number`; `text` if unsaid) and an optional `label` for the editor. A bare `"year"` is a text field |
 | `images` | Where the pictures are: a base URL, or `{ "src", "thumb", "suffix", "extension" }`. Defaults to `/static/images/` |
 | `labels` | Per field, a label for a value: an overview's heading reads `1961 - Early work` |
 | `groups` | The sections, in order: `name`, optional `label`, `items`, and optionally `groups` of their own |
 
-An item says `src` (the picture's filename), `title`, `caption`, optionally
-`slug` and `aliases`, and any other key you like — `year`, `medium`,
-`catalogue`. Those extra keys are its **fields**: you group by them and read
-them in the template. Anything the file isn't shaped like is skipped rather
-than believed, and said in the server log.
+An item says a value for any of the fields, and optionally `slug` and
+`aliases`, which are duckdown's own. The one field of kind `image` is the
+picture: a filename, resolved against `images`, and what the thumbnails are
+made from. The kinds say what the editor offers for a field; every value is
+kept as written (a `number` field may still say `skip`).
+
+Duckdown checks the file against its fields and says what doesn't fit — in the
+log, the editor's message line, and `bun run export` (`--strict` fails on it):
+an item using a key that isn't declared, a second image field, a kind it
+doesn't know. A page or template asking for `{{item-yaer}}` or
+`{{items by=yaer}}` is said in the log too. Anything the file isn't shaped like
+is skipped rather than believed.
+
+A 0.4 file — `"layout": "item"` and no `fields` — still works for now: its
+fields are read off the items and its layout acts as an each: page with an
+empty body. The log says so. Write the each: page and declare the fields.
 
 ### Order, slugs and addresses
 
@@ -251,9 +278,9 @@ than believed, and said in the server log.
 
 ### Pictures
 
-`src` is a filename; where the pictures live is said once for the collection.
-A gallery's originals are usually far too big for the site's own `static/`, so
-they can sit in a bucket or on a CDN:
+The image field holds a filename; where the pictures live is said once for the
+collection. A gallery's originals are usually far too big for the site's own
+`static/`, so they can sit in a bucket or on a CDN:
 
 ```json
 "images": {
@@ -267,8 +294,61 @@ they can sit in a bucket or on a CDN:
 `thumb` defaults to `src`; `suffix` goes before the extension (`Anna.jpg` →
 `Anna_tn.jpg`) and is `_tn` unless you say otherwise; `extension` replaces the
 original's, for a collection whose thumbnails are all `.png`. A plain string in
-place of the object is just `src`. An item with no `src` has no picture and no
-thumbnail, rather than a link to a folder.
+place of the object is just `src`. An item with no picture has no thumbnail,
+rather than a link to a folder.
+
+### The item page: an each: page
+
+`pages/gallery/item.md` (any name but `index.md`) says `each:` and the
+collection — which is its own folder's: an item lives at its folder and its
+slug, so the each: page sits beside the data. A folder has one.
+
+```markdown
+each: gallery
+layout: item
+title: {{item-title}}
+
+<figure class="work">
+  <img src="{{item-src}}" alt="{{item-title}}">
+  <figcaption>{{item-caption}}</figcaption>
+</figure>
+```
+
+Every item's page is that page with these filled in for the item — in its
+body, in its `title:` and `description:`, and in the template its `layout:`
+names:
+
+| Placeholder | Becomes |
+|-------------|---------|
+| `{{item-<field>}}` | The item's value for that field: `{{item-title}}`, `{{item-caption}}`, `{{item-year}}`. Escaped, empty when unset or `skip` |
+| `{{item-<image field>}}`, `{{item-thumb}}` | The picture and its thumbnail, as full URLs |
+| `{{item-href}}`, `{{item-slug}}` | The item's own address, and its slug |
+| `{{prev}}`, `{{next}}` | Links to the items either side, wrapping |
+| `{{group}}` | The label of the group this item is in |
+| `{{groups}}` | The section menu, this item's group marked |
+
+The each: page itself is never a page: `/gallery/item` is a 404 (or the item
+of that name), and it is in no listing, search or sitemap. Without `title:` an
+item page's title is the item's `title`; without `description:`, its
+`caption`. The body can be empty and the template do everything — or the body
+can be all of it, in `site.html`. It is markdown, so `![{{item-title}}]({{item-src}})`
+works too. The editor previews it as the first item's page.
+
+A collection with no each: page has no item pages: its overviews show the
+thumbnails without links.
+
+`{{title}}`, `{{description}}`, `{{url}}`, `{{nav}}`, `{{edit}}` and the rest
+fill as on any page — an item **is** a page. `{{edit}}` opens the
+`collection.json` it is written in.
+
+A template the item pages wear might carry the rest:
+
+```html
+<p class="back"><a href="/by-year.html#{{item-year}}">← {{group}}</a></p>
+{{content}}
+<nav class="item-nav">{{prev}}{{next}}</nav>
+{{groups}}
+```
 
 ### Overviews
 
@@ -277,13 +357,23 @@ thumbnail, rather than a link to a folder.
 | `{{items}}` | The collection's groups, each a grid of thumbnails linking to the item pages |
 | `{{items by=<field>}}` | One grid per distinct value of that field, in the order the values first appear |
 | `{{items by=<field> sort=asc}}` (or `desc`) | The same, with the groups ordered by value: years as numbers, the rest as words. Items inside a group keep the file's order |
-| `{{items <collection>}}`, `{{items <collection> by=<field>}}` | The same for another folder's collection |
+| `{{items <collection>}}`, `{{items <collection> by=<field>}}` | The same for a collection named in the tag |
 | `{{groups}}`, `{{groups <collection>}}` | The section menu: each group linking to its first item, the current one marked |
+
+A bare tag means the collection the page's `collection:` names, or else the
+page's own folder's (on an item's page, the item's own). So `pages/works/index.md`
+needs nothing, and `pages/prints.md` says:
+
+```markdown
+title: Prints
+collection: works
+
+{{items by=prints sort=asc}}
+```
 
 An item whose field is the string `skip` is left out of `{{items by=…}}`
 altogether — that's how a work stays out of the prints list without leaving the
-collection. Without a collection's name, the tag means the page's own folder's
-collection (on an item's page, the item's own).
+collection.
 
 All of them work in a page's markdown and in a template, and stay as written
 inside a code span or fence so a page can document them. A tag naming a folder
@@ -292,34 +382,6 @@ with no `collection.json` fills as nothing and says so in the log.
 Each heading carries the value as its `id` — `id="1961"`, `id="paintings"` — so
 a template can link back to the place a reader came from. A value with spaces
 in it is slugified for the `id`, so keep linked values simple.
-
-### The item template
-
-`templates/item.html` is an ordinary template with these as well:
-
-| Placeholder | Becomes |
-|-------------|---------|
-| `{{item-<field>}}` | Anything the item says, by name: `{{item-title}}`, `{{item-caption}}`, `{{item-year}}`. Escaped, empty when unset or `skip` |
-| `{{item-src}}`, `{{item-thumb}}` | The picture and its thumbnail, as full URLs |
-| `{{item-href}}` | The item's own address |
-| `{{prev}}`, `{{next}}` | Links to the items either side, wrapping |
-| `{{group}}` | The label of the group this item is in |
-
-```html
-<p class="back"><a href="/by-year.html#{{item-year}}">← {{group}}</a></p>
-<figure class="work">
-  <img src="{{item-src}}" alt="{{item-title}}">
-  <figcaption>{{item-caption}}</figcaption>
-</figure>
-<nav class="item-nav">{{prev}}{{next}}</nav>
-{{groups}}
-```
-
-`{{title}}`, `{{description}}`, `{{url}}`, `{{nav}}`, `{{edit}}` and the rest
-fill as on any page — an item **is** a page. Its title is the item's, its
-description the caption, and `{{edit}}` opens the `collection.json` it is
-written in. It has no `{{content}}` of its own: everything it says is a field.
-If an item needs prose, it wants to be a page instead.
 
 ### Old addresses
 
@@ -351,7 +413,7 @@ pane does:
 
 - **Titles and captions** are edited in place. Every other key on an item — a
   year, an index, `slug`, `aliases` — is kept exactly where it was found, and
-  so is everything around the groups (`layout`, `images`, `labels`).
+  so is everything around the groups (`fields`, `images`, `labels`).
 - **Order**: drag a work by its picture, within its group or into another, or
   use the up and down controls. Groups move with theirs.
 - **Groups**: add one, add a subgroup inside one, rename it (the heading edits
@@ -379,7 +441,7 @@ the file if anything links to it.
 ### Styling
 
 `{{items}}` emits `.collection`, `.group`, `.items`, `.item`, `.thumb` and
-`.item-title`; `{{groups}}` emits `.groups`; the seed's item template uses
+`.item-title`; `{{groups}}` emits `.groups`; the seed's each: page and item template use
 `.work` and `.item-nav`. All of it is drawn from the variables, so `theme.css`
 reaches it:
 

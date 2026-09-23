@@ -9,19 +9,31 @@ paintings, each with a picture, a title and a caption, and the only thing that
 differs between them is those three things. Writing four hundred markdown files
 would be four hundred chances to get the template wrong.
 
-A **collection** is `collection.json` beside a folder's `index.md`. It lists
-the items; duckdown gives each one a page at `/<folder>/<slug>/`, an entry in
-search and in the sitemap, and a place in `{{items}}` — the overview that
-writes itself.
+A **collection** keeps two things apart:
 
-Look at [the gallery](/gallery/) in this site, and at
-`pages/gallery/collection.json` beside it.
+- **The data** — `collection.json` in the folder: what every item is made of,
+  and the items.
+- **The pages that show it**, written in markdown like everything else. One
+  page beside the data, the **each: page**, is the page every item gets, at
+  `/<folder>/<slug>/`. Any page with `{{items}}` in it is an **overview** —
+  and one collection can have as many as you like: by section, by year, by
+  print, with no second copy of anything.
+
+Every item with a page gets an entry in search and in the sitemap too.
+
+Look at [the gallery](/gallery/) in this site, and at `pages/gallery/` — its
+`collection.json`, its `item.md`, and its `index.md`.
 
 ## The file
 
 ```json
 {
-  "layout": "item",
+  "fields": [
+    { "name": "src", "kind": "image", "label": "Picture" },
+    { "name": "title", "label": "Title" },
+    { "name": "caption", "kind": "long", "label": "Caption" },
+    { "name": "year", "label": "Year" }
+  ],
   "images": { "src": "/static/images/gallery/", "suffix": "_tn" },
   "labels": { "year": { "1961": "Early work" } },
   "groups": [
@@ -47,14 +59,15 @@ Look at [the gallery](/gallery/) in this site, and at
 
 | Key | What it does |
 |-----|--------------|
-| `layout` | The template every item wears: `templates/item.html`. Defaults to `item` |
+| `fields` | What an item is made of: each a `name`, a `kind` — `text`, `long`, `image` or `number` — and a `label` for the editor |
 | `images` | Where the pictures are — a base URL, or `{ "src", "thumb", "suffix", "extension" }`. Without it, `/static/images/` |
 | `labels` | A label for a value, shown in an overview's heading: `1961 - Early work` |
 | `groups` | The sections, in order. Each has a `name`, an optional `label`, its `items`, and optionally `groups` of its own |
 
-An **item** says `src` (the picture's filename), `title`, `caption`, and
-whatever else you want: `year`, `medium`, `catalogue`. Those extra keys are its
-**fields** — you group by them and read them in the template.
+An **item** gives a value for its fields — you group by them and show them on
+its page. The one field of kind `image` is the picture's filename. An item may
+also say `slug` and `aliases`, which are duckdown's own. A key the fields don't
+declare is a mistake duckdown tells you about, in the editor and in the export.
 
 > [!NOTE]
 > The order of the items in the file is the order `{{prev}}` and `{{next}}`
@@ -117,10 +130,14 @@ list without leaving the collection:
 ```
 
 Either form takes the name of a collection first, so an overview can live
-outside the folder it shows. `/by-year.html` in this site is one page carrying:
+outside the folder it shows — or the page says which collection it means, in
+its front matter. `/by-year.html` in this site is one page carrying:
 
 ```markdown
-{{items gallery by=year}}
+title: Gallery by year
+collection: gallery
+
+{{items by=year}}
 ```
 
 The groups come in the order their values first appear in the file. To
@@ -136,36 +153,55 @@ item's page the group being read is marked. It takes a collection name too
 All three work in a page's markdown and in a template. Inside a code span or a
 fence they're printed as written, which is how this page shows them.
 
-## The item template
+## The item page
 
-`templates/item.html` is an ordinary template with a few more placeholders:
+`pages/gallery/item.md` is the page every work gets. It says `each:` and the
+collection — its own folder's — and the rest is an ordinary page:
 
-```html
-<p class="back"><a href="/by-year.html#{{item-year}}">← {{group}}</a></p>
+```markdown
+each: gallery
+layout: item
+
 <figure class="work">
   <img src="{{item-src}}" alt="{{item-title}}">
   <figcaption>{{item-caption}}</figcaption>
 </figure>
-<nav class="item-nav">{{prev}}{{next}}</nav>
-{{groups}}
 ```
+
+Its body, its `title:` and `description:`, and the template its `layout:`
+names all take these:
 
 | Placeholder | What it fills with |
 |-------------|--------------------|
-| `{{item-<field>}}` | Anything the item says, by name: `{{item-title}}`, `{{item-caption}}`, `{{item-year}}`. Escaped, and empty when unset |
-| `{{item-src}}`, `{{item-thumb}}` | The picture and its thumbnail, as full URLs |
+| `{{item-<field>}}` | The item's value for that field: `{{item-title}}`, `{{item-caption}}`, `{{item-year}}`. Escaped, and empty when unset |
+| `{{item-src}}`, `{{item-thumb}}` | The picture and its thumbnail, as full URLs — `src` being this collection's image field |
 | `{{item-href}}` | The item's own address |
 | `{{prev}}`, `{{next}}` | Links to the items either side, wrapping |
 | `{{group}}` | The label of the group this item is in |
 | `{{groups}}` | The section menu, this item's group marked |
 
+This site's `templates/item.html` carries the frame around it:
+
+```html
+<p class="back"><a href="/by-year.html#{{item-year}}">← {{group}}</a></p>
+{{content}}
+<nav class="item-nav">{{prev}}{{next}}</nav>
+{{groups}}
+```
+
 An overview's headings carry the value as their `id` — `id="1961"` — so
-`href="/by-year.html#{{item-year}}"` in the template takes a reader back to the
-place they came from. A value with spaces in it is turned into a slug for the
-`id`, so keep the values you link to simple.
+`href="/by-year.html#{{item-year}}"` takes a reader back to the place they came
+from. A value with spaces in it is turned into a slug for the `id`, so keep the
+values you link to simple.
 
 `{{title}}`, `{{description}}`, `{{url}}`, `{{nav}}` and the rest are there as
-on any page: an item is a page.
+on any page: an item is a page. Its title is the item's `title` unless the
+each: page says `title:`; its description, the `caption`.
+
+The each: page itself is not a page — `/gallery/item` is a 404 — and without
+one, a collection has no item pages at all: its overviews show the works
+without links. In the editor, the preview of an each: page is the page of the
+first item.
 
 ## Editing one in the editor
 
@@ -238,12 +274,15 @@ is drawn from the variables in `site.css`, so `theme.css` reaches it:
 
 ## What catches people out
 
-- **`collection.json` lives in `pages/`**, beside the folder's `index.md`, not
+- **`collection.json` lives in `pages/`**, beside the folder's pages, not
   in `static/`. It's written through the editor like any other file in there,
   and saving it is what drops the caches.
 - **The folder still needs an `index.md`** — that's the page at `/gallery/`,
   the thing in the navigation, and where you'd put `{{items}}`.
-- **An item has no markdown.** Everything it says is a field, and the template
-  decides how it looks. If an item needs prose, it wants to be a page.
+- **An item has no markdown of its own.** Everything it says is a field; the
+  each: page decides how it looks, for all of them at once. If one item needs
+  prose, it wants to be a page.
+- **The data never names a template.** A second way of showing the works is a
+  second page, not a change to the file.
 - **`skip` is duckdown's word**: as a field's value it means "not in that
   overview", and `{{item-<field>}}` fills as nothing for it.
