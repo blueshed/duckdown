@@ -42,6 +42,11 @@ opens below your page, so you watch the page change while you edit it.
 
 Edit the markdown, then press **⌘⏎** (or click **Save**). The preview updates as you type; saving is what puts it on the site.
 
+Nothing you save is lost. The clock in a file's header — **Earlier versions** —
+lists how it was before each sitting of edits, and **Restore** puts one back
+(what it replaces is kept too). A page, template or stylesheet you delete is
+kept as well: **Deleted**, at the top of the list it was in, brings it back.
+
 ## Next steps
 
 - [Writing Pages](/guide/pages.html) — learn about markdown and front-matter

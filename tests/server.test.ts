@@ -235,6 +235,62 @@ describe("editor API", () => {
       expect(res.status).toBe(404);
     });
   });
+
+  describe("earlier versions", () => {
+    const at = (path: string) => `${BASE}/edit/pages/${path}`;
+    const put = (path: string, body: string) => fetch(at(path), authed({ method: "PUT", body }));
+    const versions = async (path: string) =>
+      (await (await fetch(`${at(path)}?versions`, authed())).json()) as { id: string; size: number }[];
+    const restore = (path: string, id: string) => fetch(`${at(path)}?restore=${id}`, authed({ method: "POST" }));
+
+    test("a save keeps what it replaced, once a sitting, outside pages/; a restore puts it back", async () => {
+      await put("kept/page.md", "first");
+      expect(await versions("kept/page.md")).toEqual([]);              // nothing was replaced
+      await put("kept/page.md", "second");
+      await put("kept/page.md", "third");                               // the same sitting
+      const [v, ...rest] = await versions("kept/page.md");
+      expect(rest).toEqual([]);
+      expect(await (await fetch(`${at("kept/page.md")}?version=${v!.id}`, authed())).text()).toBe("first");
+      expect(existsSync(join(SITE, ".history", "pages", "kept", "page.md", v!.id))).toBe(true);
+      // It is none of the site's business: not a page, not a file in the tree.
+      expect((await fetch(`${BASE}/.history/pages/kept/page.md/${v!.id}`)).status).toBe(404);
+
+      expect((await restore("kept/page.md", v!.id)).status).toBe(200);
+      expect(await (await fetch(at("kept/page.md"), authed())).text()).toBe("first");
+      // And the restore can itself be taken back: what it replaced is kept.
+      const after = await versions("kept/page.md");
+      expect(after.length).toBe(2);
+      expect(await (await fetch(`${at("kept/page.md")}?version=${after[0]!.id}`, authed())).text()).toBe("third");
+    });
+
+    test("a delete keeps the file, and ?deleted offers it back", async () => {
+      await put("gone/page.md", "was here");
+      await fetch(at("gone/page.md"), authed({ method: "DELETE" }));
+      const gone = await (await fetch(`${at("")}?deleted`, authed())).json() as { key: string; id: string }[];
+      const it = gone.find((d) => d.key === "gone/page.md")!;
+      expect(it).toBeDefined();
+      expect(await (await fetch(`${at("gone")}?deleted`, authed())).json()).toEqual([it]);
+      expect((await restore("gone/page.md", it.id)).status).toBe(200);
+      expect(await (await fetch(at("gone/page.md"), authed())).text()).toBe("was here");
+      expect((await (await fetch(`${at("")}?deleted`, authed())).json() as { key: string }[])
+        .some((d) => d.key === "gone/page.md")).toBe(false);
+    });
+
+    test("asks for a file, a version that exists, and a sign-in", async () => {
+      expect((await fetch(`${at("")}?versions`, authed())).status).toBe(400);
+      expect((await fetch(`${at("a//b.md")}?deleted`, authed())).status).toBe(400);
+      expect((await fetch(`${at("index.md")}?version=nope`, authed())).status).toBe(404);
+      expect((await fetch(at("index.md"), authed({ method: "POST" }))).status).toBe(400);
+      expect((await restore("index.md", "2020-01-01T00-00-00-000Z")).status).toBe(404);
+      expect((await fetch(`${at("index.md")}?restore=x`, { method: "POST" })).status).toBe(401);
+      // Each section keeps its own: a template's versions are a template's.
+      const tpl = `${BASE}/edit/templates/kept.html`;
+      await fetch(tpl, authed({ method: "PUT", body: "<p>one</p>" }));
+      await fetch(tpl, authed({ method: "PUT", body: "<p>two</p>" }));
+      expect(existsSync(join(SITE, ".history", "templates", "kept.html"))).toBe(true);
+      await fetch(tpl, authed({ method: "DELETE" }));
+    });
+  });
 });
 
 describe("markdown preview", () => {

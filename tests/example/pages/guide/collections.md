@@ -249,10 +249,11 @@ watch the overview redraw next to them.
 Every change writes the whole file, which is what drops the caches, so the
 preview and the site follow at once.
 
-> [!WARNING]
-> There is no undo in duckdown. Removing a work or a group asks first, and that
-> is the whole of the safety net. On S3, turn the bucket's versioning on; on
-> disk, keep the site in git.
+> [!TIP]
+> **Undo** (⌘Z, or the arrow in the pane's header) takes back the last change,
+> and keeps going back for as long as the pane is open; **Redo** (⇧⌘Z) goes
+> forward again. After that, the clock in the header — **Earlier versions** —
+> has the file as it was before each sitting, and puts any of them back.
 
 Two things the pane can't do for you. A collection whose pictures live off the
 site — a bucket, a CDN — says so and offers no way to add one: the editor can

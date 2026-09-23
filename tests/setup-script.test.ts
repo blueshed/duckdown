@@ -86,7 +86,7 @@ describe("create: bun create blueshed/duckdown, and the code is yours", () => {
     expect(pkg.devDependencies.railway).toBe("^3.11.0");               // resolves .railway/railway.ts's import
 
     expect(existsSync(join(root, "site", "static", "site.css"))).toBe(false);   // the base comes from server/base
-    expect(read(root, ".gitignore")).toBe("node_modules\n.dev-site/\ndist/\n.env\n*.pid\n.DS_Store\nsite/users.json\n");
+    expect(read(root, ".gitignore")).toBe("node_modules\n.dev-site/\ndist/\n.env\n*.pid\n.DS_Store\nsite/users.json\nsite/.history/\n");
     const createdRailway = read(root, join(".railway", "railway.ts"));
     expect(createdRailway).toContain('service("created"');
     expect(createdRailway).toContain('start: "bun run server/serve.ts"');   // vendored: its own server/
@@ -140,7 +140,7 @@ describe("install: bun add, then bunx duckdown init", () => {
     expect(read(root, "site/templates/site.html")).toBe(read(repo, "tests/example/templates/site.html"));
     expect(existsSync(join(root, "site", "static", "site.css"))).toBe(false);
     expect(read(root, ".env")).toStartWith("DUCKDOWN_PATH=./site\n");
-    expect(read(root, ".gitignore")).toBe("mine\nnode_modules\ndist/\n.env\n*.pid\n.DS_Store\nsite/users.json\n");
+    expect(read(root, ".gitignore")).toBe("mine\nnode_modules\ndist/\n.env\n*.pid\n.DS_Store\nsite/users.json\nsite/.history/\n");
     const installedRailway = read(root, join(".railway", "railway.ts"));
     expect(installedRailway).toContain('import { defineRailway, github, project, service } from "railway/iac"');
     expect(installedRailway).toContain('partial = "installed"');

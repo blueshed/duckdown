@@ -23,6 +23,7 @@ This is the feature map. Bugs and tasks live in `todo.jsonl`.
 - [x] `GET /edit/pages/*` — list folder or return file contents
 - [x] `PUT /edit/pages/*` — save file (auto-create directories); `If-None-Match: *` creates only
 - [x] `DELETE /edit/pages/*` — delete file
+- [x] Earlier versions of every file the editor writes (`?versions`, `?version=`, `?deleted`, `POST ?restore=`), in `.history/`
 - [x] `PUT /edit/mark/` — markdown-to-HTML preview (with front-matter parsing)
 
 ### Image API
@@ -120,6 +121,8 @@ This is the feature map. Bugs and tasks live in `todo.jsonl`.
 - [x] Save button with saved flash (green)
 - [x] Dirty indicator (unsaved changes)
 - [x] Delete button with inline confirmation
+- [x] Earlier versions (restore any) and Deleted (bring one back)
+- [x] Undo / redo in the collection pane (⌘Z, ⇧⌘Z)
 - [x] Keyboard shortcut for save (⌘⏎)
 - [ ] Code editor with syntax highlighting
 

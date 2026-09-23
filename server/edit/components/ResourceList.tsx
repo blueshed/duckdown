@@ -3,8 +3,9 @@ import type { FileEntry, Listing } from "../../storage";
 import { Icon } from "./Icon";
 import { byName } from "./Browser";
 import { apiJson } from "../api";
-import { resourceRevision, openResource, createResource, type Resource } from "../store";
+import { resourceRevision, openResource, createResource, reloadResources, type Resource } from "../store";
 import { NewDialog } from "./NewDialog";
+import { DeletedDialog } from "./History";
 
 // The stylesheets in static/ and the templates in templates/: what a page is
 // composed with, wherever it lives. Flat on purpose — neither folder has a
@@ -15,6 +16,7 @@ import { NewDialog } from "./NewDialog";
 export function ResourceList({ section }: { section: "templates" | "static" }) {
   const files = signal<FileEntry[]>([]);
   const naming = signal(false);
+  const deleted = signal(false);
   const kind = section === "templates" ? "template" : "stylesheet";
 
   effect(() => {
@@ -33,6 +35,9 @@ export function ResourceList({ section }: { section: "templates" | "static" }) {
         <span class="pane-path">/{section}</span>
         <button class="icon-btn" aria-label={`New ${kind}`} title={`New ${kind}`} onclick={() => naming.set(true)}>
           <Icon name="file-plus" />
+        </button>
+        <button class="icon-btn" aria-label={`Deleted ${kind}s`} title={`Deleted ${kind}s`} onclick={() => deleted.set(true)}>
+          <Icon name="archive-restore" />
         </button>
       </div>
 
@@ -57,6 +62,11 @@ export function ResourceList({ section }: { section: "templates" | "static" }) {
           }}
           oncancel={() => naming.set(false)}
         />
+      ))}
+      {when(deleted, () => (
+        <DeletedDialog section={section}
+          onrestored={(key) => { reloadResources(); return openResource({ section, path: key }); }}
+          oncancel={() => deleted.set(false)} />
       ))}
     </>
   );

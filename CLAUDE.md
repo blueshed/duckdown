@@ -50,6 +50,7 @@ duckdown/
 │   ├── search.ts           # The index readers search, cached like the nav; page and item aliases
 │   ├── sitemap.ts          # sitemap.xml from that index
 │   ├── collection.ts       # collection.json (the data) + its each: page (the page every item gets)
+│   ├── history.ts          # Earlier versions: what a save replaced, what a delete removed
 │   ├── images.ts           # Where a collection's pictures are, and what a thumbnail is called (both ends read it)
 │   ├── slugs.ts            # An item's slug and address, and how aliases compare (both ends read it)
 │   ├── base.ts             # Where the base files are (server/base/) and the root files
@@ -96,6 +97,7 @@ duckdown/
 │           ├── PaneHeader.tsx   # The one header both panes wear
 │           ├── NewDialog.tsx    # Name a new page, folder, collection, stylesheet, template
 │           ├── ConfirmDialog.tsx # Confirm action dialog
+│           ├── History.tsx   # Earlier versions of a file, and what was deleted: Restore
 │           ├── Notice.tsx    # Shows that line (role=alert for a failure, status for news)
 │           └── Icon.tsx      # Lucide icons (lucide-static SVG strings)
 ├── tests/                  # see Testing below
@@ -106,6 +108,7 @@ duckdown/
 │   ├── export.test.ts      # bun run export, onto a scratch folder
 │   ├── search.test.ts      # plainText, the index, its cache, and the aliases from that walk
 │   ├── collection.test.ts  # collection.json: slugs, overviews, aliases, collisions
+│   ├── history.test.ts     # History: once a sitting, the limit, what was deleted
 │   ├── editor.test.tsx     # The editor's code in happy-dom, against that server
 │   ├── units.test.ts       # pid, config, storage, auth, error handler
 │   ├── s3.test.ts          # S3Storage via Bun's S3 client + fake-s3.ts
@@ -409,6 +412,21 @@ The editor edits three folders, each its own route built by `fileRoutes()`
 own folder, so none can reach across them — and `users.json` sits at the site
 root, in none of them, which is why the hashes stay out of the editor. Keep it
 that way when adding a section.
+
+Nothing the editor writes is lost. `fileRoutes()` keeps what a save replaces
+and what a delete removes in `.history/<section>/<key>/<time>` (`history.ts`),
+at the site root beside `users.json` — outside every folder the site serves,
+exports or lists, and through the storage layer. A save keeps one only when
+none is newer than `QUIET` (ten minutes), so a sitting of edits — the
+collection pane writes on every change — leaves one version, the file as it
+was before; a delete or a restore always keeps one; `KEEP` (30) per file. The
+same routes answer `?versions`, `?version=<id>`, `?deleted` and
+`POST ?restore=<id>`, and the editor shows them as Earlier versions (the clock
+in `PaneHeader`) and Deleted (atop the tree and each resource list). A new
+write path that bypasses `fileRoutes()` bypasses the history too — the
+collection route's picture uploads do, deliberately. The collection pane also
+keeps its own undo stack: every change is a whole new file, so undo writes the
+previous one.
 
 Front matter takes only the keys duckdown reads (`KEYS` in `markdown.ts`) or an `x-` extension, unless the block is fenced with `---`, which takes anything: a page opening "Update: closed Monday" keeps its first line. Add a key there and in the skill's reference together.
 
