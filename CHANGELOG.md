@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.5.0 — 2026-09-23
 
 - **Collections are data and pages, kept apart.** `collection.json` is the
   data only: it declares its `fields` (`name`, `kind` — text, long, image,
