@@ -228,7 +228,7 @@ watch the overview redraw next to them.
 - **Starting one**: the grid icon at the top of the tree asks for a folder
   name, and writes the data, an `item.md` for the works' pages, and an
   `index.md` showing them — then opens it, ready for pictures.
-- **The fields** are edited where they sit, one labelled box per field the file
+- **The fields** are edited where they sit, one box per field the file
   declares. Anything else on an item — a `slug`, its `aliases` — is left
   exactly as it was.
 - **Renaming a work** changes its address, because the slug comes from the

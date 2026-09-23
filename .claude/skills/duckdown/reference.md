@@ -434,7 +434,7 @@ pane does:
   and writes `collection.json` (picture, title and caption fields, pictures
   under `static/images/<folder>/`), an each: page `item.md`, and an `index.md`
   with `{{items}}` if the folder has none — then opens it with the pane below.
-- **The fields** are edited in place, one labelled input per declared field (a
+- **The fields** are edited in place, one input per declared field, its label the placeholder (a
   `long` one is a text box); with no `fields` in the file, title and caption.
   Every other key on an item — `slug`, `aliases`, anything undeclared — is kept
   exactly where it was found, and so is everything around the groups

@@ -1345,9 +1345,13 @@ describe("CollectionPane", () => {
     const row = items(host)[0]!;
     expect([...row.querySelectorAll("[data-field]")].map((el) => el.getAttribute("data-field")))
       .toEqual(["title", "year", "notes"]);
-    // Each input sits in its label, shown on screen: a bare string is a text
-    // field labelled by its name, and a declared label is used as it is.
-    const label = (name: string) => field(row, name).closest("label")!.querySelector(".item-label")!.textContent;
+    // Each input is named by its label, as placeholder and accessible name: a
+    // bare string is a text field labelled by its name, and a declared label
+    // is used as it is.
+    const label = (name: string) => {
+      expect(field(row, name).getAttribute("aria-label")).toBe(field(row, name).getAttribute("placeholder"));
+      return field(row, name).getAttribute("placeholder");
+    };
     expect(label("title")).toBe("title");
     expect(label("year")).toBe("Year");
     expect(label("notes")).toBe("Notes");

@@ -401,25 +401,21 @@ export function CollectionPane() {
 
   type Row = { i: number; item: RawItem };
 
-  // One input per declared field, labelled as the file labels it — on the
-  // screen, not just to a screen reader: "1961" and "Ink" in two unlabelled
-  // boxes is a guessing game. A line for text and numbers, a box for long
-  // text. Every value stays a string — a number field may say "skip", which
-  // an <input type=number> would refuse.
+  // One input per declared field, named as the file labels it: the label is
+  // the placeholder, so an empty field says what it is for and a filled one
+  // is just its value — the row stays a picture and its words — and it is the
+  // input's name to a screen reader either way. A line for text and numbers,
+  // a box for long text. Every value stays a string — a number field may say
+  // "skip", which an <input type=number> would refuse.
   const fieldInput = (path: Path, row$: ReadonlySignal<Row>, field: Field) => {
     const value = row$.map((r) => asText(r.item[field.name]) ?? "");
     const commit = (e: Event) =>
       setField(path, row$.peek().i, field.name, (e.target as HTMLInputElement).value);
-    return (
-      <label class="item-field">
-        <span class="item-label">{field.label}</span>
-        {field.kind === "long"
-          ? <textarea class="item-input item-long" data-field={field.name} rows={2}
-              value={value} onchange={commit} />
-          : <input class="item-input" data-field={field.name}
-              value={value} onchange={commit} />}
-      </label>
-    );
+    return field.kind === "long"
+      ? <textarea class="item-input item-long" data-field={field.name} rows={2}
+          placeholder={field.label} aria-label={field.label} value={value} onchange={commit} />
+      : <input class="item-input" data-field={field.name}
+          placeholder={field.label} aria-label={field.label} value={value} onchange={commit} />;
   };
 
   const itemRow = (path: Path, row$: ReadonlySignal<Row>) => {

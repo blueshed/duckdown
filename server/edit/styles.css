@@ -764,23 +764,6 @@ button.danger-subtle:hover {
   gap: 4px;
 }
 
-/* A field is its label and its input on one line: the label a narrow,
-   quiet column, so a row of fields reads as a small form. */
-.item-field {
-  display: grid;
-  grid-template-columns: 4.5rem minmax(0, 1fr);
-  align-items: baseline;
-  gap: 4px;
-}
-
-.item-label {
-  overflow: hidden;
-  color: var(--text-dim);
-  font-size: 11px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .item-long {
   resize: vertical;
   font-size: 12px;
