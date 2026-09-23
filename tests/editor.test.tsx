@@ -2,7 +2,7 @@
 // process (signed in). Failures are staged with intercept().
 import { describe, test, expect, beforeAll, afterAll, afterEach, spyOn, mock } from "bun:test";
 import { createElement, mount, batch } from "@blueshed/railroad";
-import { BASE, signIn, waitFor } from "./helpers";
+import { BASE, signIn, waitFor, keepSite } from "./helpers";
 import { api, apiJson, urlPath } from "../server/edit/api";
 import { notice, news, speak, tell, hush } from "../server/edit/notice";
 import {
@@ -32,6 +32,7 @@ import { parseCollection } from "../server/collection";
 const nativeFetch = globalThis.fetch;
 let signedIn: typeof fetch;
 
+keepSite();
 beforeAll(async () => {
   const cookie = await signIn();
   // The editor asks for "/edit/pages/…": send that to the server under test.
@@ -1180,11 +1181,11 @@ describe("CollectionPane", () => {
     click(tool(host.querySelectorAll(".collection-group")[3]!, "Add subgroup"));
     await storedWhen((f) => f.groups[2].groups?.length === 1);
 
-    // Removing asks first, and says there is no undo.
+    // Removing asks first, and says undo brings it back.
     click(tool(host.querySelectorAll(".collection-group")[3]!, "Remove group"));
     await waitFor(() => host.querySelector("dialog")?.open);
     expect(host.querySelector("dialog h3")!.textContent).toBe("Remove Drawings and its items?");
-    expect(host.querySelector("dialog p")!.textContent).toContain("no undo");
+    expect(host.querySelector("dialog p")!.textContent).toContain("Undo");
     click(button(host.querySelector("dialog")!, "Cancel")!);
     expect(host.querySelector("dialog")).toBeNull();
     expect((await stored()).groups).toHaveLength(3);
@@ -1557,6 +1558,166 @@ describe("CollectionPane", () => {
     expect(collection.get()).toEqual({ folder: "gallery" });
     expect(filePath.get()).toBe(`${FOLDER}/index.md`);   // the page in the middle stayed put
     closeCollection();
+    dispose();
+  });
+
+  test("undoes and redoes, from the header or the keyboard, and each step is written", async () => {
+    const { host, dispose } = await open();
+    const pane = host.querySelector(".panel-collection")!;
+    const undo = tool(host, "Undo") as HTMLButtonElement;
+    const redo = tool(host, "Redo") as HTMLButtonElement;
+    const key = (target: Element, init: KeyboardEventInit) =>
+      target.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, ...init }));
+    expect(undo.disabled).toBe(true);
+    expect(redo.disabled).toBe(true);
+
+    edit(host.querySelector(`[data-field="title"]`)!, "Renamed");
+    await storedWhen((f) => f.groups[0].items[0].title === "Renamed");
+    expect(undo.disabled).toBe(false);
+    await waitFor(() => notice.get().includes("the old address still leads there"));
+    click(tool(items(host)[1]!, "Move up"));
+    await storedWhen((f) => f.groups[0].items[0].title === "Second");
+
+    click(undo);                                                             // the move
+    await storedWhen((f) => f.groups[0].items[0].title === "Renamed");
+    expect(redo.disabled).toBe(false);
+    key(pane, { key: "z", metaKey: true });                                  // ⌘Z: the rename too
+    await storedWhen((f) => f.groups[0].items[0].title === "First");
+    expect(titles(host)[0]).toBe("First");
+    expect(undo.disabled).toBe(true);
+    expect(notice.get()).toBe("");               // the rename's news went with it
+    // A field being typed in keeps its own undo; a plain Z is a letter.
+    key(host.querySelector(`[data-field="title"]`)!, { key: "z", ctrlKey: true, shiftKey: true });
+    key(pane, { key: "z" });
+    expect(titles(host)[0]).toBe("First");
+
+    key(pane, { key: "Z", ctrlKey: true, shiftKey: true });                 // ⇧⌘Z
+    await storedWhen((f) => f.groups[0].items[0].title === "Renamed");
+    key(pane, { key: "y", ctrlKey: true });                                  // and Ctrl+Y
+    await waitFor(() => redo.disabled);
+    key(pane, { key: "y", ctrlKey: true });                                  // nothing left to redo
+    click(redo);
+    expect(redo.disabled).toBe(true);
+
+    // A new change after an undo: there is nothing to redo any more.
+    click(undo);
+    await waitFor(() => !redo.disabled);
+    edit(host.querySelector(`[data-field="caption"]`)!, "New caption");
+    await waitFor(() => redo.disabled);
+    await storedWhen((f) => f.groups[0].items[0].caption === "New caption");
+    dispose();
+  });
+
+  test("puts back an earlier version of the file, and starts its undo afresh", async () => {
+    const { host, dispose } = await open();
+    edit(host.querySelector(`[data-field="title"]`)!, "Changed");
+    await storedWhen((f) => f.groups[0].items[0].title === "Changed");
+
+    click(tool(host, `Earlier versions of ${FOLDER}/collection.json`));
+    await waitFor(() => button(host, "Restore"));
+    click(button(host, "Restore")!);
+    await storedWhen((f) => f.groups[0].items[0].title === "First");
+    await waitFor(() => titles(host)[0] === "First");
+    expect(news.get()).toBe(true);
+    expect(notice.get()).toContain(`${FOLDER}/collection.json is back as it was on`);
+    expect((tool(host, "Undo") as HTMLButtonElement).disabled).toBe(true);
+    dispose();
+  });
+});
+
+// --- History.tsx: earlier versions, and what was deleted ---
+
+describe("earlier versions", () => {
+  afterEach(closeResource);
+
+  test("a page's versions, from its header: empty at first, then restorable", async () => {
+    await createFile("/versions-test.md", "versions-test.md");
+    const { host, dispose } = render(() => <Editor />);
+    const history = host.querySelector('[aria-label="Earlier versions of versions-test.md"]')!;
+
+    click(history);
+    await waitFor(() => host.querySelector(".dialog-history .dialog-hint")?.textContent?.startsWith("None yet"));
+    click(button(host.querySelector(".dialog-history")!, "Close")!);
+    expect(host.querySelector(".dialog-history")).toBeNull();
+
+    type(host.querySelector("textarea")!, "title: versions-test\n\n# Second");
+    expect(await saveFile()).toBe(true);
+    click(history);
+    await waitFor(() => host.querySelectorAll(".history-list li").length === 1);
+    expect(host.querySelector(".history-detail")!.textContent).toBe("22 bytes");
+
+    // A restore that fails says so and leaves the dialog where it was.
+    const restore = intercept(() => new Response("nope", { status: 500 }));
+    try {
+      click(button(host, "Restore")!);
+      await waitFor(() => notice.get().startsWith("Couldn't restore versions-test.md"));
+      expect(host.querySelector(".dialog-history")).not.toBeNull();
+    } finally {
+      restore();
+    }
+    await waitFor(() => !button(host, "Restore")!.disabled);
+    click(button(host, "Restore")!);
+    await waitFor(() => editorContent.get() === "title: versions-test\n\n");
+    expect(host.querySelector(".dialog-history")).toBeNull();
+    await deleteFile();
+    dispose();
+  });
+
+  test("a stylesheet's versions, from the resource pane", async () => {
+    await createResource("static", "versions.css");
+    const { host, dispose } = render(() => <ResourcePane />);
+    resourceDraft.set("/* changed */\n");
+    expect(await saveResource()).toBe(true);
+    click(host.querySelector('[aria-label="Earlier versions of versions.css"]')!);
+    await waitFor(() => button(host, "Restore"));
+    click(button(host, "Restore")!);
+    await waitFor(() => resourceSaved.get().startsWith("/* Name this"));
+    await deleteResource();
+    dispose();
+  });
+
+  test("a page and a collection deleted come back from Deleted pages, and open", async () => {
+    await createFile("/deleted-test.md", "deleted-test.md");
+    await deleteFile();
+    await fetch("/edit/pages/deleted-coll/collection.json", { method: "PUT", body: '{ "groups": [] }' });
+    await fetch("/edit/pages/deleted-coll/collection.json", { method: "DELETE" });
+    const { host, dispose } = render(() => <Browser />);
+    const restoreRow = async (key: string) => {
+      click(host.querySelector('[aria-label="Deleted pages"]')!);
+      await waitFor(() => [...host.querySelectorAll(".history-label")].some((l) => l.textContent === key));
+      const li = [...host.querySelectorAll(".history-list li")].find((l) => l.querySelector(".history-label")!.textContent === key)!;
+      click(button(li, "Restore")!);
+      await waitFor(() => !host.querySelector(".dialog-history"));
+    };
+
+    await restoreRow("deleted-test.md");
+    await waitFor(() => filePath.get() === "deleted-test.md");
+    await restoreRow("deleted-coll/collection.json");
+    expect(collection.get()).toEqual({ folder: "deleted-coll" });
+    closeCollection();
+    await deleteFile();
+
+    // Nothing deleted is said, rather than shown as an empty box.
+    const restore = intercept(() => Response.json([]));
+    try {
+      click(host.querySelector('[aria-label="Deleted pages"]')!);
+      await waitFor(() => host.querySelector(".dialog-history .dialog-hint")?.textContent === "Nothing has been deleted here.");
+    } finally {
+      restore();
+    }
+    dispose();
+  });
+
+  test("a template deleted comes back from its own list, and opens", async () => {
+    await createResource("templates", "deleted-test");
+    await deleteResource();
+    const { host, dispose } = render(() => <ResourceList section="templates" />);
+    click(host.querySelector('[aria-label="Deleted templates"]')!);
+    await waitFor(() => [...host.querySelectorAll(".history-label")].some((l) => l.textContent === "deleted-test.html"));
+    const li = [...host.querySelectorAll(".history-list li")].find((l) => l.textContent!.includes("deleted-test.html"))!;
+    click(button(li, "Restore")!);
+    await waitFor(() => resource.get()?.path === "deleted-test.html");
+    await deleteResource();
     dispose();
   });
 });

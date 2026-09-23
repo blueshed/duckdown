@@ -1,8 +1,9 @@
 import { createElement, computed, when } from "@blueshed/railroad";
 import { PaneHeader } from "./PaneHeader";
+import { urlPath } from "../api";
 import {
   resource, resourceDraft, resourceDirty, pageLayout, pageIncludes,
-  closeResource, saveResource, deleteResource,
+  closeResource, saveResource, deleteResource, openResource,
 } from "../store";
 
 // A template or a stylesheet, open below the page rather than instead of it:
@@ -33,6 +34,8 @@ export function ResourcePane() {
         onsave={saveResource}
         ondelete={deleteResource}
         onclose={closeResource}
+        url={() => `/edit/${resource.peek()!.section}/${urlPath(resource.peek()!.path)}`}
+        onrestored={() => openResource(resource.peek()!)}
       />
       {when(elsewhere, () => (
         <p class="pane-note">

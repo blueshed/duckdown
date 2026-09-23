@@ -1,6 +1,7 @@
-import { createElement, computed, signal, when } from "@blueshed/railroad";
+import { createElement, Fragment, computed, signal, when } from "@blueshed/railroad";
 import { Icon } from "./Icon";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { VersionsDialog } from "./History";
 
 const NOT_SAVED = "Not saved";
 
@@ -8,8 +9,11 @@ const NOT_SAVED = "Not saved";
 // things — name what is open, say whether it is unsaved, save it, delete it —
 // so they say them the same way, in the same order, from one place.
 //
-// Delete always asks first, wherever it is: a stylesheet or a template is as
-// easy to lose as a page, and there is no undo behind any of them.
+// Delete still asks first, wherever it is, but it is no longer the end of the
+// file: the server keeps what a delete removes and what a save replaces, and
+// Earlier versions (the clock) puts any of it back. A pane that undoes its own
+// changes (the collection's) passes undo and redo, and they sit here too.
+type Flag = { get(): boolean };
 export function PaneHeader(props: {
   icon: string;
   name: { get(): string };
@@ -17,9 +21,13 @@ export function PaneHeader(props: {
   onsave: () => unknown;
   ondelete: () => unknown;
   onclose?: () => void;
+  url: () => string;              // the open file's /edit/<section>/ address
+  onrestored: () => unknown;      // read it again: a version was put back
+  undo?: { onundo: () => unknown; onredo: () => unknown; canUndo: Flag; canRedo: Flag };
 }) {
   const flash = signal("");
   const confirming = signal(false);
+  const versions = signal(false);
   const label = () => props.name.get();
 
   // A failed save leaves the pane dirty and flashes red; the notice says why.
@@ -44,6 +52,20 @@ export function PaneHeader(props: {
       <span class="pane-name">{label}</span>
       {when(props.dirty as never, () => <span class="dot" title="Unsaved changes">●</span>)}
       <span class="pane-gap" />
+      {props.undo ? <>
+        <button class="icon-btn" aria-label="Undo" title="Undo (⌘Z)"
+          disabled={computed(() => !props.undo!.canUndo.get())} onclick={props.undo.onundo}>
+          <Icon name="undo" />
+        </button>
+        <button class="icon-btn" aria-label="Redo" title="Redo (⇧⌘Z)"
+          disabled={computed(() => !props.undo!.canRedo.get())} onclick={props.undo.onredo}>
+          <Icon name="redo" />
+        </button>
+      </> : null}
+      <button class="icon-btn" aria-label={`Earlier versions of ${label()}`} title="Earlier versions"
+        onclick={() => versions.set(true)}>
+        <Icon name="history" />
+      </button>
       <button class="icon-btn danger-subtle" aria-label={`Delete ${label()}`} title="Delete" onclick={() => confirming.set(true)}>
         <Icon name="trash-2" />
       </button>
@@ -56,10 +78,14 @@ export function PaneHeader(props: {
       {when(confirming, () => (
         <ConfirmDialog
           title={`Delete ${label()}?`}
-          message="This cannot be undone."
+          message="Its last version is kept: Deleted, beside the list it is in, brings it back."
           onconfirm={remove}
           oncancel={() => confirming.set(false)}
         />
+      ))}
+      {when(versions, () => (
+        <VersionsDialog url={props.url()} name={label()} onrestored={props.onrestored}
+          oncancel={() => versions.set(false)} />
       ))}
     </div>
   );

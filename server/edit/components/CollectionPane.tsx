@@ -5,7 +5,7 @@ import { PaneHeader } from "./PaneHeader";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { Icon } from "./Icon";
 import { api, apiJson, urlPath } from "../api";
-import { speak, tell } from "../notice";
+import { speak, tell, hush, news } from "../notice";
 import {
   collection, collectionKey, closeCollection, collectionChanged, reloadBrowser,
 } from "../store";
@@ -24,9 +24,10 @@ import type { Field } from "../../collection";
 // and watch the overview redraw beside them.
 //
 // Every change writes the whole file through /edit/pages/, which is the write
-// path that drops the nav, the search index and the collection cache. There is
-// no undo in duckdown: what the pane has written is what the site serves, and
-// a bucket's versioning is the only way back.
+// path that drops the nav, the search index and the collection cache. Because
+// every change is the whole file, undo is cheap: the pane keeps the files it
+// replaced, and undo writes the one before. That lasts as long as the pane is
+// open; after that, Earlier versions (the server's history) is the way back.
 
 // The file as it is written, not as collection.ts reads it: the pane keeps
 // every key it doesn't understand (an index, prints, anything undeclared)
@@ -138,6 +139,10 @@ export function moveWithin<T>(arr: T[], from: number, to: number): void {
   arr.splice(Math.max(0, Math.min(to, arr.length)), 0, ...held);
 }
 
+// Steps an open pane can take back. Each is a whole file, so this is a bound
+// on memory rather than on patience: four hundred works is ~100KB a step.
+export const UNDO_LIMIT = 100;
+
 // A picture's file name as a starting title: "First Light.jpg" → "First
 // Light". It is a guess, shown in an input, and changed in a second.
 const titleFrom = (name: string) => name.replace(/\.[^.]+$/, "");
@@ -159,6 +164,13 @@ export function CollectionPane() {
   const busts = signal<Record<string, string>>({});
   const dragging = signal<{ path: Path; i: number } | null>(null);
   const asking = signal<{ title: string; run: () => void } | null>(null);
+  // The files this sitting has replaced, and the ones undo has stepped back
+  // from. Each is a whole file: the model is never changed in place, only
+  // replaced (change() clones), so keeping one is keeping a reference.
+  const past = signal<RawFile[]>([]);
+  const future = signal<RawFile[]>([]);
+  const canUndo = computed(() => past.get().length > 0);
+  const canRedo = computed(() => future.get().length > 0);
 
   const key = () => collectionKey(folder);
   const fileUrl = () => `/edit/pages/${urlPath(key())}`;
@@ -196,7 +208,11 @@ export function CollectionPane() {
         throw new Error("it isn't an object");
       }
       published = new Set(itemAddresses(parsed as RawFile, folder).map((a) => aliasKey(a.href)));
-      model.set(parsed as RawFile);
+      batch(() => {
+        model.set(parsed as RawFile);
+        past.set([]);
+        future.set([]);
+      });
     } catch (e) {
       // Not editable here, and saying nothing would leave an empty pane
       // looking like an empty collection.
@@ -230,10 +246,50 @@ export function CollectionPane() {
     if (!next) return Promise.resolve();
     fn(next);
     batch(() => {
+      past.update((p) => [...p.slice(1 - UNDO_LIMIT), model.peek()!]);
+      future.set([]);
       model.set(next);
       dirty.set(true);
     });
     return write();
+  };
+
+  // One step back, or forward again, written like any other change. An old
+  // address a rename kept goes with the rename: the file it is undone to never
+  // had it, and news of it on screen is no longer true. A failure stays said.
+  const step = (from: typeof past, to: typeof past) => {
+    const stack = from.peek();
+    if (!stack.length) return Promise.resolve();
+    kept.length = 0;
+    if (news.peek()) hush();
+    batch(() => {
+      to.update((t) => [...t, model.peek()!]);
+      from.set(stack.slice(0, -1));
+      model.set(stack.at(-1)!);
+      dirty.set(true);
+    });
+    return write();
+  };
+  const undo = () => step(past, future);
+  const redo = () => step(future, past);
+
+  // ⌘Z and ⇧⌘Z (or Ctrl), anywhere in the pane but a field being typed in,
+  // which has its own undo for the words not yet committed.
+  const onkeydown = (e: KeyboardEvent) => {
+    const key = e.key.toLowerCase();
+    if (!(e.metaKey || e.ctrlKey) || (key !== "z" && key !== "y")) return;
+    const tag = (e.target as HTMLElement).tagName;
+    if (tag === "INPUT" || tag === "TEXTAREA") return;
+    e.preventDefault();
+    if (e.shiftKey || key === "y") redo();
+    else undo();
+  };
+
+  // A version put back from Earlier versions is a new starting point: the
+  // sitting's steps were steps from a file that is no longer there.
+  const restored = async () => {
+    await load();
+    collectionChanged();
   };
 
   const removeFile = async () => {
@@ -538,9 +594,11 @@ export function CollectionPane() {
   const groups = computed(() => (model.get()?.groups ?? []).map((_, i) => ({ i })));
 
   return (
-    <div class="panel-collection">
+    <div class="panel-collection" tabindex="-1" onkeydown={onkeydown}>
       <PaneHeader icon="layout-grid" name={name} dirty={dirty}
-        onsave={write} ondelete={removeFile} onclose={closeCollection} />
+        onsave={write} ondelete={removeFile} onclose={closeCollection}
+        url={fileUrl} onrestored={restored}
+        undo={{ onundo: undo, onredo: redo, canUndo, canRedo }} />
       {when(model, () => (
         <div class="collection-body">
           {when(() => !uploads.get(), () => (
@@ -561,7 +619,7 @@ export function CollectionPane() {
       {when(asking, () => (
         <ConfirmDialog
           title={asking.peek()!.title}
-          message="This cannot be undone: duckdown has no undo."
+          message="Undo (⌘Z) brings it back."
           confirmLabel="Remove"
           onconfirm={() => { const run = asking.peek()!.run; asking.set(null); run(); }}
           oncancel={() => asking.set(null)}

@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased
+
+- **Nothing the editor writes is lost.** Before a save replaces a file, or a
+  delete removes one, what was there is kept in the site's `.history/` folder
+  — beside `pages/`, never served or exported, on disk or in the bucket. The
+  clock in each pane's header, **Earlier versions**, lists them and
+  **Restore** puts one back (keeping what it replaces, so a restore can be
+  taken back too); **Deleted**, at the top of the page tree and of each
+  resource list, brings back a deleted file. A sitting of saves keeps one
+  version — the file as it was before it — so the collection pane, which
+  writes on every change, doesn't fill it; a delete or a restore always keeps
+  one; the last 30 are kept per file. A scaffolded site's `.gitignore` gets
+  `site/.history/`.
+- **Undo and redo in the collection pane**: ⌘Z / ⇧⌘Z (or Ctrl, or Ctrl+Y),
+  and arrows in its header, through every change since it opened. Each step
+  is written, like any other change. Removing a group still asks, and now says
+  undo brings it back.
+- **An exported alias ending `.html` answers.** `/old.html` is written as
+  `dist/old.html`, the file a static host (and `serve.ts`) opens for it; it was
+  written as `old/index.html`, which nothing asked for.
+- **An alias can't write outside `dist/`.** One with a `.` or `..` segment is
+  left out of the export and reported as a problem (so `--strict` fails on it).
+
 ## 0.5.1 — 2026-09-23
 
 - **A site published at its railway.app address is indexable there.** The

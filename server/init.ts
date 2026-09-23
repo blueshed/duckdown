@@ -125,7 +125,7 @@ DUCKDOWN_ORIGIN=
   // lines already, and needs these.
   const ignore = join(root, ".gitignore");
   const have = existsSync(ignore) ? readFileSync(ignore, "utf8").split("\n").map((l) => l.trim()) : [];
-  const missing = ["node_modules", "dist/", ".env", "*.pid", ".DS_Store", "site/users.json"].filter((l) => !have.includes(l));
+  const missing = ["node_modules", "dist/", ".env", "*.pid", ".DS_Store", "site/users.json", "site/.history/"].filter((l) => !have.includes(l));
   if (missing.length) {
     const lead = have.length && have.at(-1) !== "" ? "\n" : "";
     appendFileSync(ignore, `${lead}${missing.join("\n")}\n`);

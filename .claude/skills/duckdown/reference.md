@@ -472,8 +472,10 @@ aliases: /older-place.html
 They are matched on the **decoded** address, so an old slug holding a quote or
 a curly apostrophe still answers. `bun run export` writes each alias as a small
 redirect page (canonical link plus meta refresh) under the decoded name, so a
-published site keeps them too; an alias that is already a page is left alone
-and said.
+published site keeps them too: `/older-place.html` as the file
+`older-place.html`, `/old-place` as `old-place/index.html`. An alias that is
+already a page is left alone and said, and one with a `.` or `..` segment is
+left out and said.
 
 ### Editing one in the editor
 
@@ -511,10 +513,9 @@ pane does:
   `static/images/`. Name the item and put the file there yourself.
 
 Every change writes the whole file at once and the preview redraws with it.
-**There is no undo in duckdown** — not here, not anywhere else: removing a
-work or a group asks first, and that is the whole of the safety net. On S3,
-turn on the bucket's versioning and a bad afternoon is recoverable; on disk,
-keep the site in git.
+**Undo** (⌘Z, or the header's arrows) steps back through every change made
+since the pane opened, and **Redo** (⇧⌘Z) forward again; each step is written.
+Beyond that, **Earlier versions** has the file as it was before each sitting.
 
 Moving or removing works can shift a `-1`/`-2` or `item-<n>` address, and
 nothing is kept for those: give a work that matters its own `slug`.
@@ -678,7 +679,8 @@ A page's `layout:` chooses the template (`layout: post` → `templates/post.html
 - **Preview** (right): what you'd see. With a page open, the page as the site will show it, rendered by the same code — its own template and the stylesheets it links, the navigation, the `{{pages}}` listing, wiki links resolved from the page's folder — sandboxed, so no scripts run. A template open in the pane below is used in place of the saved one when it's the one this page wears, so you watch the page change as you write it; a stylesheet goes straight into the preview's head as you type, after the saved one, so it wins.
 - **With no page open**, whatever you're composing with gets a sample page of its own: for a stylesheet, a bit of everything `site.css` styles; for a template, a sample page put through it, with the site's real navigation. So a template or a stylesheet can be written with nothing else on screen.
 - **Header**: *Resources* (the sidebar), *View* (the page on the site), *Logout*.
-- **Deleting always asks first**, wherever it is — a page, a stylesheet, a template, a work in a collection. **There is no undo in duckdown**: asking is the whole of the safety net, and what is gone is gone. On S3, turn on the bucket's versioning; on disk, keep the site in git.
+- **Deleting always asks first**, wherever it is — a page, a stylesheet, a template, a work in a collection — and nothing deleted is gone. **Earlier versions** (the clock in every pane's header) lists what a file was before each sitting of saves, newest first, the last 30; **Restore** puts one back, and keeps what it replaces. **Deleted** (at the top of the page tree, and of each resource list) brings back a deleted file. They live in the site's `.history/` folder, beside `pages/` and outside everything the site serves or exports — a site kept in git ignores it (`site/.history/`). The collection pane also has **Undo** and **Redo** for its own changes while it is open.
+- When writing files directly (not through the editor), no version is kept: that is git's job.
 - Anything that fails shows in a red notice at the foot of the screen until dismissed; news that isn't a failure (a renamed work keeping its old address) shows there in the accent colour.
 
 ## Search

@@ -3,7 +3,7 @@ import { describe, test, expect, spyOn } from "bun:test";
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "fs";
 import { join } from "path";
 import { RUN, SITE } from "./helpers";
-import { exportSite, outPath, brokenLinks, main } from "../server/export";
+import { exportSite, outPath, aliasFile, brokenLinks, main } from "../server/export";
 import { LocalStorage } from "../server/storage";
 import { searchChanged } from "../server/search";
 import { collectionsChanged } from "../server/collection";
@@ -333,6 +333,34 @@ describe("collections", () => {
       writeFileSync(file, before);
       collectionsChanged();
       searchChanged();
+    }
+  });
+
+  test("an alias is written as the file a request for it opens, and never outside dist/", () => {
+    expect(aliasFile("/first-light-1961")).toBe("first-light-1961/index.html");
+    expect(aliasFile("/old/place/")).toBe("old/place/index.html");
+    // /legacy.html is opened as legacy.html — by serve.ts and by a static host.
+    expect(aliasFile("/legacy.html")).toBe("legacy.html");
+    expect(aliasFile("/")).toBe("index.html");
+    expect(aliasFile("../../escaped")).toBeNull();
+    expect(aliasFile("/a/./b")).toBeNull();
+    expect(aliasFile("/a/../../b")).toBeNull();
+  });
+
+  test("a page's .html alias answers in dist/, and one that climbs out is left out and said", async () => {
+    const dir = join(RUN, "alias-climb", "dist");
+    const page = join(SITE, "pages", "moved.md");
+    const said: string[] = [];
+    writeFileSync(page, "title: Moved\naliases: /legacy.html\naliases: ../../escaped\n\n# Moved\n");
+    try {
+      const count = await exportSite({ out: dir, origin: "https://example.com", say: (l) => said.push(l) });
+      expect(read(dir, "legacy.html")).toContain('<link rel="canonical" href="/moved.html">');
+      expect(existsSync(join(RUN, "escaped"))).toBe(false);
+      expect(existsSync(join(RUN, "alias-climb", "escaped"))).toBe(false);
+      expect(said.join("\n")).toContain("alias ../../escaped climbs out of the site");
+      expect(count.problems).toBe(1);
+    } finally {
+      rmSync(page);
     }
   });
 

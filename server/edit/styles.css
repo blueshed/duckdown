@@ -214,6 +214,12 @@ button:hover {
   background: var(--border);
 }
 
+/* Undo with nothing to undo, Restore while one is running. */
+button:disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
 button.primary {
   background: var(--accent);
   border-color: var(--accent);
@@ -544,6 +550,40 @@ button.danger-subtle:hover {
   flex-direction: column;
   gap: 6px;
   font-size: 13px;
+}
+
+/* Earlier versions and Deleted: a list of times (or names), each with Restore. */
+.dialog-history {
+  width: min(440px, calc(100vw - 32px));
+}
+
+.history-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+
+.history-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+
+.history-label {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.history-detail {
+  font-size: 12px;
+  color: var(--text-dim);
+  white-space: nowrap;
 }
 
 .dialog-actions {

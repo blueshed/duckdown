@@ -1,11 +1,12 @@
 import { createElement } from "@blueshed/railroad";
 import {
-  ArrowDown, ArrowUp, Copy, CornerLeftUp, Droplet, ExternalLink, FilePlus, FileText,
-  Folder, FolderPlus, Image, ImagePlus, LayoutGrid, LayoutTemplate, LogOut, Plus,
-  RefreshCw, Save, Trash2, Upload, X,
+  ArchiveRestore, ArrowDown, ArrowUp, Copy, CornerLeftUp, Droplet, ExternalLink, FilePlus, FileText,
+  Folder, FolderPlus, History, Image, ImagePlus, LayoutGrid, LayoutTemplate, LogOut, Plus,
+  Redo2, RefreshCw, RotateCcw, Save, Trash2, Undo2, Upload, X,
 } from "lucide-static";
 
 const ICONS: Record<string, string> = {
+  "archive-restore": ArchiveRestore,
   "arrow-down": ArrowDown,
   "arrow-up": ArrowUp,
   "copy": Copy,
@@ -16,15 +17,19 @@ const ICONS: Record<string, string> = {
   "file-text": FileText,
   "folder": Folder,
   "folder-plus": FolderPlus,
+  "history": History,
   "image": Image,
   "image-plus": ImagePlus,
   "layout-grid": LayoutGrid,
   "layout-template": LayoutTemplate,
+  "redo": Redo2,
   "refresh-cw": RefreshCw,
+  "rotate-ccw": RotateCcw,
   "log-out": LogOut,
   "plus": Plus,
   "save": Save,
   "trash-2": Trash2,
+  "undo": Undo2,
   "upload": Upload,
   "x": X,
 };

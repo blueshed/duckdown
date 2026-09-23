@@ -2,9 +2,10 @@ import { createElement, signal, effect, list, when } from "@blueshed/railroad";
 import type { FileEntry, FolderEntry, Listing } from "../../storage";
 import { Icon } from "./Icon";
 import { NewDialog, type NewKind } from "./NewDialog";
+import { DeletedDialog } from "./History";
 import { apiJson, urlPath } from "../api";
 import {
-  loadFile, createFile, createCollection, browserRevision, openCollection, COLLECTION_FILE,
+  loadFile, createFile, createCollection, browserRevision, openCollection, reloadBrowser, COLLECTION_FILE,
 } from "../store";
 
 export const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name);
@@ -14,6 +15,17 @@ export function Browser() {
   const folders = signal<FolderEntry[]>([]);
   const path = signal("");
   const newKind = signal<NewKind | null>(null);
+  const deleted = signal(false);
+
+  // A page brought back opens, as it would have if you had just made it; a
+  // collection opens in its pane.
+  const restored = (key: string) => {
+    reloadBrowser();
+    if (key === COLLECTION_FILE || key.endsWith(`/${COLLECTION_FILE}`)) {
+      return openCollection(key.slice(0, Math.max(key.length - COLLECTION_FILE.length - 1, 0)));
+    }
+    return loadFile(key);
+  };
 
   const load = async (folder: string) => {
     path.set(folder);
@@ -65,6 +77,9 @@ export function Browser() {
         <button class="icon-btn" aria-label="New collection" title="New collection" onclick={() => newKind.set("collection")}>
           <Icon name="layout-grid" />
         </button>
+        <button class="icon-btn" aria-label="Deleted pages" title="Deleted pages" onclick={() => deleted.set(true)}>
+          <Icon name="archive-restore" />
+        </button>
       </div>
       <ul class="file-list">
         {when(
@@ -94,6 +109,9 @@ export function Browser() {
           oncreate={onCreate}
           oncancel={() => newKind.set(null)}
         />
+      ))}
+      {when(deleted, () => (
+        <DeletedDialog section="pages" onrestored={restored} oncancel={() => deleted.set(false)} />
       ))}
     </div>
   );
