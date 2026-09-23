@@ -430,17 +430,28 @@ sits in the tree beside the pages of its folder, with a grid icon; open a
 folder's index page and its collection opens beneath it by itself. What the
 pane does:
 
-- **Titles and captions** are edited in place. Every other key on an item — a
-  year, an index, `slug`, `aliases` — is kept exactly where it was found, and
-  so is everything around the groups (`fields`, `images`, `labels`).
+- **Starting one**: the grid icon in the tree's header asks for a folder name
+  and writes `collection.json` (picture, title and caption fields, pictures
+  under `static/images/<folder>/`), an each: page `item.md`, and an `index.md`
+  with `{{items}}` if the folder has none — then opens it with the pane below.
+- **The fields** are edited in place, one labelled input per declared field (a
+  `long` one is a text box); with no `fields` in the file, title and caption.
+  Every other key on an item — `slug`, `aliases`, anything undeclared — is kept
+  exactly where it was found, and so is everything around the groups
+  (`fields`, `images`, `labels`).
+- **Renaming keeps the old address.** When an edit moves a work's address (its
+  slug comes from its title), the old one goes into its `aliases` — a 301 to
+  the new one — and the message line says so. Only an address the file had
+  when you opened it: a work added this sitting was never published. Renaming
+  back takes the alias out again.
 - **Order**: drag a work by its picture, within its group or into another, or
   use the up and down controls. Groups move with theirs.
 - **Groups**: add one, add a subgroup inside one, rename it (the heading edits
   `label` when the group has one, `name` when it hasn't), or remove it.
 - **Pictures**: drop one on a group, or click *Drop a picture here* to choose
-  it. The original is written where `images` says its pictures live and a
-  128px thumbnail beside it, named by the collection's own `suffix` and
-  `extension` — the new work then needs a title and a caption. Dropping a
+  it. The original is written where `images` says its pictures live (into the
+  image field) and a 128px thumbnail beside it, named by the collection's own
+  `suffix` and `extension` — the new work then needs its fields filled in. Dropping a
   picture **on a work's picture** replaces it in place, under the same file
   name, so the work keeps its address and every link to it goes on working.
 - A collection whose pictures live off the site (a bucket, a CDN) says so and
@@ -453,9 +464,8 @@ work or a group asks first, and that is the whole of the safety net. On S3,
 turn on the bucket's versioning and a bad afternoon is recoverable; on disk,
 keep the site in git.
 
-One thing to know before renaming: an item's address comes from its title, so
-renaming a work moves its page. Add the old address to the item's `aliases` in
-the file if anything links to it.
+Moving or removing works can shift a `-1`/`-2` or `item-<n>` address, and
+nothing is kept for those: give a work that matters its own `slug`.
 
 ### Styling
 

@@ -225,8 +225,16 @@ tree beside the folder's pages, with a grid icon; and opening a folder's index
 page brings its collection up beneath it by itself, so you edit the works and
 watch the overview redraw next to them.
 
-- **Titles and captions** are edited where they sit. Everything else on an item
-  — a year, a `slug`, its `aliases` — is left exactly as it was.
+- **Starting one**: the grid icon at the top of the tree asks for a folder
+  name, and writes the data, an `item.md` for the works' pages, and an
+  `index.md` showing them — then opens it, ready for pictures.
+- **The fields** are edited where they sit, one labelled box per field the file
+  declares. Anything else on an item — a `slug`, its `aliases` — is left
+  exactly as it was.
+- **Renaming a work** changes its address, because the slug comes from the
+  title — so the old address goes into its `aliases` and keeps leading there,
+  and the message line tells you. A work you added this sitting was never
+  published, so it gets none.
 - **Order**: drag a work by its picture, inside its group or into another one,
   or use the up and down arrows. Groups move with theirs.
 - **Groups**: add one, add a subgroup inside one, rename it, remove it.
@@ -249,9 +257,8 @@ preview and the site follow at once.
 Two things the pane can't do for you. A collection whose pictures live off the
 site — a bucket, a CDN — says so and offers no way to add one: the editor can
 only write this site's own `static/images/`, so name the item and put the file
-where it belongs yourself. And renaming a work changes its address, because
-the slug comes from the title; if anything links to the old one, add it to the
-item's `aliases`.
+where it belongs yourself. And moving or removing works can shift an address
+ending `-1` or `-2`; give a work that matters a `slug` of its own.
 
 ## Old addresses
 
