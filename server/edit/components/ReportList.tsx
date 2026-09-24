@@ -32,14 +32,18 @@ export function ReportList() {
           {when(
             () => path.get() !== "",
             () => (
-              <li class="folder" onclick={() => load(path.peek().split("/").slice(0, -1).join("/"))}>
-                <Icon name="corner-left-up" size={12} /> ..
+              <li class="folder">
+                <button class="row" aria-label="Up a folder" title="Up a folder" onclick={() => load(path.peek().split("/").slice(0, -1).join("/"))}>
+                  <Icon name="corner-left-up" size={12} /> ..
+                </button>
               </li>
             ),
           )}
           {list(folders, (f) => f.path, (f$) => (
-            <li class="folder" onclick={() => load(f$.peek().path.replace(/^\//, ""))}>
-              <Icon name="folder" size={12} /> {f$.map((f) => f.name)}
+            <li class="folder">
+              <button class="row" onclick={() => load(f$.peek().path.replace(/^\//, ""))}>
+                <Icon name="folder" size={12} /> {f$.map((f) => f.name)}
+              </button>
             </li>
           ))}
           {list(files, (f) => f.path, (f$) => (

@@ -44,9 +44,11 @@ export function ResourceList({ section }: { section: "templates" | "static" }) {
       <div class="sidebar-content">
         <ul class="file-list">
           {list(files, (f) => f.path, (row) => (
-            <li onclick={() => openResource({ section, path: row.peek().name } as Resource)}>
-              <Icon name={section === "templates" ? "layout-template" : "droplet"} size={12} />
-              {row.map((f) => f.name)}
+            <li>
+              <button class="row" onclick={() => openResource({ section, path: row.peek().name } as Resource)}>
+                <Icon name={section === "templates" ? "layout-template" : "droplet"} size={12} />
+                {row.map((f) => f.name)}
+              </button>
             </li>
           ))}
         </ul>

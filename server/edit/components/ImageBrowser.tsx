@@ -110,20 +110,27 @@ export function ImageBrowser() {
           {when(
             () => path.get() !== "",
             () => (
-              <li class="folder" onclick={() => load(path.peek().split("/").slice(0, -1).join("/"))}>
-                <Icon name="corner-left-up" size={12} /> ..
+              <li class="folder">
+                <button class="row" aria-label="Up a folder" title="Up a folder" onclick={() => load(path.peek().split("/").slice(0, -1).join("/"))}>
+                  <Icon name="corner-left-up" size={12} /> ..
+                </button>
               </li>
             ),
           )}
           {/* Keyed rows get a signal per row, not the item: read it with .map/.peek */}
           {list(folders, (f) => f.path, (f$) => (
-            <li class="folder" onclick={() => load(f$.peek().path.replace(/^\//, ""))}>
-              <Icon name="folder" size={12} /> {f$.map((f) => f.name)}
+            <li class="folder">
+              <button class="row" onclick={() => load(f$.peek().path.replace(/^\//, ""))}>
+                <Icon name="folder" size={12} /> {f$.map((f) => f.name)}
+              </button>
             </li>
           ))}
           {list(files, (f) => f.path, (f$) => (
-            <li onclick={() => selected.set(f$.peek().name)}>
-              <img class="thumb" src={f$.map((f) => `/edit/browse${urlPath(f.path)}?thumb=32`)} alt="" loading="lazy" /> {f$.map((f) => f.name)}
+            <li>
+              <button class="row" onclick={() => selected.set(f$.peek().name)}
+                aria-pressed={computed(() => String(selected.get() === f$.get().name))}>
+                <img class="thumb" src={f$.map((f) => `/edit/browse${urlPath(f.path)}?thumb=32`)} alt="" loading="lazy" /> {f$.map((f) => f.name)}
+              </button>
             </li>
           ))}
         </ul>
@@ -140,7 +147,8 @@ export function ImageBrowser() {
         <div class="upload-area">
           <label class="upload-label">
             <Icon name="upload" /> {when(uploading, () => <span>Uploading...</span>, () => <span>Upload</span>)}
-            <input type="file" multiple onchange={upload} style="display:none;" />
+            {/* Hidden from sight, not from the keyboard: Tab reaches it, and the label shows its focus. */}
+            <input type="file" multiple onchange={upload} class="visually-hidden" />
           </label>
         </div>
       </div>

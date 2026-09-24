@@ -449,6 +449,12 @@ export function CollectionPane() {
       }} />
   ) as unknown as HTMLInputElement;
 
+  // What a button does with the keyboard, for the two places that can't be a
+  // <button> because the chooser's <input> sits inside them.
+  const onpress = (run: () => void) => (e: KeyboardEvent) => {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); run(); }
+  };
+
   type Row = { i: number; item: RawItem };
 
   // One input per declared field, named as the file labels it: the label is
@@ -495,9 +501,7 @@ export function CollectionPane() {
             aria-label="Replace this picture (same file name)"
             title="Replace this picture (same file name)"
             onclick={() => input.click()}
-            onkeydown={(e: KeyboardEvent) => {
-              if (e.key === "Enter" || e.key === " ") { e.preventDefault(); input.click(); }
-            }}
+            onkeydown={onpress(() => input.click())}
             ondragover={(e: DragEvent) => e.preventDefault()}
             ondrop={(e: DragEvent) => {
               e.preventDefault();
@@ -564,7 +568,8 @@ export function CollectionPane() {
         {/* An item begins as its picture — or, in a collection with no
             picture field, as a row of empty fields. */}
         {imageField() ? when(uploads, () => (
-          <div class="item-drop" onclick={() => input.click()}
+          <div class="item-drop" role="button" tabindex="0"
+            onclick={() => input.click()} onkeydown={onpress(() => input.click())}
             ondragover={(e: DragEvent) => e.preventDefault()}
             ondrop={(e: DragEvent) => {
               e.preventDefault();

@@ -137,10 +137,6 @@ button.header-link:hover {
 
 .file-list li {
   display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 8px;
-  cursor: pointer;
   border-radius: 4px;
   font-size: 13px;
 }
@@ -149,14 +145,34 @@ button.header-link:hover {
   background: var(--border);
 }
 
-/* A report is a link to its own tab: the whole row, in the row's colour. */
-.file-list a.report {
+/* A row is a button (a report, a link to its own tab): the whole row, in the
+   row's colour, reachable by Tab and opened by Enter. */
+.file-list :is(button.row, a.report) {
   display: flex;
   align-items: center;
   gap: 6px;
   flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 4px;
+  background: none;
   color: inherit;
+  font: inherit;
+  text-align: left;
   text-decoration: none;
+  cursor: pointer;
+}
+
+.file-list :is(button.row, a.report):focus-visible,
+.item-drop:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* The page that is open, and the image that is chosen. */
+.file-list button.row:is([aria-current], [aria-pressed="true"]) {
+  background: var(--border);
 }
 
 .file-list .folder {
@@ -482,6 +498,7 @@ button.danger-subtle:hover {
 }
 
 .upload-label {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -496,6 +513,21 @@ button.danger-subtle:hover {
 
 .upload-label:hover {
   background: var(--border);
+}
+
+.upload-label:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Out of sight, still in the tab order and the accessibility tree. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 /* --- Dialog --- */

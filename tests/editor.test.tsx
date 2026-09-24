@@ -86,6 +86,9 @@ function render(node: () => Node) {
 const rows = (root: ParentNode) => [...root.querySelectorAll(".file-list li")].map((li) => li.textContent!.trim());
 const row = (root: ParentNode, text: string) =>
   [...root.querySelectorAll(".file-list li")].find((li) => li.textContent!.trim() === text) as HTMLElement;
+// A row's control: a button, so the tree is reachable by Tab (a report's is its link).
+const rowControl = (root: ParentNode, text: string) =>
+  row(root, text).querySelector("button.row, a.report") as HTMLElement;
 const button = (root: ParentNode, text: string) =>
   [...root.querySelectorAll("button")].find((b) => b.textContent!.trim().startsWith(text)) as HTMLButtonElement | undefined;
 const click = (el: Element) => (el as HTMLElement).click();
@@ -447,7 +450,7 @@ describe("ResourceList", () => {
     expect(host.querySelector(".pane-path")!.textContent).toBe("/templates");
     expect(rows(host)).not.toContain("favicon.ico");
 
-    click(row(host, "site.html"));
+    click(rowControl(host, "site.html"));
     await waitFor(() => resource.peek()?.path === "site.html");
     expect(resource.peek()?.section).toBe("templates");
     dispose();
@@ -580,14 +583,18 @@ describe("Browser", () => {
     expect(rows(host).some((r) => r.endsWith(".css"))).toBe(false);
     expect(row(host, "index.md").querySelector(".lucide-file-text")).not.toBeNull();
 
-    click(row(host, "guide"));
+    click(rowControl(host, "guide"));
     await waitFor(() => rows(host).includes("pages.md"));
     expect(host.querySelector(".browser-header")!.textContent).toContain("/guide");
-    click(row(host, ".."));
+    click(rowControl(host, ".."));
     await waitFor(() => rows(host).includes("guide")); // guide/ has an index.md too: wait for the root
 
-    click(row(host, "index.md"));
+    // Every row is a button, so the tree is Tab and Enter; the open page says so.
+    expect([...host.querySelectorAll(".file-list li")].every((li) => li.querySelector("button.row"))).toBe(true);
+    click(rowControl(host, "index.md"));
     await waitFor(() => filePath.get() === "index.md");
+    await waitFor(() => rowControl(host, "index.md").getAttribute("aria-current") === "page");
+    expect(host.querySelectorAll("[aria-current]")).toHaveLength(1);
     dispose();
   });
 
@@ -1212,8 +1219,10 @@ describe("ImageBrowser", () => {
     await waitFor(() => rows(host).includes("logo.svg"));
     expect(row(host, "logo.svg").querySelector("img")!.getAttribute("src")).toBe("/edit/browse/logo.svg?thumb=32");
 
-    click(row(host, "logo.svg"));
+    expect(rowControl(host, "logo.svg").getAttribute("aria-pressed")).toBe("false");
+    click(rowControl(host, "logo.svg"));
     await waitFor(() => host.querySelector(".image-preview"));
+    expect(rowControl(host, "logo.svg").getAttribute("aria-pressed")).toBe("true");
     expect(host.querySelector(".image-preview img")!.getAttribute("src")).toBe("/static/images/logo.svg");
     click(button(host, "Copy Markdown")!);
     expect(writeText).toHaveBeenCalledWith("![logo.svg](/static/images/logo.svg)");
@@ -1238,19 +1247,22 @@ describe("ImageBrowser", () => {
 
     // Upload into it: nothing chosen does nothing; a file lands and is listed
     const input = host.querySelector('input[type="file"]') as HTMLInputElement;
+    // Out of sight but not display:none, which would take it out of the tab order.
+    expect(input.className).toBe("visually-hidden");
+    expect(input.closest("label")!.textContent).toContain("Upload");
     Object.defineProperty(input, "files", { value: [], configurable: true });
     input.dispatchEvent(new Event("change"));
     Object.defineProperty(input, "files", { value: [new File(["<svg/>"], "a b.svg", { type: "image/svg+xml" })], configurable: true });
     input.dispatchEvent(new Event("change"));
     await waitFor(() => rows(host).includes("a b.svg"));
     expect(row(host, "a b.svg").querySelector("img")!.getAttribute("src")).toBe("/edit/browse/My%20shots/a%20b.svg?thumb=32");
-    click(row(host, "a b.svg"));
+    click(rowControl(host, "a b.svg"));
     await waitFor(() => host.querySelector(".image-preview"));
     expect(host.querySelector(".image-preview img")!.getAttribute("src")).toBe("/static/images/My%20shots/a%20b.svg");
 
-    click(row(host, ".."));
+    click(rowControl(host, ".."));
     await waitFor(() => rows(host).includes("My shots"));
-    click(row(host, "My shots"));
+    click(rowControl(host, "My shots"));
     await waitFor(() => rows(host).includes("a b.svg"));
 
     click(host.querySelector('[aria-label="Close resources"]')!);
@@ -1286,13 +1298,13 @@ describe("ImageBrowser", () => {
     click(tab("reports"));
     await waitFor(() => rows(host).includes("2026-09"));
     expect(rows(host)).toEqual(["2026-09", "2026-08"]);
-    click(row(host, "2026-09"));
+    click(rowControl(host, "2026-09"));
     await waitFor(() => rows(host).includes("2026-09-24.md"));
     expect(rows(host)).toEqual(["..", "2026-09-24.md", "2026-09-23.md"]);
     const link = row(host, "2026-09-24.md").querySelector("a")!;
     expect(link.getAttribute("href")).toBe("/edit/reports/2026-09/2026-09-24.md");
     expect(link.getAttribute("target")).toBe("_blank");
-    click(row(host, ".."));                                   // and back up to the months
+    click(rowControl(host, ".."));                                   // and back up to the months
     await waitFor(() => rows(host).includes("2026-08"));
     expect(rows(host)).toEqual(["2026-09", "2026-08"]);
     rmSync(join(SITE, "reports"), { recursive: true, force: true });
@@ -1544,6 +1556,15 @@ describe("CollectionPane", () => {
     expect(titles(host)).toHaveLength(4);
 
     click(drop);  // opens the chooser; the choosing is the next line
+    // And from the keyboard, as a button: Enter and Space open it, other keys don't.
+    expect(drop.getAttribute("role")).toBe("button");
+    expect(drop.getAttribute("tabindex")).toBe("0");
+    const chooser = drop.querySelector("input")!;
+    const opened = mock(() => {});
+    chooser.click = opened;
+    for (const key of ["Enter", " ", "a"]) drop.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
+    expect(opened).toHaveBeenCalledTimes(2);
+    delete (chooser as { click?: unknown }).click;
     choose(drop.querySelector("input")!, picture("Fifth Work.svg"));
     await storedWhen((f) => f.groups[0].items.length === 3);
     const added = (await stored()).groups[0].items[2];
@@ -1879,9 +1900,9 @@ describe("CollectionPane", () => {
     // And the file itself is in the tree, opening as a pane rather than as JSON.
     const { host, dispose } = render(() => <Browser />);
     await waitFor(() => rows(host).includes("gallery"));
-    click(row(host, "gallery"));
+    click(rowControl(host, "gallery"));
     await waitFor(() => rows(host).includes("collection.json"));
-    click(row(host, "collection.json"));
+    click(rowControl(host, "collection.json"));
     expect(collection.get()).toEqual({ folder: "gallery" });
     expect(filePath.get()).toBe(`${FOLDER}/index.md`);   // the page in the middle stayed put
     closeCollection();
