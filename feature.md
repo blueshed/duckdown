@@ -69,7 +69,7 @@ This is the feature map. Bugs and tasks live in `todo.jsonl`.
 - [x] Items in search, the sitemap and the export
 - [x] Pictures outside the site (a bucket, a CDN), thumbnails named by a rule
 - [x] Editor: start one, edit its fields as works, upload pictures with thumbnails, renaming keeps the old address
-- [x] The 0.4 shape removed (0.7): `layout` in the data is a problem, and a file with no `fields` is `src`/`title`/`caption`
+- [x] The 0.4 shape removed (0.8): `layout` in the data is a problem, and a file with no `fields` is `src`/`title`/`caption`
 
 ### Auth
 - [x] Login page (`GET/POST /login`) — HTML file + HTMLRewriter

@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.8.0 — 2026-09-24
 
 - **A shared link shows a card.** `{{description}}` now writes the Open
   Graph tags that chat apps and social sites read when a link is pasted:

@@ -1075,6 +1075,9 @@ describe("ImageBrowser", () => {
     const link = row(host, "2026-09-24.md").querySelector("a")!;
     expect(link.getAttribute("href")).toBe("/edit/reports/2026-09/2026-09-24.md");
     expect(link.getAttribute("target")).toBe("_blank");
+    click(row(host, ".."));                                   // and back up to the months
+    await waitFor(() => rows(host).includes("2026-08"));
+    expect(rows(host)).toEqual(["2026-09", "2026-08"]);
     rmSync(join(SITE, "reports"), { recursive: true, force: true });
 
     click(tab("images"));
