@@ -6,6 +6,7 @@ import { api, apiJson, urlPath } from "../api";
 import { speak } from "../notice";
 import { closeImages } from "../store";
 import { ResourceList } from "./ResourceList";
+import { ReportList } from "./ReportList";
 
 export function ImageBrowser() {
   const files = signal<FileEntry[]>([]);
@@ -72,7 +73,8 @@ export function ImageBrowser() {
 
   // Three kinds of resource, one chooser. Images are inserted into the page at
   // the cursor; a stylesheet or a template opens below the page to be edited.
-  const tab = signal<"images" | "styles" | "templates">("images");
+  // And what the site's own tasks reported, to read.
+  const tab = signal<"images" | "styles" | "templates" | "reports">("images");
   const on = (name: string) => tab.map((t) => (t === name ? "section on" : "section"));
 
   return (
@@ -88,10 +90,12 @@ export function ImageBrowser() {
         <button class={on("images")} onclick={() => tab.set("images")}>images</button>
         <button class={on("styles")} onclick={() => tab.set("styles")}>css</button>
         <button class={on("templates")} onclick={() => tab.set("templates")}>templates</button>
+        <button class={on("reports")} onclick={() => tab.set("reports")}>reports</button>
       </div>
 
       {when(tab.map((t) => t === "styles"), () => <ResourceList section="static" />)}
       {when(tab.map((t) => t === "templates"), () => <ResourceList section="templates" />)}
+      {when(tab.map((t) => t === "reports"), () => <ReportList />)}
 
       {when(tab.map((t) => t === "images"), () => <>
       <div class="browser-header">

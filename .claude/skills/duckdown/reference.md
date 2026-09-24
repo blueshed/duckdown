@@ -43,6 +43,7 @@
 │   └── images/
 ├── templates/
 │   └── site.html         wraps every page and links the stylesheets
+├── reports/              optional: what the site's own tasks leave for its editors (see The editor)
 └── users.json            who can sign in
 ```
 
@@ -685,10 +686,11 @@ A page's `layout:` chooses the template (`layout: post` → `templates/post.html
 - At `/edit`. Signing in lands there; `/login` when already signed in goes straight there; the home page's "Login to edit" link does the same.
 - **The tree** (left): the site's folders and pages, and nothing else — everything a page is composed with lives outside `pages/`. Click to open, `..` to go up. A folder's `collection.json` is listed there too, with a grid icon, and opens as the collection pane rather than as JSON. Three buttons in the header make a **new page**, a **new folder** (`folder/index.md`, titled with the folder's name) and a **new collection** (see [Editing one in the editor](#editing-one-in-the-editor)). None ever overwrites — each says when a name is taken.
 - **Editing** (middle): Save or ⌘⏎. The button lights up while there are unsaved changes, flashes green for "Saved", and red for "Not saved" (the notice says why). The bin deletes the page, after asking.
-- **Resources** (right sidebar, from the header): what a page is composed with, in three tabs.
+- **Resources** (right sidebar, from the header): what a page is composed with, in three tabs, and a fourth to read.
   - *images* — browse and upload, and copy a markdown link for one.
   - *css* — the stylesheets in `static/`, the ones a page names with `css:`. Themes aren't here: they belong to a folder, and the tree is where the folders are.
   - *templates* — the files in `templates/`, and a button for a new one.
+  - *reports* — the site's `reports/` folder: whatever a task of the site's own (a usage report, say) writes there for its editors, folders newest first. A markdown report opens rendered, in a tab of its own; nothing here is edited, served, exported or seeded, and only a signed-in editor can read it. duckdown writes nothing there itself.
 - **Editing a resource** (a stylesheet or a template, from the sidebar): it opens in a pane *below* the page, with the same header — name, unsaved dot, delete, Save, and a close button. The page stays where it is, so you can click through pages and watch one stylesheet against each. It's transient: closing the pane leaves nothing behind.
 - **Editing a collection** (from the tree, or offered under a folder's index page): the same pane, holding the folder's works rather than a file's text — see [Editing one in the editor](#editing-one-in-the-editor). It shares the slot with a resource: the column holds the page and one thing beneath it, so opening a stylesheet closes the collection and the other way about.
 - **The middle column holds whatever is open**, and each pane closes, the page included. Two split it; one fills it. With no page open, a stylesheet or template has the column to itself — which is how you write one from scratch.

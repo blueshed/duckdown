@@ -66,6 +66,14 @@ describe("auth", () => {
     expect(await res.text()).toContain("Email and password required");
   });
 
+  test("POST /login with a body that isn't a form returns 400, not 500", async () => {
+    const res = await fetch(`${BASE}/login`, {
+      method: "POST", body: "{}", headers: { "Content-Type": "application/json" }, redirect: "manual",
+    });
+    expect(res.status).toBe(400);
+    expect(await res.text()).toContain("Email and password required");
+  });
+
   test("POST /login says so when users.json can't be read", async () => {
     const file = join(SITE, "users.json");
     const users = readFileSync(file, "utf8");
@@ -492,6 +500,49 @@ describe("image browser", () => {
   });
 });
 
+describe("reports", () => {
+  beforeAll(() => {
+    mkdirSync(join(SITE, "reports", "2026-09"), { recursive: true });
+    writeFileSync(join(SITE, "reports", "2026-09", "index.md"), "title: September\n\n| day | views |\n|---|---|\n| 23 | 233 |\n");
+    writeFileSync(join(SITE, "reports", "2026-09", "data.json"), "{}");
+  });
+
+  test("the folder lists its months, signed in", async () => {
+    const data = await (await fetch(`${BASE}/edit/reports/`, authed())).json();
+    expect(data.folders.map((f: any) => f.name)).toEqual(["2026-09"]);
+    const month = await (await fetch(`${BASE}/edit/reports/2026-09`, authed())).json();
+    expect(month.files.map((f: any) => f.name).sort()).toEqual(["data.json", "index.md"]);
+  });
+
+  test("a report is a page of its own, rendered, tables and all", async () => {
+    const res = await fetch(`${BASE}/edit/reports/2026-09/index.md`, authed());
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("text/html");
+    const html = await res.text();
+    expect(html).toContain("<title>September</title>");
+    expect(html).toContain("<td>233</td>");
+    expect(html).toContain('name="robots" content="noindex"');
+  });
+
+  test("?raw is the markdown, and a file that isn't markdown is itself", async () => {
+    expect(await (await fetch(`${BASE}/edit/reports/2026-09/index.md?raw`, authed())).text()).toStartWith("title: September");
+    expect(await (await fetch(`${BASE}/edit/reports/2026-09/data.json`, authed())).text()).toBe("{}");
+  });
+
+  test("only for an editor: a fetch is a 401, a page load goes to sign in", async () => {
+    expect((await fetch(`${BASE}/edit/reports/`)).status).toBe(401);
+    const res = await fetch(`${BASE}/edit/reports/2026-09/index.md`, { headers: { Accept: "text/html" }, redirect: "manual" });
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toBe(`/login?next=${encodeURIComponent("/edit/reports/2026-09/index.md")}`);
+  });
+
+  test("never served by the site, and no climbing out", async () => {
+    expect((await fetch(`${BASE}/reports/2026-09/index.md`)).status).toBe(404);
+    expect((await fetch(`${BASE}/reports/2026-09/`)).status).toBe(404);
+    expect((await fetch(`${BASE}/edit/reports/2026-09/..%2F..%2Fusers.json`, authed())).status).toBe(400);
+  });
+});
+
 describe("image thumbnails", () => {
   test("serves an svg thumb as-is (Bun.Image doesn't decode vector formats)", async () => {
     const res = await fetch(`${BASE}/edit/browse/logo.svg?thumb=32`, authed());
@@ -511,6 +562,20 @@ describe("image thumbnails", () => {
     const res = await fetch(`${BASE}/edit/browse/thumb-test.png?thumb=32`, authed());
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toBe("image/webp");
+  });
+
+  test("a file Bun.Image can't decode (an .ico, an .xml) is served as-is, not a 500", async () => {
+    const form = new FormData();
+    form.set("file", new Blob(["\x00\x00\x01\x00not really an icon"], { type: "image/x-icon" }), "site.ico");
+    form.set("list", new Blob(["<xml/>"], { type: "text/xml" }), "filelist.xml");
+    await fetch(`${BASE}/edit/browse/`, authed({ method: "POST", body: form }));
+
+    const ico = await fetch(`${BASE}/edit/browse/site.ico?thumb=32`, authed());
+    expect(ico.status).toBe(200);
+    expect(ico.headers.get("content-type")).toBe("image/x-icon");
+    const xml = await fetch(`${BASE}/edit/browse/filelist.xml?thumb=32`, authed());
+    expect(xml.status).toBe(200);
+    expect(await xml.text()).toBe("<xml/>");
   });
 
   test("without a thumb param, serves the original file", async () => {

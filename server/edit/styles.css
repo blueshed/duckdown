@@ -149,6 +149,16 @@ button.header-link:hover {
   background: var(--border);
 }
 
+/* A report is a link to its own tab: the whole row, in the row's colour. */
+.file-list a.report {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  color: inherit;
+  text-decoration: none;
+}
+
 .file-list .folder {
   color: var(--accent);
   font-weight: 500;

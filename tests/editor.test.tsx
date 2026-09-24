@@ -2,7 +2,9 @@
 // process (signed in). Failures are staged with intercept().
 import { describe, test, expect, beforeAll, afterAll, afterEach, spyOn, mock } from "bun:test";
 import { createElement, mount, batch } from "@blueshed/railroad";
-import { BASE, signIn, waitFor, keepSite } from "./helpers";
+import { BASE, SITE, signIn, waitFor, keepSite } from "./helpers";
+import { mkdirSync, writeFileSync, rmSync } from "fs";
+import { join } from "path";
 import { api, apiJson, urlPath } from "../server/edit/api";
 import { notice, news, speak, tell, hush } from "../server/edit/notice";
 import {
@@ -1039,7 +1041,7 @@ describe("ImageBrowser", () => {
     dispose();
   });
 
-  test("three tabs over one sidebar: images, css, templates", async () => {
+  test("four tabs over one sidebar: images, css, templates, reports", async () => {
     const { host, dispose } = render(() => <ImageBrowser />);
     await waitFor(() => rows(host).includes("logo.svg"));
     const tab = (name: string) => button(host.querySelector(".browser-sections")!, name)!;
@@ -1054,6 +1056,26 @@ describe("ImageBrowser", () => {
     click(tab("templates"));
     await waitFor(() => rows(host).includes("site.html"));
     expect(host.querySelector(".pane-path")!.textContent).toBe("/templates");
+
+    // Reports: nothing yet says so; a month is a folder, newest first, and a
+    // report is a link to its own tab — for reading, not for the editor.
+    click(tab("reports"));
+    await waitFor(() => host.textContent!.includes("nothing here yet"));
+    for (const month of ["2026-08", "2026-09"]) mkdirSync(join(SITE, "reports", month), { recursive: true });
+    writeFileSync(join(SITE, "reports", "2026-09", "2026-09-23.md"), "# 23rd\n");
+    writeFileSync(join(SITE, "reports", "2026-09", "2026-09-24.md"), "# 24th\n");
+    writeFileSync(join(SITE, "reports", "2026-09", "data.json"), "{}");
+    click(tab("css"));
+    click(tab("reports"));
+    await waitFor(() => rows(host).includes("2026-09"));
+    expect(rows(host)).toEqual(["2026-09", "2026-08"]);
+    click(row(host, "2026-09"));
+    await waitFor(() => rows(host).includes("2026-09-24.md"));
+    expect(rows(host)).toEqual(["..", "2026-09-24.md", "2026-09-23.md"]);
+    const link = row(host, "2026-09-24.md").querySelector("a")!;
+    expect(link.getAttribute("href")).toBe("/edit/reports/2026-09/2026-09-24.md");
+    expect(link.getAttribute("target")).toBe("_blank");
+    rmSync(join(SITE, "reports"), { recursive: true, force: true });
 
     click(tab("images"));
     await waitFor(() => rows(host).includes("logo.svg"));

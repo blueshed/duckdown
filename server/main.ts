@@ -10,6 +10,7 @@ import { handlePages } from "./routes/pages";
 import { handleTemplateFiles, handleStaticFiles } from "./routes/site-files";
 import { handleMark } from "./routes/mark";
 import { handleBrowse } from "./routes/browse";
+import { handleReports } from "./routes/reports";
 import { handleCollectionFiles } from "./routes/collection";
 import { handleStatic } from "./routes/static";
 import { handleSearch } from "./routes/search";
@@ -45,6 +46,7 @@ export const server = Bun.serve({
     "/edit/static/*": handleStaticFiles,
     "/edit/mark/": handleMark,
     "/edit/browse/*": handleBrowse,
+    "/edit/reports/*": handleReports,          // what the site's own tasks left for its editors
     "/edit/collection/*": handleCollectionFiles,   // a collection's pictures, and what's wrong with it
     "/search.json": handleSearch,
     "/sitemap.xml": handleSitemap,

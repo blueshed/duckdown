@@ -71,6 +71,7 @@ duckdown/
 │   │   ├── site-files.ts   # /edit/templates/* and /edit/static/*, via fileRoutes
 │   │   ├── mark.ts         # /edit/mark/  — the preview, through page.ts
 │   │   ├── browse.ts       # /edit/browse/* — image browser + upload
+│   │   ├── reports.ts      # /edit/reports/* — reports/, read-only: a listing, or a report rendered as a page
 │   │   ├── collection.ts   # /edit/collection/* — a collection's pictures (upload + thumbnail), and its problems
 │   │   ├── static.ts       # /static/* — site static files
 │   │   ├── search.ts       # /search.json — the whole index, for the browser
@@ -91,7 +92,8 @@ duckdown/
 │           ├── Preview.tsx   # Live markdown preview
 │           ├── CssPreview.tsx # CSS preview in iframe
 │           ├── Header.tsx    # Top bar (view site, resources, logout)
-│           ├── ImageBrowser.tsx # Resources sidebar: images, css, templates
+│           ├── ImageBrowser.tsx # Resources sidebar: images, css, templates, reports
+│           ├── ReportList.tsx # Its reports tab: reports/ by folder, each a link to its own tab
 │           ├── ResourceList.tsx # One tab of it: the css or template files
 │           ├── ResourcePane.tsx # A resource open below the page
 │           ├── CollectionPane.tsx # A folder's collection.json, edited as works

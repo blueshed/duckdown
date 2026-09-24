@@ -18,16 +18,21 @@ export const handleBrowse = {
 
     if (path && (await images.exists(path))) {
       // SVG is vector and already scales cleanly — Bun.Image only decodes
-      // raster formats, so it's served as-is rather than resized.
+      // raster formats, so it's served as-is rather than resized. So is
+      // anything else it can't decode (an .ico, an .xml kept among the
+      // pictures): the browser shows it or doesn't, and the list still opens.
       if (thumb && !path.toLowerCase().endsWith(".svg")) {
         const size = Math.min(Math.max(parseInt(thumb, 10) || THUMB_MIN, THUMB_MIN), THUMB_MAX);
         const bytes = await new Bun.Image(await images.readBytes(path))
           .resize(size, size, { fit: "inside", withoutEnlargement: true })
           .webp({ quality: 70 })
-          .bytes();
-        return new Response(Buffer.from(bytes), {
-          headers: { "Content-Type": "image/webp", "Cache-Control": "private, max-age=86400" },
-        });
+          .bytes()
+          .catch(() => null);
+        if (bytes) {
+          return new Response(Buffer.from(bytes), {
+            headers: { "Content-Type": "image/webp", "Cache-Control": "private, max-age=86400" },
+          });
+        }
       }
       return new Response(Buffer.from(await images.readBytes(path)), {
         headers: { "Content-Type": images.mime(path), "Cache-Control": "private, max-age=86400" },

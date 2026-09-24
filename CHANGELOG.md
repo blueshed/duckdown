@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.7.0 — unreleased
+## Unreleased
 
 - **A shared link shows a card.** `{{description}}` now writes the Open
   Graph tags that chat apps and social sites read when a link is pasted:
@@ -58,6 +58,26 @@
   request would find it, and nothing said so. Both are now left out and
   reported like any other alias problem, so `--strict` fails on them, and the
   rest of the site is written. A served site was never affected.
+
+## 0.7.0 — 2026-09-24
+
+- **Reports, for the people who edit the site.** A site's `reports/` folder —
+  beside `pages/`, never served, exported or seeded — is a fourth tab in
+  Resources: its folders newest first (a month each, say), and a markdown
+  report opens rendered, tables and all, in a tab of its own. Only a
+  signed-in editor reads it (`/edit/reports/*`: a folder is its listing, a
+  `.md` a page, `?raw` its markdown). duckdown writes nothing there; it is
+  for a site's own tasks — a usage report from its host's logs, an error
+  from one that failed.
+
+## 0.6.2 — 2026-09-24
+
+- **The image browser opens on a folder with an .ico or an .xml in it.** Its
+  list asks for a thumbnail of every file, and one Bun.Image can't decode
+  was a 500; now it is served as it is, as an SVG already was.
+- **A POST to /login that isn't a form is a 400,** the login page asking for
+  an email and a password, not a 500 and a stack trace in the log. Scanners
+  send them.
 
 ## 0.6.1 — 2026-09-23
 
