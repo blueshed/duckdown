@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.9.0 — 2026-09-24
 
 - **Editors, from the editor.** **Editors** in the header lists who can sign
   in, adds someone (with the password they'll use), sets a password, or
