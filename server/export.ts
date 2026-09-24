@@ -13,7 +13,7 @@
 // It reads through the storage layer, so it exports a folder on disk or a
 // live bucket, whichever this environment is pointed at.
 
-import { mkdirSync, rmSync, writeFileSync } from "fs";
+import { mkdirSync, readdirSync, rmSync, writeFileSync } from "fs";
 import { dirname, join } from "path";
 import { ORIGIN, STATIC_PATH, IS_S3, BUCKET, BUCKET_PREFIX, APP_PATH } from "./config";
 import { createPageStorage, createStaticStorage, type Storage } from "./storage";
@@ -106,6 +106,18 @@ export function aliasFile(from: string): string | null {
   return folder ? `${folder}/index.html` : "index.html";
 }
 
+// Whether `path` under `out` is there spelt exactly as asked, segment by
+// segment. A filesystem that normalises names (é as e + a combining accent)
+// keeps the file under a spelling a request doesn't look up, and says nothing.
+export function lands(out: string, path: string): boolean {
+  let dir = out;
+  for (const segment of path.split("/")) {
+    if (!readdirSync(dir).includes(segment)) return false;
+    dir = join(dir, segment);
+  }
+  return true;
+}
+
 export async function exportSite(o: {
   out: string;
   origin?: string;
@@ -113,6 +125,7 @@ export async function exportSite(o: {
   files?: Storage;
   say?: (line: string) => void;
   strict?: boolean;   // a broken link is a failure, not just a report
+  lands?: typeof lands;
 }): Promise<Exported> {
   const out = o.out;
   // Trailing slash off, wherever it came from: canonicalPath supplies the
@@ -181,7 +194,11 @@ export async function exportSite(o: {
   // arrives as once it is decoded, so `/l"etoile-1976` is a folder called
   // `l"etoile-1976` holding an index.html: this server finds it, and so does
   // any host that maps a path to a file. A name a page already holds is left
-  // alone and said — the page is the thing at that address.
+  // alone and said — the page is the thing at that address. So is a name this
+  // filesystem refuses (Windows won't take `"`; nowhere takes a segment of
+  // 256 bytes, or a folder where a file already is) or keeps under another
+  // spelling: the published site can't answer at that address, and an owner
+  // who isn't told finds out from a reader's 404.
   for (const { from, to } of moved) {
     const path = aliasFile(from);
     if (path === null) {
@@ -192,7 +209,17 @@ export async function exportSite(o: {
       problems.push(`alias ${from} is already a page — left as it is`);
       continue;
     }
-    write(path, redirectHtml(to));
+    try {
+      put(path, redirectHtml(to));
+    } catch (e) {
+      problems.push(`alias ${from} can't be written here as ${path} (${(e as NodeJS.ErrnoException).code ?? (e as Error).message}) — left out`);
+      continue;
+    }
+    if (!(o.lands ?? lands)(out, path)) {
+      problems.push(`alias ${from} was written, but this filesystem spells ${path} another way — a request for it won't find it`);
+      continue;
+    }
+    written.add(path);
     count.files++;
   }
 

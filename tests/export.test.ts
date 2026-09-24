@@ -3,7 +3,7 @@ import { describe, test, expect, spyOn } from "bun:test";
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "fs";
 import { join } from "path";
 import { RUN, SITE } from "./helpers";
-import { exportSite, outPath, aliasFile, brokenLinks, main } from "../server/export";
+import { exportSite, outPath, aliasFile, brokenLinks, main, lands } from "../server/export";
 import { LocalStorage } from "../server/storage";
 import { searchChanged } from "../server/search";
 import { collectionsChanged } from "../server/collection";
@@ -362,6 +362,54 @@ describe("collections", () => {
     } finally {
       rmSync(page);
     }
+  });
+
+  // n95: a name the filesystem refuses, or keeps under another spelling, was
+  // an export that crashed or an address that silently didn't answer.
+  test("an alias this filesystem won't take is left out and said, and the rest of the site is written", async () => {
+    const dir = join(RUN, "alias-refused", "dist");
+    const page = join(SITE, "pages", "refused.md");
+    const said: string[] = [];
+    const long = `/${"x".repeat(300)}`;                                   // no filesystem takes a 300-byte name
+    writeFileSync(page, `title: Refused\naliases: ${long}\naliases: /refused.html/under\naliases: /kept\n\n# Refused\n`);
+    try {
+      const count = await exportSite({ out: dir, origin: "https://example.com", say: (l) => said.push(l) });
+      const lines = said.join("\n");
+      expect(lines).toContain(`alias ${long} can't be written here as ${long.slice(1)}/index.html (ENAMETOOLONG) — left out`);
+      expect(lines).toContain("alias /refused.html/under can't be written here as refused.html/under/index.html (");   // a page is a file, not a folder
+      expect(read(dir, "refused.html")).toContain("<h1");                  // the page it clashed with is untouched
+      expect(read(dir, "kept/index.html")).toContain('href="/refused.html"');
+      expect(count.problems).toBe(2);
+    } finally {
+      rmSync(page);
+    }
+  });
+
+  test("an alias a filesystem keeps under another spelling is said, and not counted as written", async () => {
+    const dir = join(RUN, "alias-respelt", "dist");
+    const page = join(SITE, "pages", "respelt.md");
+    const said: string[] = [];
+    writeFileSync(page, "title: Respelt\naliases: /café\n\n# Respelt\n");
+    try {
+      const count = await exportSite({
+        out: dir, origin: "https://example.com", say: (l) => said.push(l),
+        lands: (_, path) => path !== "café/index.html",                      // as a normalising filesystem would
+      });
+      expect(said.join("\n")).toContain("alias /café was written, but this filesystem spells café/index.html another way — a request for it won't find it");
+      expect(count.problems).toBe(1);
+    } finally {
+      rmSync(page);
+    }
+  });
+
+  test("lands() is true only for the name spelt exactly as asked", () => {
+    const dir = join(RUN, "lands");
+    rmSync(dir, { recursive: true, force: true });
+    mkdirSync(join(dir, "cafe\u0301"), { recursive: true });              // é as e + a combining accent
+    writeFileSync(join(dir, "cafe\u0301", "index.html"), "");
+    expect(lands(dir, "cafe\u0301/index.html")).toBe(true);
+    expect(lands(dir, "caf\u00e9/index.html")).toBe(false);               // é as one character: another name
+    expect(lands(dir, "cafe\u0301/other.html")).toBe(false);
   });
 
   test("an alias that is already a page leaves the page alone and says so", async () => {

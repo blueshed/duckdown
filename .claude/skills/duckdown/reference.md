@@ -475,7 +475,10 @@ redirect page (canonical link plus meta refresh) under the decoded name, so a
 published site keeps them too: `/older-place.html` as the file
 `older-place.html`, `/old-place` as `old-place/index.html`. An alias that is
 already a page is left alone and said, and one with a `.` or `..` segment is
-left out and said.
+left out and said. So is one the machine running the export can't write under
+that name (Windows refuses `"`; a segment over 255 bytes fails anywhere) or
+keeps under another spelling: the published site couldn't answer there, and
+`--strict` fails on it. The served site answers every alias whatever its name.
 
 ### Editing one in the editor
 

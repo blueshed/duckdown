@@ -15,6 +15,14 @@
   `"layout"` out, and declare `fields` if the items use anything beyond src,
   title and caption. `bun run export --strict` lists every file that still
   needs it.
+- **The export says when it can't write an old address.** Each alias is
+  written as a file under its decoded name. A name the filesystem refused (a
+  `"` on Windows, a segment over 255 bytes, a folder name that is already a
+  page) stopped the whole export with an error; one it kept under another
+  spelling (a filesystem that normalises accents) was written where no
+  request would find it, and nothing said so. Both are now left out and
+  reported like any other alias problem, so `--strict` fails on them, and the
+  rest of the site is written. A served site was never affected.
 
 ## 0.6.1 — 2026-09-23
 

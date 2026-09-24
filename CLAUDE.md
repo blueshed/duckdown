@@ -391,7 +391,9 @@ file order and a title with nothing usable in it takes `item-<n>`. Aliases —
 `buildSite()` and matched by `aliasTarget()` on the **decoded** path
 (`decodePath()` runs first), because a legacy address may hold a quote or a
 curly apostrophe; the site answers 301, and the export writes a redirect page
-under the decoded name.
+under the decoded name — or says it can't, when the filesystem refuses that
+name or keeps it under another spelling (`lands()`), rather than crashing or
+publishing an address that won't answer.
 
 `{{items}}`, `{{items <collection>}}`, `{{items by=<field>}}` and `{{groups}}`
 are filled by `fillCollections()`, over the page's body (outside `<code>`, like
