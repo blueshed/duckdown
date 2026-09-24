@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.6.2 — 2026-09-24
+
+- **The image browser opens on a folder with an .ico or an .xml in it.** Its
+  list asks for a thumbnail of every file, and one Bun.Image can't decode
+  was a 500; now it is served as it is, as an SVG already was.
+- **A POST to /login that isn't a form is a 400,** the login page asking for
+  an email and a password, not a 500 and a stack trace in the log. Scanners
+  send them.
+
 ## 0.6.1 — 2026-09-23
 
 - **A served site has one address too.** With `DUCKDOWN_ORIGIN` set, the

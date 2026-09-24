@@ -64,6 +64,14 @@ describe("auth", () => {
     expect(await res.text()).toContain("Email and password required");
   });
 
+  test("POST /login with a body that isn't a form returns 400, not 500", async () => {
+    const res = await fetch(`${BASE}/login`, {
+      method: "POST", body: "{}", headers: { "Content-Type": "application/json" }, redirect: "manual",
+    });
+    expect(res.status).toBe(400);
+    expect(await res.text()).toContain("Email and password required");
+  });
+
   test("POST /login says so when users.json can't be read", async () => {
     const file = join(SITE, "users.json");
     const users = readFileSync(file, "utf8");
@@ -411,6 +419,20 @@ describe("image thumbnails", () => {
     const res = await fetch(`${BASE}/edit/browse/thumb-test.png?thumb=32`, authed());
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toBe("image/webp");
+  });
+
+  test("a file Bun.Image can't decode (an .ico, an .xml) is served as-is, not a 500", async () => {
+    const form = new FormData();
+    form.set("file", new Blob(["\x00\x00\x01\x00not really an icon"], { type: "image/x-icon" }), "site.ico");
+    form.set("list", new Blob(["<xml/>"], { type: "text/xml" }), "filelist.xml");
+    await fetch(`${BASE}/edit/browse/`, authed({ method: "POST", body: form }));
+
+    const ico = await fetch(`${BASE}/edit/browse/site.ico?thumb=32`, authed());
+    expect(ico.status).toBe(200);
+    expect(ico.headers.get("content-type")).toBe("image/x-icon");
+    const xml = await fetch(`${BASE}/edit/browse/filelist.xml?thumb=32`, authed());
+    expect(xml.status).toBe(200);
+    expect(await xml.text()).toBe("<xml/>");
   });
 
   test("without a thumb param, serves the original file", async () => {

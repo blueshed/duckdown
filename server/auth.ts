@@ -185,7 +185,9 @@ export async function handleLoginGet(req: BunRequest): Promise<Response> {
 }
 
 export async function handleLoginPost(req: BunRequest): Promise<Response> {
-  const form = await req.formData();
+  // A body that isn't a form (a scanner's JSON, say) is a login without an
+  // email or a password, not a server error.
+  const form = await req.formData().catch(() => new FormData());
   const email = form.get("email") as string;
   const password = form.get("password") as string;
   const next = safeNext(form.get("next") as string, "/edit");
