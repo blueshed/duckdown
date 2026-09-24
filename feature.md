@@ -40,6 +40,7 @@ This is the feature map. Bugs and tasks live in `todo.jsonl`.
 - [x] The nav marks the current page, or the section it's in (`aria-current`)
 - [x] Default stylesheet built on CSS variables (a theme is a few lines), with dark mode
 - [x] Per-page `layout`, `description` and `draft`
+- [x] A card for a shared link: Open Graph title, type, address, and `image:` (an item's own picture), from `{{description}}`
 - [x] Folder listings (`{{pages}}`, newest first by `date:`)
 - [x] Folders served by their index (`/blog`, `/blog/`, `/blog/index.html`)
 - [x] "Edit this page" for whoever is signed in (`{{edit}}`)

@@ -784,6 +784,42 @@ describe("folders, the edit link, layouts, drafts and listings", () => {
     expect(await (await fetch(`${BASE}/index.html`)).text()).not.toContain('<meta name="description"');
   });
 
+  // n112: a shared link shows a card.
+  test("{{description}} writes the card a shared link shows: title, type, address, and a picture when there is one", async () => {
+    await put("carded.md", "title: A card\ndescription: What it's about\ndate: 2026-09-24\nimage: images/green.svg\n\n# Carded");
+    const html = await (await fetch(`${BASE}/carded.html`)).text();
+    for (const tag of [
+      '<meta property="og:title" content="A card">',
+      '<meta property="og:type" content="article">',                        // it has a date
+      `<meta property="og:url" content="${BASE}/carded.html">`,
+      `<meta property="og:image" content="${BASE}/static/images/green.svg">`,
+      '<meta name="twitter:card" content="summary_large_image">',
+      `<meta property="og:description" content="What it's about">`,
+    ]) expect(html).toContain(tag);
+
+    // No picture, no date: a website with a title and an address, and no picture card.
+    const home = await (await fetch(`${BASE}/`)).text();
+    expect(home).toContain('<meta property="og:type" content="website">');
+    expect(home).toContain(`<meta property="og:url" content="${BASE}/">`);
+    expect(home).not.toContain("og:image");
+    expect(home).not.toContain("twitter:card");
+
+    // A work's picture is its card.
+    const work = await (await fetch(`${BASE}/gallery/first-light/`)).text();
+    expect(work).toContain(`<meta property="og:image" content="${BASE}/static/images/gallery/one.svg">`);
+  });
+
+  test("image: is a full URL as it is, a site path after the origin, and never a climb", async () => {
+    const card = async (image: string) => {
+      await put("pictured.md", `title: Pictured\nimage: ${image}\n\n# P`);
+      return (await (await fetch(`${BASE}/pictured.html`)).text()).match(/og:image" content="([^"]*)"/)?.[1] ?? null;
+    };
+    expect(await card("https://cdn.example.com/a.jpg")).toBe("https://cdn.example.com/a.jpg");
+    expect(await card("/static/images/Big Picture.jpg")).toBe(`${BASE}/static/images/Big%20Picture.jpg`);
+    expect(await card("/static/images/already%20escaped.jpg")).toBe(`${BASE}/static/images/already%20escaped.jpg`);
+    expect(await card("../../users.json")).toBeNull();
+  });
+
   test("a draft is for whoever is signed in, and stays out of the nav", async () => {
     await put("secret/index.md", "title: Secret\nnav: Secret\ndraft: true\n\n# Secret");
     expect((await fetch(`${BASE}/secret/index.html`)).status).toBe(404);

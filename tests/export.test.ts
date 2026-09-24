@@ -183,6 +183,10 @@ describe("what a published site needs beside its pages", () => {
     expect(feed).toContain("<id>https://example.com/blog/a-post-with-its-own-layout.html</id>");
     expect(read(full, "blog/a-post-with-its-own-layout.html"))
       .toContain('<link rel="alternate" type="application/atom+xml" title="Blog" href="/blog/feed.xml">');
+    // n112: a card with absolute addresses, from DUCKDOWN_ORIGIN.
+    const work = read(full, "gallery/first-light/index.html");
+    expect(work).toContain('<meta property="og:url" content="https://example.com/gallery/first-light/">');
+    expect(work).toContain('<meta property="og:image" content="https://example.com/static/images/gallery/one.svg">');
     rmSync(dir, { recursive: true, force: true });
     rmSync(full, { recursive: true, force: true });
   });
@@ -197,6 +201,11 @@ describe("what a published site needs beside its pages", () => {
     expect(existsSync(join(dir, "blog/feed.xml"))).toBe(false);
     expect(said.join("\n")).toContain("/blog/feed.xml not written: a feed needs DUCKDOWN_ORIGIN for its addresses.");
     expect(read(dir, "blog/index.html")).not.toContain("application/atom+xml");
+    // n112: nor a card's address or picture, which must be absolute; its title stays.
+    const work = read(dir, "gallery/first-light/index.html");
+    expect(work).toContain('<meta property="og:title"');
+    expect(work).not.toContain("og:url");
+    expect(work).not.toContain("og:image");
     rmSync(dir, { recursive: true, force: true });
   });
 });

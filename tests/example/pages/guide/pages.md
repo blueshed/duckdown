@@ -24,6 +24,7 @@ nav: About
 | `layout` | `layout: post` wraps the page in `templates/post.html` |
 | `css` | `css: poster` links `/static/poster.css` to this page alone |
 | `description` | Fills in the page's description for search engines and links shared online |
+| `image` | The picture a link to the page shows when it's shared: `image: images/cover.jpg` |
 | `date` | Used to order a folder's [[#listing-a-folder\|listing]], newest first |
 | `order` | On a folder's `index.md`: a whole number, for where it sits among its siblings in the navigation |
 | `draft` | `draft: true` keeps the page off the site until you're ready |

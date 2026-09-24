@@ -2,6 +2,14 @@
 
 ## 0.7.0 — unreleased
 
+- **A shared link shows a card.** `{{description}}` now writes the Open
+  Graph tags that chat apps and social sites read when a link is pasted:
+  the page's title, whether it's an article (it has a `date:`) or not, its
+  address and — with the new `image:` key — a picture (`image:
+  images/cover.jpg`, a site path, or a full URL). A collection's item uses its
+  own picture without being told. Every template that already has
+  `{{description}}` gets this; an export needs `DUCKDOWN_ORIGIN` for the
+  address and the picture, which must be absolute.
 - **Feeds.** `feed: true` in a folder's `index.md` gives the folder an Atom
   feed at `/<folder>/feed.xml` (`/feed.xml` for the root), so a blog can be
   followed in a feed reader. It lists the pages `{{pages}}` lists, newest
@@ -31,6 +39,9 @@
     has three fields: `src` (the picture), `title` and `caption`, the same
     three the editor's collection pane already adds items as. Any other key an
     item uses is reported until the fields are declared.
+- **Upgrading, for cards:** a template that writes its own
+  `<meta property="og:…">` tags will now have them twice. Take them out and
+  let `{{description}}` write them.
 - **Upgrading, for a feed:** a site's own templates don't have `{{feed}}`
   yet. Add it beside `{{description}}` in `templates/site.html` (and any other
   template that has a `<head>`), then `feed: true` to the folder's index.

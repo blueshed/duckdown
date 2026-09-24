@@ -561,6 +561,10 @@ export function itemMeta(context: ItemContext): Record<string, string[]> {
   const fill = (value: string) => value.replace(/\{\{(item-[\w-]+|group)\}\}/g, (_, name: string) => itemText(name, context));
   meta.title = [meta.title ? fill(meta.title[0]!) : context.item.title];
   meta.description = [meta.description ? fill(meta.description[0]!) : context.item.caption];
+  // The item's picture is its card when a link to it is shared, unless the
+  // each: page names another (`image: {{item-detail}}`).
+  const image = meta.image ? fill(meta.image[0]!) : context.item.src;
+  if (image) meta.image = [image]; else delete meta.image;
   return meta;
 }
 

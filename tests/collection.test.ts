@@ -601,6 +601,22 @@ describe("each: pages", () => {
     expect(itemMeta(context).description).toEqual(["Ink"]);                    // the caption, unsaid
   });
 
+  // n112: the picture on a shared link's card.
+  test("an item's card picture is its own, unless the each: page names another; none without one", async () => {
+    const files = (each: string) => memory({
+      "works/collection.json": json({
+        fields: [{ name: "src", kind: "image" }, "title", "detail"],
+        groups: [group("all", [{ title: "Anna", src: "anna.jpg", detail: "/static/anna-detail.jpg" }, { title: "Bea" }])],
+      }),
+      "works/item.md": each,
+    });
+    const own = (await loadCollection(files("each: true"), "works", true))!;
+    expect(itemMeta({ collection: own, item: own.items[0]! }).image).toEqual(["/static/images/anna.jpg"]);
+    expect(itemMeta({ collection: own, item: own.items[1]! }).image).toBeUndefined();      // Bea has no picture
+    const named = (await loadCollection(files("each: true\nimage: {{item-detail}}"), "works", true))!;
+    expect(itemMeta({ collection: named, item: named.items[0]! }).image).toEqual(["/static/anna-detail.jpg"]);
+  });
+
   test("an each: page serves its own folder's collection, and there is one", async () => {
     const collection = (await loadCollection(memory({
       "works/collection.json": data,

@@ -66,6 +66,7 @@
 | `toc` | `true` (or `yes`) adds a contents list under the page's title |
 | `layout` | `post` wraps the page in `templates/post.html`, falling back to `site.html` |
 | `description` | The page's description, for `<meta name="description">` and `og:description` |
+| `image` | The picture on the card a shared link shows (`og:image`): `images/cover.jpg` (under `static/`), a site path (`/static/images/cover.jpg`) or a full URL. An item's own picture is its card without saying so; an each: page may name another (`image: {{item-detail}}`) |
 | `date` | Orders a folder's `{{pages}}` listing, newest first, and is shown beside the link (ISO: `2026-09-19`) |
 | `order` | In a folder's `index.md` only: a whole number, for where that folder sits among its siblings in the navigation and `{{sitemap}}` |
 | `draft` | `true` keeps the page off the site, the nav and listings; signed in to the editor, you still see it |
@@ -622,7 +623,7 @@ In the editor, a stylesheet opens from **Resources → css** in a pane below wha
 | Placeholder | Becomes |
 |-------------|---------|
 | `{{title}}` | The page's `title`, else `duckie` |
-| `{{description}}` | The page's `description` as `<meta name="description">` and `og:description`, or nothing |
+| `{{description}}` | The page's `description` as `<meta name="description">` and `og:description`, and the card a shared link shows: `og:title`, `og:type` (`article` for a page with a `date:`, else `website`), `og:url`, and with an `image:` (or an item's picture) `og:image` and `twitter:card`. The URL and the picture are absolute, so an export without `DUCKDOWN_ORIGIN` leaves them out. A template that writes its own `og:` tags will have them twice: take its own out |
 | `{{url}}` | The page's one canonical address — use it as `<link rel="canonical" href="{{url}}">` |
 | `{{date}}` | The page's `date` as a `<time>`, written out (`21 September 2026`), or nothing |
 | `{{nav}}` | The navigation (above), or nothing |
