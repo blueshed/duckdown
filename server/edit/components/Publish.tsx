@@ -2,6 +2,7 @@ import { createElement, signal, computed, effect, list, when } from "@blueshed/r
 import { api } from "../api";
 import { tell } from "../notice";
 import { Icon } from "./Icon";
+import { modal } from "../modal";
 import {
   browserRevision, resourceRevision, collectionRevision, reloadBrowser,
   filePath, fileContent, editorContent, loadFile,
@@ -60,12 +61,11 @@ export function PublishButton() {
 const STATE = { added: "new", changed: "changed", deleted: "deleted" } as const;
 
 export function PublishDialog(props: { oncancel: () => void }) {
-  let dialogRef: HTMLDialogElement | null = null;
+  const dialog = modal();
   const busy = signal(false);
   const error = signal("");
   const found = signal<string[]>([]);       // what the checks said, or what a pull couldn't merge
   const foundTitle = signal("");
-  queueMicrotask(() => dialogRef?.showModal());
   refreshPublish();
 
   const status = computed(() => {
@@ -116,10 +116,10 @@ export function PublishDialog(props: { oncancel: () => void }) {
   };
 
   return (
-    <dialog ref={(el: HTMLDialogElement) => { dialogRef = el; }} class="dialog dialog-history" onclose={props.oncancel}>
-      <h3>Publish {() => (status.get() ? `to ${status.get()?.remote}` : "")}</h3>
-      {when(() => typeof publishState.get() === "string", () => <p class="dialog-error">{() => publishState.get() as string}</p>)}
-      {when(() => status.get()?.problem, () => <p class="dialog-error">{() => status.get()?.problem}</p>)}
+    <dialog ref={dialog.ref} class="dialog dialog-history" aria-labelledby={dialog.title} onclose={props.oncancel}>
+      <h3 id={dialog.title}>Publish {() => (status.get() ? `to ${status.get()?.remote}` : "")}</h3>
+      {when(() => typeof publishState.get() === "string", () => <p class="dialog-error" role="alert">{() => publishState.get() as string}</p>)}
+      {when(() => status.get()?.problem, () => <p class="dialog-error" role="alert">{() => status.get()?.problem}</p>)}
       {when(() => status.get() && nothing.get(), () => <p class="dialog-hint">Nothing here that isn't published.</p>)}
       <ul class="history-list">
         {list(changes, (c) => c.path, (row$) => (
@@ -136,12 +136,12 @@ export function PublishDialog(props: { oncancel: () => void }) {
         <p class="dialog-hint">{() => `The published site has ${status.get()?.behind} change(s) this copy hasn't: Pull first.`}</p>
       ))}
       <form class="editor-add" onsubmit={publish}>
-        <input name="message" placeholder="What changed (optional)" autocomplete="off" />
+        <input name="message" placeholder="What changed (optional)" aria-label="What changed (optional)" autocomplete="off" />
         <button type="submit" class="primary" disabled={computed(() => busy.get() || nothing.get())}>
           <Icon name="cloud-upload" size={12} /> Publish
         </button>
       </form>
-      {when(error, () => <p class="dialog-error">{error}</p>)}
+      {when(error, () => <p class="dialog-error" role="alert">{error}</p>)}
       {when(() => found.get().length > 0, () => (
         <div class="dialog-hint">
           <p>{foundTitle}</p>
@@ -150,7 +150,7 @@ export function PublishDialog(props: { oncancel: () => void }) {
       ))}
       <div class="dialog-actions">
         <button type="button" disabled={busy} onclick={pull}><Icon name="cloud-download" size={12} /> Pull</button>
-        <button type="button" onclick={() => { dialogRef?.close(); props.oncancel(); }}>Close</button>
+        <button type="button" onclick={() => { dialog.close(); props.oncancel(); }}>Close</button>
       </div>
     </dialog>
   );

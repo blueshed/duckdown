@@ -219,6 +219,20 @@ button.header-link:hover {
   tab-size: 2;
 }
 
+/* The pane fills its column, so an outline would be cut off at the edges:
+   the focus is drawn inside it instead. */
+.editor-area textarea:focus-visible,
+.panel-resource textarea:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+/* One focus ring for everything else you can reach with Tab. */
+:is(button, a, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
 /* --- Buttons --- */
 
 button {

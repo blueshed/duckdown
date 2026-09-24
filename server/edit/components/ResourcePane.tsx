@@ -43,6 +43,7 @@ export function ResourcePane() {
         </p>
       ))}
       <textarea
+        aria-label={computed(() => `Contents of ${name.get()}`)}
         spellcheck={false}
         value={resourceDraft}
         oninput={(e: Event) => resourceDraft.set((e.target as HTMLTextAreaElement).value)}

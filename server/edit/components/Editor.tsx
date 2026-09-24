@@ -33,7 +33,7 @@ export function Editor() {
     <div class="editor-area">
       <PaneHeader icon="file-text" name={fp} dirty={dirty} onsave={save} ondelete={deleteFile} onclose={closeFile}
         url={() => `/edit/pages/${urlPath(fp.peek())}`} onrestored={() => loadFile(fp.peek())} onmove={moveFile} />
-      <textarea value={editorContent} onkeydown={onkeydown} oninput={oninput} />
+      <textarea aria-label={computed(() => `Contents of ${fp.get()}`)} value={editorContent} onkeydown={onkeydown} oninput={oninput} />
     </div>
   );
 }

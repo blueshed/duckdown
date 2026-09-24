@@ -2,6 +2,7 @@ import { createElement, signal, computed, list, when } from "@blueshed/railroad"
 import { api, apiJson } from "../api";
 import { tell } from "../notice";
 import { Icon } from "./Icon";
+import { modal } from "../modal";
 import { ConfirmDialog } from "./ConfirmDialog";
 
 // Who can sign in (routes/users.ts): add one, set a password, remove one.
@@ -16,13 +17,12 @@ const JSON_HEADERS = { "Content-Type": "application/json" };
 const EXPLAINED = [400, 403, 404, 409];
 
 export function EditorsDialog(props: { oncancel: () => void }) {
-  let dialogRef: HTMLDialogElement | null = null;
+  const dialog = modal();
   const info = signal<Info | null>(null);
   const users = computed(() => info.get()?.users ?? []);
   const error = signal("");
   const setting = signal("");                  // whose password is being set
   const removing = signal<string | null>(null);
-  queueMicrotask(() => dialogRef?.showModal());
 
   const load = async () => info.set(await apiJson<Info>("list the editors", "/edit/users"));
   load();
@@ -68,8 +68,8 @@ export function EditorsDialog(props: { oncancel: () => void }) {
   };
 
   return (
-    <dialog ref={(el: HTMLDialogElement) => { dialogRef = el; }} class="dialog dialog-history" onclose={props.oncancel}>
-      <h3>Editors</h3>
+    <dialog ref={dialog.ref} class="dialog dialog-history" aria-labelledby={dialog.title} onclose={props.oncancel}>
+      <h3 id={dialog.title}>Editors</h3>
       <ul class="history-list editors">
         {list(users, (u) => u.name, (row$) => {
           const { name, env } = row$.peek();
@@ -88,8 +88,8 @@ export function EditorsDialog(props: { oncancel: () => void }) {
               ))}
               {when(() => setting.get() === name, () => (
                 <form class="editor-password" onsubmit={(e: Event) => setPassword(e, name)}>
-                  {me() ? <input name="current" type="password" placeholder="Current password" autocomplete="current-password" /> : null}
-                  <input name="password" type="password" placeholder="New password" autocomplete="new-password" />
+                  {me() ? <input name="current" type="password" placeholder="Current password" aria-label="Current password" autocomplete="current-password" /> : null}
+                  <input name="password" type="password" placeholder="New password" aria-label={`New password for ${name}`} autocomplete="new-password" />
                   <button type="submit" class="primary">Set</button>
                   <button type="button" onclick={() => setting.set("")}>Cancel</button>
                 </form>
@@ -99,13 +99,13 @@ export function EditorsDialog(props: { oncancel: () => void }) {
         })}
       </ul>
       <form class="editor-add" onsubmit={add}>
-        <input name="name" placeholder="Name or email" autocomplete="off" />
-        <input name="password" type="password" placeholder="Their password" autocomplete="new-password" />
+        <input name="name" placeholder="Name or email" aria-label="Name or email" autocomplete="off" />
+        <input name="password" type="password" placeholder="Their password" aria-label="Their password" autocomplete="new-password" />
         <button type="submit" class="primary"><Icon name="plus" size={12} /> Add</button>
       </form>
-      {when(error, () => <p class="dialog-error">{error}</p>)}
+      {when(error, () => <p class="dialog-error" role="alert">{error}</p>)}
       <div class="dialog-actions">
-        <button type="button" onclick={() => { dialogRef?.close(); props.oncancel(); }}>Close</button>
+        <button type="button" onclick={() => { dialog.close(); props.oncancel(); }}>Close</button>
       </div>
       {when(removing, () => (
         <ConfirmDialog

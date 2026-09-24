@@ -31,6 +31,13 @@ describe("auth", () => {
     const html = await res.text();
     expect(html).toContain("Sign In");
     expect(html).toContain('name="next" value="/edit"');
+    // Labelled fields a password manager recognises, under a heading.
+    expect(html).toContain('<label for="email">Name or email</label>');
+    expect(html).toContain('id="email" name="email" autocomplete="username"');
+    expect(html).toContain('<label for="password">Password</label>');
+    expect(html).toContain('autocomplete="current-password"');
+    expect(html).toContain('<h1 class="title">');
+    expect(html).not.toContain('role="alert"');
   });
 
   test("GET /login keeps a same-site next and drops any other", async () => {
@@ -59,7 +66,9 @@ describe("auth", () => {
   test("POST /login with bad creds returns 401", async () => {
     const res = await login({ email: "admin", password: "wrong" });
     expect(res.status).toBe(401);
-    expect(await res.text()).toContain("Invalid");
+    const html = await res.text();
+    expect(html).toContain("Invalid");
+    expect(html).toContain('role="alert"'); // said aloud, not only shown in red
   });
 
   test("POST /login without a password returns 400", async () => {

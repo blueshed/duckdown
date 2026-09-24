@@ -8,8 +8,9 @@
   <style>
     .login { margin: 6em auto; width: 320px; }
     .login form { padding: 1.5em; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
-    .title { margin-bottom: 1.5em; text-align: center; font-size: 1.2em; font-weight: 600; }
+    .title { margin: 0 0 1.5em; text-align: center; font-size: 1.2em; font-weight: 600; }
     .form-input { width: 100%; margin-bottom: 0.75em; }
+    .form-input label { display: block; margin-bottom: 0.25em; font-size: 0.85em; }
     .form-input input { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 4px; box-sizing: border-box; background: var(--bg); color: var(--text); }
     .error { color: #c00; margin-bottom: 1em; font-size: 0.9em; }
     .action { text-align: center; }
@@ -20,13 +21,15 @@
 <body>
   <div class="login">
     <form method="post">
-      <div class="title">duckie</div>
+      <h1 class="title">duckie</h1>
       <div id="error"></div>
       <div class="form-input">
-        <input type="text" name="email" placeholder="email" required autofocus>
+        <label for="email">Name or email</label>
+        <input type="text" id="email" name="email" autocomplete="username" required autofocus>
       </div>
       <div class="form-input">
-        <input type="password" name="password" placeholder="password" required>
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" autocomplete="current-password" required>
       </div>
       <input type="hidden" name="next" value="/edit">
       <div class="action">

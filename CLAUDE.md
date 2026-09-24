@@ -89,6 +89,7 @@ duckdown/
 │       ├── store.ts         # Signals + actions (shared state)
 │       ├── api.ts           # fetch wrapper: failures speak; a 401 goes to /login
 │       ├── notice.ts        # the one line: a failure (speak), news (tell), hush
+│       ├── modal.ts         # every dialog: shown modally, named by its heading, focus given back
 │       ├── styles.css       # Editor styles (light/dark theme-aware)
 │       ├── login.html       # Login page (HTMLRewriter; styled by /edit/styles.css)
 │       └── components/

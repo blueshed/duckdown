@@ -1,7 +1,7 @@
 // The editor's own code, in happy-dom, talking to the real server in this
 // process (signed in). Failures are staged with intercept().
 import { describe, test, expect, beforeAll, afterAll, afterEach, spyOn, mock } from "bun:test";
-import { createElement, mount, batch } from "@blueshed/railroad";
+import { createElement, mount, batch, signal, when } from "@blueshed/railroad";
 import { BASE, SITE, signIn, waitFor, keepSite } from "./helpers";
 import { mkdirSync, writeFileSync, rmSync } from "fs";
 import { join } from "path";
@@ -334,6 +334,37 @@ describe("ConfirmDialog", () => {
     dispose();
   });
 
+  test("is named by its heading, and gives focus back when it is taken away", async () => {
+    // What a confirmed dialog does: the when() that made it drops it, without
+    // a close() — which left focus on <body>. It goes back to what opened it.
+    const asking = signal(false);
+    const { host, dispose } = render(() => (
+      <div>
+        <button onclick={() => asking.set(true)}>Delete</button>
+        {when(asking, () => <ConfirmDialog title="Delete a.md?" onconfirm={() => asking.set(false)} oncancel={() => asking.set(false)} />)}
+      </div>
+    ));
+    const opener = host.querySelector("button")!;
+    opener.focus();
+    click(opener);
+    await waitFor(() => host.querySelector("dialog")?.open);
+    const dialog = host.querySelector("dialog")!;
+    expect(document.getElementById(dialog.getAttribute("aria-labelledby")!)!.textContent).toBe("Delete a.md?");
+    (dialog.querySelector("button.danger") as HTMLElement).focus();
+    click(dialog.querySelector("button.danger")!);
+    expect(host.querySelector("dialog")).toBeNull();
+    expect(dialog.open).toBe(false);
+    expect(document.activeElement).toBe(opener);
+
+    // An opener that has gone meanwhile gets nothing: focus is not forced anywhere.
+    click(opener);
+    await waitFor(() => host.querySelector("dialog")?.open);
+    opener.remove();
+    asking.set(false);
+    expect(document.activeElement).not.toBe(opener);
+    dispose();
+  });
+
   test("takes its own label and class, and needs no message", () => {
     const { host, dispose } = render(() => (
       <ConfirmDialog title="Go?" confirmLabel="Go" confirmClass="primary" onconfirm={() => {}} oncancel={() => {}} />
@@ -354,6 +385,8 @@ describe("NewDialog", () => {
 
     const input = dialog.querySelector("input")!;
     expect(dialog.querySelector("h3")!.textContent).toBe("New page");
+    expect(dialog.getAttribute("aria-labelledby")).toBe(dialog.querySelector("h3")!.id);
+    expect(input.getAttribute("aria-label")).toBe("Name");
     expect(input.placeholder).toBe("my-page.md");
 
     submit(dialog.querySelector("form")!); // no name yet: nothing to create
@@ -362,6 +395,7 @@ describe("NewDialog", () => {
     submit(dialog.querySelector("form")!);
     await waitFor(() => dialog.querySelector(".dialog-error"));
     expect(dialog.querySelector(".dialog-error")!.textContent).toBe("taken.md already exists");
+    expect(dialog.querySelector(".dialog-error")!.getAttribute("role")).toBe("alert");
     type(input, "fine");
     expect(dialog.querySelector(".dialog-error")).toBeNull();
     submit(dialog.querySelector("form")!);
@@ -502,6 +536,7 @@ describe("ResourcePane", () => {
     expect(host.querySelector(".lucide-droplet")).not.toBeNull();
 
     const area = host.querySelector("textarea")!;
+    expect(area.getAttribute("aria-label")).toBe("Contents of poster.css");
     type(area, `${resourceDraft.peek()}\n/* pane */\n`);
     expect(resourceDirty.peek()).toBe(true);
     area.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", metaKey: true }));
@@ -744,6 +779,7 @@ describe("Editor", () => {
     const area = host.querySelector("textarea")!;
     const save = button(host, "Save")!;
     expect(host.querySelector(".pane-header .pane-name")!.textContent).toBe("editor-test.md");
+    expect(area.getAttribute("aria-label")).toBe("Contents of editor-test.md");
     expect(area.value).toBe("title: editor-test\n\n");
 
     type(area, "title: editor-test\n\n# Edited");
@@ -876,6 +912,7 @@ describe("Preview", () => {
     });
     const { host, dispose } = render(() => <Preview />);
     expect(frame(host).getAttribute("sandbox")).toBe("allow-same-origin");
+    expect(frame(host).title).toBe("Preview of the page");
     editorContent.set("title: Typed\ntheme: dark\n\n# Hello [[other]]"); // within the debounce: replaces the first
     await waitFor(() => frame(host).srcdoc.includes("Hello"));
     const doc = frame(host).srcdoc;

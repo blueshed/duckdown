@@ -5,6 +5,7 @@ import { byName } from "./Browser";
 import { api, apiJson, urlPath } from "../api";
 import { speak } from "../notice";
 import { closeImages } from "../store";
+import { modal } from "../modal";
 import { ResourceList } from "./ResourceList";
 import { ReportList } from "./ReportList";
 
@@ -155,24 +156,21 @@ export function ImageBrowser() {
       </>)}
 
       {when(showFolderInput, () => {
-        let dialogRef: HTMLDialogElement | null = null;
-        queueMicrotask(() => dialogRef?.showModal());
+        const dialog = modal();
         return (
-          <dialog
-            ref={(el: HTMLDialogElement) => { dialogRef = el; }}
-            class="dialog"
-            onclose={() => showFolderInput.set(false)}
-          >
+          <dialog ref={dialog.ref} class="dialog" aria-labelledby={dialog.title}
+            onclose={() => showFolderInput.set(false)}>
             <form onsubmit={(e: Event) => { e.preventDefault(); createFolder(); }}>
-              <h3>New folder</h3>
+              <h3 id={dialog.title}>New folder</h3>
               <input
                 type="text"
+                aria-label="Folder name"
                 placeholder="folder-name"
                 autofocus
                 oninput={(e: Event) => folderName.set((e.target as HTMLInputElement).value)}
               />
               <div class="dialog-actions">
-                <button type="button" onclick={() => { dialogRef?.close(); showFolderInput.set(false); }}>Cancel</button>
+                <button type="button" onclick={() => { dialog.close(); showFolderInput.set(false); }}>Cancel</button>
                 <button type="submit" class="primary">Create</button>
               </div>
             </form>

@@ -1,4 +1,5 @@
 import { createElement } from "@blueshed/railroad";
+import { modal } from "../modal";
 
 interface ConfirmDialogProps {
   title: string;
@@ -10,20 +11,14 @@ interface ConfirmDialogProps {
 }
 
 export function ConfirmDialog({ title, message, confirmLabel, confirmClass, onconfirm, oncancel }: ConfirmDialogProps) {
-  let dialogRef: HTMLDialogElement | null = null;
-
-  queueMicrotask(() => dialogRef?.showModal());
+  const dialog = modal();
 
   return (
-    <dialog
-      ref={(el: HTMLDialogElement) => { dialogRef = el; }}
-      class="dialog"
-      onclose={oncancel}
-    >
-      <h3>{title}</h3>
+    <dialog ref={dialog.ref} class="dialog" aria-labelledby={dialog.title} onclose={oncancel}>
+      <h3 id={dialog.title}>{title}</h3>
       {message && <p style="font-size: 13px; color: var(--text-dim); margin-bottom: 16px;">{message}</p>}
       <div class="dialog-actions">
-        <button type="button" onclick={() => { dialogRef?.close(); oncancel(); }}>Cancel</button>
+        <button type="button" onclick={() => { dialog.close(); oncancel(); }}>Cancel</button>
         <button class={confirmClass || "danger"} onclick={onconfirm}>{confirmLabel || "Delete"}</button>
       </div>
     </dialog>
