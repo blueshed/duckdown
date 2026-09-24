@@ -1,5 +1,64 @@
 # Changelog
 
+## 0.8.0 — 2026-09-24
+
+- **A shared link shows a card.** `{{description}}` now writes the Open
+  Graph tags that chat apps and social sites read when a link is pasted:
+  the page's title, whether it's an article (it has a `date:`) or not, its
+  address and — with the new `image:` key — a picture (`image:
+  images/cover.jpg`, a site path, or a full URL). A collection's item uses its
+  own picture without being told. Every template that already has
+  `{{description}}` gets this; an export needs `DUCKDOWN_ORIGIN` for the
+  address and the picture, which must be absolute.
+- **Feeds.** `feed: true` in a folder's `index.md` gives the folder an Atom
+  feed at `/<folder>/feed.xml` (`/feed.xml` for the root), so a blog can be
+  followed in a feed reader. It lists the pages `{{pages}}` lists, newest
+  first, taking those with a `date:`; each entry carries the page's title,
+  address, date, description and the whole page. `{{feed}}` in a template is
+  the link that lets a browser find it. The export writes `feed.xml` when
+  `DUCKDOWN_ORIGIN` is set. The seed's blog has one.
+- **The preview says when a link leads nowhere.** As you write, a link on
+  the page that a reader would follow to nothing — no page, no work, no old
+  address, no file in `static/`, or a draft — is named in the message line,
+  and the line goes again once the link is fixed. It is checked against what
+  the site already knows, not by exporting, so it keeps up with typing. The
+  export's own check (`bun run export --strict`) reads links the same way.
+- **Rename or move a page in the editor.** A new button in the page's
+  header, beside Earlier versions, asks where it should live (`blog/new-name`).
+  The page moves, its old address goes into its `aliases` so links and
+  bookmarks still lead to it (a 301), and its earlier versions go with it. A
+  page moved back loses the alias that is its address again. Unsaved changes
+  are saved first. It won't move onto a page that exists, change only the case
+  of a name, or move a folder's `index.md` or an each: page. A draft keeps no
+  alias, because it never had a public address.
+- **The 0.4 collection shape is gone, as 0.5 said it would be.**
+  - `"layout"` in `collection.json` no longer makes item pages. It is reported
+    as a problem (in the log, the editor's message line, and `bun run export`,
+    where `--strict` fails on it) that names the each: page to write instead.
+  - A file with no `fields` is no longer read by guessing from its items. It
+    has three fields: `src` (the picture), `title` and `caption`, the same
+    three the editor's collection pane already adds items as. Any other key an
+    item uses is reported until the fields are declared.
+- **Upgrading, for cards:** a template that writes its own
+  `<meta property="og:…">` tags will now have them twice. Take them out and
+  let `{{description}}` write them.
+- **Upgrading, for a feed:** a site's own templates don't have `{{feed}}`
+  yet. Add it beside `{{description}}` in `templates/site.html` (and any other
+  template that has a `<head>`), then `feed: true` to the folder's index.
+- **Upgrading from 0.4's shape:** for each collection still saying `"layout"`,
+  write `item.md` beside it (`each: true`, `layout: <that template>`), take
+  `"layout"` out, and declare `fields` if the items use anything beyond src,
+  title and caption. `bun run export --strict` lists every file that still
+  needs it.
+- **The export says when it can't write an old address.** Each alias is
+  written as a file under its decoded name. A name the filesystem refused (a
+  `"` on Windows, a segment over 255 bytes, a folder name that is already a
+  page) stopped the whole export with an error; one it kept under another
+  spelling (a filesystem that normalises accents) was written where no
+  request would find it, and nothing said so. Both are now left out and
+  reported like any other alias problem, so `--strict` fails on them, and the
+  rest of the site is written. A served site was never affected.
+
 ## 0.7.0 — 2026-09-24
 
 - **Reports, for the people who edit the site.** A site's `reports/` folder —

@@ -40,9 +40,11 @@ This is the feature map. Bugs and tasks live in `todo.jsonl`.
 - [x] The nav marks the current page, or the section it's in (`aria-current`)
 - [x] Default stylesheet built on CSS variables (a theme is a few lines), with dark mode
 - [x] Per-page `layout`, `description` and `draft`
+- [x] A card for a shared link: Open Graph title, type, address, and `image:` (an item's own picture), from `{{description}}`
 - [x] Folder listings (`{{pages}}`, newest first by `date:`)
 - [x] Folders served by their index (`/blog`, `/blog/`, `/blog/index.html`)
 - [x] "Edit this page" for whoever is signed in (`{{edit}}`)
+- [x] Feeds: `feed: true` on a folder's index gives it an Atom `feed.xml` of its dated pages; `{{feed}}` links it
 - [ ] Custom scripts via `x-script-*` metadata
 - [x] `GET /static/*` — serve site static files
 
@@ -67,7 +69,7 @@ This is the feature map. Bugs and tasks live in `todo.jsonl`.
 - [x] Items in search, the sitemap and the export
 - [x] Pictures outside the site (a bucket, a CDN), thumbnails named by a rule
 - [x] Editor: start one, edit its fields as works, upload pictures with thumbnails, renaming keeps the old address
-- [ ] The 0.4 shape (`layout` in the data, no `fields`): still read, with a warning — remove in the release after 0.5
+- [x] The 0.4 shape removed (0.8): `layout` in the data is a problem, and a file with no `fields` is `src`/`title`/`caption`
 
 ### Auth
 - [x] Login page (`GET/POST /login`) — HTML file + HTMLRewriter
@@ -121,6 +123,7 @@ This is the feature map. Bugs and tasks live in `todo.jsonl`.
 - [x] Save button with saved flash (green)
 - [x] Dirty indicator (unsaved changes)
 - [x] Delete button with inline confirmation
+- [x] Rename or move a page; its old address becomes an alias, its versions go with it
 - [x] Earlier versions (restore any) and Deleted (bring one back)
 - [x] Undo / redo in the collection pane (⌘Z, ⇧⌘Z)
 - [x] Keyboard shortcut for save (⌘⏎)
@@ -131,6 +134,7 @@ This is the feature map. Bugs and tasks live in `todo.jsonl`.
 - [x] Debounced updates on editor input
 - [x] Calls `/edit/mark/` API for server-side rendering
 - [x] Renders on initial file load
+- [x] Names the links on the page that lead nowhere a reader can go, and clears once they're fixed
 - [x] Sandboxed (`allow-same-origin`, no scripts) with site CSS, theme CSS and images
 
 ### CSS Preview

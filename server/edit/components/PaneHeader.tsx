@@ -2,6 +2,7 @@ import { createElement, Fragment, computed, signal, when } from "@blueshed/railr
 import { Icon } from "./Icon";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { VersionsDialog } from "./History";
+import { NewDialog } from "./NewDialog";
 
 const NOT_SAVED = "Not saved";
 
@@ -23,11 +24,13 @@ export function PaneHeader(props: {
   onclose?: () => void;
   url: () => string;              // the open file's /edit/<section>/ address
   onrestored: () => unknown;      // read it again: a version was put back
+  onmove?: (to: string) => Promise<string | void>;   // a page renames; a message when it didn't
   undo?: { onundo: () => unknown; onredo: () => unknown; canUndo: Flag; canRedo: Flag };
 }) {
   const flash = signal("");
   const confirming = signal(false);
   const versions = signal(false);
+  const moving = signal(false);
   const label = () => props.name.get();
 
   // A failed save leaves the pane dirty and flashes red; the notice says why.
@@ -62,6 +65,12 @@ export function PaneHeader(props: {
           <Icon name="redo" />
         </button>
       </> : null}
+      {props.onmove
+        ? <button class="icon-btn" aria-label={`Rename or move ${label()}`} title="Rename or move"
+            onclick={() => moving.set(true)}>
+            <Icon name="folder-input" />
+          </button>
+        : null}
       <button class="icon-btn" aria-label={`Earlier versions of ${label()}`} title="Earlier versions"
         onclick={() => versions.set(true)}>
         <Icon name="history" />
@@ -82,6 +91,15 @@ export function PaneHeader(props: {
           onconfirm={remove}
           oncancel={() => confirming.set(false)}
         />
+      ))}
+      {when(moving, () => (
+        <NewDialog kind="page" heading={`Rename or move ${label()}`} initial={label()} action="Move"
+          oncreate={async (to) => {
+            const message = await props.onmove!(to);
+            if (!message) moving.set(false);
+            return message;
+          }}
+          oncancel={() => moving.set(false)} />
       ))}
       {when(versions, () => (
         <VersionsDialog url={props.url()} name={label()} onrestored={props.onrestored}

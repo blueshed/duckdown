@@ -1,7 +1,7 @@
 import { createElement } from "@blueshed/railroad";
 import {
   ArchiveRestore, ArrowDown, ArrowUp, Copy, CornerLeftUp, Droplet, ExternalLink, FilePlus, FileText,
-  Folder, FolderPlus, History, Image, ImagePlus, LayoutGrid, LayoutTemplate, LogOut, Plus,
+  Folder, FolderInput, FolderPlus, History, Image, ImagePlus, LayoutGrid, LayoutTemplate, LogOut, Plus,
   Redo2, RefreshCw, RotateCcw, Save, Trash2, Undo2, Upload, X,
 } from "lucide-static";
 
@@ -16,6 +16,7 @@ const ICONS: Record<string, string> = {
   "file-plus": FilePlus,
   "file-text": FileText,
   "folder": Folder,
+  "folder-input": FolderInput,
   "folder-plus": FolderPlus,
   "history": History,
   "image": Image,

@@ -1,5 +1,5 @@
 import { describe, test, expect, spyOn } from "bun:test";
-import { parseFrontMatter, renderMarkdown, buildNav } from "../server/markdown";
+import { parseFrontMatter, renderMarkdown, buildNav, addMeta, dropMeta } from "../server/markdown";
 import type { Storage, Listing } from "../server/storage";
 import { siteNav, pagesChanged, markCurrent, folderListing } from "../server/nav";
 
@@ -286,6 +286,30 @@ describe("parseFrontMatter", () => {
     const { meta, body } = parseFrontMatter("title: Hello\n# Heading\n\nParagraph");
     expect(meta.title).toEqual(["Hello"]);
     expect(body).toBe("# Heading\n\nParagraph");
+  });
+});
+
+describe("addMeta and dropMeta", () => {
+  test("a line goes at the end of the front matter, fenced or bare", () => {
+    expect(addMeta("title: A\nnav: yes\n\n# A\n", "aliases", "/a.html")).toBe("title: A\nnav: yes\naliases: /a.html\n\n# A\n");
+    expect(addMeta("---\ntitle: A\n\nsubtitle: B\n---\n# A", "aliases", "/a.html"))
+      .toBe("---\ntitle: A\n\nsubtitle: B\naliases: /a.html\n---\n# A");
+    expect(addMeta("---\n---\n# A", "aliases", "/a.html")).toBe("---\naliases: /a.html\n---\n# A");
+  });
+
+  test("a page with none gets a block of its own, and keeps every line it had", () => {
+    for (const page of ["# A\n", "Update: closed Monday\n", "---\nno fence closes this\n"]) {
+      const added = addMeta(page, "aliases", "/a.html");
+      expect(added).toBe(`aliases: /a.html\n\n${page}`);
+      expect(parseFrontMatter(added)).toEqual({ meta: { aliases: ["/a.html"] }, body: page });
+    }
+  });
+
+  test("a line comes out of the front matter only, when its value is picked", () => {
+    const page = "title: A\naliases: /a.html\naliases: /b.html\n\naliases: /a.html in the text\n";
+    expect(dropMeta(page, "aliases", (v) => v === "/a.html")).toBe("title: A\naliases: /b.html\n\naliases: /a.html in the text\n");
+    expect(dropMeta("---\nAliases: /a.html\ntitle: A\n---\nx", "aliases", () => true)).toBe("---\ntitle: A\n---\nx");
+    expect(dropMeta("# A\naliases: /a.html\n", "aliases", () => true)).toBe("# A\naliases: /a.html\n");   // no front matter
   });
 });
 

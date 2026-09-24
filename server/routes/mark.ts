@@ -1,12 +1,15 @@
 import type { BunRequest } from "bun";
 import { requireAuth } from "../auth";
 import { parsePage, pageHtml, itemPage, type DraftTemplate } from "../page";
-import { createPageStorage } from "../storage";
+import { createPageStorage, createStaticStorage } from "../storage";
+import { canonicalPath } from "../utils";
+import { deadLinks } from "../links";
 import { folderOf } from "../markdown";
 import { collectionProblems, loadCollection, type ItemContext } from "../collection";
 import { siteOrigin } from "./site";
 
 const pages = createPageStorage();
+const files = createStaticStorage();
 
 type MarkRequest = { source: string; draft?: DraftTemplate; through?: string };
 
@@ -48,6 +51,11 @@ export const handleMark = {
     // No edit link: the preview shows the page a reader gets, and a link into
     // the editor from inside the editor helps nobody.
     const { html, layout, includes } = await pageHtml(shown, { origin: siteOrigin(req), draft, through, item });
+    // A link a reader would follow to nothing, said while it is being
+    // written rather than by the export later (or by a reader). Only for a
+    // page: a template shown through a sample page has no address of its own.
+    const dead = path ? await deadLinks(html, canonicalPath(shown.key), pages, files) : [];
+    if (dead.length) problems.push(`Links that lead nowhere a reader can go: ${dead.join(", ")}`);
     return Response.json({ html, layout, includes, meta: page.meta, problems });
   },
 };

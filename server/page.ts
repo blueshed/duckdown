@@ -2,6 +2,7 @@ import { TEMPLATES_PATH } from "./config";
 import { createPageStorage, createStorage } from "./storage";
 import { renderMarkdown, folderOf } from "./markdown";
 import { siteNav, markCurrent, folderListing, siteMap } from "./nav";
+import { feedLink } from "./feed";
 import { fillCollections, fillItem, itemMeta, itemBody, type ItemContext } from "./collection";
 import { escapeHtml, outsideCode, canonicalPath, dateHtml } from "./utils";
 
@@ -14,6 +15,19 @@ const BARE = "<!DOCTYPE html><html><head><title>{{title}}</title></head><body>{{
 // name a file in a folder a page must not be able to climb out of, and one
 // guard in one place is one thing to get right.
 export const plainName = (value: string) => /^[\w-]+$/.test(value);
+
+// `image:` as an absolute address, for a card: a full URL as it is, a path
+// on the site ("/static/images/cover.jpg") or one under static/
+// ("images/cover.jpg") after the origin. Nothing without an origin — a card's
+// picture must be absolute — and nothing that climbs out with "..". Characters
+// a URL can't hold are encoded, and an escape already made is left alone (an
+// item's picture arrives encoded).
+export function pictureUrl(value: string, origin: string): string {
+  if (/^https?:\/\//i.test(value)) return value;
+  if (!value || !origin || value.split("/").includes("..")) return "";
+  const path = value.startsWith("/") ? value : `/static/${value}`;
+  return origin + path.replace(/[^\w\-.~:/?#[\]@!$&'()*+,;=%]/g, encodeURIComponent);
+}
 
 // A file open in the editor and not yet saved, used in place of the one on
 // disk. It is how the preview shows you a template while you are writing it.
@@ -142,6 +156,7 @@ export type PageOptions = {
 export async function pageHtml(page: Page, o: PageOptions): Promise<{ html: string; layout: string; includes: string[] }> {
   const { file, meta } = page;
   const nav = markCurrent(await siteNav(pages), file);
+  const title = meta.title?.[0] || "duckie";
   const description = meta.description?.[0] ?? "";
 
   // {{pages}} in a page lists the pages beside it (a blog index writes itself),
@@ -176,14 +191,31 @@ export async function pageHtml(page: Page, o: PageOptions): Promise<{ html: stri
   // reason: a placeholder written in a page's text is never filled.
   html = await fillCollections(html, collection);
   html = fillItem(html, o.item);
+  // No origin (an export without DUCKDOWN_ORIGIN) means no feed is written,
+  // so there is none to link to.
+  const feed = o.origin && html.includes("{{feed}}") ? await feedLink(pages, folderOf(file)) : "";
   for (const [name, value] of [
-    ["title", () => escapeHtml(meta.title?.[0] || "duckie")],
+    ["title", () => escapeHtml(title)],
     ["url", () => escapeHtml(o.origin + canonicalPath(page.key))],
     ["date", () => dateHtml(meta.date?.[0] ?? "")],
-    ["description", () => description
-      ? `<meta name="description" content="${escapeHtml(description)}">\n  <meta property="og:description" content="${escapeHtml(description)}">`
-      : ""],
+    // The page's description, and the card a link to it shows when shared:
+    // Open Graph, which most places that unfurl a link read. Addresses in it
+    // are absolute, so without an origin (an export with no DUCKDOWN_ORIGIN)
+    // the URL and the picture are left out rather than written relative.
+    ["description", () => {
+      const picture = pictureUrl(meta.image?.[0] ?? "", o.origin);
+      const tag = (attr: string, name: string, value: string) => `<meta ${attr}="${name}" content="${escapeHtml(value)}">`;
+      return [
+        ...(description ? [tag("name", "description", description), tag("property", "og:description", description)] : []),
+        tag("property", "og:title", title),
+        tag("property", "og:type", meta.date ? "article" : "website"),
+        ...(o.origin ? [tag("property", "og:url", o.origin + encodeURI(canonicalPath(page.key)))] : []),
+        ...(picture ? [tag("property", "og:image", picture), tag("name", "twitter:card", "summary_large_image")] : []),
+      ].join("\n  ");
+    }],
     ["nav", () => nav ? `<nav><ul class="nav">${nav}</ul></nav>` : ""],
+    // The feed of the folder this page is in, for a reader's browser to find.
+    ["feed", () => feed],
     // A stylesheet this page asked for by name: `css: poster` links
     // /static/poster.css after whatever the template links, so one page can
     // look however it likes without a template of its own. Guarded like

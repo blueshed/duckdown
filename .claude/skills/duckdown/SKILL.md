@@ -45,11 +45,11 @@ users.json    who can sign in (password hashes)
    - `toc: true` for a contents list; every heading gets a `#` link
    - `{{pages}}` in a folder's `index.md` lists the pages beside it, newest first by `date:`
    - `draft: true` keeps a page off the site until it's ready (you can still read it signed in)
-   - `aliases: /old-address` keeps an address that has moved working, as a 301
+   - `aliases: /old-address` keeps an address that has moved working, as a 301 — the editor's Rename or move adds it; when you move a file yourself, add it yourself
 
 ## What catches people out
 
-- **A plain block of front matter may only use the keys duckdown reads** — `title`, `nav`, `toc`, `layout`, `css`, `description`, `date`, `order`, `draft`, `aliases`, `each`, `collection`, or an `x-…` of your own. For any other key, fence it with `---` … `---`. (That's why prose starting "Update: closed Monday" keeps its first line.)
+- **A plain block of front matter may only use the keys duckdown reads** — `title`, `nav`, `toc`, `layout`, `css`, `description`, `date`, `order`, `draft`, `aliases`, `each`, `collection`, `feed`, `image`, or an `x-…` of your own. For any other key, fence it with `---` … `---`. (That's why prose starting "Update: closed Monday" keeps its first line.)
 - **Only a folder's `index.md` is in the navigation**, labelled by its `nav:` (else its `title:`). To put "About" in the nav, write `pages/about/index.md`, not `pages/about.md`. Folders starting with `-` or `.` stay out of it, though their pages are still served. Drafts stay out too.
 - **Styling is templates and stylesheets, nothing else.** `templates/site.html` links `static/site.css` (duckdown's base, drawn from variables) and `static/theme.css` (this site's look, which only says what differs — `:root { --accent: … }`). To restyle the site, edit `theme.css`. For one page, `css: poster` links `/static/poster.css` after them. For a *kind* of page, give it a template with `layout:` and let that template link what it needs.
 - **In development (`DEBUG=1`) the navigation is rebuilt on every request**, so a folder's `index.md` written straight to disk shows up at once. In production it's cached and rebuilt when a page is saved or deleted through the editor, so files put there another way need a restart (`bun run stop`, then start again).

@@ -3,6 +3,8 @@ import { mkdirSync, writeFileSync, readFileSync, renameSync, existsSync, rmSync 
 import { join } from "path";
 import { BASE, SITE, signIn, authed, keepSite } from "./helpers";
 import { siteHandler } from "../server/routes/site";
+import { feedXml, feedsChanged } from "../server/feed";
+import type { Storage } from "../server/storage";
 
 keepSite();
 beforeAll(signIn);
@@ -285,6 +287,79 @@ describe("editor API", () => {
         .some((d) => d.key === "gone/page.md")).toBe(false);
     });
 
+    // n109: a page renamed or moved keeps its old address, and its versions.
+    describe("moving a page", () => {
+      const move = (path: string, to: string, init = authed({ method: "POST" })) =>
+        fetch(`${at(path)}?move=${encodeURIComponent(to)}`, init);
+      const read = async (path: string) => (await fetch(at(path), authed())).text();
+
+      test("the page goes to its new name, its old address still leads there, and its versions go with it", async () => {
+        await put("moving/old name.md", "title: Old\n\n# Old\n");
+        await put("moving/old name.md", "title: Old\n\n# Old, again\n");      // a version to follow it
+        expect((await fetch(`${BASE}/moving/old%20name.html`)).status).toBe(200);  // the site knows it (and caches that)
+        const res = await move("moving/old name.md", "moved/new name.md");
+        expect(res.status).toBe(200);
+        expect(await res.json()).toEqual({ ok: true, to: "moved/new name.md", kept: "/moving/old name.html" });
+        expect(await read("moved/new name.md")).toBe("title: Old\naliases: /moving/old name.html\n\n# Old, again\n");
+        expect((await fetch(at("moving/old name.md"), authed())).status).toBe(404);
+        // The old address is a 301 now — the caches heard about it — and the page answers at the new one.
+        const old = await fetch(`${BASE}/moving/old%20name.html`, { redirect: "manual" });
+        expect(old.status).toBe(301);
+        expect(old.headers.get("location")).toBe("/moved/new%20name.html");
+        expect((await fetch(`${BASE}/moved/new%20name.html`)).status).toBe(200);
+        // Its versions came too: the first save, and the page as it was just before the move.
+        const kept = await versions("moved/new name.md");
+        expect(kept.length).toBe(2);
+        expect(await (await fetch(`${at("moved/new name.md")}?version=${kept[0]!.id}`, authed())).text()).toBe("title: Old\n\n# Old, again\n");
+        expect(await versions("moving/old name.md")).toEqual([]);
+        // And it isn't Deleted: it moved.
+        expect((await (await fetch(`${at("")}?deleted`, authed())).json() as { key: string }[])
+          .some((d) => d.key === "moving/old name.md")).toBe(false);
+
+        // Moved back, the alias that is its address again comes off, and the one it leaves goes on.
+        expect(await (await move("moved/new name.md", "moving/old name.md")).json())
+          .toEqual({ ok: true, to: "moving/old name.md", kept: "/moved/new name.html" });
+        expect(await read("moving/old name.md")).toBe("title: Old\naliases: /moved/new name.html\n\n# Old, again\n");
+        // And once more: an alias it already has isn't said twice.
+        await move("moving/old name.md", "moved/new name.md");
+        await move("moved/new name.md", "moving/old name.md");
+        expect(await read("moving/old name.md")).toBe("title: Old\naliases: /moved/new name.html\n\n# Old, again\n");
+        await fetch(at("moving/old name.md"), authed({ method: "DELETE" }));
+      });
+
+      test("a draft moves without keeping an address it never had", async () => {
+        await put("moving/draft.md", "title: D\ndraft: true\n\nx");
+        expect(await (await move("moving/draft.md", "moving/still-a-draft.md")).json())
+          .toEqual({ ok: true, to: "moving/still-a-draft.md", kept: null });
+        expect(await read("moving/still-a-draft.md")).toBe("title: D\ndraft: true\n\nx");
+        await fetch(at("moving/still-a-draft.md"), authed({ method: "DELETE" }));
+      });
+
+      test("never onto a file, never a folder's page or a collection's, and only a page", async () => {
+        await put("moving/a.md", "title: A");
+        await put("moving/b.md", "title: B");
+        const said = async (res: Response) => [res.status, await res.text()];
+        expect(await said(await move("moving/a.md", "moving/b.md"))).toEqual([412, "Already exists"]);
+        expect(await said(await move("moving/nope.md", "moving/c.md"))).toEqual([404, "Not Found"]);
+        expect(await said(await move("moving/a.md", "../templates/a.md"))).toEqual([400, "Not a file"]);
+        expect(await said(await move("moving/a.md", "moving/a.txt"))).toEqual([400, "Only a page moves: a name ending .md"]);
+        expect(await said(await move("moving/a.md", "moving/.md"))).toEqual([400, "Only a page moves: a name ending .md"]);
+        expect(await said(await move("moving/a.md", "moving/A.md")))
+          .toEqual([400, "A change of case alone isn't a move every filesystem can make: move it to another name, then back"]);
+        expect(await said(await move("guide/index.md", "guide/start.md")))
+          .toEqual([400, "guide/index.md is its folder's page: moving it is moving the folder"]);
+        expect(await said(await move("gallery/item.md", "gallery/work.md")))
+          .toEqual([400, "gallery/item.md is the page every item of its collection gets, and stays with the collection"]);
+        expect(await read("moving/a.md")).toBe("title: A");                      // nothing moved
+        expect((await move("moving/a.md", "moving/c.md", { method: "POST" })).status).toBe(401);
+        // Templates and stylesheets are named by pages: they don't move from here.
+        expect(await said(await fetch(`${BASE}/edit/templates/site.html?move=other.html`, authed({ method: "POST" }))))
+          .toEqual([405, "Files here can't be moved"]);
+        await fetch(at("moving/a.md"), authed({ method: "DELETE" }));
+        await fetch(at("moving/b.md"), authed({ method: "DELETE" }));
+      });
+    });
+
     test("asks for a file, a version that exists, and a sign-in", async () => {
       expect((await fetch(`${at("")}?versions`, authed())).status).toBe(400);
       expect((await fetch(`${at("a//b.md")}?deleted`, authed())).status).toBe(400);
@@ -308,6 +383,31 @@ describe("markdown preview", () => {
   const mark = (source: string, path = "", draft?: { name: string; body: string }) =>
     fetch(`${BASE}/edit/mark/?path=${encodeURIComponent(path)}`,
       authed({ method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ source, draft }) }));
+
+  // n110: a link a reader would follow to nothing is said while it is written.
+  test("says which links lead nowhere a reader can go, each once, as written", async () => {
+    await fetch(`${BASE}/edit/pages/blog/unready.md`, authed({ method: "PUT", body: "title: Unready\ndraft: true\n\nx" }));
+    try {
+      const source = [
+        "[a page](/guide/pages.html) [[../guide/index]] [a folder](/blog/) [without its slash](/blog) [by its index](/blog/index.html)",
+        "[a work](/gallery/first-light/) [an old address](/first-light-1961) [moved, as .html](/first-light-1961.html)",
+        "![a picture](/static/images/green.svg) [the base](/static/site.css) [the root](/robots.txt) [the index](/search.json)",
+        "[mail](mailto:a@b.c) [away](https://example.com/x) [here](#top) [the editor](/edit)",
+        "[a draft](/blog/unready.html) [nowhere](/nowhere.html) [nowhere again](/nowhere.html)",
+        "[relative](missing.html) ![no picture](/static/images/missing.png) [no root file](/humans.txt)",
+        "[the feed](/blog/feed.xml) [no feed](/guide/feed.xml)",
+      ].join("\n\n");
+      const data = await (await mark(source, "blog/linking.md")).json();
+      expect(data.problems).toEqual([
+        "Links that lead nowhere a reader can go: /blog/unready.html, /nowhere.html, missing.html, /static/images/missing.png, /humans.txt, /guide/feed.xml",
+      ]);
+      // Fixed, it says nothing; and a template shown through a sample page has no address to check from.
+      expect((await (await mark("[a page](/guide/pages.html)", "blog/linking.md")).json()).problems).toEqual([]);
+      expect((await (await mark("[nowhere](/nowhere.html)")).json()).problems).toEqual([]);
+    } finally {
+      await fetch(`${BASE}/edit/pages/blog/unready.md`, authed({ method: "DELETE" }));
+    }
+  });
 
   test("renders the whole document, through the page's own template", async () => {
     const data = await (await mark("# Hello\n\nWorld")).json();
@@ -588,7 +688,7 @@ describe("a collection's pictures", () => {
     await collectionAt(".away", { images: "https://pictures.example.com/works/", groups: [] });
     const info = await (await fetch(`${BASE}/edit/collection/.away`, authed())).json();
     expect(info.uploads).toBe(false);
-    expect(info.fields).toBeNull();   // it declares none: the pane shows what it always did
+    expect(info.fields.map((f: { name: string }) => f.name)).toEqual(["src", "title", "caption"]);   // it declares none: the plain three
 
     const res = await send(".away", new Blob([PNG]), "a.png");
     expect(res.status).toBe(409);
@@ -747,6 +847,42 @@ describe("folders, the edit link, layouts, drafts and listings", () => {
     expect(html).toContain('<meta name="description" content="Tea &amp; &quot;biscuits&quot;, from 4pm">');
     expect(html).toContain('<meta property="og:description" content="Tea &amp; &quot;biscuits&quot;, from 4pm">');
     expect(await (await fetch(`${BASE}/index.html`)).text()).not.toContain('<meta name="description"');
+  });
+
+  // n112: a shared link shows a card.
+  test("{{description}} writes the card a shared link shows: title, type, address, and a picture when there is one", async () => {
+    await put("carded.md", "title: A card\ndescription: What it's about\ndate: 2026-09-24\nimage: images/green.svg\n\n# Carded");
+    const html = await (await fetch(`${BASE}/carded.html`)).text();
+    for (const tag of [
+      '<meta property="og:title" content="A card">',
+      '<meta property="og:type" content="article">',                        // it has a date
+      `<meta property="og:url" content="${BASE}/carded.html">`,
+      `<meta property="og:image" content="${BASE}/static/images/green.svg">`,
+      '<meta name="twitter:card" content="summary_large_image">',
+      `<meta property="og:description" content="What it's about">`,
+    ]) expect(html).toContain(tag);
+
+    // No picture, no date: a website with a title and an address, and no picture card.
+    const home = await (await fetch(`${BASE}/`)).text();
+    expect(home).toContain('<meta property="og:type" content="website">');
+    expect(home).toContain(`<meta property="og:url" content="${BASE}/">`);
+    expect(home).not.toContain("og:image");
+    expect(home).not.toContain("twitter:card");
+
+    // A work's picture is its card.
+    const work = await (await fetch(`${BASE}/gallery/first-light/`)).text();
+    expect(work).toContain(`<meta property="og:image" content="${BASE}/static/images/gallery/one.svg">`);
+  });
+
+  test("image: is a full URL as it is, a site path after the origin, and never a climb", async () => {
+    const card = async (image: string) => {
+      await put("pictured.md", `title: Pictured\nimage: ${image}\n\n# P`);
+      return (await (await fetch(`${BASE}/pictured.html`)).text()).match(/og:image" content="([^"]*)"/)?.[1] ?? null;
+    };
+    expect(await card("https://cdn.example.com/a.jpg")).toBe("https://cdn.example.com/a.jpg");
+    expect(await card("/static/images/Big Picture.jpg")).toBe(`${BASE}/static/images/Big%20Picture.jpg`);
+    expect(await card("/static/images/already%20escaped.jpg")).toBe(`${BASE}/static/images/already%20escaped.jpg`);
+    expect(await card("../../users.json")).toBeNull();
   });
 
   test("a draft is for whoever is signed in, and stays out of the nav", async () => {
@@ -981,7 +1117,7 @@ describe("the site's own 404 page", () => {
   test("is not a page to search for, list or map", async () => {
     const found = await (await fetch(`${BASE}/search.json`)).json();
     expect(found.some((e: any) => e.url === "/404.html")).toBe(false);
-    expect(await (await fetch(`${BASE}/sitemap.xml`)).text()).not.toContain("404");
+    expect(await (await fetch(`${BASE}/sitemap.xml`)).text()).not.toContain("/404");   // not "404": the port may hold it
     expect(await (await fetch(`${BASE}/`)).text()).not.toContain("404.html");
   });
 });
@@ -1479,5 +1615,87 @@ describe("a collection that can't have the addresses it asks for", () => {
 
   test("a page with no collection beside it has no problems to report", async () => {
     expect((await (await preview("index.md")).json()).problems).toEqual([]);
+  });
+});
+
+// n111: a folder that says feed: true can be followed in a feed reader.
+describe("a folder's feed", () => {
+  const put = (path: string, body: string) => fetch(`${BASE}/edit/pages/${path}`, authed({ method: "PUT", body }));
+  const remove = (path: string) => fetch(`${BASE}/edit/pages/${path}`, authed({ method: "DELETE" }));
+
+  test("the blog's, as Atom: its dated posts newest first, in absolute addresses", async () => {
+    const res = await fetch(`${BASE}/blog/feed.xml`);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("application/atom+xml; charset=utf-8");
+    const xml = await res.text();
+    const host = new URL(BASE).host;
+    expect(xml).toStartWith('<?xml version="1.0" encoding="UTF-8"?>\n<feed xmlns="http://www.w3.org/2005/Atom">');
+    expect(xml).toContain(`<id>${BASE}/blog/feed.xml</id>`);
+    expect(xml).toContain("<title>Blog</title>");
+    expect(xml).toContain(`<link rel="self" type="application/atom+xml" href="${BASE}/blog/feed.xml"/>`);
+    expect(xml).toContain(`<link rel="alternate" type="text/html" href="${BASE}/blog/"/>`);
+    expect(xml).toContain("<updated>2026-09-21T00:00:00Z</updated>");          // the newest post's
+    expect(xml).toContain(`<author><name>${host}</name></author>`);
+    const newer = xml.indexOf(`<id>${BASE}/blog/a-post-with-its-own-layout.html</id>`);
+    const older = xml.indexOf(`<id>${BASE}/blog/one-page-that-looks-different.html</id>`);
+    expect(newer).toBeGreaterThan(0);
+    expect(older).toBeGreaterThan(newer);
+    // The page itself, escaped, with its relative links resolving from where it lives.
+    expect(xml).toContain(`<content type="html" xml:base="${BASE}/blog/a-post-with-its-own-layout.html">&lt;`);
+    // A reader that has it already is told so.
+    const again = await fetch(`${BASE}/blog/feed.xml`, { headers: { "If-None-Match": res.headers.get("etag")! } });
+    expect(again.status).toBe(304);
+  });
+
+  test("{{feed}} is where a browser finds the feed of the folder a page is in, and nothing elsewhere", async () => {
+    const link = '<link rel="alternate" type="application/atom+xml" title="Blog" href="/blog/feed.xml">';
+    expect(await (await fetch(`${BASE}/blog/`)).text()).toContain(link);
+    expect(await (await fetch(`${BASE}/blog/a-post-with-its-own-layout.html`)).text()).toContain(link);   // post.html links it too
+    expect(await (await fetch(`${BASE}/guide/`)).text()).not.toContain("application/atom+xml");
+    // A folder, or the root, that asks for none has no feed.xml: a miss like any other.
+    expect((await fetch(`${BASE}/guide/feed.xml`)).status).toBe(404);
+    expect((await fetch(`${BASE}/feed.xml`)).status).toBe(404);
+  });
+
+  test("dated pages only, never a draft, and it keeps up with the editor", async () => {
+    await put("diary/index.md", "title: Diary & notes\nfeed: true\n\n{{pages}}");
+    await put("diary/monday.md", "title: Monday\ndate: 2026-09-21T10:30:00Z\ndescription: The <first> day\n\n[back](index.html)");
+    await put("diary/undated.md", "title: Undated\n\nno date");
+    await put("diary/someday.md", "title: Someday\ndate: someday\n\nnot a date");
+    await put("diary/secret.md", "title: Secret\ndate: 2026-09-22\ndraft: true\n\nshh");
+    await put("quiet/index.md", "title: Quiet\nfeed: true");
+    try {
+      const xml = await (await fetch(`${BASE}/diary/feed.xml`)).text();
+      expect(xml).toContain("<title>Diary &amp; notes</title>");
+      expect(xml).toContain("<updated>2026-09-21T10:30:00Z</updated>");
+      expect(xml).toContain("<summary>The &lt;first&gt; day</summary>");
+      expect(xml.match(/<entry>/g)!.length).toBe(1);
+      for (const left of ["Undated", "Someday", "Secret"]) expect(xml).not.toContain(left);
+      // Nothing dated yet: a feed with no entries, and a time that says so.
+      expect(await (await fetch(`${BASE}/quiet/feed.xml`)).text()).toContain("<updated>1970-01-01T00:00:00Z</updated>");
+
+      // Cached like the nav, and dropped when the editor writes.
+      await put("diary/tuesday.md", "title: Tuesday\ndate: 2026-09-22\n\nlater");
+      const later = await (await fetch(`${BASE}/diary/feed.xml`)).text();
+      expect(later.indexOf("Tuesday")).toBeLessThan(later.indexOf("Monday"));
+      await put("diary/index.md", "title: Diary\n\n{{pages}}");          // and a folder that stops asking
+      expect((await fetch(`${BASE}/diary/feed.xml`)).status).toBe(404);
+    } finally {
+      for (const f of ["monday", "undated", "someday", "secret", "tuesday", "index"]) await remove(`diary/${f}.md`);
+      await remove("quiet/index.md");
+    }
+  });
+
+  test("a feed that can't be built isn't kept: the next request tries again", async () => {
+    let tries = 0;
+    const failing = { exists: async () => { tries++; throw new Error("the bucket is away"); } } as unknown as Storage;
+    feedsChanged();
+    try {
+      await expect(feedXml(failing, "away", "https://example.com", false)).rejects.toThrow("the bucket is away");
+      await expect(feedXml(failing, "away", "https://example.com", false)).rejects.toThrow("the bucket is away");
+      expect(tries).toBe(2);
+    } finally {
+      feedsChanged();
+    }
   });
 });

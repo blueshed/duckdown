@@ -68,7 +68,7 @@ export const handleCollectionFiles = {
     const collection = await loadCollection(pages, folder);
     if (!collection) return missing(folder);
     return Response.json({
-      fields: collection.declared ? collection.fields : null,
+      fields: collection.fields,
       images: collection.images,
       uploads: imagesKey(collection.images.src) !== null && imagesKey(collection.images.thumb) !== null,
       problems: await collectionProblems(pages, folder),

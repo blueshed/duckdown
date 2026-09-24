@@ -11,6 +11,7 @@ import { APP_PATH, IS_S3, ORIGIN } from "../config";
 import { hostAnswer, hostOf, looking } from "../hosts";
 import { existsSync } from "fs";
 import { staticFile, CACHE } from "./static";
+import { feedXml, feedFolder, FEED_FILE } from "../feed";
 
 const pages = createPageStorage();
 
@@ -120,6 +121,12 @@ const renderPage = async (req: Request) => {
   if (ROOT_FILES.includes(path)) {
     const file = await staticFile(req, path);
     if (file) return file;
+  }
+  // A folder's feed, when its index asks for one (feed.ts); otherwise the
+  // name is just a miss like any other.
+  if (path === FEED_FILE || path.endsWith(`/${FEED_FILE}`)) {
+    const xml = await feedXml(pages, feedFolder(`/${path}`), siteOrigin(req));
+    if (xml) return conditional(req, xml, { "Content-Type": "application/atom+xml; charset=utf-8", "Cache-Control": CACHE });
   }
   const name = path.replace(/\.html$/, "").replace(/\/$/, "") || "index";
   // A page, or the index of the folder of that name: /blog, /blog/ and

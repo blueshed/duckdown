@@ -13,17 +13,19 @@
 // It reads through the storage layer, so it exports a folder on disk or a
 // live bucket, whichever this environment is pointed at.
 
-import { mkdirSync, rmSync, writeFileSync } from "fs";
+import { mkdirSync, readdirSync, rmSync, writeFileSync } from "fs";
 import { dirname, join } from "path";
 import { ORIGIN, STATIC_PATH, IS_S3, BUCKET, BUCKET_PREFIX, APP_PATH } from "./config";
 import { createPageStorage, createStaticStorage, type Storage } from "./storage";
 import { parsePage, pageHtml, itemPage } from "./page";
 import { buildSite } from "./search";
 import { COLLECTION_FILE, collectionProblems, loadCollection } from "./collection";
-import { canonicalPath, decodePath, escapeHtml } from "./utils";
+import { canonicalPath, escapeHtml } from "./utils";
+import { brokenLinks } from "./links";
 import { yes } from "./markdown";
 import { BASE_FILES, ROOT_FILES, baseFile } from "./base";
 import { sitemapXml } from "./sitemap";
+import { feedXml, FEED_FILE } from "./feed";
 
 export type Exported = { pages: number; drafts: number; files: number; broken: number; problems: number };
 
@@ -36,42 +38,6 @@ export function redirectHtml(to: string): string {
     + `<title>Moved</title><link rel="canonical" href="${href}">`
     + `<meta http-equiv="refresh" content="0; url=${href}">`
     + `</head><body><p>This page is now at <a href="${href}">${href}</a>.</p></body></html>\n`;
-}
-
-
-// `&amp;` and `&#x27;` in an attribute are one character each. A link scan
-// that doesn't undo them calls "Hart&#x27;sLeap.jpg" a missing file.
-const NAMED: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'" };
-function unescapeHtml(text: string): string {
-  return text.replace(/&(#x[0-9a-f]+|#\d+|\w+);/gi, (whole, e: string) => {
-    if (e[0] !== "#") return NAMED[e.toLowerCase()] ?? whole;
-    const code = e[1]!.toLowerCase() === "x" ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10);
-    return code <= 0x10ffff ? String.fromCodePoint(code) : whole;
-  });
-}
-
-// Every relative href and src on every page that points at nothing in the
-// site, as "page -> link". `known` is every file the export wrote. Links with a
-// scheme, and bare #fragments, are somebody else's to check; so are the
-// editor's own addresses, which exist on a served site and are no mistake.
-const EDITOR = /^\/(edit|login|logout)(\/|$)/;
-
-export function brokenLinks(pages: Map<string, string>, known: Set<string>): string[] {
-  const broken: string[] = [];
-  for (const [from, html] of pages) {
-    for (const m of html.matchAll(/\s(?:href|src)=(?:"([^"]*)"|'([^']*)')/g)) {
-      const link = unescapeHtml(m[1] ?? m[2]!);
-      if (link === "" || link.startsWith("#") || /^([a-z][a-z0-9+.-]*:|\/\/)/i.test(link)) continue;
-      const { pathname } = new URL(link, `http://site/${from}`);
-      const file = (decodePath(pathname) ?? pathname).slice(1);
-      // A file, a folder's index, or a folder named without its slash.
-      if (EDITOR.test(pathname)) continue;
-      if (!known.has(file) && !known.has(`${file}index.html`) && !known.has(`${file}/index.html`)) {
-        broken.push(`${from} -> ${link}`);
-      }
-    }
-  }
-  return broken;
 }
 
 // Every key under a storage, depth first. Folders the site serves but keeps
@@ -106,6 +72,18 @@ export function aliasFile(from: string): string | null {
   return folder ? `${folder}/index.html` : "index.html";
 }
 
+// Whether `path` under `out` is there spelt exactly as asked, segment by
+// segment. A filesystem that normalises names (é as e + a combining accent)
+// keeps the file under a spelling a request doesn't look up, and says nothing.
+export function lands(out: string, path: string): boolean {
+  let dir = out;
+  for (const segment of path.split("/")) {
+    if (!readdirSync(dir).includes(segment)) return false;
+    dir = join(dir, segment);
+  }
+  return true;
+}
+
 export async function exportSite(o: {
   out: string;
   origin?: string;
@@ -113,6 +91,7 @@ export async function exportSite(o: {
   files?: Storage;
   say?: (line: string) => void;
   strict?: boolean;   // a broken link is a failure, not just a report
+  lands?: typeof lands;
 }): Promise<Exported> {
   const out = o.out;
   // Trailing slash off, wherever it came from: canonicalPath supplies the
@@ -135,6 +114,7 @@ export async function exportSite(o: {
   const count: Exported = { pages: 0, drafts: 0, files: 0, broken: 0, problems: 0 };
   const problems: string[] = [];
   const moved: { from: string; to: string }[] = [];
+  const feeds: string[] = [];   // folders whose index says feed: true
 
   for (const key of await walk(pages)) {
     // A folder's collection is a folder of pages: every item rendered at its
@@ -160,6 +140,7 @@ export async function exportSite(o: {
     const { html } = await pageHtml(page, { origin, editHref: "" });
     rendered.set(outPath(key), html);
     for (const alias of page.meta.aliases ?? []) moved.push({ from: alias, to: canonicalPath(key) });
+    if (yes(page.meta.feed) && (key === "index.md" || key.endsWith("/index.md"))) feeds.push(key.slice(0, -"index.md".length));
   }
   if (!rendered.size) {
     const where = IS_S3 ? `s3://${BUCKET}/${BUCKET_PREFIX}` : APP_PATH;
@@ -181,7 +162,11 @@ export async function exportSite(o: {
   // arrives as once it is decoded, so `/l"etoile-1976` is a folder called
   // `l"etoile-1976` holding an index.html: this server finds it, and so does
   // any host that maps a path to a file. A name a page already holds is left
-  // alone and said — the page is the thing at that address.
+  // alone and said — the page is the thing at that address. So is a name this
+  // filesystem refuses (Windows won't take `"`; nowhere takes a segment of
+  // 256 bytes, or a folder where a file already is) or keeps under another
+  // spelling: the published site can't answer at that address, and an owner
+  // who isn't told finds out from a reader's 404.
   for (const { from, to } of moved) {
     const path = aliasFile(from);
     if (path === null) {
@@ -192,7 +177,17 @@ export async function exportSite(o: {
       problems.push(`alias ${from} is already a page — left as it is`);
       continue;
     }
-    write(path, redirectHtml(to));
+    try {
+      put(path, redirectHtml(to));
+    } catch (e) {
+      problems.push(`alias ${from} can't be written here as ${path} (${(e as NodeJS.ErrnoException).code ?? (e as Error).message}) — left out`);
+      continue;
+    }
+    if (!(o.lands ?? lands)(out, path)) {
+      problems.push(`alias ${from} was written, but this filesystem spells ${path} another way — a request for it won't find it`);
+      continue;
+    }
+    written.add(path);
     count.files++;
   }
 
@@ -221,10 +216,16 @@ export async function exportSite(o: {
   const { entries, pages: listed } = await buildSite(pages);
   write("search.json", JSON.stringify(entries));
   count.files++;
-  // A sitemap needs absolute addresses, so it needs the origin.
+  // A sitemap needs absolute addresses, so it needs the origin; so does a feed.
   if (origin) {
     write("sitemap.xml", sitemapXml(listed, origin));
     count.files++;
+    for (const folder of feeds) {
+      write(`${folder}${FEED_FILE}`, (await feedXml(pages, folder.replace(/\/$/, ""), origin, true))!);
+      count.files++;
+    }
+  } else if (feeds.length) {
+    say(`${feeds.map((f) => `/${f}${FEED_FILE}`).join(", ")} not written: a feed needs DUCKDOWN_ORIGIN for its addresses.`);
   }
 
   const broken = brokenLinks(rendered, written);

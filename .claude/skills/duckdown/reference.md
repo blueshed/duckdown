@@ -67,11 +67,13 @@
 | `toc` | `true` (or `yes`) adds a contents list under the page's title |
 | `layout` | `post` wraps the page in `templates/post.html`, falling back to `site.html` |
 | `description` | The page's description, for `<meta name="description">` and `og:description` |
+| `image` | The picture on the card a shared link shows (`og:image`): `images/cover.jpg` (under `static/`), a site path (`/static/images/cover.jpg`) or a full URL. An item's own picture is its card without saying so; an each: page may name another (`image: {{item-detail}}`) |
 | `date` | Orders a folder's `{{pages}}` listing, newest first, and is shown beside the link (ISO: `2026-09-19`) |
 | `order` | In a folder's `index.md` only: a whole number, for where that folder sits among its siblings in the navigation and `{{sitemap}}` |
 | `draft` | `true` keeps the page off the site, the nav and listings; signed in to the editor, you still see it |
 | `aliases` | An address this page used to answer at; a request for it is a 301 to this page. Repeat the line for more than one |
 | `each` | This page is the page every item of a collection gets, not a page of its own: `each: true` in a folder that has a `collection.json` (see Collections) |
+| `feed` | In a folder's `index.md` only: `feed: true` gives the folder an Atom feed at `/<folder>/feed.xml` of its dated pages — see [A feed](#a-feed) |
 | `collection` | The collection a bare `{{items}}` or `{{groups}}` on this page means, when it isn't the page's own folder's: `collection: gallery` |
 
 - A plain block may hold **only those keys**, or one starting `x-` (your own). At the first line that isn't one, the block ends and everything from there is content — so prose opening `Update: closed on Monday` keeps its first line, and a mistyped key appears on the page instead of vanishing.
@@ -164,6 +166,10 @@ HTML in a page is passed through as written, scripts included, on the published 
 `{{pages}}` in a page lists the pages beside it — newest first by `date:`, each with its `description:` — as `<ul class="pages">`. A folder's `index.md`, drafts, files starting with `-` and anything that isn't `.md` are left out. It's how a blog index keeps itself.
 
 `{{sitemap}}` is the same made recursive, for a page a reader can read: every page on the site as nested `<ul class="sitemap">`, the site's front page first, each folder labelled by its index's `title:` and linked to it, pages newest first as `{{pages}}` has them, and folders after them by name. Drafts, `404.md`, folders starting with `-` or `.`, and folders with nothing to show are left out. Like `{{pages}}` it stays as written inside code, so a page can document it, and it works in an export. Put it in a `pages/sitemap.md` (which stays out of the nav, since only folders' indexes are in it) and link that from the 404 page.
+
+### A feed
+
+`feed: true` in a folder's `index.md` (the root's too, at `/feed.xml`) lets a reader follow the folder in a feed reader: `/<folder>/feed.xml`, Atom, the pages `{{pages}}` lists there, newest first — but only those with a `date:` a machine can read (`2026-09-21`, or with a time: `2026-09-21T10:30:00Z`), because a feed is what's new. Each entry is the page's title, address, date, `description:` as its summary, and the whole rendered page. Drafts never go in. `{{feed}}` in the template is the `<link rel="alternate">` that lets a browser find it (the seed's templates have it; an older site adds it beside `{{description}}`). The export writes `feed.xml` only when `DUCKDOWN_ORIGIN` is set — its addresses must be absolute — and without it `{{feed}}` is empty, so nothing links to a feed that wasn't written.
 
 ### Not supported
 
@@ -288,7 +294,7 @@ otherwise (see Pictures).
 
 | Key | What it does |
 |-----|--------------|
-| `fields` | What an item is made of: `name`, `kind` (`text`, `long`, `image` or `number`; `text` if unsaid) and an optional `label` for the editor. A bare `"year"` is a text field |
+| `fields` | What an item is made of: `name`, `kind` (`text`, `long`, `image` or `number`; `text` if unsaid) and an optional `label` for the editor. A bare `"year"` is a text field. Unsaid, an item is `src` (the picture), `title` and `caption` |
 | `images` | Where the pictures are: a base URL, or `{ "src", "thumb", "suffix", "extension" }`. Defaults to `/static/images/` |
 | `labels` | Per field, a label for a value: an overview's heading reads `1961 - Early work` |
 | `groups` | The sections, in order: `name`, optional `label`, `items`, and optionally `groups` of their own |
@@ -306,9 +312,9 @@ doesn't know. A page or template asking for `{{item-yaer}}` or
 `{{items by=yaer}}` is said in the log too. Anything the file isn't shaped like
 is skipped rather than believed.
 
-A 0.4 file — `"layout": "item"` and no `fields` — still works for now: its
-fields are read off the items and its layout acts as an each: page with an
-empty body. The log says so. Write the each: page and declare the fields.
+`"layout"` in `collection.json` (0.4's way of naming the item template) makes
+no pages any more, and is said as a problem: write the each: page beside it
+(`item.md`, `each: true`, `layout: <that template>`) and take `layout` out.
 
 ### Order, slugs and addresses
 
@@ -470,13 +476,22 @@ aliases: /old-place
 aliases: /older-place.html
 ```
 
+Renaming or moving a page in the editor (**Rename or move**, in its header)
+adds its old address to its `aliases` for you, and takes off an alias that is
+its new address (a page moved back). A draft keeps none: it never had an
+address. A folder's `index.md` and an each: page don't move on their own.
+Moving a file by hand, outside the editor, add the line yourself.
+
 They are matched on the **decoded** address, so an old slug holding a quote or
 a curly apostrophe still answers. `bun run export` writes each alias as a small
 redirect page (canonical link plus meta refresh) under the decoded name, so a
 published site keeps them too: `/older-place.html` as the file
 `older-place.html`, `/old-place` as `old-place/index.html`. An alias that is
 already a page is left alone and said, and one with a `.` or `..` segment is
-left out and said.
+left out and said. So is one the machine running the export can't write under
+that name (Windows refuses `"`; a segment over 255 bytes fails anywhere) or
+keeps under another spelling: the published site couldn't answer there, and
+`--strict` fails on it. The served site answers every alias whatever its name.
 
 ### Editing one in the editor
 
@@ -609,10 +624,11 @@ In the editor, a stylesheet opens from **Resources → css** in a pane below wha
 | Placeholder | Becomes |
 |-------------|---------|
 | `{{title}}` | The page's `title`, else `duckie` |
-| `{{description}}` | The page's `description` as `<meta name="description">` and `og:description`, or nothing |
+| `{{description}}` | The page's `description` as `<meta name="description">` and `og:description`, and the card a shared link shows: `og:title`, `og:type` (`article` for a page with a `date:`, else `website`), `og:url`, and with an `image:` (or an item's picture) `og:image` and `twitter:card`. The URL and the picture are absolute, so an export without `DUCKDOWN_ORIGIN` leaves them out. A template that writes its own `og:` tags will have them twice: take its own out |
 | `{{url}}` | The page's one canonical address — use it as `<link rel="canonical" href="{{url}}">` |
 | `{{date}}` | The page's `date` as a `<time>`, written out (`21 September 2026`), or nothing |
 | `{{nav}}` | The navigation (above), or nothing |
+| `{{feed}}` | `<link rel="alternate" type="application/atom+xml">` for the feed of the folder the page is in, or nothing when that folder has none |
 | `{{css}}` | `<link>` for the page's `css:`, or nothing |
 | `{{edit}}` | An "Edit this page" link to the editor — only for whoever is signed in |
 | `{{x-anything}}` | The page's own `x-anything:` front-matter value, escaped, or nothing when the page doesn't set it |
@@ -678,10 +694,11 @@ A page's `layout:` chooses the template (`layout: post` → `templates/post.html
 - **Editing a resource** (a stylesheet or a template, from the sidebar): it opens in a pane *below* the page, with the same header — name, unsaved dot, delete, Save, and a close button. The page stays where it is, so you can click through pages and watch one stylesheet against each. It's transient: closing the pane leaves nothing behind.
 - **Editing a collection** (from the tree, or offered under a folder's index page): the same pane, holding the folder's works rather than a file's text — see [Editing one in the editor](#editing-one-in-the-editor). It shares the slot with a resource: the column holds the page and one thing beneath it, so opening a stylesheet closes the collection and the other way about.
 - **The middle column holds whatever is open**, and each pane closes, the page included. Two split it; one fills it. With no page open, a stylesheet or template has the column to itself — which is how you write one from scratch.
-- **Preview** (right): what you'd see. With a page open, the page as the site will show it, rendered by the same code — its own template and the stylesheets it links, the navigation, the `{{pages}}` listing, wiki links resolved from the page's folder — sandboxed, so no scripts run. A template open in the pane below is used in place of the saved one when it's the one this page wears, so you watch the page change as you write it; a stylesheet goes straight into the preview's head as you type, after the saved one, so it wins.
+- **Preview** (right): what you'd see. With a page open, the page as the site will show it, rendered by the same code — its own template and the stylesheets it links, the navigation, the `{{pages}}` listing, wiki links resolved from the page's folder — sandboxed, so no scripts run. A template open in the pane below is used in place of the saved one when it's the one this page wears, so you watch the page change as you write it; a stylesheet goes straight into the preview's head as you type, after the saved one, so it wins. A link on the page that a reader would follow to nothing — no page, no work, no old address, no file in `static/`, or a draft — is named in the message line (`Links that lead nowhere a reader can go: …`), and the line goes once the link is put right.
 - **With no page open**, whatever you're composing with gets a sample page of its own: for a stylesheet, a bit of everything `site.css` styles; for a template, a sample page put through it, with the site's real navigation. So a template or a stylesheet can be written with nothing else on screen.
 - **Header**: *Resources* (the sidebar), *View* (the page on the site), *Logout*.
 - **Deleting always asks first**, wherever it is — a page, a stylesheet, a template, a work in a collection — and nothing deleted is gone. **Earlier versions** (the clock in every pane's header) lists what a file was before each sitting of saves, newest first, the last 30; **Restore** puts one back, and keeps what it replaces. **Deleted** (at the top of the page tree, and of each resource list) brings back a deleted file. They live in the site's `.history/` folder, beside `pages/` and outside everything the site serves or exports — a site kept in git ignores it (`site/.history/`). The collection pane also has **Undo** and **Redo** for its own changes while it is open.
+- **Rename or move** (the folder-arrow in the page's header) gives a page a new name or folder: type its new place (`blog/new-name`; `.md` is added). Unsaved changes are saved first, the old address goes into its `aliases`, and its Earlier versions go with it. It won't move onto a page that exists, a folder's `index.md` or an each: page, or change only a name's case.
 - When writing files directly (not through the editor), no version is kept: that is git's job.
 - Anything that fails shows in a red notice at the foot of the screen until dismissed; news that isn't a failure (a renamed work keeping its old address) shows there in the accent colour.
 

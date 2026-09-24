@@ -3,7 +3,8 @@ import { describe, test, expect, spyOn } from "bun:test";
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "fs";
 import { join } from "path";
 import { RUN, SITE } from "./helpers";
-import { exportSite, outPath, aliasFile, brokenLinks, main } from "../server/export";
+import { exportSite, outPath, aliasFile, main, lands } from "../server/export";
+import { brokenLinks } from "../server/links";
 import { LocalStorage } from "../server/storage";
 import { searchChanged } from "../server/search";
 import { collectionsChanged } from "../server/collection";
@@ -176,6 +177,16 @@ describe("what a published site needs beside its pages", () => {
     expect(xml).toContain("<loc>https://example.com/blog/a-post-with-its-own-layout.html</loc><lastmod>2026-09-21</lastmod>");
     expect(xml).not.toContain("404");
     expect(existsSync(join(full, "404.html"))).toBe(true);           // the miss page a static host serves
+    // n111: the blog's feed, at the address its pages link to, in absolute addresses.
+    const feed = read(full, "blog/feed.xml");
+    expect(feed).toContain("<id>https://example.com/blog/feed.xml</id>");
+    expect(feed).toContain("<id>https://example.com/blog/a-post-with-its-own-layout.html</id>");
+    expect(read(full, "blog/a-post-with-its-own-layout.html"))
+      .toContain('<link rel="alternate" type="application/atom+xml" title="Blog" href="/blog/feed.xml">');
+    // n112: a card with absolute addresses, from DUCKDOWN_ORIGIN.
+    const work = read(full, "gallery/first-light/index.html");
+    expect(work).toContain('<meta property="og:url" content="https://example.com/gallery/first-light/">');
+    expect(work).toContain('<meta property="og:image" content="https://example.com/static/images/gallery/one.svg">');
     rmSync(dir, { recursive: true, force: true });
     rmSync(full, { recursive: true, force: true });
   });
@@ -186,6 +197,15 @@ describe("what a published site needs beside its pages", () => {
     await exportSite({ out: dir, say: (l) => said.push(l) });
     expect(existsSync(join(dir, "sitemap.xml"))).toBe(false);
     expect(said.join("\n")).toContain("sitemap.xml");
+    // n111: nor a feed, which says so, and no page links to the feed it didn't write.
+    expect(existsSync(join(dir, "blog/feed.xml"))).toBe(false);
+    expect(said.join("\n")).toContain("/blog/feed.xml not written: a feed needs DUCKDOWN_ORIGIN for its addresses.");
+    expect(read(dir, "blog/index.html")).not.toContain("application/atom+xml");
+    // n112: nor a card's address or picture, which must be absolute; its title stays.
+    const work = read(dir, "gallery/first-light/index.html");
+    expect(work).toContain('<meta property="og:title"');
+    expect(work).not.toContain("og:url");
+    expect(work).not.toContain("og:image");
     rmSync(dir, { recursive: true, force: true });
   });
 });
@@ -362,6 +382,54 @@ describe("collections", () => {
     } finally {
       rmSync(page);
     }
+  });
+
+  // n95: a name the filesystem refuses, or keeps under another spelling, was
+  // an export that crashed or an address that silently didn't answer.
+  test("an alias this filesystem won't take is left out and said, and the rest of the site is written", async () => {
+    const dir = join(RUN, "alias-refused", "dist");
+    const page = join(SITE, "pages", "refused.md");
+    const said: string[] = [];
+    const long = `/${"x".repeat(300)}`;                                   // no filesystem takes a 300-byte name
+    writeFileSync(page, `title: Refused\naliases: ${long}\naliases: /refused.html/under\naliases: /kept\n\n# Refused\n`);
+    try {
+      const count = await exportSite({ out: dir, origin: "https://example.com", say: (l) => said.push(l) });
+      const lines = said.join("\n");
+      expect(lines).toContain(`alias ${long} can't be written here as ${long.slice(1)}/index.html (ENAMETOOLONG) — left out`);
+      expect(lines).toContain("alias /refused.html/under can't be written here as refused.html/under/index.html (");   // a page is a file, not a folder
+      expect(read(dir, "refused.html")).toContain("<h1");                  // the page it clashed with is untouched
+      expect(read(dir, "kept/index.html")).toContain('href="/refused.html"');
+      expect(count.problems).toBe(2);
+    } finally {
+      rmSync(page);
+    }
+  });
+
+  test("an alias a filesystem keeps under another spelling is said, and not counted as written", async () => {
+    const dir = join(RUN, "alias-respelt", "dist");
+    const page = join(SITE, "pages", "respelt.md");
+    const said: string[] = [];
+    writeFileSync(page, "title: Respelt\naliases: /café\n\n# Respelt\n");
+    try {
+      const count = await exportSite({
+        out: dir, origin: "https://example.com", say: (l) => said.push(l),
+        lands: (_, path) => path !== "café/index.html",                      // as a normalising filesystem would
+      });
+      expect(said.join("\n")).toContain("alias /café was written, but this filesystem spells café/index.html another way — a request for it won't find it");
+      expect(count.problems).toBe(1);
+    } finally {
+      rmSync(page);
+    }
+  });
+
+  test("lands() is true only for the name spelt exactly as asked", () => {
+    const dir = join(RUN, "lands");
+    rmSync(dir, { recursive: true, force: true });
+    mkdirSync(join(dir, "cafe\u0301"), { recursive: true });              // é as e + a combining accent
+    writeFileSync(join(dir, "cafe\u0301", "index.html"), "");
+    expect(lands(dir, "cafe\u0301/index.html")).toBe(true);
+    expect(lands(dir, "caf\u00e9/index.html")).toBe(false);               // é as one character: another name
+    expect(lands(dir, "cafe\u0301/other.html")).toBe(false);
   });
 
   test("an alias that is already a page leaves the page alone and says so", async () => {

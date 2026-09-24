@@ -47,6 +47,11 @@ lists how it was before each sitting of edits, and **Restore** puts one back
 (what it replaces is kept too). A page, template or stylesheet you delete is
 kept as well: **Deleted**, at the top of the list it was in, brings it back.
 
+To rename a page, or move it to another folder, use the folder-arrow button in
+its header — **Rename or move** — and type where it should live
+(`blog/new-name`). Its old address keeps working: the page gets an `aliases:`
+line for it, so a link or bookmark to where it was leads to where it is.
+
 ## Next steps
 
 - [Writing Pages](/guide/pages.html) — learn about markdown and front-matter

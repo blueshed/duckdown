@@ -49,6 +49,7 @@ duckdown/
 │   ├── log.ts              # The view log: what was read, never who
 │   ├── search.ts           # The index readers search, cached like the nav; page and item aliases
 │   ├── sitemap.ts          # sitemap.xml from that index
+│   ├── feed.ts             # A folder's Atom feed (feed: true), cached like the nav; {{feed}}
 │   ├── collection.ts       # collection.json (the data) + its each: page (the page every item gets)
 │   ├── history.ts          # Earlier versions: what a save replaced, what a delete removed
 │   ├── images.ts           # Where a collection's pictures are, and what a thumbnail is called (both ends read it)
@@ -62,6 +63,7 @@ duckdown/
 │   ├── scaffold.ts         # Says so when `bun create` left a half-scaffold
 │   ├── page.ts             # A page, rendered: markdown in its template
 │   ├── export.ts           # bun run export — the whole site as files
+│   ├── links.ts            # The links a page makes, and which lead nowhere (the export and the preview ask)
 │   ├── utils.ts            # Shared helpers: paths, escaping, dates, a pass outside code
 │   ├── routes/
 │   │   ├── files.ts        # fileRoutes() — GET/PUT/DELETE over one folder
@@ -330,9 +332,10 @@ every item gets at `/<folder>/<slug>/` — found by `eachPageIn()` when the
 collection loads, rendered once and kept on `Collection.each`, never served,
 listed or searched as a page itself — and any page with `{{items}}` is an
 overview (`collection: <name>` names the collection its bare tags mean). No
-each: page, no item pages: overviews show unlinked thumbnails. A 0.4 file
-(`layout`, no `fields`) is read with its fields inferred and its layout as an
-empty each: page, and says so once; that goes in the release after 0.5. It is
+each: page, no item pages: overviews show unlinked thumbnails. A file with no
+`fields` has `PLAIN` ones (`src` the picture, `title`, `caption`), the same
+three the pane adds items as; a `layout` in the data (0.4's item template)
+is a problem that says to write the each: page. It is
 read through the storage layer like everything else, so it works on disk and
 in a bucket, and it is cached exactly like the nav — `routes/pages.ts` calls
 `collectionsChanged()` beside `pagesChanged()` and `searchChanged()`, because
@@ -357,8 +360,8 @@ that a slug collides with a page.
 `CollectionPane.tsx` edits that file as what it is: groups of items, each an
 input per field the file declares (`fields`, as the server parses them: a line
 for text and number — values stay strings, a number may say `skip` — a box for
-long) and the `image` field as the picture; a file with no `fields` is edited as
-`src`/`title`/`caption`, and one with no image field adds items as empty rows.
+long) and the `image` field as the picture; a file with no `fields` gets
+`PLAIN` from the server, and one with no image field adds items as empty rows.
 It keeps the **raw** JSON, not the parsed
 `Collection` — a parsed one has slugs and resolved URLs in it, and writing
 that back would be writing duckdown's reading of the file rather than the file
@@ -392,7 +395,9 @@ file order and a title with nothing usable in it takes `item-<n>`. Aliases —
 `buildSite()` and matched by `aliasTarget()` on the **decoded** path
 (`decodePath()` runs first), because a legacy address may hold a quote or a
 curly apostrophe; the site answers 301, and the export writes a redirect page
-under the decoded name.
+under the decoded name — or says it can't, when the filesystem refuses that
+name or keeps it under another spelling (`lands()`), rather than crashing or
+publishing an address that won't answer.
 
 `{{items}}`, `{{items <collection>}}`, `{{items by=<field>}}` and `{{groups}}`
 are filled by `fillCollections()`, over the page's body (outside `<code>`, like
@@ -425,7 +430,15 @@ collection pane writes on every change — leaves one version, the file as it
 was before; a delete or a restore always keeps one; `KEEP` (30) per file. The
 same routes answer `?versions`, `?version=<id>`, `?deleted` and
 `POST ?restore=<id>`, and the editor shows them as Earlier versions (the clock
-in `PaneHeader`) and Deleted (atop the tree and each resource list). A new
+in `PaneHeader`) and Deleted (atop the tree and each resource list).
+`POST ?move=<to>` renames, for a section that passes `fileRoutes()` a `Mover`
+(only pages do: templates and stylesheets are named by pages): never onto a
+file that exists or to a change of case alone, the versions follow
+(`History.move()`), and the page as it was is kept at the new name. The pages'
+`movePage()` adds the old address to the page's `aliases` (`addMeta()`/
+`dropMeta()` in markdown.ts edit front matter lines in place), except for a
+draft, and refuses a folder's `index.md` and an each: page; the editor's
+Rename or move (`moveFile()`) saves first and tells the address it kept. A new
 write path that bypasses `fileRoutes()` bypasses the history too — the
 collection route's picture uploads do, deliberately. The collection pane also
 keeps its own undo stack: every change is a whole new file, so undo writes the
@@ -472,10 +485,12 @@ Paths: storage keys are real names. The server decodes the URL path (`after()`);
 - **Root files.** `ROOT_FILES` (robots.txt, favicon.ico) in `base.ts`: a list of two, answered at the root from `static/` and written to the root of `dist/`. Not a mechanism.
 - **One address.** `hosts.ts` is what both servers ask of a request's name (`hostOf()`: x-forwarded-host first): `hostAnswer()` 301s another name to `DUCKDOWN_ORIGIN` and closes `robots.txt` on a place to look (`looking()`: localhost, 127.0.0.1, `*.up.railway.app`, never the origin's own host), and the caller adds `X-Robots-Tag: noindex` there to every answer. `serve.ts` asks it in `route()`, the served site in `siteHandler(origin)` (routes/site.ts) — pages only: the other routes answer under any name. Unset, nothing moves.
 - **Sitemap.** `sitemapXml()` over `searchIndex()`, served at `/sitemap.xml` and written by the exporter when `DUCKDOWN_ORIGIN` is set (it needs absolute addresses).
+- **Feeds.** `feed: true` on a folder's `index.md` gives it `/<folder>/feed.xml` (`feed.ts`): Atom over `folderEntries()` — what `{{pages}}` lists, so they agree on drafts and order — taking only the pages whose `date:` parses. What it is made from is cached per folder without an origin, dropped by `feedsChanged()` from the pages route, and `feedXml()` writes it for an origin. The site route answers `…/feed.xml` before a page (a folder with no feed falls through to a miss); the export writes it only with `DUCKDOWN_ORIGIN`, and `{{feed}}` is empty when `pageHtml` has no origin, so no page links to a feed that wasn't written. `deadLinks()` counts a feed as somewhere.
 - **Validators.** `conditional()` in utils.ts: an ETag from the bytes, 304 on a match. Static files and signed-out pages use it; a signed-in page (it has the edit link) is `private, no-cache`.
 - **Template values.** `{{x-anything}}` in a template is the page's own `x-` key, escaped, empty when unset, filled before `{{content}}`.
+- **A card for a shared link.** `{{description}}` writes the Open Graph tags as well as the description — `og:title`, `og:type` (article when dated), `og:url`, and `og:image` plus `twitter:card` when the page says `image:` — so every site that already has `{{description}}` gets them. `pictureUrl()` (page.ts) makes `image:` absolute (a full URL, a site path, or a path under `static/`; never `..`; an escape already made kept), and addresses are left out without an origin. An item's picture is its `image` through `itemMeta()`, unless the each: page names one.
 - **Bad URLs.** `decodePath()` answers null for a malformed escape; `after()` throws `BadRequest`, which `handleError` answers 400 without a stack. The site route and `serve.ts` answer 400 themselves.
-- **The export's checks.** It renders everything before it deletes `dist/`, and fails when there is nothing to write (naming where it looked). `brokenLinks()` reports each relative link that leads nowhere; `--strict` or `DUCKDOWN_STRICT=1` fails on them. `main()` returns the exit code so the `import.meta.main` line stays one line (coverage counts a multi-line block that a test can't run).
+- **The export's checks.** It renders everything before it deletes `dist/`, and fails when there is nothing to write (naming where it looked). `brokenLinks()` reports each relative link that leads nowhere; `--strict` or `DUCKDOWN_STRICT=1` fails on them. The preview asks the same of the page being edited as it is written: `links.ts` holds `linksIn()` (what counts as a link, for both) and `deadLinks()`, which checks against the cached index (`pageList()`, `aliasTargets()`), and against `static/` only for the files the page names, and `routes/mark.ts` returns what it finds among `problems`. `Preview.tsx` takes its own line down once the problems are gone. `main()` returns the exit code so the `import.meta.main` line stays one line (coverage counts a multi-line block that a test can't run).
 
 ## Testing
 

@@ -6,7 +6,7 @@ import {
   SLUG, slugify, fragmentId, aliasKey, parseCollection, parseArgs,
   itemsHtml, groupsHtml, neighbour, itemValue, fillCollections, sortValues,
   loadCollection, collectionsChanged, collectionPath, collisions, collectionProblems, itemAt,
-  fillItem, itemMeta, itemBody,
+  fillItem, itemMeta, itemBody, PLAIN,
 } from "../server/collection";
 import { thumbName } from "../server/images";
 
@@ -211,9 +211,8 @@ describe("parseCollection", () => {
 
   test("anything the file isn't shaped like is skipped rather than believed", () => {
     const collection = parseCollection("works", json({
-      layout: 7, labels: "no", groups: [group("all", ["not an object", { title: "Anna", aliases: "not a list" }]), "nope"],
+      labels: "no", groups: [group("all", ["not an object", { title: "Anna", aliases: "not a list" }]), "nope"],
     }));
-    expect(collection.layout).toBe("");                           // not a name: no layout
     expect(collection.labels).toEqual({});
     expect(collection.items).toHaveLength(1);
     expect(collection.items[0]!.aliases).toEqual([]);
@@ -368,7 +367,7 @@ describe("parseArgs", () => {
 
 describe("fillCollections", () => {
   const pages = () => memory({
-    "works/collection.json": json({ groups: [group("1960", [{ title: "Battersea", index: "1962" }])] }),
+    "works/collection.json": json({ fields: ["title", "index"], groups: [group("1960", [{ title: "Battersea", index: "1962" }])] }),
   });
 
   test("a tag names another folder's collection, so an overview can live outside it", async () => {
@@ -524,7 +523,6 @@ describe("fields", () => {
       fields: ["title", { name: "picture", kind: "image", label: "Picture" }, { name: "caption", kind: "long" }],
       groups: [group("all", [{ title: "Anna", picture: "anna.jpg" }])],
     }));
-    expect(collection.declared).toBe(true);
     expect(collection.fields).toEqual([
       { name: "title", kind: "text", label: "title" },
       { name: "picture", kind: "image", label: "Picture" },
@@ -553,10 +551,14 @@ describe("fields", () => {
     expect(collection.problems).toEqual(['works/collection.json: 2 item(s) say "year", which isn\'t one of the fields — declare it, or take it out']);
   });
 
-  test("undeclared (0.4), the fields are read off the items, src the picture", () => {
+  test("undeclared, an item is src (the picture), title and caption — anything else is said", () => {
     const collection = parseCollection("works", json({ groups: [group("all", [{ title: "A", src: "a.jpg" }, { title: "B", year: "1" }])] }));
-    expect(collection.declared).toBe(false);
-    expect(collection.fields.map((f) => `${f.name}:${f.kind}`)).toEqual(["title:text", "src:image", "year:text"]);
+    expect(collection.fields).toEqual(PLAIN);
+    expect(collection.image).toBe("src");
+    expect(collection.items[0]!.thumb).toBe("/static/images/a_tn.jpg");
+    expect(collection.problems).toEqual([
+      'works/collection.json: 1 item(s) say "year", and there are no "fields" — without them an item is src, title and caption; declare the fields',
+    ]);
   });
 
   test("asking for a field that isn't declared is a typo, said once in the log", () => {
@@ -599,6 +601,22 @@ describe("each: pages", () => {
     expect(itemMeta(context).description).toEqual(["Ink"]);                    // the caption, unsaid
   });
 
+  // n112: the picture on a shared link's card.
+  test("an item's card picture is its own, unless the each: page names another; none without one", async () => {
+    const files = (each: string) => memory({
+      "works/collection.json": json({
+        fields: [{ name: "src", kind: "image" }, "title", "detail"],
+        groups: [group("all", [{ title: "Anna", src: "anna.jpg", detail: "/static/anna-detail.jpg" }, { title: "Bea" }])],
+      }),
+      "works/item.md": each,
+    });
+    const own = (await loadCollection(files("each: true"), "works", true))!;
+    expect(itemMeta({ collection: own, item: own.items[0]! }).image).toEqual(["/static/images/anna.jpg"]);
+    expect(itemMeta({ collection: own, item: own.items[1]! }).image).toBeUndefined();      // Bea has no picture
+    const named = (await loadCollection(files("each: true\nimage: {{item-detail}}"), "works", true))!;
+    expect(itemMeta({ collection: named, item: named.items[0]! }).image).toEqual(["/static/anna-detail.jpg"]);
+  });
+
   test("an each: page serves its own folder's collection, and there is one", async () => {
     const collection = (await loadCollection(memory({
       "works/collection.json": data,
@@ -621,22 +639,21 @@ describe("each: pages", () => {
     expect(groupsHtml(collection)).toContain("<span>all</span>");
   });
 
-  test("0.4's layout in the data still works, as an each: page of nothing, and says it is going", async () => {
-    const warn = spyOn(console, "warn").mockImplementation(() => {});
+  test("0.4's layout in the data makes no pages, and says what to write instead", async () => {
+    const error = spyOn(console, "error").mockImplementation(() => {});
     try {
-      collectionsChanged();
       const store = memory({ "works/collection.json": json({ layout: "item", groups: [group("all", [{ title: "Anna" }])] }) });
-      await loadCollection(store, "works", true);
       const collection = (await loadCollection(store, "works", true))!;
-      expect(collection.each).toEqual({ key: "", meta: { layout: ["item"] }, content: "" });
-      expect(itemMeta({ collection, item: collection.items[0]! }).title).toEqual(["Anna"]);
-      expect(warn.mock.calls.map((c) => c[0])).toEqual([
-        'works/collection.json: "layout" in the data is going — write an each: page instead (works/item.md, saying "each: true" and "layout: item")',
-        'works/collection.json: no "fields" — read off the items; declare them',
-      ]);
+      expect(collection.each).toBeNull();
+      expect(await itemAt(store, "works/anna", true)).toBeNull();
+      const said = 'works/collection.json: "layout" isn\'t read any more — write an each: page beside it '
+        + '(works/item.md, saying "each: true" and "layout: item") and take "layout" out';
+      expect(collection.problems).toEqual([said]);
+      expect(error.mock.calls.map((c) => c[0])).toContain(said);
+      // Not a name: the each: page is still the answer, with its layout to fill in.
+      expect(parseCollection("", json({ layout: 7 })).problems[0]).toContain('(item.md, saying "each: true" and "layout: <template>")');
     } finally {
-      warn.mockRestore();
-      collectionsChanged();
+      error.mockRestore();
     }
   });
 
