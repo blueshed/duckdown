@@ -62,6 +62,7 @@ duckdown/
 │   ├── scaffold.ts         # Says so when `bun create` left a half-scaffold
 │   ├── page.ts             # A page, rendered: markdown in its template
 │   ├── export.ts           # bun run export — the whole site as files
+│   ├── links.ts            # The links a page makes, and which lead nowhere (the export and the preview ask)
 │   ├── utils.ts            # Shared helpers: paths, escaping, dates, a pass outside code
 │   ├── routes/
 │   │   ├── files.ts        # fileRoutes() — GET/PUT/DELETE over one folder
@@ -484,7 +485,7 @@ Paths: storage keys are real names. The server decodes the URL path (`after()`);
 - **Validators.** `conditional()` in utils.ts: an ETag from the bytes, 304 on a match. Static files and signed-out pages use it; a signed-in page (it has the edit link) is `private, no-cache`.
 - **Template values.** `{{x-anything}}` in a template is the page's own `x-` key, escaped, empty when unset, filled before `{{content}}`.
 - **Bad URLs.** `decodePath()` answers null for a malformed escape; `after()` throws `BadRequest`, which `handleError` answers 400 without a stack. The site route and `serve.ts` answer 400 themselves.
-- **The export's checks.** It renders everything before it deletes `dist/`, and fails when there is nothing to write (naming where it looked). `brokenLinks()` reports each relative link that leads nowhere; `--strict` or `DUCKDOWN_STRICT=1` fails on them. `main()` returns the exit code so the `import.meta.main` line stays one line (coverage counts a multi-line block that a test can't run).
+- **The export's checks.** It renders everything before it deletes `dist/`, and fails when there is nothing to write (naming where it looked). `brokenLinks()` reports each relative link that leads nowhere; `--strict` or `DUCKDOWN_STRICT=1` fails on them. The preview asks the same of the page being edited as it is written: `links.ts` holds `linksIn()` (what counts as a link, for both) and `deadLinks()`, which checks against the cached index (`pageList()`, `aliasTargets()`), and against `static/` only for the files the page names, and `routes/mark.ts` returns what it finds among `problems`. `Preview.tsx` takes its own line down once the problems are gone. `main()` returns the exit code so the `import.meta.main` line stays one line (coverage counts a multi-line block that a test can't run).
 
 ## Testing
 

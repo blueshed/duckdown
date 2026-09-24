@@ -136,6 +136,10 @@ function site(pages: Storage, debug: boolean): Promise<Built> {
 export const searchIndex = async (pages: Storage, debug = DEBUG): Promise<Entry[]> => (await site(pages, debug)).entries;
 export const pageList = async (pages: Storage, debug = DEBUG): Promise<PageRef[]> => (await site(pages, debug)).pages;
 
+// Every old address that moves, through aliasKey(): what a link may still say.
+export const aliasTargets = async (pages: Storage, debug = DEBUG): Promise<string[]> =>
+  (await site(pages, debug)).aliases.map((a) => a.from);
+
 // Where an old address goes now, or null when it is simply a miss. Built from
 // the same walk as the index, so it costs nothing extra and expires with it.
 export async function aliasTarget(pages: Storage, path: string, debug = DEBUG): Promise<string | null> {

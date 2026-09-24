@@ -1,14 +1,15 @@
 import { createElement, signal, computed, effect } from "@blueshed/railroad";
 import { apiJson } from "../api";
 import { editorContent, filePath, pageLayout, pageIncludes, resource, resourceDraft, collectionRevision } from "../store";
-import { speak } from "../notice";
+import { speak, hush, notice } from "../notice";
 import { PreviewFrame } from "./PreviewFrame";
 
 // The server renders the whole document, the way the site will: the page's
 // markdown inside its template, with the nav, its stylesheets and the rest
 // filled in. `layout` says which template it used, and `problems` is anything
-// wrong with the folder's collection.json — nothing a page's text can cause,
-// so it is said once and not on every keystroke.
+// wrong with the folder's collection.json, or a link on the page that leads
+// nowhere — said when it changes, not on every keystroke, and taken down once
+// it is put right, if it is still what the line says.
 type Rendered = { html: string; layout: string; includes: string[]; problems?: string[] };
 
 export function Preview() {
@@ -28,6 +29,7 @@ export function Preview() {
     pageIncludes.set(data.includes);
     const problems = (data.problems ?? []).join(" ");
     if (problems && problems !== said) speak(problems);
+    if (!problems && said && notice.peek() === said) hush();
     said = problems;
   };
 

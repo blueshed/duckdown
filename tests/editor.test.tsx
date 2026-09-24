@@ -870,6 +870,32 @@ describe("Preview", () => {
     dispose();
   });
 
+  // n110
+  test("says a link leads nowhere, once, and takes it down when the link is put right", async () => {
+    batch(() => {
+      filePath.set("blog/linked.md");
+      editorContent.set("[gone](/nowhere.html)");
+    });
+    const { host, dispose } = render(() => <Preview />);
+    const said = "Links that lead nowhere a reader can go: /nowhere.html";
+    await waitFor(() => notice.get() === said);
+    expect(news.get()).toBe(false);                               // a failure, not news
+    editorContent.set("[gone](/nowhere.html) and more words");   // still broken: said once, not again
+    await waitFor(() => frame(host).srcdoc.includes("more words"));
+    expect(notice.get()).toBe(said);
+    editorContent.set("[home](/)");
+    await waitFor(() => notice.get() === "");
+
+    // Something else said since is left alone: only its own line comes down.
+    editorContent.set("[gone](/nowhere.html)");
+    await waitFor(() => notice.get() === said);
+    speak("Couldn't save something else");
+    editorContent.set("[home](/) again");
+    await waitFor(() => frame(host).srcdoc.includes("again"));
+    expect(notice.get()).toBe("Couldn't save something else");
+    dispose();
+  });
+
   test("with no file open, a bare page gets the defaults and the root theme", async () => {
     editorContent.set("Just text");
     const { host, dispose } = render(() => <Preview />);

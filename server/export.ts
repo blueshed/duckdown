@@ -20,7 +20,8 @@ import { createPageStorage, createStaticStorage, type Storage } from "./storage"
 import { parsePage, pageHtml, itemPage } from "./page";
 import { buildSite } from "./search";
 import { COLLECTION_FILE, collectionProblems, loadCollection } from "./collection";
-import { canonicalPath, decodePath, escapeHtml } from "./utils";
+import { canonicalPath, escapeHtml } from "./utils";
+import { brokenLinks } from "./links";
 import { yes } from "./markdown";
 import { BASE_FILES, ROOT_FILES, baseFile } from "./base";
 import { sitemapXml } from "./sitemap";
@@ -36,42 +37,6 @@ export function redirectHtml(to: string): string {
     + `<title>Moved</title><link rel="canonical" href="${href}">`
     + `<meta http-equiv="refresh" content="0; url=${href}">`
     + `</head><body><p>This page is now at <a href="${href}">${href}</a>.</p></body></html>\n`;
-}
-
-
-// `&amp;` and `&#x27;` in an attribute are one character each. A link scan
-// that doesn't undo them calls "Hart&#x27;sLeap.jpg" a missing file.
-const NAMED: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'" };
-function unescapeHtml(text: string): string {
-  return text.replace(/&(#x[0-9a-f]+|#\d+|\w+);/gi, (whole, e: string) => {
-    if (e[0] !== "#") return NAMED[e.toLowerCase()] ?? whole;
-    const code = e[1]!.toLowerCase() === "x" ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10);
-    return code <= 0x10ffff ? String.fromCodePoint(code) : whole;
-  });
-}
-
-// Every relative href and src on every page that points at nothing in the
-// site, as "page -> link". `known` is every file the export wrote. Links with a
-// scheme, and bare #fragments, are somebody else's to check; so are the
-// editor's own addresses, which exist on a served site and are no mistake.
-const EDITOR = /^\/(edit|login|logout)(\/|$)/;
-
-export function brokenLinks(pages: Map<string, string>, known: Set<string>): string[] {
-  const broken: string[] = [];
-  for (const [from, html] of pages) {
-    for (const m of html.matchAll(/\s(?:href|src)=(?:"([^"]*)"|'([^']*)')/g)) {
-      const link = unescapeHtml(m[1] ?? m[2]!);
-      if (link === "" || link.startsWith("#") || /^([a-z][a-z0-9+.-]*:|\/\/)/i.test(link)) continue;
-      const { pathname } = new URL(link, `http://site/${from}`);
-      const file = (decodePath(pathname) ?? pathname).slice(1);
-      // A file, a folder's index, or a folder named without its slash.
-      if (EDITOR.test(pathname)) continue;
-      if (!known.has(file) && !known.has(`${file}index.html`) && !known.has(`${file}/index.html`)) {
-        broken.push(`${from} -> ${link}`);
-      }
-    }
-  }
-  return broken;
 }
 
 // Every key under a storage, depth first. Folders the site serves but keeps

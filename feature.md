@@ -132,6 +132,7 @@ This is the feature map. Bugs and tasks live in `todo.jsonl`.
 - [x] Debounced updates on editor input
 - [x] Calls `/edit/mark/` API for server-side rendering
 - [x] Renders on initial file load
+- [x] Names the links on the page that lead nowhere a reader can go, and clears once they're fixed
 - [x] Sandboxed (`allow-same-origin`, no scripts) with site CSS, theme CSS and images
 
 ### CSS Preview

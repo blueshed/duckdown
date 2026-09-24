@@ -374,6 +374,30 @@ describe("markdown preview", () => {
     fetch(`${BASE}/edit/mark/?path=${encodeURIComponent(path)}`,
       authed({ method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ source, draft }) }));
 
+  // n110: a link a reader would follow to nothing is said while it is written.
+  test("says which links lead nowhere a reader can go, each once, as written", async () => {
+    await fetch(`${BASE}/edit/pages/blog/unready.md`, authed({ method: "PUT", body: "title: Unready\ndraft: true\n\nx" }));
+    try {
+      const source = [
+        "[a page](/guide/pages.html) [[../guide/index]] [a folder](/blog/) [without its slash](/blog) [by its index](/blog/index.html)",
+        "[a work](/gallery/first-light/) [an old address](/first-light-1961) [moved, as .html](/first-light-1961.html)",
+        "![a picture](/static/images/green.svg) [the base](/static/site.css) [the root](/robots.txt) [the index](/search.json)",
+        "[mail](mailto:a@b.c) [away](https://example.com/x) [here](#top) [the editor](/edit)",
+        "[a draft](/blog/unready.html) [nowhere](/nowhere.html) [nowhere again](/nowhere.html)",
+        "[relative](missing.html) ![no picture](/static/images/missing.png) [no root file](/humans.txt)",
+      ].join("\n\n");
+      const data = await (await mark(source, "blog/linking.md")).json();
+      expect(data.problems).toEqual([
+        "Links that lead nowhere a reader can go: /blog/unready.html, /nowhere.html, missing.html, /static/images/missing.png, /humans.txt",
+      ]);
+      // Fixed, it says nothing; and a template shown through a sample page has no address to check from.
+      expect((await (await mark("[a page](/guide/pages.html)", "blog/linking.md")).json()).problems).toEqual([]);
+      expect((await (await mark("[nowhere](/nowhere.html)")).json()).problems).toEqual([]);
+    } finally {
+      await fetch(`${BASE}/edit/pages/blog/unready.md`, authed({ method: "DELETE" }));
+    }
+  });
+
   test("renders the whole document, through the page's own template", async () => {
     const data = await (await mark("# Hello\n\nWorld")).json();
     expect(data.html).toContain('<h1 id="hello">');

@@ -2,6 +2,12 @@
 
 ## 0.7.0 — unreleased
 
+- **The preview says when a link leads nowhere.** As you write, a link on
+  the page that a reader would follow to nothing — no page, no work, no old
+  address, no file in `static/`, or a draft — is named in the message line,
+  and the line goes again once the link is fixed. It is checked against what
+  the site already knows, not by exporting, so it keeps up with typing. The
+  export's own check (`bun run export --strict`) reads links the same way.
 - **Rename or move a page in the editor.** A new button in the page's
   header, beside Earlier versions, asks where it should live (`blog/new-name`).
   The page moves, its old address goes into its `aliases` so links and
