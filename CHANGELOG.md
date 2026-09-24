@@ -11,6 +11,18 @@
 - **A new password, or removing someone, signs them out.** Their sessions end
   at once (within a few seconds for a change made from the terminal while the
   server runs). Changing your own keeps you signed in where you did it.
+- **Publish from the editor.** A site kept in git and published by the
+  platform building from it (the scaffold's Railway layout) can be edited on
+  your machine and published with a button: set `DUCKDOWN_REMOTE=git` in
+  `.env`, and the header gets **Publish** with a count of what's waiting. It
+  checks the site the way `bun run export` does, commits `site/` — never
+  `users.json`, `.history/` or `reports/`, and nothing else you had staged —
+  with an `Edited-by:` line, and pushes. Problems the checks find are shown;
+  `DUCKDOWN_STRICT=1` makes them stop the publish.
+- **Pull.** In the same dialog, or `duckdown pull`: what was published from
+  elsewhere comes in. A page changed on both sides keeps your version, and
+  theirs goes into its Earlier versions. `duckdown publish [message]` is the
+  terminal's Publish.
 - **Upgrading:** nothing to do. `users.json` keeps exactly the shape it had,
   so going back to 0.8 still signs everyone in, and anyone already signed in
   stays signed in until their session expires as usual.

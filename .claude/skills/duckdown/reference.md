@@ -780,9 +780,32 @@ name is served. On a served site, set it only once the domain's certificate
 is issued: before that, everything would move to an address that can't
 answer.
 
-Where the output goes is the site's own business, not duckdown's: its
-README.md or CLAUDE.md says how it's deployed — read whichever it has. Don't
-invent a deployment step that isn't written down.
+**Publishing from the editor.** A published site kept in git (the scaffold's
+layout: the site in `site/`, Railway building from the repository) can be
+published from the editor on the machine where it is edited. Set
+`DUCKDOWN_REMOTE=git` in that machine's `.env`, and the header gets
+**Publish**, with a count of what is waiting:
+
+- **Publish** runs the export's checks, then commits `site/` — only `site/`,
+  never `users.json`, `.history/` or `reports/`, and nothing else you have
+  staged — with your message (or one naming what changed) and an
+  `Edited-by:` line, and pushes it. The platform rebuilds from the push. A
+  problem the checks find is shown with what was published; with
+  `DUCKDOWN_STRICT=1` it stops the publish instead.
+- **Pull** brings in what was published from somewhere else. Edits here that
+  aren't committed yet are committed first. A file changed on both sides
+  keeps this copy's version, and the published one goes into that file's
+  **Earlier versions**, where Restore brings it back. A change outside
+  `site/` that collides is left for git.
+- If Publish says the published site has moved on, Pull, then Publish again.
+- From a terminal: `duckdown publish [message]` and `duckdown pull` (a
+  vendored site: `bun server/cli.ts publish …`) do the same.
+- It uses this machine's git: its identity, its credentials, its signing.
+  The branch needs an upstream (`git push -u` once).
+
+Where the output goes is otherwise the site's own business, not duckdown's:
+its README.md or CLAUDE.md says how it's deployed — read whichever it has.
+Don't invent a deployment step that isn't written down.
 
 ## Troubleshooting
 

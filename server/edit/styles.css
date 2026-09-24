@@ -596,6 +596,17 @@ button.danger-subtle:hover {
   white-space: nowrap;
 }
 
+/* Publish: how much is waiting, on the button. */
+.publish .badge {
+  margin-left: 4px;
+  padding: 0 6px;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 11px;
+  line-height: 16px;
+}
+
 /* Editors: a row per name; setting a password opens a line under it. */
 .editor-row {
   flex-wrap: wrap;

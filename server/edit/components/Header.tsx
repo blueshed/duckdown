@@ -1,6 +1,7 @@
 import { createElement, computed, signal, when } from "@blueshed/railroad";
 import { Icon } from "./Icon";
 import { EditorsDialog } from "./Users";
+import { PublishButton } from "./Publish";
 import { filePath, toggleImages } from "../store";
 import { urlPath } from "../api";
 
@@ -15,6 +16,7 @@ export function Header() {
     <div class="header">
       <h1>duckie</h1>
       <span style="flex: 1;" />
+      <PublishButton />
       <button onclick={toggleImages}>
         <Icon name="layout-template" /> Resources
       </button>

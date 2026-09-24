@@ -43,6 +43,7 @@ duckdown/
 │   ├── storage.ts          # Storage abstraction (local filesystem / S3) + dev seed
 │   ├── auth.ts             # JWT auth, login/logout handlers; getUser checks the user and their fingerprint
 │   ├── users.ts            # users.json: read/write, the fingerprint, `duckdown user`
+│   ├── remote.ts           # Where the site is published from here (DUCKDOWN_REMOTE): git; publish, pull
 │   ├── markdown.ts         # Front-matter parser + Bun.markdown
 │   ├── nav.ts              # The site nav, cached until the editor changes a page
 │   ├── pid.ts              # Pid file: written at startup, removed on exit; stopServer()
@@ -74,6 +75,7 @@ duckdown/
 │   │   ├── browse.ts       # /edit/browse/* — image browser + upload
 │   │   ├── reports.ts      # /edit/reports/* — reports/, read-only: a listing, or a report rendered as a page
 │   │   ├── users.ts        # /edit/users — who can sign in: names, never hashes
+│   │   ├── publish.ts      # /edit/publish — status, publish (checked), ?pull
 │   │   ├── collection.ts   # /edit/collection/* — a collection's pictures (upload + thumbnail), and its problems
 │   │   ├── static.ts       # /static/* — site static files
 │   │   ├── search.ts       # /search.json — the whole index, for the browser
@@ -106,6 +108,7 @@ duckdown/
 │           ├── ConfirmDialog.tsx # Confirm action dialog
 │           ├── History.tsx   # Earlier versions of a file, and what was deleted: Restore
 │           ├── Users.tsx     # The Editors dialog: add, set a password, remove
+│           ├── Publish.tsx   # The header's Publish button and dialog: what's waiting, Publish, Pull
 │           ├── Notice.tsx    # Shows that line (role=alert for a failure, status for news)
 │           └── Icon.tsx      # Lucide icons (lucide-static SVG strings)
 ├── tests/                  # see Testing below
@@ -118,6 +121,7 @@ duckdown/
 │   ├── collection.test.ts  # collection.json: slugs, overviews, aliases, collisions
 │   ├── history.test.ts     # History: once a sitting, the limit, what was deleted
 │   ├── users.test.ts       # duckdown user, the password prompt, what a session is checked against
+│   ├── remote.test.ts      # The git kind against real repositories; the publish route; duckdown publish|pull
 │   ├── editor.test.tsx     # The editor's code in happy-dom, against that server
 │   ├── units.test.ts       # pid, config, storage, auth, error handler
 │   ├── s3.test.ts          # S3Storage via Bun's S3 client + fake-s3.ts
@@ -300,6 +304,14 @@ Users stored in `users.json` in the content directory, passwords hashed with `Bu
 `server/users.ts` owns the file, and its shape never changes (`{name: hash}`), so an older duckdown can always read what a newer one wrote. Who is signed in is decided per request by `getUser()`: the cookie is signed, names a user who must still be in the file, and carries `fingerprint()` of their hash, so a new password or a removal ends their sessions without any session list; a cookie with no fingerprint (made by 0.8 or earlier) stands until it expires. The file is read through `currentUsers()`, kept `FRESH` (5s) and dropped by `writeUsers()`, so a change by `duckdown user` (`userCommand()`, via `cli.ts`) or by hand lands within seconds; login reads it afresh. `/edit/users` (`routes/users.ts`) answers names, never hashes, and adds, re-passwords and removes — every editor equal, nobody removing themselves, the environment's admin untouchable there, and your own password needing the current one (the answer re-signs your cookie). The editor's **Editors** dialog is `components/Users.tsx`.
 
 Signed out, a page load of a protected route is redirected to `/login?next=…`; a fetch (no `text/html` in `Accept`) gets a 401. The editor sends every request through `edit/api.ts`, which turns a 401 into a trip to the login page and back. `/edit` itself is an HTML import and can't be guarded server-side, so the editor's first request does it. Signing in lands on `/edit` unless `next` says otherwise (and `/login` when already signed in goes straight there). Logout is POST-only and refuses `Sec-Fetch-Site: cross-site`.
+
+## Publishing from here
+
+A local duckdown with `DUCKDOWN_REMOTE` set edits its own copy of a site that is published somewhere else, and publishing is a push (`server/remote.ts`). One interface — `status()`, `push(message, by)`, `pull(by)` — whatever is on the other end, and `RemoteRefused` for a reason the person can act on (the route answers it 409, with the line). `remoteFrom()` makes it from `REMOTE` (config): unset is null and nothing changes, no Publish anywhere; `git` is the one kind; anything else, or git over a bucket, fails at startup.
+
+The git kind works in the repository the content folder is in, and on that folder only: pathspecs exclude `NEVER` (`users.json`, `.history`, `reports`) whatever `.gitignore` says, and a commit adds the folder whole and then `git reset`s those paths — `git add` refuses a path list naming an ignored file even as an exclusion, and the scaffold ignores two of them (the tests' repositories carry that `.gitignore` for this reason). A commit is `git commit -- <paths>`, so whatever else is staged stays staged; it carries `Edited-by: <user>`. Status doesn't fetch; pull does. A pull commits edits not yet committed ("Edits kept before pulling"), merges the upstream, and settles a conflict inside the site by keeping this copy's side and saving the other into that file's history (`History.save`, bytes, forced) — a conflict outside the site, or git refusing to merge, aborts the merge and says so. The git kind needs no sync record: git is the record.
+
+`publishSite()` checks first (`checkSite()` in export.ts: the whole export into a thrown-away folder, keeping the broken-link and collection lines, or why there was nothing to export), reports problems with what was published, and refuses only under `DUCKDOWN_STRICT`; with no message it writes `defaultMessage()`. `routes/publish.ts` (`/edit/publish`: GET status, POST publish, POST `?pull`) and `remoteCommand()` (`duckdown publish|pull`, via cli.ts) both call it; a pull that changed anything drops the site's caches through the pages route's `changed()`. The editor's `components/Publish.tsx` is the header button (hidden on a 404, a badge counting changes plus unpushed commits, refreshed after writes) and its dialog.
 
 ## The view log
 

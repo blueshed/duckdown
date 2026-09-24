@@ -190,7 +190,8 @@ This is the feature map. Bugs and tasks live in `todo.jsonl`.
 
 ### CLI
 - [x] `bun create blueshed/duckdown` — clone + postinstall setup
-- [ ] `duckie publish` — deploy to S3
+- [x] Publish from the editor (`DUCKDOWN_REMOTE=git`): commit and push `site/`, checked first; `duckdown publish`
+- [x] Pull what was published elsewhere; a page changed on both sides keeps yours, theirs in Earlier versions; `duckdown pull`
 
 ---
 

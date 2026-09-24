@@ -24,6 +24,7 @@ import { Preview } from "../server/edit/components/Preview";
 import { CssPreview } from "../server/edit/components/CssPreview";
 import { Header } from "../server/edit/components/Header";
 import { EditorsDialog } from "../server/edit/components/Users";
+import { PublishButton, publishState, refreshPublish } from "../server/edit/components/Publish";
 import { ImageBrowser } from "../server/edit/components/ImageBrowser";
 import { ResourceList } from "../server/edit/components/ResourceList";
 import { ResourcePane } from "../server/edit/components/ResourcePane";
@@ -985,6 +986,125 @@ describe("Header", () => {
     expect(logout.getAttribute("method")).toBe("post");
     expect(logout.getAttribute("action")).toBe("/logout");
     dispose();
+  });
+});
+
+// n115, n116
+describe("Publish", () => {
+  // The server under test has no remote; these stand in for one, and let
+  // everything else through to it.
+  function remote(answers: { status?: () => Response; publish?: () => Response; pull?: () => Response }) {
+    const seen: string[] = [];
+    const restore = intercept((url, init) => {
+      if (!url.startsWith("/edit/publish")) return signedIn(url, init);
+      const which = url.includes("?pull") ? "pull" : init?.method === "POST" ? "publish" : "status";
+      seen.push(which);
+      return answers[which]!();
+    });
+    return { seen, restore };
+  }
+  const status = (over: object = {}) => () => Response.json({
+    remote: "git origin/main", changes: [{ path: "pages/a.md", state: "changed" }, { path: "pages/b.md", state: "added" }], ahead: 1, behind: 2, ...over,
+  });
+
+  test("no remote, no button", async () => {
+    publishState.set({ remote: "x", changes: [], ahead: 0, behind: 0 });
+    await refreshPublish();                                             // the real server: 404
+    expect(publishState.get()).toBeNull();
+    const { host, dispose } = render(() => <Header />);
+    await settle(450);
+    expect(button(host, "Publish")).toBeUndefined();
+    dispose();
+  });
+
+  test("says what's waiting, publishes it with what the checks found, and pulls in what was published elsewhere", async () => {
+    const r = remote({
+      status: status(),
+      publish: () => Response.json({ committed: true, pushed: 2, problems: ["broken link: index.html -> /gone.html"] }),
+      pull: () => Response.json({ changed: ["pages/index.md"], conflicts: ["pages/a.md"] }),
+    });
+    try {
+      await loadFile("index.md");
+      const { host, dispose } = render(() => <PublishButton />);
+      await waitFor(() => button(host, "Publish"));
+      expect(host.querySelector(".badge")!.textContent).toBe("3");       // two changes, one commit waiting
+      click(button(host, "Publish")!);
+      await waitFor(() => host.querySelector("dialog")?.open);
+      const dialog = host.querySelector("dialog")!;
+      expect(dialog.querySelector("h3")!.textContent).toBe("Publish to git origin/main");
+      expect([...dialog.querySelectorAll(".history-list li")].map((li) => li.textContent)).toEqual(["pages/a.mdchanged", "pages/b.mdnew"]);
+      expect(dialog.textContent).toContain("1 commit(s) made here, not yet published.");
+      expect(dialog.textContent).toContain("The published site has 2 change(s) this copy hasn't: Pull first.");
+
+      const form = dialog.querySelector("form.editor-add") as HTMLFormElement;
+      (form.elements.namedItem("message") as HTMLInputElement).value = "A change";
+      submit(form);
+      await waitFor(() => notice.get() === "Published: 2 commit(s) pushed");
+      expect(dialog.textContent).toContain("Published, but the export found these");
+      expect(dialog.textContent).toContain("broken link: index.html -> /gone.html");
+
+      click(button(dialog, "Pull")!);
+      await waitFor(() => notice.get() === "Pulled 1 change(s) from the published site");
+      expect(dialog.textContent).toContain("Changed here and there — yours is kept");
+      expect(dialog.textContent).toContain("pages/a.md");
+      expect(r.seen).toContain("pull");
+
+      click(button(dialog, "Close")!);
+      expect(host.querySelector("dialog")).toBeNull();
+      dispose();
+    } finally {
+      r.restore();
+    }
+  });
+
+  test("a refusal is said in the dialog; nothing waiting is said too, and Publish waits", async () => {
+    let answer = status({ changes: [], ahead: 0, behind: 0, problem: "This branch has no upstream to publish to: push it once with git push -u" });
+    const r = remote({
+      status: () => answer(),
+      publish: () => new Response("The published site has changes this copy hasn't: Pull, then Publish again", { status: 409 }),
+      pull: () => Response.json({ changed: [], conflicts: [] }),
+    });
+    try {
+      const { host, dispose } = render(() => <PublishButton />);
+      await refreshPublish();
+      await waitFor(() => button(host, "Publish"));
+      expect(host.querySelector(".badge")).toBeNull();
+      click(button(host, "Publish")!);
+      await waitFor(() => host.querySelector("dialog")?.textContent!.includes("no upstream"));
+      const dialog = host.querySelector("dialog")!;
+      expect(dialog.textContent).toContain("Nothing here that isn't published.");
+      expect(button(dialog.querySelector("form")!, "Publish")!.disabled).toBe(true);
+      click(button(dialog, "Pull")!);
+      await waitFor(() => notice.get() === "Nothing new to pull");
+
+      answer = status();
+      await refreshPublish();
+      submit(dialog.querySelector("form")!);
+      await waitFor(() => dialog.querySelector(".dialog-error")?.textContent!.includes("Pull, then Publish again"));
+
+      // Why the status can't be known at all, and a pull where every change collided.
+      answer = () => new Response("/x isn't in a git repository, so DUCKDOWN_REMOTE=git has nowhere to push", { status: 409 });
+      await refreshPublish();
+      await waitFor(() => dialog.textContent!.includes("isn't in a git repository"));
+      dispose();
+    } finally {
+      r.restore();
+    }
+    const collided = remote({ status: status(), pull: () => Response.json({ changed: [], conflicts: ["pages/a.md"] }), publish: () => Response.json({ committed: false, pushed: 0, problems: [] }) });
+    try {
+      const { host, dispose } = render(() => <PublishButton />);
+      await waitFor(() => button(host, "Publish"));
+      click(button(host, "Publish")!);
+      await waitFor(() => host.querySelector("dialog")?.open);
+      click(button(host.querySelector("dialog")!, "Pull")!);
+      await waitFor(() => notice.get() === "Pulled: everything that changed there was changed here too");
+      submit(host.querySelector("dialog form")!);
+      await waitFor(() => notice.get() === "Nothing to publish");
+      dispose();
+    } finally {
+      collided.restore();
+      publishState.set(null);
+    }
   });
 });
 

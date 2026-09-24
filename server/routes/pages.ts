@@ -12,8 +12,9 @@ import { fileRoutes, type Mover } from "./files";
 // the search index and a folder's collection.json would say, so all of them
 // are dropped and rebuilt on the next request — collection.json lives under
 // pages/ and is written through this same route. A new thing the site knows
-// about itself is dropped here too.
-const changed = () => {
+// about itself is dropped here too — and by a pull (routes/publish.ts), which
+// changes pages on disk behind the server's back.
+export const changed = () => {
   pagesChanged();
   searchChanged();
   collectionsChanged();

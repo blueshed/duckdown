@@ -76,8 +76,10 @@ Every page rendered the way the site renders it, at its one address, with
 `static/` alongside; drafts are left out, and so are pages that would 404. It also writes `sitemap.xml` (given `DUCKDOWN_ORIGIN`), reports internal links that lead nowhere (`--strict` makes that a failure), and refuses to publish an empty site.
 A **published** site is handed out by `bun run node_modules/duckdown/server/serve.ts` (`SITE_DIR`, `PORT`) or any static host. Where `dist/` then goes is the site's
 own business — its README.md or CLAUDE.md says, whichever it has, and on some
-sites a `git push` does the whole of it. Don't invent a deployment step that
-isn't written down.
+sites a `git push` does the whole of it. A site whose `.env` sets
+`DUCKDOWN_REMOTE=git` publishes from the editor (**Publish**, in the header) or
+with `duckdown publish`, and takes in changes made elsewhere with **Pull** or
+`duckdown pull`. Don't invent a deployment step that isn't written down.
 
 ## Everything else
 

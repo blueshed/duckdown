@@ -2,7 +2,7 @@
 
 // `duckdown` — the server, or with `init`, the scaffold for a site that has
 // duckdown installed as a dependency (bun add, then bunx duckdown init), or
-// with `user`, who can sign in.
+// with `user`, who can sign in, or with `publish` and `pull`, the remote.
 
 import { scaffold } from "./init";
 
@@ -10,6 +10,8 @@ import { scaffold } from "./init";
 // environment as they load, and `init` runs where there is no site yet.
 const commands: Record<string, (args: string[]) => Promise<number>> = {
   user: async (args) => (await import("./users")).userCommand(args),
+  publish: async (args) => (await import("./remote")).remoteCommand("publish", args),
+  pull: async (args) => (await import("./remote")).remoteCommand("pull", args),
 };
 
 export async function cli(

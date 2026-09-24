@@ -1,11 +1,14 @@
 // n114–n116: a remote site, the git kind — against real repositories: a bare
 // one for what the site is published from, the copy being edited here, and a
 // second clone for someone publishing from somewhere else.
-import { describe, test, expect } from "bun:test";
+import { describe, test, expect, beforeAll, spyOn } from "bun:test";
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync, readdirSync, renameSync } from "fs";
 import { join } from "path";
-import { RUN } from "./helpers";
-import { remoteFrom, gitRemote, parseStatus, RemoteRefused } from "../server/remote";
+import { RUN, BASE, signIn, authed } from "./helpers";
+import { remoteFrom, gitRemote, parseStatus, RemoteRefused, defaultMessage, publishSite, remoteCommand, type Remote } from "../server/remote";
+import { publishRoutes } from "../server/routes/publish";
+import { checkSite } from "../server/export";
+import { cli } from "../server/cli";
 
 function sh(cwd: string, ...args: string[]): string {
   const ran = Bun.spawnSync(["git", ...args], { cwd, env: { ...process.env, GIT_TERMINAL_PROMPT: "0" } });
@@ -37,6 +40,9 @@ function sites(under = "site") {
   put(content, "pages/index.md", "title: Home\n\nhello\n");
   put(content, "pages/about.md", "title: About\n");
   put(here, "README.md", "the code\n");
+  // What the scaffold ignores. git add refuses to be told about ignored files,
+  // even to leave them out, which is how a first version of this failed.
+  put(here, ".gitignore", under ? `${under}/users.json\n${under}/.history/\n` : "users.json\n.history/\n");
   sh(here, "add", "-A");
   sh(here, "commit", "-q", "-m", "start");
   sh(here, "push", "-q", "-u", "origin", "main");
@@ -143,7 +149,7 @@ describe("the git kind", () => {
     const picture = join(s.content, ".history/pages/logo.png");
     expect(readFileSync(join(picture, readdirSync(picture)[0]!))).toEqual(Buffer.from("\x89PNG theirs"));
     expect(sh(s.here, "log", "--format=%s", "-3")).toContain("Edits kept before pulling");
-    expect(sh(s.here, "status", "--porcelain", "--", "site").trim()).toBe("?? site/.history/");   // merged and clean, the history aside
+    expect(sh(s.here, "status", "--porcelain", "--", "site").trim()).toBe("");   // merged and clean (the history is ignored, as a site ignores it)
     expect(await remote.pull("ann")).toEqual({ changed: [], conflicts: [] });   // nothing new
   });
 
@@ -204,5 +210,117 @@ describe("the git kind", () => {
     await expect(remote.pull("ann")).rejects.toThrow("no upstream to pull from");
     await expect(gitRemote(join(lone, "pages")).status()).resolves.toMatchObject({ changes: [] });
     expect(RemoteRefused.name).toBe("RemoteRefused");
+  });
+});
+
+// n115: publishing — checked, then pushed — and n116's pull, from the editor's route and the command line.
+describe("publishing", () => {
+  beforeAll(signIn);
+  const request = (method: string, path = "/edit/publish", body?: unknown) =>
+    new Request(`${BASE}${path}`, { method, headers: { ...(authed().headers as Record<string, string>), "Content-Type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) }) as any;
+
+  test("the checks are the export's: its problems, or why there was nothing to export", async () => {
+    expect(await checkSite()).toEqual([]);                                 // the seed site is clean
+    expect(await checkSite(async (o) => {
+      o.say!("broken link: a.html -> /nowhere.html");
+      o.say!("collection: gallery/collection.json: something");
+      o.say!("12 page(s) written");
+      return {} as never;
+    })).toEqual(["broken link: a.html -> /nowhere.html", "collection: gallery/collection.json: something"]);
+    expect(await checkSite(async () => { throw new Error("No pages to export"); })).toEqual(["No pages to export"]);
+  });
+
+  test("a commit says what changed when the person didn't", () => {
+    expect(defaultMessage([])).toBe("Published from duckdown");
+    expect(defaultMessage([{ path: "pages/a.md", state: "changed" }])).toBe("Edited pages/a.md");
+    const five = ["a", "b", "c", "d", "e"].map((n) => ({ path: `pages/${n}.md`, state: "added" as const }));
+    expect(defaultMessage(five)).toBe("Edited pages/a.md, pages/b.md, pages/c.md and 2 more");
+  });
+
+  test("the route: status, a publish with what the checks found, strict refusal, and a pull", async () => {
+    const s = sites();
+    const routes = publishRoutes(gitRemote(s.content), async () => ["broken link: index.html -> /gone.html"]);   // strict as the environment says: not
+    put(s.content, "pages/new.md", "title: New\n");
+    const status = await (await routes.GET(request("GET"))).json();
+    expect(status).toEqual({ remote: "git origin/main", changes: [{ path: "pages/new.md", state: "added" }], ahead: 0, behind: 0 });
+
+    const published = await (await routes.POST(request("POST", "/edit/publish", {}))).json();
+    expect(published).toEqual({ committed: true, pushed: 1, problems: ["broken link: index.html -> /gone.html"] });
+    expect(lastMessage(s.here)).toBe("Edited pages/new.md\n\nEdited-by: admin");
+
+    put(s.content, "pages/more.md", "title: More\n");
+    const strict = publishRoutes(gitRemote(s.content), async () => ["broken link: x -> y"], () => true);
+    const refused = await strict.POST(request("POST", "/edit/publish", { message: "more" }));
+    expect(refused.status).toBe(409);
+    expect(await refused.text()).toBe("Not published: 1 problem(s), and DUCKDOWN_STRICT is on — broken link: x -> y");
+    expect(await (await routes.POST(request("POST", "/edit/publish", { message: "  More, said  " }))).json())
+      .toMatchObject({ committed: true, pushed: 1 });
+    expect(lastMessage(s.here)).toBe("More, said\n\nEdited-by: admin");
+
+    put(s.thereContent, "pages/there.md", "title: There\n");
+    sh(s.there, "add", "-A");
+    sh(s.there, "commit", "-q", "-m", "there");
+    sh(s.there, "pull", "-q", "--no-rebase");
+    sh(s.there, "push", "-q");
+    expect(await (await routes.POST(request("POST", "/edit/publish?pull"))).json()).toEqual({ changed: ["pages/there.md"], conflicts: [] });
+    expect(await (await routes.POST(request("POST", "/edit/publish?pull"))).json()).toEqual({ changed: [], conflicts: [] });
+    // No body at all is a publish with nothing said, and here, nothing to publish.
+    expect(await (await routes.POST(request("POST"))).json()).toMatchObject({ committed: false, pushed: 0 });
+  });
+
+  test("the route says what it can't do, and a failure that isn't a reason is still a failure", async () => {
+    const lone = publishRoutes(gitRemote(mkdtempSync(join(RUN, "not-a-repo-"))));
+    const res = await lone.GET(request("GET"));
+    expect(res.status).toBe(409);
+    expect(await res.text()).toContain("isn't in a git repository");
+    const broken = { name: "x", status: async () => { throw new Error("disk on fire"); } } as unknown as Remote;
+    await expect(publishRoutes(broken).GET(request("GET"))).rejects.toThrow("disk on fire");
+    // This server has no remote: nothing to publish, and signed out, nothing at all.
+    expect((await fetch(`${BASE}/edit/publish`, authed())).status).toBe(404);
+    expect((await fetch(`${BASE}/edit/publish`, authed({ method: "POST" }))).status).toBe(404);
+    expect(await (await fetch(`${BASE}/edit/publish`, authed())).text()).toBe("This site isn't published from here: set DUCKDOWN_REMOTE");
+    expect((await fetch(`${BASE}/edit/publish`)).status).toBe(401);
+    expect((await fetch(`${BASE}/edit/publish`, { method: "POST" })).status).toBe(401);
+  });
+
+  test("duckdown publish and duckdown pull, signed as whoever runs them", async () => {
+    const s = sites();
+    const remote = gitRemote(s.content);
+    const said: string[] = [];
+    const say = (l: string) => said.push(l);
+    const env = { USER: "pat" };
+    put(s.content, "pages/new.md", "title: New\n");
+    expect(await remoteCommand("publish", ["A", "new", "page"], remote, say, async () => ["broken link: a -> b"], env)).toBe(0);
+    expect(lastMessage(s.here)).toBe("A new page\n\nEdited-by: pat");
+    expect(await remoteCommand("publish", [], remote, say, async () => [], {})).toBe(0);
+    await expect(publishSite(remote, { by: "pat", checks: async () => ["x"], strict: true })).rejects.toThrow("DUCKDOWN_STRICT");
+    await expect(remoteCommand("publish", [], remote, say, async () => ["x"], { DUCKDOWN_STRICT: "1" })).rejects.toThrow("Not published");
+    expect(await remoteCommand("pull", [], remote, say, undefined, env)).toBe(0);
+    sh(s.there, "pull", "-q", "--no-rebase");
+    put(s.thereContent, "pages/new.md", "title: New, theirs\n");
+    sh(s.there, "commit", "-q", "-am", "theirs");
+    sh(s.there, "push", "-q");
+    put(s.content, "pages/new.md", "title: New, ours\n");
+    expect(await remoteCommand("pull", [], remote, say, undefined, env)).toBe(0);
+    expect(said).toEqual([
+      "problem: broken link: a -> b",
+      "Published: 1 commit(s) pushed to git origin/main",
+      "Nothing to publish",
+      "Nothing new to pull",
+      "Pulled: everything that changed there was changed here too",
+      "changed on both sides, kept yours: pages/new.md (theirs is in its earlier versions)",
+    ]);
+    await expect(remoteCommand("pull", [], null)).rejects.toThrow("This site isn't published from here: set DUCKDOWN_REMOTE (git)");
+  });
+
+  test("they are duckdown commands, and with no remote they say so and fail", async () => {
+    const error = spyOn(console, "error").mockImplementation(() => {});
+    try {
+      expect(await cli(["publish"])).toBe(1);
+      expect(await cli(["pull"])).toBe(1);
+      expect(error.mock.calls[0]![0]).toBe("duckdown publish: This site isn't published from here: set DUCKDOWN_REMOTE (git)");
+    } finally {
+      error.mockRestore();
+    }
   });
 });

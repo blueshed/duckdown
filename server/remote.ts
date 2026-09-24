@@ -3,6 +3,7 @@ import { join, relative, sep } from "path";
 import { APP_PATH, IS_S3, REMOTE } from "./config";
 import { LocalStorage } from "./storage";
 import { History, HISTORY_PATH } from "./history";
+import { checkSite } from "./export";
 
 const HISTORY_DIR = HISTORY_PATH.replace(/\/$/, "");
 
@@ -127,9 +128,13 @@ export function gitRemote(contentDir: string, keep = (section: string) => new Hi
   };
 
   // A commit of the content folder's changes, and only those: whatever else is
-  // staged in the repository stays as it was.
+  // staged in the repository stays as it was. The folder is added whole and
+  // what stays on this machine taken out again, rather than excluded from the
+  // add: `git add` refuses a path list that names an ignored file, even to
+  // exclude it, and the scaffold's .gitignore names two of them.
   const commit = async (root: string, under: string, message: string, by: string) => {
-    await must(root, ["add", "-A", "--", ...paths(under)]);
+    await must(root, ["add", "-A", "--", under || "."]);
+    await must(root, ["reset", "-q", "--", ...NEVER.map((n) => `${under ? `${under}/` : ""}${n}`)]);
     await must(root, ["commit", "-m", message, "-m", `Edited-by: ${by}`, "--", ...paths(under)]);
   };
 
@@ -208,4 +213,59 @@ export function gitRemote(contentDir: string, keep = (section: string) => new Hi
     },
   };
   return self;
+}
+
+// --- Publishing ----------------------------------------------------------
+
+// "Edited pages/about.md and pages/blog/new.md", or so many and "3 more":
+// what a commit says when the person publishing didn't say anything.
+export function defaultMessage(changes: Change[]): string {
+  if (!changes.length) return "Published from duckdown";
+  const named = changes.slice(0, 3).map((c) => c.path);
+  const more = changes.length - named.length;
+  return `Edited ${named.join(", ")}${more ? ` and ${more} more` : ""}`;
+}
+
+export type Published = Pushed & { problems: string[] };
+
+// A publish: the site checked the way the export checks it, then pushed. A
+// problem the checks find is reported with what was published — the person
+// can see it and fix it — and stops the push only under DUCKDOWN_STRICT.
+export async function publishSite(remote: Remote, o: {
+  message?: string;
+  by: string;
+  checks?: () => Promise<string[]>;
+  strict?: boolean;
+}): Promise<Published> {
+  const problems = await (o.checks ?? checkSite)();
+  if (problems.length && o.strict) {
+    throw new RemoteRefused(`Not published: ${problems.length} problem(s), and DUCKDOWN_STRICT is on — ${problems.join("; ")}`);
+  }
+  const message = o.message?.trim() || defaultMessage((await remote.status()).changes);
+  return { ...await remote.push(message, o.by), problems };
+}
+
+// `duckdown publish [message…]` and `duckdown pull`, for a terminal or a
+// script: the same as the editor's Publish and Pull, signed as whoever runs it.
+export async function remoteCommand(
+  verb: string,
+  args: string[],
+  remote = remoteFrom(),
+  say: (line: string) => void = console.log,
+  checks?: () => Promise<string[]>,
+  env: Record<string, string | undefined> = process.env,
+): Promise<number> {
+  if (!remote) throw new Error("This site isn't published from here: set DUCKDOWN_REMOTE (git)");
+  const by = env.USER || "duckdown";
+  if (verb === "pull") {
+    const { changed, conflicts } = await remote.pull(by);
+    say(changed.length ? `Pulled ${changed.length} change(s): ${changed.join(", ")}`
+      : conflicts.length ? "Pulled: everything that changed there was changed here too" : "Nothing new to pull");
+    for (const path of conflicts) say(`changed on both sides, kept yours: ${path} (theirs is in its earlier versions)`);
+    return 0;
+  }
+  const done = await publishSite(remote, { message: args.join(" "), by, checks, strict: env.DUCKDOWN_STRICT === "1" });
+  for (const problem of done.problems) say(`problem: ${problem}`);
+  say(done.pushed ? `Published: ${done.pushed} commit(s) pushed to ${(await remote.status()).remote}` : "Nothing to publish");
+  return 0;
 }
