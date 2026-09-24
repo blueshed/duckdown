@@ -41,3 +41,32 @@ export function logView(req: Request, status: number, startedAt: number, on = LO
     req.headers.get("user-agent") ?? "",
   ));
 }
+
+// A view line read back, by `duckdown report`: from the platform's log as it
+// prints it (anything before "view" — a timestamp, a service name — is
+// allowed), or as a JSON line with a `message` and a `timestamp`. `at` is
+// the timestamp when the line carries one. Anything else is not a view line.
+export type View = { path: string; status: number; ms: number; from: string; crawler: boolean; at: string };
+
+const VIEW = /(?:^|\s)view (\S+) (\d{3}) (\d+)ms(?: from=(\S+))?( crawler)?\s*$/;
+const STAMP = /^\s*\[?(\d{4}-\d{2}-\d{2}[T ][\d:.]+(?:Z|[+-]\d\d:?\d\d)?)/;
+
+export function parseView(line: string): View | null {
+  let text = line;
+  let at = "";
+  if (line.trimStart().startsWith("{")) {
+    try {
+      const said = JSON.parse(line) as { message?: unknown; timestamp?: unknown };
+      text = typeof said.message === "string" ? said.message : "";
+      at = typeof said.timestamp === "string" ? said.timestamp : "";
+    } catch {
+      return null;   // not JSON after all, so not a line this wrote
+    }
+  }
+  const m = text.match(VIEW);
+  if (!m) return null;
+  return {
+    path: m[1]!, status: Number(m[2]), ms: Number(m[3]), from: m[4] ?? "", crawler: Boolean(m[5]),
+    at: at || (text.match(STAMP)?.[1] ?? ""),
+  };
+}

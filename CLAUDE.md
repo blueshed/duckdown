@@ -48,7 +48,8 @@ duckdown/
 │   ├── nav.ts              # The site nav, cached until the editor changes a page
 │   ├── pid.ts              # Pid file: written at startup, removed on exit; stopServer()
 │   ├── stop.ts             # bun run stop
-│   ├── log.ts              # The view log: what was read, never who
+│   ├── log.ts              # The view log: what was read, never who; parseView reads a line back
+│   ├── report.ts           # duckdown report: view lines in, reports/<month>/<day>.md out
 │   ├── search.ts           # The index readers search, cached like the nav; page and item aliases
 │   ├── sitemap.ts          # sitemap.xml from that index
 │   ├── feed.ts             # A folder's Atom feed (feed: true), cached like the nav; {{feed}}
@@ -122,6 +123,7 @@ duckdown/
 │   ├── history.test.ts     # History: once a sitting, the limit, what was deleted
 │   ├── users.test.ts       # duckdown user, the password prompt, what a session is checked against
 │   ├── remote.test.ts      # The git kind against real repositories; the publish route; duckdown publish|pull
+│   ├── report.test.ts      # parseView, the report, duckdown report
 │   ├── editor.test.tsx     # The editor's code in happy-dom, against that server
 │   ├── units.test.ts       # pid, config, storage, auth, error handler
 │   ├── s3.test.ts          # S3Storage via Bun's S3 client + fake-s3.ts
@@ -322,6 +324,8 @@ another site, a crawler flag — and deliberately records nothing that identifie
 a reader: no IP, no user agent, no cookie, no session. Keep it that way. An IP
 is personal data, and the moment one is logged the site needs a lawful basis, a
 privacy notice and a retention policy.
+
+`duckdown report` (`server/report.ts`) reads those lines back — `parseView()` sits beside `viewLine()` in log.ts, so the two can't drift — from a file argument or stdin (a platform's log as it prints it, or JSON lines with `message` and `timestamp`), and writes `reports/<yyyy-mm>/<yyyy-mm-dd>.md` for the editor's Reports tab: readers and crawlers apart, the most read, the 404s, the referring sites. It is of exactly the lines it was given and keeps no count between runs, so overlapping logs never count twice, and it asks the platform for nothing. It is the one thing duckdown writes in `reports/`, and only when someone runs it; the server never does.
 
 ## Failures speak
 

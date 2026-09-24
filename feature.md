@@ -71,6 +71,8 @@ This is the feature map. Bugs and tasks live in `todo.jsonl`.
 - [x] Editor: start one, edit its fields as works, upload pictures with thumbnails, renaming keeps the old address
 - [x] The 0.4 shape removed (0.8): `layout` in the data is a problem, and a file with no `fields` is `src`/`title`/`caption`
 
+- [x] `duckdown report`: the view log made into a report for the editors, in `reports/`
+
 ### Auth
 - [x] Login page (`GET/POST /login`) — HTML file + HTMLRewriter
 - [x] Signing in lands in the editor (`/edit`), or on `next`

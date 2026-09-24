@@ -23,6 +23,15 @@
   elsewhere comes in. A page changed on both sides keeps your version, and
   theirs goes into its Earlier versions. `duckdown publish [message]` is the
   terminal's Publish.
+- **A visitor report, from the view log.** `duckdown report` reads the lines
+  a site's server prints with `DUCKDOWN_LOG=1` — piped in (`railway logs |
+  duckdown report`) or from a saved log (`duckdown report site.log`) — and
+  writes `reports/<month>/<day>.md`, which the editor's Reports tab shows:
+  views by readers and by crawlers, the most read pages, the addresses that
+  weren't there, and the sites that sent readers. It counts exactly the lines
+  it's given, so overlapping logs never count twice, and it names no reader,
+  because the log never recorded one. It is the one thing duckdown writes in
+  `reports/`, and only when you run it.
 - **Upgrading:** nothing to do. `users.json` keeps exactly the shape it had,
   so going back to 0.8 still signs everyone in, and anyone already signed in
   stays signed in until their session expires as usual.

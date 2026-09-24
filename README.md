@@ -95,6 +95,9 @@ same code, so you can change your mind.
   and edited as works in the editor, not as JSON
 - Navigation generated from `index.md` files, and folder listings that keep themselves
 - JWT authentication
+- `duckdown report`: that log (from Railway, say: `railway logs | duckdown
+  report`) made into a report in the editor's Reports tab — most read, not
+  found, where readers came from.
 - A view log that counts readers without identifying them — no IP, no user
   agent, no cookie
 - Local filesystem or S3 storage
