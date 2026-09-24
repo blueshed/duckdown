@@ -112,6 +112,9 @@ DUCKDOWN_ADMIN_PASSWORD=admin
 # The published site's address, for canonical links and sitemap.xml
 DUCKDOWN_ORIGIN=
 
+# Publish from the editor: commit site/ and push it, and Railway rebuilds
+# DUCKDOWN_REMOTE=git
+
 # S3 storage (uncomment to use)
 # DUCKDOWN_BUCKET=my-bucket
 # DUCKDOWN_PREFIX=
