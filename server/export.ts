@@ -25,6 +25,7 @@ import { brokenLinks } from "./links";
 import { yes } from "./markdown";
 import { BASE_FILES, ROOT_FILES, baseFile } from "./base";
 import { sitemapXml } from "./sitemap";
+import { feedXml, FEED_FILE } from "./feed";
 
 export type Exported = { pages: number; drafts: number; files: number; broken: number; problems: number };
 
@@ -113,6 +114,7 @@ export async function exportSite(o: {
   const count: Exported = { pages: 0, drafts: 0, files: 0, broken: 0, problems: 0 };
   const problems: string[] = [];
   const moved: { from: string; to: string }[] = [];
+  const feeds: string[] = [];   // folders whose index says feed: true
 
   for (const key of await walk(pages)) {
     // A folder's collection is a folder of pages: every item rendered at its
@@ -138,6 +140,7 @@ export async function exportSite(o: {
     const { html } = await pageHtml(page, { origin, editHref: "" });
     rendered.set(outPath(key), html);
     for (const alias of page.meta.aliases ?? []) moved.push({ from: alias, to: canonicalPath(key) });
+    if (yes(page.meta.feed) && (key === "index.md" || key.endsWith("/index.md"))) feeds.push(key.slice(0, -"index.md".length));
   }
   if (!rendered.size) {
     const where = IS_S3 ? `s3://${BUCKET}/${BUCKET_PREFIX}` : APP_PATH;
@@ -213,10 +216,16 @@ export async function exportSite(o: {
   const { entries, pages: listed } = await buildSite(pages);
   write("search.json", JSON.stringify(entries));
   count.files++;
-  // A sitemap needs absolute addresses, so it needs the origin.
+  // A sitemap needs absolute addresses, so it needs the origin; so does a feed.
   if (origin) {
     write("sitemap.xml", sitemapXml(listed, origin));
     count.files++;
+    for (const folder of feeds) {
+      write(`${folder}${FEED_FILE}`, (await feedXml(pages, folder.replace(/\/$/, ""), origin, true))!);
+      count.files++;
+    }
+  } else if (feeds.length) {
+    say(`${feeds.map((f) => `/${f}${FEED_FILE}`).join(", ")} not written: a feed needs DUCKDOWN_ORIGIN for its addresses.`);
   }
 
   const broken = brokenLinks(rendered, written);

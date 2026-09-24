@@ -2,6 +2,13 @@
 
 ## 0.7.0 — unreleased
 
+- **Feeds.** `feed: true` in a folder's `index.md` gives the folder an Atom
+  feed at `/<folder>/feed.xml` (`/feed.xml` for the root), so a blog can be
+  followed in a feed reader. It lists the pages `{{pages}}` lists, newest
+  first, taking those with a `date:`; each entry carries the page's title,
+  address, date, description and the whole page. `{{feed}}` in a template is
+  the link that lets a browser find it. The export writes `feed.xml` when
+  `DUCKDOWN_ORIGIN` is set. The seed's blog has one.
 - **The preview says when a link leads nowhere.** As you write, a link on
   the page that a reader would follow to nothing — no page, no work, no old
   address, no file in `static/`, or a draft — is named in the message line,
@@ -24,6 +31,9 @@
     has three fields: `src` (the picture), `title` and `caption`, the same
     three the editor's collection pane already adds items as. Any other key an
     item uses is reported until the fields are declared.
+- **Upgrading, for a feed:** a site's own templates don't have `{{feed}}`
+  yet. Add it beside `{{description}}` in `templates/site.html` (and any other
+  template that has a `<head>`), then `feed: true` to the folder's index.
 - **Upgrading from 0.4's shape:** for each collection still saying `"layout"`,
   write `item.md` beside it (`each: true`, `layout: <that template>`), take
   `"layout"` out, and declare `fields` if the items use anything beyond src,

@@ -27,6 +27,7 @@ nav: About
 | `date` | Used to order a folder's [[#listing-a-folder\|listing]], newest first |
 | `order` | On a folder's `index.md`: a whole number, for where it sits among its siblings in the navigation |
 | `draft` | `draft: true` keeps the page off the site until you're ready |
+| `feed` | On a folder's `index.md`: `feed: true` gives the folder a [[#a-feed\|feed]] |
 
 Only two of these touch how a page looks, and both name a file you wrote:
 `layout:` picks a template, `css:` adds a stylesheet. See [[themes|Styling]].
@@ -182,6 +183,14 @@ nav: Blog
 That's a blog index that writes itself: drafts stay out, and a new post appears the moment you save it.
 
 `{{sitemap}}` is the same made recursive: every page on the site, nested by folder, each folder under its index's title. It is what the [[/sitemap|site map]] page here is made of, and a good thing for a 404 page to offer.
+
+## A feed
+
+Add `feed: true` to a folder's `index.md` and anyone can follow it in a feed
+reader: the folder gets `feed.xml` beside its index (the [[/blog/index|blog]]
+has one at `/blog/feed.xml`), listing its dated pages newest first — a page
+with no `date:` stays on the folder's page and out of its feed. The template's
+`{{feed}}` is what lets a reader's browser find it.
 
 ## A page's own layout
 

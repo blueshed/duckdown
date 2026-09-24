@@ -41,11 +41,12 @@ export function pagesChanged(): void {
   listings.clear();
 }
 
-type Listed = { href: string; title: string; date: string; description: string };
+export type Listed = { key: string; href: string; title: string; date: string; description: string };
 
 // A folder's pages, newest first by date:, then by title. Its own index,
-// drafts, the 404 page, and anything starting with - are left out.
-async function folderEntries(pages: Storage, folder: string): Promise<Listed[]> {
+// drafts, the 404 page, and anything starting with - are left out. The feed
+// (feed.ts) is made from these too, so it and {{pages}} agree.
+export async function folderEntries(pages: Storage, folder: string): Promise<Listed[]> {
   const { files } = await pages.list(folder);
   const entries: Listed[] = [];
 
@@ -54,6 +55,7 @@ async function folderEntries(pages: Storage, folder: string): Promise<Listed[]> 
     const { meta } = parseFrontMatter(await pages.read(file.path.replace(/^\//, "")));
     if (yes(meta.draft) || meta.each) continue;   // an each: page is its items, not a page
     entries.push({
+      key: file.path.replace(/^\//, ""),
       href: encodeURI(`/${file.path.replace(/\.md$/, ".html").replace(/^\//, "")}`),
       title: meta.title?.[0] ?? file.name.replace(/\.md$/, ""),
       date: meta.date?.[0] ?? "",

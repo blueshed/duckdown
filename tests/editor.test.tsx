@@ -790,7 +790,12 @@ describe("Editor", () => {
     await createFile("/editor-move.md", "editor-move.md");
     const { host, dispose } = render(() => <Editor />);
     type(host.querySelector("textarea")!, "title: editor-move\n\n# Changed");
-    click(host.querySelector('[aria-label="Rename or move editor-move.md"]')!);
+    const rename = host.querySelector('[aria-label="Rename or move editor-move.md"]')!;
+    click(rename);                                             // asked, and thought better of
+    await waitFor(() => host.querySelector("dialog")?.open);
+    click(button(host.querySelector("dialog")!, "Cancel")!);
+    expect(host.querySelector("dialog")).toBeNull();
+    click(rename);
     const dialog = host.querySelector("dialog")!;
     await waitFor(() => dialog.open);
     expect(dialog.querySelector("h3")!.textContent).toBe("Rename or move editor-move.md");

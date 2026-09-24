@@ -2,6 +2,7 @@ import { createPageStorage } from "../storage";
 import { pagesChanged } from "../nav";
 import { searchChanged } from "../search";
 import { collectionsChanged } from "../collection";
+import { feedsChanged } from "../feed";
 import { addMeta, dropMeta, parseFrontMatter, yes } from "../markdown";
 import { aliasKey } from "../slugs";
 import { canonicalPath } from "../utils";
@@ -16,6 +17,7 @@ const changed = () => {
   pagesChanged();
   searchChanged();
   collectionsChanged();
+  feedsChanged();
 };
 
 const refuse = (why: string) => new Response(why, { status: 400 });

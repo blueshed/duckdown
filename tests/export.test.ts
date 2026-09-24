@@ -177,6 +177,12 @@ describe("what a published site needs beside its pages", () => {
     expect(xml).toContain("<loc>https://example.com/blog/a-post-with-its-own-layout.html</loc><lastmod>2026-09-21</lastmod>");
     expect(xml).not.toContain("404");
     expect(existsSync(join(full, "404.html"))).toBe(true);           // the miss page a static host serves
+    // n111: the blog's feed, at the address its pages link to, in absolute addresses.
+    const feed = read(full, "blog/feed.xml");
+    expect(feed).toContain("<id>https://example.com/blog/feed.xml</id>");
+    expect(feed).toContain("<id>https://example.com/blog/a-post-with-its-own-layout.html</id>");
+    expect(read(full, "blog/a-post-with-its-own-layout.html"))
+      .toContain('<link rel="alternate" type="application/atom+xml" title="Blog" href="/blog/feed.xml">');
     rmSync(dir, { recursive: true, force: true });
     rmSync(full, { recursive: true, force: true });
   });
@@ -187,6 +193,10 @@ describe("what a published site needs beside its pages", () => {
     await exportSite({ out: dir, say: (l) => said.push(l) });
     expect(existsSync(join(dir, "sitemap.xml"))).toBe(false);
     expect(said.join("\n")).toContain("sitemap.xml");
+    // n111: nor a feed, which says so, and no page links to the feed it didn't write.
+    expect(existsSync(join(dir, "blog/feed.xml"))).toBe(false);
+    expect(said.join("\n")).toContain("/blog/feed.xml not written: a feed needs DUCKDOWN_ORIGIN for its addresses.");
+    expect(read(dir, "blog/index.html")).not.toContain("application/atom+xml");
     rmSync(dir, { recursive: true, force: true });
   });
 });

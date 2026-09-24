@@ -3,6 +3,7 @@ import { decodePath } from "./utils";
 import { aliasKey } from "./slugs";
 import { pageList, aliasTargets } from "./search";
 import { BASE_FILES, ROOT_FILES } from "./base";
+import { isFeed } from "./feed";
 
 // The links a page makes, and whether anything answers them. The export asks
 // of every page it writes, against the files it wrote; the preview asks of
@@ -61,8 +62,8 @@ export function brokenLinks(pages: Map<string, string>, known: Set<string>): str
 
 // The links on one rendered page (at site address `from`, "/guide/pages.html")
 // that a reader following them would find nothing at: not a page a reader can
-// reach (a draft isn't one), an item, an old address that moves, a file in
-// static/ or the base, or a file served at the root. Asked of the index the
+// reach (a draft isn't one), an item, an old address that moves, a folder's
+// feed, a file in static/ or the base, or a file served at the root. Asked of the index the
 // site already keeps, and of static/ only for the files the page names, so it
 // costs a lookup or two rather than an export. Each link once, as written.
 export async function deadLinks(html: string, from: string, pages: Storage, files: Storage): Promise<string[]> {
@@ -73,7 +74,7 @@ export async function deadLinks(html: string, from: string, pages: Storage, file
   const dead = new Set<string>();
   for (const { link, path, file } of links) {
     if (reaches(file, (p) => answered.has(p)) || moved.has(aliasKey(path))) continue;
-    if (file === "search.json" || file === "sitemap.xml") continue;
+    if (file === "search.json" || file === "sitemap.xml" || await isFeed(pages, path)) continue;
     if (file.startsWith("static/")) {
       const name = file.slice("static/".length);
       if (BASE_FILES.includes(name) || await files.exists(name)) continue;

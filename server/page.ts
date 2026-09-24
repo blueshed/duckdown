@@ -2,6 +2,7 @@ import { TEMPLATES_PATH } from "./config";
 import { createPageStorage, createStorage } from "./storage";
 import { renderMarkdown, folderOf } from "./markdown";
 import { siteNav, markCurrent, folderListing, siteMap } from "./nav";
+import { feedLink } from "./feed";
 import { fillCollections, fillItem, itemMeta, itemBody, type ItemContext } from "./collection";
 import { escapeHtml, outsideCode, canonicalPath, dateHtml } from "./utils";
 
@@ -176,6 +177,9 @@ export async function pageHtml(page: Page, o: PageOptions): Promise<{ html: stri
   // reason: a placeholder written in a page's text is never filled.
   html = await fillCollections(html, collection);
   html = fillItem(html, o.item);
+  // No origin (an export without DUCKDOWN_ORIGIN) means no feed is written,
+  // so there is none to link to.
+  const feed = o.origin && html.includes("{{feed}}") ? await feedLink(pages, folderOf(file)) : "";
   for (const [name, value] of [
     ["title", () => escapeHtml(meta.title?.[0] || "duckie")],
     ["url", () => escapeHtml(o.origin + canonicalPath(page.key))],
@@ -184,6 +188,8 @@ export async function pageHtml(page: Page, o: PageOptions): Promise<{ html: stri
       ? `<meta name="description" content="${escapeHtml(description)}">\n  <meta property="og:description" content="${escapeHtml(description)}">`
       : ""],
     ["nav", () => nav ? `<nav><ul class="nav">${nav}</ul></nav>` : ""],
+    // The feed of the folder this page is in, for a reader's browser to find.
+    ["feed", () => feed],
     // A stylesheet this page asked for by name: `css: poster` links
     // /static/poster.css after whatever the template links, so one page can
     // look however it likes without a template of its own. Guarded like

@@ -49,6 +49,7 @@ duckdown/
 │   ├── log.ts              # The view log: what was read, never who
 │   ├── search.ts           # The index readers search, cached like the nav; page and item aliases
 │   ├── sitemap.ts          # sitemap.xml from that index
+│   ├── feed.ts             # A folder's Atom feed (feed: true), cached like the nav; {{feed}}
 │   ├── collection.ts       # collection.json (the data) + its each: page (the page every item gets)
 │   ├── history.ts          # Earlier versions: what a save replaced, what a delete removed
 │   ├── images.ts           # Where a collection's pictures are, and what a thumbnail is called (both ends read it)
@@ -482,6 +483,7 @@ Paths: storage keys are real names. The server decodes the URL path (`after()`);
 - **Root files.** `ROOT_FILES` (robots.txt, favicon.ico) in `base.ts`: a list of two, answered at the root from `static/` and written to the root of `dist/`. Not a mechanism.
 - **One address.** `hosts.ts` is what both servers ask of a request's name (`hostOf()`: x-forwarded-host first): `hostAnswer()` 301s another name to `DUCKDOWN_ORIGIN` and closes `robots.txt` on a place to look (`looking()`: localhost, 127.0.0.1, `*.up.railway.app`, never the origin's own host), and the caller adds `X-Robots-Tag: noindex` there to every answer. `serve.ts` asks it in `route()`, the served site in `siteHandler(origin)` (routes/site.ts) — pages only: the other routes answer under any name. Unset, nothing moves.
 - **Sitemap.** `sitemapXml()` over `searchIndex()`, served at `/sitemap.xml` and written by the exporter when `DUCKDOWN_ORIGIN` is set (it needs absolute addresses).
+- **Feeds.** `feed: true` on a folder's `index.md` gives it `/<folder>/feed.xml` (`feed.ts`): Atom over `folderEntries()` — what `{{pages}}` lists, so they agree on drafts and order — taking only the pages whose `date:` parses. What it is made from is cached per folder without an origin, dropped by `feedsChanged()` from the pages route, and `feedXml()` writes it for an origin. The site route answers `…/feed.xml` before a page (a folder with no feed falls through to a miss); the export writes it only with `DUCKDOWN_ORIGIN`, and `{{feed}}` is empty when `pageHtml` has no origin, so no page links to a feed that wasn't written. `deadLinks()` counts a feed as somewhere.
 - **Validators.** `conditional()` in utils.ts: an ETag from the bytes, 304 on a match. Static files and signed-out pages use it; a signed-in page (it has the edit link) is `private, no-cache`.
 - **Template values.** `{{x-anything}}` in a template is the page's own `x-` key, escaped, empty when unset, filled before `{{content}}`.
 - **Bad URLs.** `decodePath()` answers null for a malformed escape; `after()` throws `BadRequest`, which `handleError` answers 400 without a stack. The site route and `serve.ts` answer 400 themselves.

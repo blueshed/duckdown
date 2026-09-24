@@ -43,6 +43,7 @@ This is the feature map. Bugs and tasks live in `todo.jsonl`.
 - [x] Folder listings (`{{pages}}`, newest first by `date:`)
 - [x] Folders served by their index (`/blog`, `/blog/`, `/blog/index.html`)
 - [x] "Edit this page" for whoever is signed in (`{{edit}}`)
+- [x] Feeds: `feed: true` on a folder's index gives it an Atom `feed.xml` of its dated pages; `{{feed}}` links it
 - [ ] Custom scripts via `x-script-*` metadata
 - [x] `GET /static/*` — serve site static files
 

@@ -71,6 +71,7 @@
 | `draft` | `true` keeps the page off the site, the nav and listings; signed in to the editor, you still see it |
 | `aliases` | An address this page used to answer at; a request for it is a 301 to this page. Repeat the line for more than one |
 | `each` | This page is the page every item of a collection gets, not a page of its own: `each: true` in a folder that has a `collection.json` (see Collections) |
+| `feed` | In a folder's `index.md` only: `feed: true` gives the folder an Atom feed at `/<folder>/feed.xml` of its dated pages — see [A feed](#a-feed) |
 | `collection` | The collection a bare `{{items}}` or `{{groups}}` on this page means, when it isn't the page's own folder's: `collection: gallery` |
 
 - A plain block may hold **only those keys**, or one starting `x-` (your own). At the first line that isn't one, the block ends and everything from there is content — so prose opening `Update: closed on Monday` keeps its first line, and a mistyped key appears on the page instead of vanishing.
@@ -163,6 +164,10 @@ HTML in a page is passed through as written, scripts included, on the published 
 `{{pages}}` in a page lists the pages beside it — newest first by `date:`, each with its `description:` — as `<ul class="pages">`. A folder's `index.md`, drafts, files starting with `-` and anything that isn't `.md` are left out. It's how a blog index keeps itself.
 
 `{{sitemap}}` is the same made recursive, for a page a reader can read: every page on the site as nested `<ul class="sitemap">`, the site's front page first, each folder labelled by its index's `title:` and linked to it, pages newest first as `{{pages}}` has them, and folders after them by name. Drafts, `404.md`, folders starting with `-` or `.`, and folders with nothing to show are left out. Like `{{pages}}` it stays as written inside code, so a page can document it, and it works in an export. Put it in a `pages/sitemap.md` (which stays out of the nav, since only folders' indexes are in it) and link that from the 404 page.
+
+### A feed
+
+`feed: true` in a folder's `index.md` (the root's too, at `/feed.xml`) lets a reader follow the folder in a feed reader: `/<folder>/feed.xml`, Atom, the pages `{{pages}}` lists there, newest first — but only those with a `date:` a machine can read (`2026-09-21`, or with a time: `2026-09-21T10:30:00Z`), because a feed is what's new. Each entry is the page's title, address, date, `description:` as its summary, and the whole rendered page. Drafts never go in. `{{feed}}` in the template is the `<link rel="alternate">` that lets a browser find it (the seed's templates have it; an older site adds it beside `{{description}}`). The export writes `feed.xml` only when `DUCKDOWN_ORIGIN` is set — its addresses must be absolute — and without it `{{feed}}` is empty, so nothing links to a feed that wasn't written.
 
 ### Not supported
 
@@ -621,6 +626,7 @@ In the editor, a stylesheet opens from **Resources → css** in a pane below wha
 | `{{url}}` | The page's one canonical address — use it as `<link rel="canonical" href="{{url}}">` |
 | `{{date}}` | The page's `date` as a `<time>`, written out (`21 September 2026`), or nothing |
 | `{{nav}}` | The navigation (above), or nothing |
+| `{{feed}}` | `<link rel="alternate" type="application/atom+xml">` for the feed of the folder the page is in, or nothing when that folder has none |
 | `{{css}}` | `<link>` for the page's `css:`, or nothing |
 | `{{edit}}` | An "Edit this page" link to the editor — only for whoever is signed in |
 | `{{x-anything}}` | The page's own `x-anything:` front-matter value, escaped, or nothing when the page doesn't set it |

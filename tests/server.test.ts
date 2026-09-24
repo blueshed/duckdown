@@ -3,6 +3,8 @@ import { mkdirSync, writeFileSync, readFileSync, renameSync, existsSync, rmSync 
 import { join } from "path";
 import { BASE, SITE, signIn, authed, keepSite } from "./helpers";
 import { siteHandler } from "../server/routes/site";
+import { feedXml, feedsChanged } from "../server/feed";
+import type { Storage } from "../server/storage";
 
 keepSite();
 beforeAll(signIn);
@@ -385,10 +387,11 @@ describe("markdown preview", () => {
         "[mail](mailto:a@b.c) [away](https://example.com/x) [here](#top) [the editor](/edit)",
         "[a draft](/blog/unready.html) [nowhere](/nowhere.html) [nowhere again](/nowhere.html)",
         "[relative](missing.html) ![no picture](/static/images/missing.png) [no root file](/humans.txt)",
+        "[the feed](/blog/feed.xml) [no feed](/guide/feed.xml)",
       ].join("\n\n");
       const data = await (await mark(source, "blog/linking.md")).json();
       expect(data.problems).toEqual([
-        "Links that lead nowhere a reader can go: /blog/unready.html, /nowhere.html, missing.html, /static/images/missing.png, /humans.txt",
+        "Links that lead nowhere a reader can go: /blog/unready.html, /nowhere.html, missing.html, /static/images/missing.png, /humans.txt, /guide/feed.xml",
       ]);
       // Fixed, it says nothing; and a template shown through a sample page has no address to check from.
       expect((await (await mark("[a page](/guide/pages.html)", "blog/linking.md")).json()).problems).toEqual([]);
@@ -1013,7 +1016,7 @@ describe("the site's own 404 page", () => {
   test("is not a page to search for, list or map", async () => {
     const found = await (await fetch(`${BASE}/search.json`)).json();
     expect(found.some((e: any) => e.url === "/404.html")).toBe(false);
-    expect(await (await fetch(`${BASE}/sitemap.xml`)).text()).not.toContain("404");
+    expect(await (await fetch(`${BASE}/sitemap.xml`)).text()).not.toContain("/404");   // not "404": the port may hold it
     expect(await (await fetch(`${BASE}/`)).text()).not.toContain("404.html");
   });
 });
@@ -1511,5 +1514,87 @@ describe("a collection that can't have the addresses it asks for", () => {
 
   test("a page with no collection beside it has no problems to report", async () => {
     expect((await (await preview("index.md")).json()).problems).toEqual([]);
+  });
+});
+
+// n111: a folder that says feed: true can be followed in a feed reader.
+describe("a folder's feed", () => {
+  const put = (path: string, body: string) => fetch(`${BASE}/edit/pages/${path}`, authed({ method: "PUT", body }));
+  const remove = (path: string) => fetch(`${BASE}/edit/pages/${path}`, authed({ method: "DELETE" }));
+
+  test("the blog's, as Atom: its dated posts newest first, in absolute addresses", async () => {
+    const res = await fetch(`${BASE}/blog/feed.xml`);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("application/atom+xml; charset=utf-8");
+    const xml = await res.text();
+    const host = new URL(BASE).host;
+    expect(xml).toStartWith('<?xml version="1.0" encoding="UTF-8"?>\n<feed xmlns="http://www.w3.org/2005/Atom">');
+    expect(xml).toContain(`<id>${BASE}/blog/feed.xml</id>`);
+    expect(xml).toContain("<title>Blog</title>");
+    expect(xml).toContain(`<link rel="self" type="application/atom+xml" href="${BASE}/blog/feed.xml"/>`);
+    expect(xml).toContain(`<link rel="alternate" type="text/html" href="${BASE}/blog/"/>`);
+    expect(xml).toContain("<updated>2026-09-21T00:00:00Z</updated>");          // the newest post's
+    expect(xml).toContain(`<author><name>${host}</name></author>`);
+    const newer = xml.indexOf(`<id>${BASE}/blog/a-post-with-its-own-layout.html</id>`);
+    const older = xml.indexOf(`<id>${BASE}/blog/one-page-that-looks-different.html</id>`);
+    expect(newer).toBeGreaterThan(0);
+    expect(older).toBeGreaterThan(newer);
+    // The page itself, escaped, with its relative links resolving from where it lives.
+    expect(xml).toContain(`<content type="html" xml:base="${BASE}/blog/a-post-with-its-own-layout.html">&lt;`);
+    // A reader that has it already is told so.
+    const again = await fetch(`${BASE}/blog/feed.xml`, { headers: { "If-None-Match": res.headers.get("etag")! } });
+    expect(again.status).toBe(304);
+  });
+
+  test("{{feed}} is where a browser finds the feed of the folder a page is in, and nothing elsewhere", async () => {
+    const link = '<link rel="alternate" type="application/atom+xml" title="Blog" href="/blog/feed.xml">';
+    expect(await (await fetch(`${BASE}/blog/`)).text()).toContain(link);
+    expect(await (await fetch(`${BASE}/blog/a-post-with-its-own-layout.html`)).text()).toContain(link);   // post.html links it too
+    expect(await (await fetch(`${BASE}/guide/`)).text()).not.toContain("application/atom+xml");
+    // A folder, or the root, that asks for none has no feed.xml: a miss like any other.
+    expect((await fetch(`${BASE}/guide/feed.xml`)).status).toBe(404);
+    expect((await fetch(`${BASE}/feed.xml`)).status).toBe(404);
+  });
+
+  test("dated pages only, never a draft, and it keeps up with the editor", async () => {
+    await put("diary/index.md", "title: Diary & notes\nfeed: true\n\n{{pages}}");
+    await put("diary/monday.md", "title: Monday\ndate: 2026-09-21T10:30:00Z\ndescription: The <first> day\n\n[back](index.html)");
+    await put("diary/undated.md", "title: Undated\n\nno date");
+    await put("diary/someday.md", "title: Someday\ndate: someday\n\nnot a date");
+    await put("diary/secret.md", "title: Secret\ndate: 2026-09-22\ndraft: true\n\nshh");
+    await put("quiet/index.md", "title: Quiet\nfeed: true");
+    try {
+      const xml = await (await fetch(`${BASE}/diary/feed.xml`)).text();
+      expect(xml).toContain("<title>Diary &amp; notes</title>");
+      expect(xml).toContain("<updated>2026-09-21T10:30:00Z</updated>");
+      expect(xml).toContain("<summary>The &lt;first&gt; day</summary>");
+      expect(xml.match(/<entry>/g)!.length).toBe(1);
+      for (const left of ["Undated", "Someday", "Secret"]) expect(xml).not.toContain(left);
+      // Nothing dated yet: a feed with no entries, and a time that says so.
+      expect(await (await fetch(`${BASE}/quiet/feed.xml`)).text()).toContain("<updated>1970-01-01T00:00:00Z</updated>");
+
+      // Cached like the nav, and dropped when the editor writes.
+      await put("diary/tuesday.md", "title: Tuesday\ndate: 2026-09-22\n\nlater");
+      const later = await (await fetch(`${BASE}/diary/feed.xml`)).text();
+      expect(later.indexOf("Tuesday")).toBeLessThan(later.indexOf("Monday"));
+      await put("diary/index.md", "title: Diary\n\n{{pages}}");          // and a folder that stops asking
+      expect((await fetch(`${BASE}/diary/feed.xml`)).status).toBe(404);
+    } finally {
+      for (const f of ["monday", "undated", "someday", "secret", "tuesday", "index"]) await remove(`diary/${f}.md`);
+      await remove("quiet/index.md");
+    }
+  });
+
+  test("a feed that can't be built isn't kept: the next request tries again", async () => {
+    let tries = 0;
+    const failing = { exists: async () => { tries++; throw new Error("the bucket is away"); } } as unknown as Storage;
+    feedsChanged();
+    try {
+      await expect(feedXml(failing, "away", "https://example.com", false)).rejects.toThrow("the bucket is away");
+      await expect(feedXml(failing, "away", "https://example.com", false)).rejects.toThrow("the bucket is away");
+      expect(tries).toBe(2);
+    } finally {
+      feedsChanged();
+    }
   });
 });
