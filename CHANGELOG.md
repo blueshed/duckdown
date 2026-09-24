@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.7.0 — unreleased
+
+- **The 0.4 collection shape is gone, as 0.5 said it would be.**
+  - `"layout"` in `collection.json` no longer makes item pages. It is reported
+    as a problem (in the log, the editor's message line, and `bun run export`,
+    where `--strict` fails on it) that names the each: page to write instead.
+  - A file with no `fields` is no longer read by guessing from its items. It
+    has three fields: `src` (the picture), `title` and `caption`, the same
+    three the editor's collection pane already adds items as. Any other key an
+    item uses is reported until the fields are declared.
+- **Upgrading from 0.4's shape:** for each collection still saying `"layout"`,
+  write `item.md` beside it (`each: true`, `layout: <that template>`), take
+  `"layout"` out, and declare `fields` if the items use anything beyond src,
+  title and caption. `bun run export --strict` lists every file that still
+  needs it.
+
 ## 0.6.1 — 2026-09-23
 
 - **A served site has one address too.** With `DUCKDOWN_ORIGIN` set, the

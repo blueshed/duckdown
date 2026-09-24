@@ -33,12 +33,20 @@ const RESERVED = ["aliases", "slug"];
 export const KINDS = ["text", "long", "image", "number"] as const;
 export type Field = { name: string; kind: typeof KINDS[number]; label: string };
 
+// A file that declares no fields: a picture in src, a title and a caption —
+// what every collection was before fields were declared, and what the
+// editor's collection pane adds items as.
+export const PLAIN: Field[] = [
+  { name: "src", kind: "image", label: "Picture" },
+  { name: "title", kind: "text", label: "Title" },
+  { name: "caption", kind: "long", label: "Caption" },
+];
+
 // Values every item answers to whatever its fields: {{item-slug}} and the rest.
 const BUILT_IN = ["slug", "href", "thumb"];
 
 // The page every item gets: an `each:` page's front matter and rendered
-// markdown, with its {{item-…}} still in it. `key` is "" for the one a 0.4
-// collection.json implies with its `layout`.
+// markdown, with its {{item-…}} still in it.
 export type EachPage = { key: string; meta: Record<string, string[]>; content: string };
 
 export type Group = {
@@ -64,10 +72,8 @@ export type Item = {
 
 export type Collection = {
   folder: string;                   // "works" ("" at the site root)
-  fields: Field[];                  // declared, or read off the items (0.4)
-  declared: boolean;                // whether the file said them
+  fields: Field[];                  // declared, or PLAIN when the file says none
   image: string;                    // the field that is the picture
-  layout: string;                   // 0.4's item template; "" when unsaid
   each: EachPage | null;            // the page each item gets, when there is one
   images: Images;
   labels: Record<string, Record<string, string>>;
@@ -184,12 +190,18 @@ export function parseCollection(folder: string, source: string): Collection {
   const where = collectionPath(folder);
   const picture = images(raw.images, problems);
   const declared = fieldsOf(raw.fields, problems, where);
+  const fields = declared ?? PLAIN;
+  // 0.4 named the item template here. The data has no say in how it is shown
+  // now: that is an each: page, and a file still saying layout is told so.
+  if (raw.layout !== undefined) {
+    const layout = typeof raw.layout === "string" && raw.layout ? raw.layout : "<template>";
+    problems.push(`${where}: "layout" isn't read any more — write an each: page beside it `
+      + `(${folder ? `${folder}/` : ""}item.md, saying "each: true" and "layout: ${layout}") and take "layout" out`);
+  }
   const collection: Collection = {
     folder,
-    fields: declared ?? [],
-    declared: declared !== null,
-    image: declared ? declared.find((f) => f.kind === "image")?.name ?? "" : "src",
-    layout: typeof raw.layout === "string" ? raw.layout : "",
+    fields,
+    image: fields.find((f) => f.kind === "image")?.name ?? "",
     each: null,
     images: picture,
     labels: labelsOf(raw.labels),
@@ -225,14 +237,8 @@ export function parseCollection(folder: string, source: string): Collection {
       if (key === "aliases") continue;
       const said = text(value);
       if (said !== null) fields[key] = said;
-      if (RESERVED.includes(key)) continue;
-      if (!declared) {
-        if (!collection.fields.some((f) => f.name === key)) {
-          collection.fields.push({ name: key, kind: key === "src" ? "image" : "text", label: key });
-        }
-      } else if (!declared.some((f) => f.name === key)) {
-        undeclared.set(key, (undeclared.get(key) ?? 0) + 1);
-      }
+      if (RESERVED.includes(key) || collection.fields.some((f) => f.name === key)) continue;
+      undeclared.set(key, (undeclared.get(key) ?? 0) + 1);
     }
     const title = fields.title ?? "";
     // A slug the file states has to be a slug; one that isn't is said so and
@@ -261,7 +267,9 @@ export function parseCollection(folder: string, source: string): Collection {
 
   for (const rawGroup of asArray(raw.groups)) collection.groups.push(readGroup(rawGroup));
   for (const [key, count] of undeclared) {
-    problems.push(`${where}: ${count} item(s) say "${key}", which isn't one of the fields — declare it, or take it out`);
+    problems.push(declared
+      ? `${where}: ${count} item(s) say "${key}", which isn't one of the fields — declare it, or take it out`
+      : `${where}: ${count} item(s) say "${key}", and there are no "fields" — without them an item is src, title and caption; declare the fields`);
   }
   return collection;
 }
@@ -313,15 +321,8 @@ async function eachPageIn(pages: Storage, collection: Collection): Promise<EachP
     problems.push(`${found.map((f) => f.key).join(" and ")} are each: pages for one collection — ${found[0]!.key} is used`);
   }
   const first = found[0];
-  if (first) return { key: first.key, meta: first.meta, content: renderMarkdown(first.source, first.key.replace(/\.md$/, "")).content };
-  // 0.4's shape: the template named in the data. Honoured for one release,
-  // as an each: page with nothing in it but that layout.
-  if (collection.layout) {
-    warnOnce(`${collectionPath(folder)}: "layout" in the data is going — write an each: page instead `
-      + `(${folder ? `${folder}/` : ""}item.md, saying "each: true" and "layout: ${collection.layout}")`);
-    return { key: "", meta: { layout: [collection.layout] }, content: "" };
-  }
-  return null;
+  if (!first) return null;
+  return { key: first.key, meta: first.meta, content: renderMarkdown(first.source, first.key.replace(/\.md$/, "")).content };
 }
 
 async function read(pages: Storage, folder: string): Promise<Collection | null> {
@@ -329,7 +330,6 @@ async function read(pages: Storage, folder: string): Promise<Collection | null> 
   if (!await pages.exists(key)) return null;
   const collection = parseCollection(folder, await pages.read(key));
   collection.each = await eachPageIn(pages, collection);
-  if (!collection.declared) warnOnce(`${key}: no "fields" — read off the items; declare them`);
   // Failures speak: a file the site can't read is a folder of missing pages,
   // and the log is where that gets noticed.
   for (const problem of collection.problems) console.error(problem);
@@ -518,7 +518,7 @@ export const SKIP = "skip";
 // A field a page or template asks for that the collection doesn't declare is
 // a typo that would otherwise publish as nothing. Said once, in the log.
 function unknownField(collection: Collection, field: string, where: string): void {
-  if (!collection.declared || BUILT_IN.includes(field) || collection.fields.some((f) => f.name === field)) return;
+  if (BUILT_IN.includes(field) || collection.fields.some((f) => f.name === field)) return;
   warnOnce(`${where}: ${collectionPath(collection.folder)} has no field "${field}"`);
 }
 

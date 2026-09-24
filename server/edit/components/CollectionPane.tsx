@@ -36,17 +36,9 @@ type RawItem = Record<string, unknown> & { title?: unknown; aliases?: unknown };
 type RawGroup = Record<string, unknown> & { name?: unknown; label?: unknown; items?: RawItem[]; groups?: RawGroup[] };
 type RawFile = Record<string, unknown> & { groups?: RawGroup[] };
 
-// `fields` is null when the file declares none.
-type Info = { fields: Field[] | null; images: Images; uploads: boolean; problems: string[] };
+// `fields` as the server reads them: the plain three when the file declares none.
+type Info = { fields: Field[]; images: Images; uploads: boolean; problems: string[] };
 type Upload = { name: string; src: string; thumb: string; v: string };
-
-// What a file that declares no fields is edited as: a picture in src, a title
-// and a caption — what every collection was before fields were declared.
-export const PLAIN: Field[] = [
-  { name: "src", kind: "image", label: "Picture" },
-  { name: "title", kind: "text", label: "Title" },
-  { name: "caption", kind: "long", label: "Caption" },
-];
 
 // A group by its position: [1] is the second group, [1, 0] the first subgroup
 // of it. Positions, not names, because two groups may be called the same thing
@@ -152,7 +144,7 @@ export function CollectionPane() {
   const name = signal("");
   const model = signal<RawFile | null>(null);
   const images = signal<Images>(ownImages());
-  const fields = signal<Field[]>(PLAIN);
+  const fields = signal<Field[]>([]);
   const uploads = signal(true);
   // The addresses the file had when it was opened: the ones worth keeping.
   let published = new Set<string>();
@@ -181,10 +173,10 @@ export function CollectionPane() {
   let spoken = "";
   const check = async () => {
     const info = await apiJson<Info>(`read ${key()}`, infoUrl());
-    if (!info) return;
+    if (!info) return false;
     batch(() => {
       images.set(info.images);
-      fields.set(info.fields ?? PLAIN);
+      fields.set(info.fields);
       uploads.set(info.uploads);
     });
     // Failures speak: a slug that collides with a page is a work nobody can
@@ -192,13 +184,15 @@ export function CollectionPane() {
     const problems = info.problems.join(" ");
     if (problems && problems !== spoken) speak(problems);
     spoken = problems;
+    return true;
   };
 
   const load = async () => {
     // Where the pictures are and what the fields are first, so no item is
     // ever drawn against the wrong base or with the wrong inputs, and no
-    // thumbnail is fetched from an address it never had.
-    await check();
+    // thumbnail is fetched from an address it never had. Without them (the
+    // failure has spoken) nothing is drawn at all.
+    if (!(await check())) return;
     const res = await api(`open ${key()}`, fileUrl());
     if (!res.ok) return;
     const body = await res.text();

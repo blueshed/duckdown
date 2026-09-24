@@ -328,9 +328,10 @@ every item gets at `/<folder>/<slug>/` — found by `eachPageIn()` when the
 collection loads, rendered once and kept on `Collection.each`, never served,
 listed or searched as a page itself — and any page with `{{items}}` is an
 overview (`collection: <name>` names the collection its bare tags mean). No
-each: page, no item pages: overviews show unlinked thumbnails. A 0.4 file
-(`layout`, no `fields`) is read with its fields inferred and its layout as an
-empty each: page, and says so once; that goes in the release after 0.5. It is
+each: page, no item pages: overviews show unlinked thumbnails. A file with no
+`fields` has `PLAIN` ones (`src` the picture, `title`, `caption`), the same
+three the pane adds items as; a `layout` in the data (0.4's item template)
+is a problem that says to write the each: page. It is
 read through the storage layer like everything else, so it works on disk and
 in a bucket, and it is cached exactly like the nav — `routes/pages.ts` calls
 `collectionsChanged()` beside `pagesChanged()` and `searchChanged()`, because
@@ -355,8 +356,8 @@ that a slug collides with a page.
 `CollectionPane.tsx` edits that file as what it is: groups of items, each an
 input per field the file declares (`fields`, as the server parses them: a line
 for text and number — values stay strings, a number may say `skip` — a box for
-long) and the `image` field as the picture; a file with no `fields` is edited as
-`src`/`title`/`caption`, and one with no image field adds items as empty rows.
+long) and the `image` field as the picture; a file with no `fields` gets
+`PLAIN` from the server, and one with no image field adds items as empty rows.
 It keeps the **raw** JSON, not the parsed
 `Collection` — a parsed one has slugs and resolved URLs in it, and writing
 that back would be writing duckdown's reading of the file rather than the file

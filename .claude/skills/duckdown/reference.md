@@ -287,7 +287,7 @@ otherwise (see Pictures).
 
 | Key | What it does |
 |-----|--------------|
-| `fields` | What an item is made of: `name`, `kind` (`text`, `long`, `image` or `number`; `text` if unsaid) and an optional `label` for the editor. A bare `"year"` is a text field |
+| `fields` | What an item is made of: `name`, `kind` (`text`, `long`, `image` or `number`; `text` if unsaid) and an optional `label` for the editor. A bare `"year"` is a text field. Unsaid, an item is `src` (the picture), `title` and `caption` |
 | `images` | Where the pictures are: a base URL, or `{ "src", "thumb", "suffix", "extension" }`. Defaults to `/static/images/` |
 | `labels` | Per field, a label for a value: an overview's heading reads `1961 - Early work` |
 | `groups` | The sections, in order: `name`, optional `label`, `items`, and optionally `groups` of their own |
@@ -305,9 +305,9 @@ doesn't know. A page or template asking for `{{item-yaer}}` or
 `{{items by=yaer}}` is said in the log too. Anything the file isn't shaped like
 is skipped rather than believed.
 
-A 0.4 file — `"layout": "item"` and no `fields` — still works for now: its
-fields are read off the items and its layout acts as an each: page with an
-empty body. The log says so. Write the each: page and declare the fields.
+`"layout"` in `collection.json` (0.4's way of naming the item template) makes
+no pages any more, and is said as a problem: write the each: page beside it
+(`item.md`, `each: true`, `layout: <that template>`) and take `layout` out.
 
 ### Order, slugs and addresses
 

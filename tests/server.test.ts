@@ -523,7 +523,7 @@ describe("a collection's pictures", () => {
     await collectionAt(".away", { images: "https://pictures.example.com/works/", groups: [] });
     const info = await (await fetch(`${BASE}/edit/collection/.away`, authed())).json();
     expect(info.uploads).toBe(false);
-    expect(info.fields).toBeNull();   // it declares none: the pane shows what it always did
+    expect(info.fields.map((f: { name: string }) => f.name)).toEqual(["src", "title", "caption"]);   // it declares none: the plain three
 
     const res = await send(".away", new Blob([PNG]), "a.png");
     expect(res.status).toBe(409);

@@ -59,7 +59,7 @@ Look at [the gallery](/gallery/) in this site, and at `pages/gallery/` — its
 
 | Key | What it does |
 |-----|--------------|
-| `fields` | What an item is made of: each a `name`, a `kind` — `text`, `long`, `image` or `number` — and a `label` for the editor |
+| `fields` | What an item is made of: each a `name`, a `kind` — `text`, `long`, `image` or `number` — and a `label` for the editor. Without it, an item is a picture in `src`, a `title` and a `caption` |
 | `images` | Where the pictures are — a base URL, or `{ "src", "thumb", "suffix", "extension" }`. Without it, `/static/images/` |
 | `labels` | A label for a value, shown in an overview's heading: `1961 - Early work` |
 | `groups` | The sections, in order. Each has a `name`, an optional `label`, its `items`, and optionally `groups` of its own |

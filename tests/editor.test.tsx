@@ -1033,15 +1033,16 @@ describe("CollectionPane", () => {
   const fresh = () => { FOLDER = `.pane${++made}`; return FOLDER; };
   const FILE = () => `/edit/pages/${FOLDER}/collection.json`;
 
+  // No `fields`: a picture in src, a title and a caption, the plain three.
   const seed = () => ({
-    layout: "item",
+    labels: { title: { Print: "A print" } },
     images: { src: `/static/images/${FOLDER}/`, suffix: "_tn" },
     groups: [
       {
         name: "paintings",
         label: "Paintings",
         items: [
-          { src: "one.svg", title: "First", caption: "First caption", year: "1961" },
+          { src: "one.svg", title: "First", caption: "First caption" },
           { src: "two.svg", title: "Second", caption: "" },
         ],
         groups: [{ name: "studies", items: [{ src: "three.svg", title: "Study" }] }],
@@ -1112,8 +1113,7 @@ describe("CollectionPane", () => {
 
     edit(host.querySelector(`[data-field="title"]`)!, "First Light");
     const file = await storedWhen((f) => f.groups[0].items[0].title === "First Light");
-    expect(file.groups[0].items[0].year).toBe("1961");     // a field the pane doesn't show is kept
-    expect(file.layout).toBe("item");                      // and so is everything around the groups
+    expect(file.labels).toEqual({ title: { Print: "A print" } });   // what the pane doesn't show is kept
 
     edit(host.querySelector(`[data-field="caption"]`)!, "Ink on paper");
     await storedWhen((f) => f.groups[0].items[0].caption === "Ink on paper");
