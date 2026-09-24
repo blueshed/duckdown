@@ -71,6 +71,8 @@ This is the feature map. Bugs and tasks live in `todo.jsonl`.
 - [x] Editor: start one, edit its fields as works, upload pictures with thumbnails, renaming keeps the old address
 - [x] The 0.4 shape removed (0.8): `layout` in the data is a problem, and a file with no `fields` is `src`/`title`/`caption`
 
+- [x] `duckdown report`: the view log made into a report for the editors, in `reports/`
+
 ### Auth
 - [x] Login page (`GET/POST /login`) — HTML file + HTMLRewriter
 - [x] Signing in lands in the editor (`/edit`), or on `next`
@@ -79,6 +81,7 @@ This is the feature map. Bugs and tasks live in `todo.jsonl`.
 - [x] `users.json` credential store
 - [x] Protected editor routes (page loads redirect to `/login?next=...`; fetches get 401)
 - [x] Password hashing (`Bun.password`, argon2id), in place of the Python `cryptography` encryption
+- [x] Editors: add, re-password and remove who can sign in, from the editor or `duckdown user`; either ends that user's sessions
 
 ### Storage
 - [x] Local filesystem backend
@@ -189,7 +192,8 @@ This is the feature map. Bugs and tasks live in `todo.jsonl`.
 
 ### CLI
 - [x] `bun create blueshed/duckdown` — clone + postinstall setup
-- [ ] `duckie publish` — deploy to S3
+- [x] Publish from the editor (`DUCKDOWN_REMOTE=git`): commit and push `site/`, checked first; `duckdown publish`
+- [x] Pull what was published elsewhere; a page changed on both sides keeps yours, theirs in Earlier versions; `duckdown pull`
 
 ---
 

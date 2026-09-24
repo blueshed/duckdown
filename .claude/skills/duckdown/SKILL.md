@@ -56,7 +56,7 @@ users.json    who can sign in (password hashes)
 - **A folder of like things doesn't need a file each.** `pages/<folder>/collection.json` is the data: the fields every item has (a picture, a title, a caption, a year — declared once) and the items, in groups. The pages that show it are markdown: an **each: page** beside it (`item.md` saying `each: true`) is the page every item gets, at `/<folder>/<slug>/`, with a search entry and a sitemap line; any page with `{{items}}` is an overview that writes itself, and a page elsewhere says `collection: <folder>` to show the same items another way. The data never names a template. Its pictures may live outside the site (a bucket, a CDN); `{{items by=<field>}}` regroups the same items by any field; `aliases` keeps old addresses answering. `{{items template=tile}}` draws each item with a template of your own. The editor starts one (the grid icon in the tree) and edits it as works rather than as JSON — the declared fields in place, dragging to reorder, a picture dropped to add a work or to replace one, a renamed work keeping its old address — and writes the file as you go. The whole of it is in **Collections** in [reference.md](reference.md).
 - **A page is searchable because it is readable** — `/search.json` carries every non-draft page's words, and the browser matches against it. Nothing to register, no index to rebuild by hand. A `draft:` page is left out, so it can't be found until it's published.
 - **Whether a change is live depends on how the site is deployed**, and there are two ways. On a **served** site duckdown is running and a save at `/edit` is live at once. On a **published** site the pages were rendered to files by `bun run export` and a host is handing those out — editing markdown changes nothing anybody can see until the site is exported and deployed again. The site's own README.md or CLAUDE.md says how it's deployed — read whichever it has, not a `DEPLOY.md`, which not every site keeps. Never tell someone their change is live without knowing which kind of site it is.
-- **`users.json` holds password hashes**, never passwords: a plain one won't sign in. Make a hash with `bun -e 'console.log(await Bun.password.hash("their-password"))'`.
+- **`users.json` holds password hashes**, never passwords: a plain one won't sign in. Add an editor with **Editors** in the editor, or `duckdown user add <name>`, which hash it for you.
 
 ## Check your work
 
@@ -76,8 +76,10 @@ Every page rendered the way the site renders it, at its one address, with
 `static/` alongside; drafts are left out, and so are pages that would 404. It also writes `sitemap.xml` (given `DUCKDOWN_ORIGIN`), reports internal links that lead nowhere (`--strict` makes that a failure), and refuses to publish an empty site.
 A **published** site is handed out by `bun run node_modules/duckdown/server/serve.ts` (`SITE_DIR`, `PORT`) or any static host. Where `dist/` then goes is the site's
 own business — its README.md or CLAUDE.md says, whichever it has, and on some
-sites a `git push` does the whole of it. Don't invent a deployment step that
-isn't written down.
+sites a `git push` does the whole of it. A site whose `.env` sets
+`DUCKDOWN_REMOTE=git` publishes from the editor (**Publish**, in the header) or
+with `duckdown publish`, and takes in changes made elsewhere with **Pull** or
+`duckdown pull`. Don't invent a deployment step that isn't written down.
 
 ## Everything else
 

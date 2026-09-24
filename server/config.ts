@@ -46,8 +46,12 @@ export const USERS_PATH = "users.json";
 
 export const IS_S3 = BUCKET !== "";
 
+// Where this copy of the site is published, when it is edited here and
+// published by a push (remote.ts). Unset, the site is edited where it runs.
+export const REMOTE = process.env.DUCKDOWN_REMOTE || "";
+
 const running = {
-  s3: IS_S3, bucket: BUCKET, prefix: BUCKET_PREFIX, endpoint: BUCKET_ENDPOINT,
+  s3: IS_S3, bucket: BUCKET, prefix: BUCKET_PREFIX, endpoint: BUCKET_ENDPOINT, remote: REMOTE,
   path: APP_PATH, debug: DEBUG, pidFile: PID_FILE, pid: process.pid,
 };
 
@@ -60,6 +64,7 @@ export function configLines(c: typeof running = running): string[] {
   } else {
     lines.push(`  storage: ${c.path}`);
   }
+  if (c.remote) lines.push(`  remote: ${c.remote} (Publish in the editor pushes the site)`);
   lines.push(`  mode: ${c.debug ? "development" : "production"}`);
   if (c.pidFile) lines.push(`  pid: ${c.pid} (${c.pidFile})`);
   return lines;

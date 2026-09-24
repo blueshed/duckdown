@@ -5,6 +5,8 @@ import { BASE, SITE, signIn, authed, keepSite } from "./helpers";
 import { siteHandler } from "../server/routes/site";
 import { feedXml, feedsChanged } from "../server/feed";
 import type { Storage } from "../server/storage";
+import { signJwt } from "../server/auth";
+import { usersChanged } from "../server/users";
 
 keepSite();
 beforeAll(signIn);
@@ -1696,6 +1698,118 @@ describe("a folder's feed", () => {
       expect(tries).toBe(2);
     } finally {
       feedsChanged();
+    }
+  });
+});
+
+// n113: who can sign in, from the editor. Never the admin the other tests are
+// signed in as: its sessions must survive this.
+describe("editors", () => {
+  const url = `${BASE}/edit/users`;
+  const admin = () => (authed().headers as Record<string, string>).Cookie!;
+  const send = (method: string, body: unknown, cookie = admin()) =>
+    fetch(url, { method, headers: { "Content-Type": "application/json", Cookie: cookie }, body: JSON.stringify(body) });
+  const signInAs = async (name: string, password: string) => {
+    const form = new FormData();
+    form.set("email", name);
+    form.set("password", password);
+    const res = await fetch(`${BASE}/login`, { method: "POST", body: form, redirect: "manual" });
+    return res.headers.get("set-cookie")?.match(/duckie_token=[^;]+/)?.[0] ?? "";
+  };
+  const signedIn = async (cookie: string) => (await fetch(url, { headers: { Cookie: cookie } })).status === 200;
+  const said = async (res: Response) => [res.status, await res.text()];
+  const users = () => JSON.parse(readFileSync(join(SITE, "users.json"), "utf8"));
+
+  test("lists names, never hashes; adds an editor who can then sign in", async () => {
+    const listed = await (await fetch(url, authed())).json();
+    expect(listed.me).toBe("admin");
+    expect(listed.users).toContainEqual({ name: "admin", env: false });
+    expect(JSON.stringify(listed)).not.toContain("argon2");
+    expect(await said(await send("POST", { name: "ann@example.com", password: "long enough" }))).toEqual([200, '{"ok":true}']);
+    expect(users()["ann@example.com"]).toStartWith("$argon2");
+    const ann = await signInAs("ann@example.com", "long enough");
+    expect(await signedIn(ann)).toBe(true);
+    expect((await (await fetch(url, { headers: { Cookie: ann } })).json()).me).toBe("ann@example.com");
+    // The file keeps the shape every duckdown reads: a name and a hash.
+    expect(typeof users()["ann@example.com"]).toBe("string");
+  });
+
+  test("says what's wrong with a name, a password, or a name taken", async () => {
+    expect(await said(await send("POST", { name: "two words", password: "long enough" })))
+      .toEqual([400, "A name is one word — no spaces — of up to 100 characters"]);
+    expect(await said(await send("POST", { name: "bea", password: "short" }))).toEqual([400, "A password is at least 8 characters"]);
+    expect(await said(await send("POST", { name: "admin", password: "long enough" }))).toEqual([409, "admin can already sign in"]);
+    expect((await fetch(url, { method: "POST", body: "not json", headers: authed().headers })).status).toBe(400);
+    expect((await fetch(url)).status).toBe(401);
+    expect((await fetch(url, authed({ method: "POST", headers: { ...authed().headers, "Sec-Fetch-Site": "cross-site" }, body: "{}" }))).status).toBe(403);
+  });
+
+  test("a new password ends the sessions made with the old one; your own needs the one you have, and keeps you in", async () => {
+    await send("POST", { name: "cat", password: "first password" });
+    const cat = await signInAs("cat", "first password");
+    const catAgain = await signInAs("cat", "first password");
+    // Another editor sets it: every session cat had ends.
+    expect(await said(await send("PUT", { name: "cat", password: "second password" }))).toEqual([200, '{"ok":true}']);
+    expect(await signedIn(cat)).toBe(false);
+    expect(await signInAs("cat", "first password")).toBe("");
+    const now = await signInAs("cat", "second password");
+    expect(await signedIn(now)).toBe(true);
+    // Cat sets their own: the current one first, and the answer signs them in again.
+    expect(await said(await send("PUT", { name: "cat", password: "third password" }, now))).toEqual([403, "That isn't your current password"]);
+    const own = await send("PUT", { name: "cat", password: "third password", current: "second password" }, now);
+    expect(own.status).toBe(200);
+    const renewed = own.headers.get("set-cookie")!.match(/duckie_token=[^;]+/)![0];
+    expect(await signedIn(renewed)).toBe(true);
+    expect(await signedIn(now)).toBe(false);          // the session it was changed in has a new cookie, not the old one
+    expect(await signedIn(catAgain)).toBe(false);
+    expect(await said(await send("PUT", { name: "nobody", password: "long enough" }))).toEqual([404, "No one called nobody can sign in"]);
+    expect(await said(await send("PUT", { name: "cat", password: "short" }))).toEqual([400, "A password is at least 8 characters"]);
+  });
+
+  test("a removed editor is signed out; nobody removes themselves", async () => {
+    await send("POST", { name: "dan", password: "dan's password" });
+    const dan = await signInAs("dan", "dan's password");
+    expect(await said(await fetch(`${url}?name=dan`, { method: "DELETE", headers: { Cookie: dan } })))
+      .toEqual([409, "You can't remove yourself: ask another editor"]);
+    expect((await fetch(`${url}?name=dan`, authed({ method: "DELETE" }))).status).toBe(200);
+    expect(await signedIn(dan)).toBe(false);
+    expect(users().dan).toBeUndefined();
+    expect(await said(await fetch(`${url}?name=dan`, authed({ method: "DELETE" })))).toEqual([404, "No one called dan can sign in"]);
+  });
+
+  test("the environment's admin is the environment's to change", async () => {
+    await send("POST", { name: "robot", password: "robot's password" });
+    process.env.DUCKDOWN_ADMIN_PASSWORD = "whatever";
+    process.env.DUCKDOWN_ADMIN_USER = "robot";
+    try {
+      expect((await (await fetch(url, authed())).json()).users).toContainEqual({ name: "robot", env: true });
+      expect(await said(await send("PUT", { name: "robot", password: "long enough" })))
+        .toEqual([409, "robot's password is set by DUCKDOWN_ADMIN_PASSWORD: change it there"]);
+      expect(await said(await fetch(`${url}?name=robot`, authed({ method: "DELETE" }))))
+        .toEqual([409, "robot is set by DUCKDOWN_ADMIN_PASSWORD: take it out there"]);
+    } finally {
+      delete process.env.DUCKDOWN_ADMIN_PASSWORD;
+      delete process.env.DUCKDOWN_ADMIN_USER;
+    }
+  });
+
+  test("a session from before fingerprints stands; a users.json that can't be read signs nobody in, and says so", async () => {
+    const old = `duckie_token=${await signJwt({ sub: "admin", exp: Math.floor(Date.now() / 1000) + 60 })}`;
+    expect(await signedIn(old)).toBe(true);
+    expect(await signedIn(`duckie_token=${await signJwt({ exp: Math.floor(Date.now() / 1000) + 60 })}`)).toBe(false);   // no one
+    const file = join(SITE, "users.json");
+    const before = readFileSync(file, "utf8");
+    const error = spyOn(console, "error").mockImplementation(() => {});
+    try {
+      writeFileSync(file, "{ not json");
+      usersChanged();
+      expect(await signedIn(old)).toBe(false);
+      expect(error.mock.calls[0]![0]).toContain("Couldn't read users.json, so nobody is signed in");
+      expect((await fetch(`${BASE}/`, { headers: { Cookie: old } })).status).toBe(200);   // the site stays up
+    } finally {
+      error.mockRestore();
+      writeFileSync(file, before);
+      usersChanged();
     }
   });
 });

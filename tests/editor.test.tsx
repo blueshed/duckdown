@@ -23,6 +23,8 @@ import { Editor } from "../server/edit/components/Editor";
 import { Preview } from "../server/edit/components/Preview";
 import { CssPreview } from "../server/edit/components/CssPreview";
 import { Header } from "../server/edit/components/Header";
+import { EditorsDialog } from "../server/edit/components/Users";
+import { PublishButton, publishState, refreshPublish } from "../server/edit/components/Publish";
 import { ImageBrowser } from "../server/edit/components/ImageBrowser";
 import { ResourceList } from "../server/edit/components/ResourceList";
 import { ResourcePane } from "../server/edit/components/ResourcePane";
@@ -984,6 +986,221 @@ describe("Header", () => {
     expect(logout.getAttribute("method")).toBe("post");
     expect(logout.getAttribute("action")).toBe("/logout");
     dispose();
+  });
+});
+
+// n115, n116
+describe("Publish", () => {
+  // The server under test has no remote; these stand in for one, and let
+  // everything else through to it.
+  function remote(answers: { status?: () => Response; publish?: () => Response; pull?: () => Response }) {
+    const seen: string[] = [];
+    const restore = intercept((url, init) => {
+      if (!url.startsWith("/edit/publish")) return signedIn(url, init);
+      const which = url.includes("?pull") ? "pull" : init?.method === "POST" ? "publish" : "status";
+      seen.push(which);
+      return answers[which]!();
+    });
+    return { seen, restore };
+  }
+  const status = (over: object = {}) => () => Response.json({
+    remote: "git origin/main", changes: [{ path: "pages/a.md", state: "changed" }, { path: "pages/b.md", state: "added" }], ahead: 1, behind: 2, ...over,
+  });
+
+  test("no remote, no button", async () => {
+    publishState.set({ remote: "x", changes: [], ahead: 0, behind: 0 });
+    await refreshPublish();                                             // the real server: 404
+    expect(publishState.get()).toBeNull();
+    const { host, dispose } = render(() => <Header />);
+    await settle(450);
+    expect(button(host, "Publish")).toBeUndefined();
+    dispose();
+  });
+
+  test("says what's waiting, publishes it with what the checks found, and pulls in what was published elsewhere", async () => {
+    const r = remote({
+      status: status(),
+      publish: () => Response.json({ committed: true, pushed: 2, problems: ["broken link: index.html -> /gone.html"] }),
+      pull: () => Response.json({ changed: ["pages/index.md"], conflicts: ["pages/a.md"] }),
+    });
+    try {
+      await loadFile("index.md");
+      const { host, dispose } = render(() => <PublishButton />);
+      await waitFor(() => button(host, "Publish"));
+      expect(host.querySelector(".badge")!.textContent).toBe("3");       // two changes, one commit waiting
+      click(button(host, "Publish")!);
+      await waitFor(() => host.querySelector("dialog")?.open);
+      const dialog = host.querySelector("dialog")!;
+      expect(dialog.querySelector("h3")!.textContent).toBe("Publish to git origin/main");
+      expect([...dialog.querySelectorAll(".history-list li")].map((li) => li.textContent)).toEqual(["pages/a.mdchanged", "pages/b.mdnew"]);
+      expect(dialog.textContent).toContain("1 commit(s) made here, not yet published.");
+      expect(dialog.textContent).toContain("The published site has 2 change(s) this copy hasn't: Pull first.");
+
+      const form = dialog.querySelector("form.editor-add") as HTMLFormElement;
+      (form.elements.namedItem("message") as HTMLInputElement).value = "A change";
+      submit(form);
+      await waitFor(() => notice.get() === "Published: 2 commit(s) pushed");
+      expect(dialog.textContent).toContain("Published, but the export found these");
+      expect(dialog.textContent).toContain("broken link: index.html -> /gone.html");
+
+      click(button(dialog, "Pull")!);
+      await waitFor(() => notice.get() === "Pulled 1 change(s) from the published site");
+      expect(dialog.textContent).toContain("Changed here and there — yours is kept");
+      expect(dialog.textContent).toContain("pages/a.md");
+      expect(r.seen).toContain("pull");
+
+      click(button(dialog, "Close")!);
+      expect(host.querySelector("dialog")).toBeNull();
+      dispose();
+    } finally {
+      r.restore();
+    }
+  });
+
+  test("a refusal is said in the dialog; nothing waiting is said too, and Publish waits", async () => {
+    let answer = status({ changes: [], ahead: 0, behind: 0, problem: "This branch has no upstream to publish to: push it once with git push -u" });
+    const r = remote({
+      status: () => answer(),
+      publish: () => new Response("The published site has changes this copy hasn't: Pull, then Publish again", { status: 409 }),
+      pull: () => Response.json({ changed: [], conflicts: [] }),
+    });
+    try {
+      const { host, dispose } = render(() => <PublishButton />);
+      await refreshPublish();
+      await waitFor(() => button(host, "Publish"));
+      expect(host.querySelector(".badge")).toBeNull();
+      click(button(host, "Publish")!);
+      await waitFor(() => host.querySelector("dialog")?.textContent!.includes("no upstream"));
+      const dialog = host.querySelector("dialog")!;
+      expect(dialog.textContent).toContain("Nothing here that isn't published.");
+      expect(button(dialog.querySelector("form")!, "Publish")!.disabled).toBe(true);
+      click(button(dialog, "Pull")!);
+      await waitFor(() => notice.get() === "Nothing new to pull");
+
+      answer = status();
+      await refreshPublish();
+      submit(dialog.querySelector("form")!);
+      await waitFor(() => dialog.querySelector(".dialog-error")?.textContent!.includes("Pull, then Publish again"));
+
+      // Why the status can't be known at all, and a pull where every change collided.
+      answer = () => new Response("/x isn't in a git repository, so DUCKDOWN_REMOTE=git has nowhere to push", { status: 409 });
+      await refreshPublish();
+      await waitFor(() => dialog.textContent!.includes("isn't in a git repository"));
+      dispose();
+    } finally {
+      r.restore();
+    }
+    const collided = remote({ status: status(), pull: () => Response.json({ changed: [], conflicts: ["pages/a.md"] }), publish: () => Response.json({ committed: false, pushed: 0, problems: [] }) });
+    try {
+      const { host, dispose } = render(() => <PublishButton />);
+      await waitFor(() => button(host, "Publish"));
+      click(button(host, "Publish")!);
+      await waitFor(() => host.querySelector("dialog")?.open);
+      click(button(host.querySelector("dialog")!, "Pull")!);
+      await waitFor(() => notice.get() === "Pulled: everything that changed there was changed here too");
+      submit(host.querySelector("dialog form")!);
+      await waitFor(() => notice.get() === "Nothing to publish");
+      dispose();
+    } finally {
+      collided.restore();
+      publishState.set(null);
+    }
+  });
+});
+
+// n113
+describe("EditorsDialog", () => {
+  const dialogOf = (host: HTMLElement) => host.querySelector("dialog.dialog-history") as HTMLDialogElement;
+  const names = (host: HTMLElement) => [...host.querySelectorAll(".editor-row .history-label")].map((e) => e.textContent);
+  const fill = (form: HTMLFormElement, values: Record<string, string>) => {
+    for (const [name, value] of Object.entries(values)) (form.elements.namedItem(name) as HTMLInputElement).value = value;
+    submit(form);
+  };
+
+  test("opens from the header: adds an editor, sets a password, removes one, and says what the server refused", async () => {
+    const { host, dispose } = render(() => <Header />);
+    click(button(host, "Editors")!);
+    await waitFor(() => names(host).includes("admin"));
+    const dialog = dialogOf(host);
+    expect(dialog.open).toBe(true);
+    const admin = [...host.querySelectorAll(".editor-row")].find((r) => r.textContent!.includes("admin"))!;
+    expect(admin.textContent).toContain("you");
+    expect(admin.querySelector('[aria-label="Remove admin"]')).toBeNull();     // not yourself
+
+    const add = host.querySelector("form.editor-add") as HTMLFormElement;
+    fill(add, { name: "eve", password: "short" });
+    await waitFor(() => host.querySelector(".dialog-error"));
+    expect(host.querySelector(".dialog-error")!.textContent).toBe("A password is at least 8 characters");
+    fill(add, { name: "eve", password: "eve's password" });
+    await waitFor(() => names(host).includes("eve"));
+    expect(notice.get()).toBe("eve can sign in");
+    expect(host.querySelector(".dialog-error")).toBeNull();
+
+    // Another's password: no current one asked for; Cancel closes the line.
+    click(host.querySelector('[aria-label="Set eve\'s password"]')!);
+    let line = host.querySelector("form.editor-password") as HTMLFormElement;
+    expect(line.elements.namedItem("current")).toBeNull();
+    click(button(line, "Cancel")!);
+    expect(host.querySelector("form.editor-password")).toBeNull();
+    click(host.querySelector('[aria-label="Set eve\'s password"]')!);
+    fill(host.querySelector("form.editor-password") as HTMLFormElement, { password: "eve's new password" });
+    await waitFor(() => notice.get().startsWith("eve's password changed"));
+    expect(host.querySelector("form.editor-password")).toBeNull();
+
+    // Your own: the one you have now, first.
+    click(host.querySelector('[aria-label="Set admin\'s password"]')!);
+    line = host.querySelector("form.editor-password") as HTMLFormElement;
+    fill(line, { current: "not it", password: "a new password" });
+    await waitFor(() => host.querySelector(".dialog-error"));
+    expect(host.querySelector(".dialog-error")!.textContent).toBe("That isn't your current password");
+    const restore = intercept(() => Response.json({ ok: true }));          // a change that worked, without changing it
+    try {
+      fill(line, { current: "admin", password: "a new password" });
+      await waitFor(() => notice.get().startsWith("Your password changed"));
+    } finally {
+      restore();
+    }
+
+    // Removing asks first.
+    click(host.querySelector('[aria-label="Remove eve"]')!);
+    await waitFor(() => host.querySelector("dialog:not(.dialog-history)"));
+    click(button(host.querySelector("dialog:not(.dialog-history)")!, "Cancel")!);
+    expect(names(host)).toContain("eve");
+    click(host.querySelector('[aria-label="Remove eve"]')!);
+    await waitFor(() => host.querySelector("dialog:not(.dialog-history)"));
+    click(button(host.querySelector("dialog:not(.dialog-history)")!, "Remove")!);
+    await waitFor(() => !names(host).includes("eve"));
+    expect(notice.get()).toBe("eve can't sign in any more");
+
+    // A failure nobody explained speaks on the line, and changes nothing here.
+    const broken = intercept(() => new Response("disk full", { status: 507 }));
+    try {
+      fill(add, { name: "fay", password: "fay's password" });
+      await waitFor(() => notice.get() === "Couldn't add fay: 507 disk full");
+    } finally {
+      broken();
+    }
+
+    click(button(dialog, "Close")!);
+    expect(dialogOf(host)).toBeNull();
+    dispose();
+  });
+
+  test("the environment's admin can't be changed here, so it offers nothing to change", async () => {
+    await fetch("/edit/users", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: "gus", password: "gus's password" }) });
+    process.env.DUCKDOWN_ADMIN_PASSWORD = "x";
+    process.env.DUCKDOWN_ADMIN_USER = "gus";
+    try {
+      const { host, dispose } = render(() => <EditorsDialog oncancel={() => {}} />);
+      await waitFor(() => names(host).includes("gus"));
+      const gus = [...host.querySelectorAll(".editor-row")].find((r) => r.textContent!.includes("gus"))!;
+      expect(gus.textContent).toContain("set by the environment");
+      expect(gus.querySelector("button")).toBeNull();
+      dispose();
+    } finally {
+      delete process.env.DUCKDOWN_ADMIN_PASSWORD;
+      delete process.env.DUCKDOWN_ADMIN_USER;
+    }
   });
 });
 

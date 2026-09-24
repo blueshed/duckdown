@@ -23,6 +23,9 @@ Object.assign(process.env, {
 // .env may point these at the dev site or a bucket; tests set their own.
 delete process.env.DUCKDOWN_SEED;
 delete process.env.DUCKDOWN_BUCKET;
+// And whether the environment names an admin: the tests that care set it.
+delete process.env.DUCKDOWN_ADMIN_PASSWORD;
+delete process.env.DUCKDOWN_ADMIN_USER;
 
 // A DOM for the editor's code. happy-dom brings its own fetch, Response,
 // timers and so on; the server in this process needs Bun's, so put them back.

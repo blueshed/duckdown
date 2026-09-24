@@ -13,8 +13,9 @@
 // It reads through the storage layer, so it exports a folder on disk or a
 // live bucket, whichever this environment is pointed at.
 
-import { mkdirSync, readdirSync, rmSync, writeFileSync } from "fs";
+import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "fs";
 import { dirname, join } from "path";
+import { tmpdir } from "os";
 import { ORIGIN, STATIC_PATH, IS_S3, BUCKET, BUCKET_PREFIX, APP_PATH } from "./config";
 import { createPageStorage, createStaticStorage, type Storage } from "./storage";
 import { parsePage, pageHtml, itemPage } from "./page";
@@ -247,6 +248,23 @@ export async function exportSite(o: {
     throw new Error(`${broken.length} broken link(s) and ${problems.length} collection problem(s), and --strict is on.`);
   }
   return count;
+}
+
+// What would stop this site publishing cleanly, found the way the export finds
+// it — by doing the whole export, into a folder thrown away after: each broken
+// link, each collection problem, or why there was nothing to export at all.
+// Publishing (remote.ts) asks before every push.
+export async function checkSite(run: typeof exportSite = exportSite): Promise<string[]> {
+  const out = mkdtempSync(join(tmpdir(), "duckdown-check-"));
+  const said: string[] = [];
+  try {
+    await run({ out, say: (line) => said.push(line) });
+    return said.filter((line) => line.startsWith("broken link: ") || line.startsWith("collection: "));
+  } catch (e) {
+    return [(e as Error).message];
+  } finally {
+    rmSync(out, { recursive: true, force: true });
+  }
 }
 
 // bun run export [--strict] [out]. Says what went wrong and answers the exit

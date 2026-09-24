@@ -1,5 +1,41 @@
 # Changelog
 
+## 0.9.0 — 2026-09-24
+
+- **Editors, from the editor.** **Editors** in the header lists who can sign
+  in, adds someone (with the password they'll use), sets a password, or
+  removes someone — every editor can, nobody can remove themselves, and the
+  admin that `DUCKDOWN_ADMIN_PASSWORD` sets is changed only there. The same
+  from a terminal: `duckdown user list | add <name> | passwd <name> | remove
+  <name>`, which asks for the password rather than taking it as an argument.
+- **A new password, or removing someone, signs them out.** Their sessions end
+  at once (within a few seconds for a change made from the terminal while the
+  server runs). Changing your own keeps you signed in where you did it.
+- **Publish from the editor.** A site kept in git and published by the
+  platform building from it (the scaffold's Railway layout) can be edited on
+  your machine and published with a button: set `DUCKDOWN_REMOTE=git` in
+  `.env`, and the header gets **Publish** with a count of what's waiting. It
+  checks the site the way `bun run export` does, commits `site/` — never
+  `users.json`, `.history/` or `reports/`, and nothing else you had staged —
+  with an `Edited-by:` line, and pushes. Problems the checks find are shown;
+  `DUCKDOWN_STRICT=1` makes them stop the publish.
+- **Pull.** In the same dialog, or `duckdown pull`: what was published from
+  elsewhere comes in. A page changed on both sides keeps your version, and
+  theirs goes into its Earlier versions. `duckdown publish [message]` is the
+  terminal's Publish.
+- **A visitor report, from the view log.** `duckdown report` reads the lines
+  a site's server prints with `DUCKDOWN_LOG=1` — piped in (`railway logs |
+  duckdown report`) or from a saved log (`duckdown report site.log`) — and
+  writes `reports/<month>/<day>.md`, which the editor's Reports tab shows:
+  views by readers and by crawlers, the most read pages, the addresses that
+  weren't there, and the sites that sent readers. It counts exactly the lines
+  it's given, so overlapping logs never count twice, and it names no reader,
+  because the log never recorded one. It is the one thing duckdown writes in
+  `reports/`, and only when you run it.
+- **Upgrading:** nothing to do. `users.json` keeps exactly the shape it had,
+  so going back to 0.8 still signs everyone in, and anyone already signed in
+  stays signed in until their session expires as usual.
+
 ## 0.8.0 — 2026-09-24
 
 - **A shared link shows a card.** `{{description}}` now writes the Open

@@ -675,9 +675,12 @@ A page's `layout:` chooses the template (`layout: post` → `templates/post.html
 }
 ```
 
-- Make a hash with `bun -e 'console.log(await Bun.password.hash("their-password"))'` and paste it in. A plain password in the file won't sign anyone in.
+- In the editor, **Editors** (in the header) lists who can sign in and adds one, sets a password, or removes one. Every editor can do all of it; nobody can remove themselves, and the environment's admin (below) is changed only in the environment. A new password is at least 8 characters.
+- From a terminal: `duckdown user list`, `duckdown user add <name>`, `duckdown user passwd <name>`, `duckdown user remove <name>` (a vendored site: `bun server/cli.ts user …`). It asks for the password; it never takes one as an argument.
+- A new password, or removing someone, signs out every session they had — within a few seconds when done from the terminal while the server runs.
+- By hand, a hash is `bun -e 'console.log(await Bun.password.hash("their-password"))'`. A plain password in the file won't sign anyone in.
 - The login form's "email" field is just the name as written in the file.
-- A new project starts with `admin` / `admin`: replace it before the site goes anywhere.
+- A new project starts with `admin` / `admin`: replace it before the site goes anywhere. A deployment sets `DUCKDOWN_ADMIN_PASSWORD` (and `DUCKDOWN_ADMIN_USER`, else `admin`) instead, which writes that user at every start.
 - Signing in lasts seven days. Production needs `COOKIE_SECRET` set in the environment.
 - With no `users.json`, nobody can sign in (the server logs it); with a broken one, the login page says it can't be read.
 
@@ -690,7 +693,8 @@ A page's `layout:` chooses the template (`layout: post` → `templates/post.html
   - *images* — browse and upload, and copy a markdown link for one.
   - *css* — the stylesheets in `static/`, the ones a page names with `css:`. Themes aren't here: they belong to a folder, and the tree is where the folders are.
   - *templates* — the files in `templates/`, and a button for a new one.
-  - *reports* — the site's `reports/` folder: whatever a task of the site's own (a usage report, say) writes there for its editors, folders newest first. A markdown report opens rendered, in a tab of its own; nothing here is edited, served, exported or seeded, and only a signed-in editor can read it. duckdown writes nothing there itself.
+  - *reports* — the site's `reports/` folder: whatever a task of the site's own (a usage report, say) writes there for its editors, folders newest first. A markdown report opens rendered, in a tab of its own; nothing here is edited, served, exported or seeded, and only a signed-in editor can read it. duckdown writes there only when someone runs `duckdown report` (below).
+  - A visitor report for a site whose server logs views (`DUCKDOWN_LOG=1`): feed its log to `duckdown report` — piped (`railway logs | duckdown report`) or as a saved file (`duckdown report site.log`) — and it writes `reports/<month>/<day>.md`: views by readers and by crawlers, the most read pages, addresses that weren't there (worth an `aliases:` line), and the sites that sent readers. It counts exactly the lines it is given, and names no reader.
 - **Editing a resource** (a stylesheet or a template, from the sidebar): it opens in a pane *below* the page, with the same header — name, unsaved dot, delete, Save, and a close button. The page stays where it is, so you can click through pages and watch one stylesheet against each. It's transient: closing the pane leaves nothing behind.
 - **Editing a collection** (from the tree, or offered under a folder's index page): the same pane, holding the folder's works rather than a file's text — see [Editing one in the editor](#editing-one-in-the-editor). It shares the slot with a resource: the column holds the page and one thing beneath it, so opening a stylesheet closes the collection and the other way about.
 - **The middle column holds whatever is open**, and each pane closes, the page included. Two split it; one fills it. With no page open, a stylesheet or template has the column to itself — which is how you write one from scratch.
@@ -777,9 +781,32 @@ name is served. On a served site, set it only once the domain's certificate
 is issued: before that, everything would move to an address that can't
 answer.
 
-Where the output goes is the site's own business, not duckdown's: its
-README.md or CLAUDE.md says how it's deployed — read whichever it has. Don't
-invent a deployment step that isn't written down.
+**Publishing from the editor.** A published site kept in git (the scaffold's
+layout: the site in `site/`, Railway building from the repository) can be
+published from the editor on the machine where it is edited. Set
+`DUCKDOWN_REMOTE=git` in that machine's `.env`, and the header gets
+**Publish**, with a count of what is waiting:
+
+- **Publish** runs the export's checks, then commits `site/` — only `site/`,
+  never `users.json`, `.history/` or `reports/`, and nothing else you have
+  staged — with your message (or one naming what changed) and an
+  `Edited-by:` line, and pushes it. The platform rebuilds from the push. A
+  problem the checks find is shown with what was published; with
+  `DUCKDOWN_STRICT=1` it stops the publish instead.
+- **Pull** brings in what was published from somewhere else. Edits here that
+  aren't committed yet are committed first. A file changed on both sides
+  keeps this copy's version, and the published one goes into that file's
+  **Earlier versions**, where Restore brings it back. A change outside
+  `site/` that collides is left for git.
+- If Publish says the published site has moved on, Pull, then Publish again.
+- From a terminal: `duckdown publish [message]` and `duckdown pull` (a
+  vendored site: `bun server/cli.ts publish …`) do the same.
+- It uses this machine's git: its identity, its credentials, its signing.
+  The branch needs an upstream (`git push -u` once).
+
+Where the output goes is otherwise the site's own business, not duckdown's:
+its README.md or CLAUDE.md says how it's deployed — read whichever it has.
+Don't invent a deployment step that isn't written down.
 
 ## Troubleshooting
 

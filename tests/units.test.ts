@@ -173,10 +173,14 @@ describe("stop", () => {
 });
 
 describe("config", () => {
-  const local = { s3: false, bucket: "", prefix: "", endpoint: "", path: "/srv/site", debug: false, pidFile: "/run/d.pid", pid: 7 };
+  const local = { s3: false, bucket: "", prefix: "", endpoint: "", remote: "", path: "/srv/site", debug: false, pidFile: "/run/d.pid", pid: 7 };
 
   test("describes local storage, production, and the pid file", () => {
     expect(configLines(local)).toEqual(["duckie", "  storage: /srv/site", "  mode: production", "  pid: 7 (/run/d.pid)"]);
+  });
+
+  test("says where the site is published from here, when it is (n114)", () => {
+    expect(configLines({ ...local, remote: "git" })).toContain("  remote: git (Publish in the editor pushes the site)");
   });
 
   test("describes S3 storage and its endpoint, in development, without a pid file", () => {

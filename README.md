@@ -97,6 +97,9 @@ same code, so you can change your mind.
 - JWT authentication
 - A view log that counts readers without identifying them — no IP, no user
   agent, no cookie
+- `duckdown report`: that log (from Railway, say: `railway logs | duckdown
+  report`) made into a report in the editor's Reports tab — most read, not
+  found, where readers came from
 - Local filesystem or S3 storage
 - Zero build step — Bun serves everything
 
@@ -177,6 +180,17 @@ finds no pages fails rather than publish an empty site.
 To hand `dist/` out: `bun run node_modules/duckdown/server/serve.ts` (or the
 `duckdown-serve` bin), with `SITE_DIR` and `PORT`. It logs page views the way
 the served site does, and nothing else.
+
+### Publishing from the editor
+
+Edit the site on your own machine and publish it with a button: set
+`DUCKDOWN_REMOTE=git` in `.env` and the editor's header gets **Publish** (with
+a count of what's waiting) and **Pull**. Publish checks the site the way the
+export does, commits `site/` — never `users.json`, `.history/` or `reports/` —
+and pushes; Railway rebuilds from the push. Pull brings in what was published
+from elsewhere; a page changed on both sides keeps your version and puts
+theirs in its Earlier versions. `duckdown publish` and `duckdown pull` do the
+same from a terminal.
 
 Drafts are left out rather than hidden behind a login, `{{edit}}` is empty, and
 `{{url}}` takes its origin from `DUCKDOWN_ORIGIN` because there's no request to
