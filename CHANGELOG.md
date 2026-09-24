@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.7.0 — 2026-09-24
+
+- **Reports, for the people who edit the site.** A site's `reports/` folder —
+  beside `pages/`, never served, exported or seeded — is a fourth tab in
+  Resources: its folders newest first (a month each, say), and a markdown
+  report opens rendered, tables and all, in a tab of its own. Only a
+  signed-in editor reads it (`/edit/reports/*`: a folder is its listing, a
+  `.md` a page, `?raw` its markdown). duckdown writes nothing there; it is
+  for a site's own tasks — a usage report from its host's logs, an error
+  from one that failed.
+
 ## 0.6.2 — 2026-09-24
 
 - **The image browser opens on a folder with an .ico or an .xml in it.** Its

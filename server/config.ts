@@ -39,6 +39,9 @@ export const PAGE_PATH = "pages/";
 export const STATIC_PATH = "static/";
 export const IMAGES_PATH = "static/images/";
 export const TEMPLATES_PATH = "templates/";
+// What a site's own tasks write for its editors to read: never served, exported
+// or seeded, and read only through /edit/reports/.
+export const REPORTS_PATH = "reports/";
 export const USERS_PATH = "users.json";
 
 export const IS_S3 = BUCKET !== "";
