@@ -2,6 +2,7 @@ import type { BunRequest } from "bun";
 import { createStorage } from "./storage";
 import { USERS_PATH, DEBUG } from "./config";
 import { scaffoldNotice } from "./scaffold";
+import { readUsers, writeUsers, currentUsers, fingerprint, type Users } from "./users";
 
 const site = createStorage();
 
@@ -77,17 +78,6 @@ export async function verifyJwt(token: string): Promise<Record<string, unknown> 
 
 // --- Users ---
 
-// No users file means nobody can sign in: say so in the log, rather than
-// leave every attempt looking like a wrong password. A broken one throws,
-// and the login page says the file can't be read.
-async function loadUsers(): Promise<Record<string, string>> {
-  if (!(await site.exists(USERS_PATH))) {
-    console.error(`No ${USERS_PATH} in the site folder, so nobody can sign in.`);
-    return {};
-  }
-  return JSON.parse(await site.read(USERS_PATH));
-}
-
 // A deployment's first user, from the environment. A site seeded from the
 // example (or from `bun create`) would otherwise carry that seed's admin onto
 // the internet, at a known URL. Set DUCKDOWN_ADMIN_PASSWORD and the user is
@@ -99,14 +89,12 @@ export async function ensureAdmin(
   email = process.env.DUCKDOWN_ADMIN_USER || "admin",
 ): Promise<boolean> {
   if (!password) return false;
-  const users: Record<string, string> = (await site.exists(USERS_PATH))
-    ? JSON.parse(await site.read(USERS_PATH))
-    : {};
+  const users: Users = (await site.exists(USERS_PATH)) ? await readUsers(site) : {};
   // Already this password: leave the file alone, so a restart isn't a write
   // (on S3 that's a PUT) and the hash doesn't churn.
   if (users[email] && (await Bun.password.verify(password, users[email]))) return false;
   users[email] = await Bun.password.hash(password);
-  await site.write(USERS_PATH, JSON.stringify(users, null, 2) + "\n");
+  await writeUsers(users, site);
   console.log(`  admin: ${email} set in ${USERS_PATH} from DUCKDOWN_ADMIN_PASSWORD`);
   return true;
 }
@@ -122,11 +110,38 @@ function safeNext(next: string | null | undefined, fallback = "/"): string {
 
 // Takes any Request: the site's pages are served by the fetch fallback, which
 // gets a plain one (no .cookies), and they show an edit link when signed in.
+//
+// A session is only as good as its user: one who has been removed is signed
+// out, and so is a session from before their password last changed (its
+// fingerprint no longer matches). A session with no fingerprint was made by
+// 0.8 or earlier and stands until it expires. A users.json that can't be read
+// signs nobody in — said in the log — rather than taking the site down.
 export async function getUser(req: Request): Promise<string | null> {
   const token = new Bun.CookieMap(req.headers.get("cookie") ?? "").get(COOKIE_NAME);
   if (!token) return null;
   const payload = await verifyJwt(token);
-  return (payload?.sub as string) || null;
+  const name = payload?.sub;
+  if (typeof name !== "string" || !name) return null;
+  let users: Users;
+  try {
+    users = await currentUsers();
+  } catch (e) {
+    console.error(`Couldn't read ${USERS_PATH}, so nobody is signed in:`, e);
+    return null;
+  }
+  const hash = users[name];
+  if (!hash) return null;
+  if (payload!.h !== undefined && payload!.h !== fingerprint(hash)) return null;
+  return name;
+}
+
+// The cookie that signs `name` in, carrying their hash's fingerprint. Login
+// sets it, and so does changing your own password, which would otherwise sign
+// you out of the session you changed it in.
+export async function sessionCookie(name: string, hash: string): Promise<string> {
+  const now = Math.floor(Date.now() / 1000);
+  const token = await signJwt({ sub: name, iat: now, exp: now + TOKEN_MAX_AGE, h: fingerprint(hash) });
+  return `${COOKIE_NAME}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${TOKEN_MAX_AGE}`;
 }
 
 export async function requireAuth(req: BunRequest): Promise<Response | null> {
@@ -196,9 +211,11 @@ export async function handleLoginPost(req: BunRequest): Promise<Response> {
     return renderLogin(400, next, "Email and password required", email);
   }
 
-  let users: Record<string, string>;
+  // Read afresh, not from what getUser keeps: signing in is rare, and it is
+  // where a file edited by hand is found to be broken.
+  let users: Users;
   try {
-    users = await loadUsers();
+    users = await readUsers();
   } catch (e) {
     console.error(`Couldn't read ${USERS_PATH}:`, e);
     return renderLogin(500, next, `Sign-in is broken: ${USERS_PATH} can't be read. See the server log.`, email);
@@ -208,17 +225,8 @@ export async function handleLoginPost(req: BunRequest): Promise<Response> {
     return renderLogin(401, next, "Invalid email or password", email);
   }
 
-  const token = await signJwt({
-    sub: email,
-    iat: Math.floor(Date.now() / 1000),
-    exp: Math.floor(Date.now() / 1000) + TOKEN_MAX_AGE,
-  });
-
   const res = Response.redirect(next, 302);
-  res.headers.append(
-    "Set-Cookie",
-    `${COOKIE_NAME}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${TOKEN_MAX_AGE}`,
-  );
+  res.headers.append("Set-Cookie", await sessionCookie(email, hash));
   return res;
 }
 

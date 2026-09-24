@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+- **Editors, from the editor.** **Editors** in the header lists who can sign
+  in, adds someone (with the password they'll use), sets a password, or
+  removes someone — every editor can, nobody can remove themselves, and the
+  admin that `DUCKDOWN_ADMIN_PASSWORD` sets is changed only there. The same
+  from a terminal: `duckdown user list | add <name> | passwd <name> | remove
+  <name>`, which asks for the password rather than taking it as an argument.
+- **A new password, or removing someone, signs them out.** Their sessions end
+  at once (within a few seconds for a change made from the terminal while the
+  server runs). Changing your own keeps you signed in where you did it.
+- **Upgrading:** nothing to do. `users.json` keeps exactly the shape it had,
+  so going back to 0.8 still signs everyone in, and anyone already signed in
+  stays signed in until their session expires as usual.
+
 ## 0.8.0 — 2026-09-24
 
 - **A shared link shows a card.** `{{description}}` now writes the Open

@@ -1,9 +1,11 @@
-import { createElement, computed } from "@blueshed/railroad";
+import { createElement, computed, signal, when } from "@blueshed/railroad";
 import { Icon } from "./Icon";
+import { EditorsDialog } from "./Users";
 import { filePath, toggleImages } from "../store";
 import { urlPath } from "../api";
 
 export function Header() {
+  const editors = signal(false);
   const viewHref = computed(() => {
     const fp = filePath.get();
     return fp ? `/${urlPath(fp.replace(/\.md$/, ".html"))}` : "/";
@@ -16,6 +18,10 @@ export function Header() {
       <button onclick={toggleImages}>
         <Icon name="layout-template" /> Resources
       </button>
+      <button onclick={() => editors.set(true)}>
+        <Icon name="users" /> Editors
+      </button>
+      {when(editors, () => <EditorsDialog oncancel={() => editors.set(false)} />)}
       <a href={viewHref} target="_blank" class="header-link">
         <Icon name="external-link" /> View
       </a>

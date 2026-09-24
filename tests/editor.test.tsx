@@ -23,6 +23,7 @@ import { Editor } from "../server/edit/components/Editor";
 import { Preview } from "../server/edit/components/Preview";
 import { CssPreview } from "../server/edit/components/CssPreview";
 import { Header } from "../server/edit/components/Header";
+import { EditorsDialog } from "../server/edit/components/Users";
 import { ImageBrowser } from "../server/edit/components/ImageBrowser";
 import { ResourceList } from "../server/edit/components/ResourceList";
 import { ResourcePane } from "../server/edit/components/ResourcePane";
@@ -984,6 +985,102 @@ describe("Header", () => {
     expect(logout.getAttribute("method")).toBe("post");
     expect(logout.getAttribute("action")).toBe("/logout");
     dispose();
+  });
+});
+
+// n113
+describe("EditorsDialog", () => {
+  const dialogOf = (host: HTMLElement) => host.querySelector("dialog.dialog-history") as HTMLDialogElement;
+  const names = (host: HTMLElement) => [...host.querySelectorAll(".editor-row .history-label")].map((e) => e.textContent);
+  const fill = (form: HTMLFormElement, values: Record<string, string>) => {
+    for (const [name, value] of Object.entries(values)) (form.elements.namedItem(name) as HTMLInputElement).value = value;
+    submit(form);
+  };
+
+  test("opens from the header: adds an editor, sets a password, removes one, and says what the server refused", async () => {
+    const { host, dispose } = render(() => <Header />);
+    click(button(host, "Editors")!);
+    await waitFor(() => names(host).includes("admin"));
+    const dialog = dialogOf(host);
+    expect(dialog.open).toBe(true);
+    const admin = [...host.querySelectorAll(".editor-row")].find((r) => r.textContent!.includes("admin"))!;
+    expect(admin.textContent).toContain("you");
+    expect(admin.querySelector('[aria-label="Remove admin"]')).toBeNull();     // not yourself
+
+    const add = host.querySelector("form.editor-add") as HTMLFormElement;
+    fill(add, { name: "eve", password: "short" });
+    await waitFor(() => host.querySelector(".dialog-error"));
+    expect(host.querySelector(".dialog-error")!.textContent).toBe("A password is at least 8 characters");
+    fill(add, { name: "eve", password: "eve's password" });
+    await waitFor(() => names(host).includes("eve"));
+    expect(notice.get()).toBe("eve can sign in");
+    expect(host.querySelector(".dialog-error")).toBeNull();
+
+    // Another's password: no current one asked for; Cancel closes the line.
+    click(host.querySelector('[aria-label="Set eve\'s password"]')!);
+    let line = host.querySelector("form.editor-password") as HTMLFormElement;
+    expect(line.elements.namedItem("current")).toBeNull();
+    click(button(line, "Cancel")!);
+    expect(host.querySelector("form.editor-password")).toBeNull();
+    click(host.querySelector('[aria-label="Set eve\'s password"]')!);
+    fill(host.querySelector("form.editor-password") as HTMLFormElement, { password: "eve's new password" });
+    await waitFor(() => notice.get().startsWith("eve's password changed"));
+    expect(host.querySelector("form.editor-password")).toBeNull();
+
+    // Your own: the one you have now, first.
+    click(host.querySelector('[aria-label="Set admin\'s password"]')!);
+    line = host.querySelector("form.editor-password") as HTMLFormElement;
+    fill(line, { current: "not it", password: "a new password" });
+    await waitFor(() => host.querySelector(".dialog-error"));
+    expect(host.querySelector(".dialog-error")!.textContent).toBe("That isn't your current password");
+    const restore = intercept(() => Response.json({ ok: true }));          // a change that worked, without changing it
+    try {
+      fill(line, { current: "admin", password: "a new password" });
+      await waitFor(() => notice.get().startsWith("Your password changed"));
+    } finally {
+      restore();
+    }
+
+    // Removing asks first.
+    click(host.querySelector('[aria-label="Remove eve"]')!);
+    await waitFor(() => host.querySelector("dialog:not(.dialog-history)"));
+    click(button(host.querySelector("dialog:not(.dialog-history)")!, "Cancel")!);
+    expect(names(host)).toContain("eve");
+    click(host.querySelector('[aria-label="Remove eve"]')!);
+    await waitFor(() => host.querySelector("dialog:not(.dialog-history)"));
+    click(button(host.querySelector("dialog:not(.dialog-history)")!, "Remove")!);
+    await waitFor(() => !names(host).includes("eve"));
+    expect(notice.get()).toBe("eve can't sign in any more");
+
+    // A failure nobody explained speaks on the line, and changes nothing here.
+    const broken = intercept(() => new Response("disk full", { status: 507 }));
+    try {
+      fill(add, { name: "fay", password: "fay's password" });
+      await waitFor(() => notice.get() === "Couldn't add fay: 507 disk full");
+    } finally {
+      broken();
+    }
+
+    click(button(dialog, "Close")!);
+    expect(dialogOf(host)).toBeNull();
+    dispose();
+  });
+
+  test("the environment's admin can't be changed here, so it offers nothing to change", async () => {
+    await fetch("/edit/users", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: "gus", password: "gus's password" }) });
+    process.env.DUCKDOWN_ADMIN_PASSWORD = "x";
+    process.env.DUCKDOWN_ADMIN_USER = "gus";
+    try {
+      const { host, dispose } = render(() => <EditorsDialog oncancel={() => {}} />);
+      await waitFor(() => names(host).includes("gus"));
+      const gus = [...host.querySelectorAll(".editor-row")].find((r) => r.textContent!.includes("gus"))!;
+      expect(gus.textContent).toContain("set by the environment");
+      expect(gus.querySelector("button")).toBeNull();
+      dispose();
+    } finally {
+      delete process.env.DUCKDOWN_ADMIN_PASSWORD;
+      delete process.env.DUCKDOWN_ADMIN_USER;
+    }
   });
 });
 

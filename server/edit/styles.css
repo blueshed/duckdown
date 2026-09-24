@@ -596,6 +596,29 @@ button.danger-subtle:hover {
   white-space: nowrap;
 }
 
+/* Editors: a row per name; setting a password opens a line under it. */
+.editor-row {
+  flex-wrap: wrap;
+}
+
+.editor-password,
+.editor-add {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  margin-top: 8px;
+}
+
+.editor-add {
+  margin-top: 16px;
+}
+
+.editor-password input,
+.editor-add input {
+  flex: 1;
+  min-width: 0;
+}
+
 .dialog-actions {
   display: flex;
   justify-content: flex-end;

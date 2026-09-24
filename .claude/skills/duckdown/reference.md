@@ -675,9 +675,12 @@ A page's `layout:` chooses the template (`layout: post` → `templates/post.html
 }
 ```
 
-- Make a hash with `bun -e 'console.log(await Bun.password.hash("their-password"))'` and paste it in. A plain password in the file won't sign anyone in.
+- In the editor, **Editors** (in the header) lists who can sign in and adds one, sets a password, or removes one. Every editor can do all of it; nobody can remove themselves, and the environment's admin (below) is changed only in the environment. A new password is at least 8 characters.
+- From a terminal: `duckdown user list`, `duckdown user add <name>`, `duckdown user passwd <name>`, `duckdown user remove <name>` (a vendored site: `bun server/cli.ts user …`). It asks for the password; it never takes one as an argument.
+- A new password, or removing someone, signs out every session they had — within a few seconds when done from the terminal while the server runs.
+- By hand, a hash is `bun -e 'console.log(await Bun.password.hash("their-password"))'`. A plain password in the file won't sign anyone in.
 - The login form's "email" field is just the name as written in the file.
-- A new project starts with `admin` / `admin`: replace it before the site goes anywhere.
+- A new project starts with `admin` / `admin`: replace it before the site goes anywhere. A deployment sets `DUCKDOWN_ADMIN_PASSWORD` (and `DUCKDOWN_ADMIN_USER`, else `admin`) instead, which writes that user at every start.
 - Signing in lasts seven days. Production needs `COOKIE_SECRET` set in the environment.
 - With no `users.json`, nobody can sign in (the server logs it); with a broken one, the login page says it can't be read.
 

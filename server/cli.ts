@@ -1,15 +1,32 @@
 #!/usr/bin/env bun
 
 // `duckdown` — the server, or with `init`, the scaffold for a site that has
-// duckdown installed as a dependency (bun add, then bunx duckdown init).
+// duckdown installed as a dependency (bun add, then bunx duckdown init), or
+// with `user`, who can sign in.
 
 import { scaffold } from "./init";
+
+// Loaded when asked for, not at the top: the server's modules read the
+// environment as they load, and `init` runs where there is no site yet.
+const commands: Record<string, (args: string[]) => Promise<number>> = {
+  user: async (args) => (await import("./users")).userCommand(args),
+};
 
 export async function cli(
   argv: string[],
   cwd = process.cwd(),
   start: () => Promise<unknown> = () => import("./main"),
+  run = commands,
 ): Promise<number> {
+  const command = run[argv[0] ?? ""];
+  if (command) {
+    try {
+      return await command(argv.slice(1));
+    } catch (e) {
+      console.error(`duckdown ${argv[0]}: ${(e as Error).message}`);
+      return 1;
+    }
+  }
   if (argv[0] !== "init") {
     await start();   // the server keeps the process alive from here
     return 0;

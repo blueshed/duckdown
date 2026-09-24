@@ -79,6 +79,7 @@ This is the feature map. Bugs and tasks live in `todo.jsonl`.
 - [x] `users.json` credential store
 - [x] Protected editor routes (page loads redirect to `/login?next=...`; fetches get 401)
 - [x] Password hashing (`Bun.password`, argon2id), in place of the Python `cryptography` encryption
+- [x] Editors: add, re-password and remove who can sign in, from the editor or `duckdown user`; either ends that user's sessions
 
 ### Storage
 - [x] Local filesystem backend

@@ -41,7 +41,8 @@ duckdown/
 │   ├── main.ts            # Entry point — resources and routes
 │   ├── config.ts           # Env vars (DUCKDOWN_PATH, PORT, DEBUG, etc.)
 │   ├── storage.ts          # Storage abstraction (local filesystem / S3) + dev seed
-│   ├── auth.ts             # JWT auth, login/logout handlers
+│   ├── auth.ts             # JWT auth, login/logout handlers; getUser checks the user and their fingerprint
+│   ├── users.ts            # users.json: read/write, the fingerprint, `duckdown user`
 │   ├── markdown.ts         # Front-matter parser + Bun.markdown
 │   ├── nav.ts              # The site nav, cached until the editor changes a page
 │   ├── pid.ts              # Pid file: written at startup, removed on exit; stopServer()
@@ -72,6 +73,7 @@ duckdown/
 │   │   ├── mark.ts         # /edit/mark/  — the preview, through page.ts
 │   │   ├── browse.ts       # /edit/browse/* — image browser + upload
 │   │   ├── reports.ts      # /edit/reports/* — reports/, read-only: a listing, or a report rendered as a page
+│   │   ├── users.ts        # /edit/users — who can sign in: names, never hashes
 │   │   ├── collection.ts   # /edit/collection/* — a collection's pictures (upload + thumbnail), and its problems
 │   │   ├── static.ts       # /static/* — site static files
 │   │   ├── search.ts       # /search.json — the whole index, for the browser
@@ -103,6 +105,7 @@ duckdown/
 │           ├── NewDialog.tsx    # Name a new page, folder, collection, stylesheet, template
 │           ├── ConfirmDialog.tsx # Confirm action dialog
 │           ├── History.tsx   # Earlier versions of a file, and what was deleted: Restore
+│           ├── Users.tsx     # The Editors dialog: add, set a password, remove
 │           ├── Notice.tsx    # Shows that line (role=alert for a failure, status for news)
 │           └── Icon.tsx      # Lucide icons (lucide-static SVG strings)
 ├── tests/                  # see Testing below
@@ -114,6 +117,7 @@ duckdown/
 │   ├── search.test.ts      # plainText, the index, its cache, and the aliases from that walk
 │   ├── collection.test.ts  # collection.json: slugs, overviews, aliases, collisions
 │   ├── history.test.ts     # History: once a sitting, the limit, what was deleted
+│   ├── users.test.ts       # duckdown user, the password prompt, what a session is checked against
 │   ├── editor.test.tsx     # The editor's code in happy-dom, against that server
 │   ├── units.test.ts       # pid, config, storage, auth, error handler
 │   ├── s3.test.ts          # S3Storage via Bun's S3 client + fake-s3.ts
@@ -292,6 +296,8 @@ COOKIE_NAME=duckie_token     # Cookie name
 ```
 
 Users stored in `users.json` in the content directory, passwords hashed with `Bun.password`. A deployment sets `DUCKDOWN_ADMIN_PASSWORD` (and optionally `DUCKDOWN_ADMIN_USER`) instead of committing a hash: `ensureAdmin()` writes it at startup, so a seeded site never carries the example's `admin`/`admin` onto the internet.
+
+`server/users.ts` owns the file, and its shape never changes (`{name: hash}`), so an older duckdown can always read what a newer one wrote. Who is signed in is decided per request by `getUser()`: the cookie is signed, names a user who must still be in the file, and carries `fingerprint()` of their hash, so a new password or a removal ends their sessions without any session list; a cookie with no fingerprint (made by 0.8 or earlier) stands until it expires. The file is read through `currentUsers()`, kept `FRESH` (5s) and dropped by `writeUsers()`, so a change by `duckdown user` (`userCommand()`, via `cli.ts`) or by hand lands within seconds; login reads it afresh. `/edit/users` (`routes/users.ts`) answers names, never hashes, and adds, re-passwords and removes — every editor equal, nobody removing themselves, the environment's admin untouchable there, and your own password needing the current one (the answer re-signs your cookie). The editor's **Editors** dialog is `components/Users.tsx`.
 
 Signed out, a page load of a protected route is redirected to `/login?next=…`; a fetch (no `text/html` in `Accept`) gets a 401. The editor sends every request through `edit/api.ts`, which turns a 401 into a trip to the login page and back. `/edit` itself is an HTML import and can't be guarded server-side, so the editor's first request does it. Signing in lands on `/edit` unless `next` says otherwise (and `/login` when already signed in goes straight there). Logout is POST-only and refuses `Sec-Fetch-Site: cross-site`.
 

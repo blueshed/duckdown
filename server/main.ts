@@ -11,6 +11,7 @@ import { handleTemplateFiles, handleStaticFiles } from "./routes/site-files";
 import { handleMark } from "./routes/mark";
 import { handleBrowse } from "./routes/browse";
 import { handleReports } from "./routes/reports";
+import { handleUsers } from "./routes/users";
 import { handleCollectionFiles } from "./routes/collection";
 import { handleStatic } from "./routes/static";
 import { handleSearch } from "./routes/search";
@@ -47,6 +48,7 @@ export const server = Bun.serve({
     "/edit/mark/": handleMark,
     "/edit/browse/*": handleBrowse,
     "/edit/reports/*": handleReports,          // what the site's own tasks left for its editors
+    "/edit/users": handleUsers,                // who can sign in: names, never hashes
     "/edit/collection/*": handleCollectionFiles,   // a collection's pictures, and what's wrong with it
     "/search.json": handleSearch,
     "/sitemap.xml": handleSitemap,
