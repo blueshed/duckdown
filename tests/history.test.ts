@@ -44,6 +44,20 @@ describe("History", () => {
     expect(await Promise.all(all.map(async (v) => text(await h.read("b.md", v.id))))).toEqual(["v4", "v3", "v2"]);
   });
 
+  test("a file's versions follow it to a new name, among that name's own, and the newest stay", async () => {
+    const h = fresh(3);
+    await h.save("old.md", bytes("o1"), true, T);
+    await h.save("old.md", bytes("o2"), true, T + 20);
+    await h.save("new.md", bytes("n0"), true, T + 5);       // a file of that name, deleted once
+    await h.save("new.md", bytes("n1"), true, T + 10);
+    await h.move("old.md", "new.md");
+    expect(await h.versions("old.md")).toEqual([]);
+    const all = await h.versions("new.md");
+    expect(await Promise.all(all.map(async (v) => text(await h.read("new.md", v.id))))).toEqual(["o2", "n1", "n0"]);
+    await h.move("never.md", "new.md");                     // nothing to move is nothing
+    expect((await h.versions("new.md")).length).toBe(3);
+  });
+
   test("lists what was deleted, at any depth, with its newest version", async () => {
     const h = fresh();
     await h.save("here.md", bytes("x"), true, T);

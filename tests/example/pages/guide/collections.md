@@ -270,7 +270,8 @@ ones working — a request for one is a **301** to where the item lives now:
 { "title": "First Light", "aliases": ["/first-light-1961", "/old/first-light"] }
 ```
 
-A page can do the same in its front matter, one line each:
+A page can do the same in its front matter, one line each (renaming a page in
+the editor writes the line for you):
 
 ```markdown
 title: Moved

@@ -63,6 +63,16 @@ export class History {
     return true;
   }
 
+  // A file's versions follow it to its new name, among any that name already
+  // had (a file deleted from there once), and the newest `keep` stay.
+  async move(from: string, to: string): Promise<void> {
+    for (const { id } of await this.versions(from)) {
+      await this.store.write(`${to}/${id}`, await this.store.readBytes(`${from}/${id}`));
+      await this.store.remove(`${from}/${id}`);
+    }
+    for (const old of (await this.versions(to)).slice(this.keep)) await this.store.remove(`${to}/${old.id}`);
+  }
+
   // Every file under `prefix` that has versions but is no longer there, with
   // its newest version: what a Deleted list offers back.
   async deleted(exists: (key: string) => Promise<boolean>, prefix = ""): Promise<Deleted[]> {

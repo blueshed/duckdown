@@ -277,6 +277,79 @@ describe("editor API", () => {
         .some((d) => d.key === "gone/page.md")).toBe(false);
     });
 
+    // n109: a page renamed or moved keeps its old address, and its versions.
+    describe("moving a page", () => {
+      const move = (path: string, to: string, init = authed({ method: "POST" })) =>
+        fetch(`${at(path)}?move=${encodeURIComponent(to)}`, init);
+      const read = async (path: string) => (await fetch(at(path), authed())).text();
+
+      test("the page goes to its new name, its old address still leads there, and its versions go with it", async () => {
+        await put("moving/old name.md", "title: Old\n\n# Old\n");
+        await put("moving/old name.md", "title: Old\n\n# Old, again\n");      // a version to follow it
+        expect((await fetch(`${BASE}/moving/old%20name.html`)).status).toBe(200);  // the site knows it (and caches that)
+        const res = await move("moving/old name.md", "moved/new name.md");
+        expect(res.status).toBe(200);
+        expect(await res.json()).toEqual({ ok: true, to: "moved/new name.md", kept: "/moving/old name.html" });
+        expect(await read("moved/new name.md")).toBe("title: Old\naliases: /moving/old name.html\n\n# Old, again\n");
+        expect((await fetch(at("moving/old name.md"), authed())).status).toBe(404);
+        // The old address is a 301 now — the caches heard about it — and the page answers at the new one.
+        const old = await fetch(`${BASE}/moving/old%20name.html`, { redirect: "manual" });
+        expect(old.status).toBe(301);
+        expect(old.headers.get("location")).toBe("/moved/new%20name.html");
+        expect((await fetch(`${BASE}/moved/new%20name.html`)).status).toBe(200);
+        // Its versions came too: the first save, and the page as it was just before the move.
+        const kept = await versions("moved/new name.md");
+        expect(kept.length).toBe(2);
+        expect(await (await fetch(`${at("moved/new name.md")}?version=${kept[0]!.id}`, authed())).text()).toBe("title: Old\n\n# Old, again\n");
+        expect(await versions("moving/old name.md")).toEqual([]);
+        // And it isn't Deleted: it moved.
+        expect((await (await fetch(`${at("")}?deleted`, authed())).json() as { key: string }[])
+          .some((d) => d.key === "moving/old name.md")).toBe(false);
+
+        // Moved back, the alias that is its address again comes off, and the one it leaves goes on.
+        expect(await (await move("moved/new name.md", "moving/old name.md")).json())
+          .toEqual({ ok: true, to: "moving/old name.md", kept: "/moved/new name.html" });
+        expect(await read("moving/old name.md")).toBe("title: Old\naliases: /moved/new name.html\n\n# Old, again\n");
+        // And once more: an alias it already has isn't said twice.
+        await move("moving/old name.md", "moved/new name.md");
+        await move("moved/new name.md", "moving/old name.md");
+        expect(await read("moving/old name.md")).toBe("title: Old\naliases: /moved/new name.html\n\n# Old, again\n");
+        await fetch(at("moving/old name.md"), authed({ method: "DELETE" }));
+      });
+
+      test("a draft moves without keeping an address it never had", async () => {
+        await put("moving/draft.md", "title: D\ndraft: true\n\nx");
+        expect(await (await move("moving/draft.md", "moving/still-a-draft.md")).json())
+          .toEqual({ ok: true, to: "moving/still-a-draft.md", kept: null });
+        expect(await read("moving/still-a-draft.md")).toBe("title: D\ndraft: true\n\nx");
+        await fetch(at("moving/still-a-draft.md"), authed({ method: "DELETE" }));
+      });
+
+      test("never onto a file, never a folder's page or a collection's, and only a page", async () => {
+        await put("moving/a.md", "title: A");
+        await put("moving/b.md", "title: B");
+        const said = async (res: Response) => [res.status, await res.text()];
+        expect(await said(await move("moving/a.md", "moving/b.md"))).toEqual([412, "Already exists"]);
+        expect(await said(await move("moving/nope.md", "moving/c.md"))).toEqual([404, "Not Found"]);
+        expect(await said(await move("moving/a.md", "../templates/a.md"))).toEqual([400, "Not a file"]);
+        expect(await said(await move("moving/a.md", "moving/a.txt"))).toEqual([400, "Only a page moves: a name ending .md"]);
+        expect(await said(await move("moving/a.md", "moving/.md"))).toEqual([400, "Only a page moves: a name ending .md"]);
+        expect(await said(await move("moving/a.md", "moving/A.md")))
+          .toEqual([400, "A change of case alone isn't a move every filesystem can make: move it to another name, then back"]);
+        expect(await said(await move("guide/index.md", "guide/start.md")))
+          .toEqual([400, "guide/index.md is its folder's page: moving it is moving the folder"]);
+        expect(await said(await move("gallery/item.md", "gallery/work.md")))
+          .toEqual([400, "gallery/item.md is the page every item of its collection gets, and stays with the collection"]);
+        expect(await read("moving/a.md")).toBe("title: A");                      // nothing moved
+        expect((await move("moving/a.md", "moving/c.md", { method: "POST" })).status).toBe(401);
+        // Templates and stylesheets are named by pages: they don't move from here.
+        expect(await said(await fetch(`${BASE}/edit/templates/site.html?move=other.html`, authed({ method: "POST" }))))
+          .toEqual([405, "Files here can't be moved"]);
+        await fetch(at("moving/a.md"), authed({ method: "DELETE" }));
+        await fetch(at("moving/b.md"), authed({ method: "DELETE" }));
+      });
+    });
+
     test("asks for a file, a version that exists, and a sign-in", async () => {
       expect((await fetch(`${at("")}?versions`, authed())).status).toBe(400);
       expect((await fetch(`${at("a//b.md")}?deleted`, authed())).status).toBe(400);

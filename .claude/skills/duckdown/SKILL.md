@@ -45,7 +45,7 @@ users.json    who can sign in (password hashes)
    - `toc: true` for a contents list; every heading gets a `#` link
    - `{{pages}}` in a folder's `index.md` lists the pages beside it, newest first by `date:`
    - `draft: true` keeps a page off the site until it's ready (you can still read it signed in)
-   - `aliases: /old-address` keeps an address that has moved working, as a 301
+   - `aliases: /old-address` keeps an address that has moved working, as a 301 — the editor's Rename or move adds it; when you move a file yourself, add it yourself
 
 ## What catches people out
 

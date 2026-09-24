@@ -12,6 +12,10 @@ const PLACEHOLDER: Record<NewKind, string> = {
 
 interface NewDialogProps {
   kind: NewKind;
+  // Renaming asks the same question of a file that has a name already.
+  heading?: string;
+  initial?: string;
+  action?: string;
   // Resolves to a message when nothing was created (e.g. the name is taken).
   oncreate: (name: string) => Promise<string | void>;
   oncancel: () => void;
@@ -21,9 +25,9 @@ interface NewDialogProps {
 // pressed, so there is nothing to pick here — a dialog that first asked you to
 // choose page or folder was a step between you and the only thing you came to
 // type.
-export function NewDialog({ kind, oncreate, oncancel }: NewDialogProps) {
+export function NewDialog({ kind, heading, initial = "", action = "Create", oncreate, oncancel }: NewDialogProps) {
   let dialogRef: HTMLDialogElement | null = null;
-  const name = signal("");
+  const name = signal(initial);
   const error = signal("");
 
   queueMicrotask(() => dialogRef?.showModal());
@@ -42,16 +46,17 @@ export function NewDialog({ kind, oncreate, oncancel }: NewDialogProps) {
       onclose={oncancel}
     >
       <form onsubmit={(e: Event) => { e.preventDefault(); create(); }}>
-        <h3>New {kind}</h3>
+        <h3>{heading ?? `New ${kind}`}</h3>
         <input
           type="text"
+          value={initial}
           placeholder={PLACEHOLDER[kind]}
           autofocus
           oninput={(e: Event) => { name.set((e.target as HTMLInputElement).value); error.set(""); }}
         />
         <div class="dialog-actions">
           <button type="button" onclick={() => { dialogRef?.close(); oncancel(); }}>Cancel</button>
-          <button type="submit" class="primary">Create</button>
+          <button type="submit" class="primary">{action}</button>
         </div>
       </form>
       {when(error, () => <p class="dialog-error">{error}</p>)}

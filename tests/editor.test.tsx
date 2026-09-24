@@ -7,7 +7,7 @@ import { api, apiJson, urlPath } from "../server/edit/api";
 import { notice, news, speak, tell, hush } from "../server/edit/notice";
 import {
   filePath, fileContent, editorContent, showImages, browserRevision,
-  loadFile, createFile, saveFile, deleteFile, closeFile, reloadBrowser, toggleImages, closeImages,
+  loadFile, createFile, saveFile, deleteFile, closeFile, moveFile, reloadBrowser, toggleImages, closeImages,
   resource, resourceDraft, resourceSaved, resourceDirty, pageLayout, pageIncludes, openResource, closeResource,
   saveResource, deleteResource, createResource,
   collection, openCollection, closeCollection, createCollection,
@@ -783,6 +783,60 @@ describe("Editor", () => {
     click(button(host.querySelector("dialog")!, "Delete")!);
     await waitFor(() => filePath.get() === null);
     dispose();
+  });
+
+  // n109
+  test("renames or moves the page, unsaved changes and all, and tells the address it kept", async () => {
+    await createFile("/editor-move.md", "editor-move.md");
+    const { host, dispose } = render(() => <Editor />);
+    type(host.querySelector("textarea")!, "title: editor-move\n\n# Changed");
+    click(host.querySelector('[aria-label="Rename or move editor-move.md"]')!);
+    const dialog = host.querySelector("dialog")!;
+    await waitFor(() => dialog.open);
+    expect(dialog.querySelector("h3")!.textContent).toBe("Rename or move editor-move.md");
+    const input = dialog.querySelector("input")!;
+    expect(input.value).toBe("editor-move.md");
+    expect(button(dialog, "Move")).toBeDefined();
+
+    submit(dialog.querySelector("form")!);                   // where it is already
+    await waitFor(() => dialog.querySelector(".dialog-error"));
+    expect(dialog.querySelector(".dialog-error")!.textContent).toBe("It is already editor-move.md");
+
+    type(input, "moved/editor-moved");                       // .md is added
+    submit(dialog.querySelector("form")!);
+    await waitFor(() => filePath.get() === "moved/editor-moved.md");
+    expect(host.querySelector("dialog")).toBeNull();
+    expect(editorContent.get()).toBe("title: editor-move\naliases: /editor-move.html\n\n# Changed");
+    expect(button(host, "Save")!.className).toBe("");        // it was saved on the way
+    expect(news.get()).toBe(true);
+    expect(notice.get()).toBe("editor-move.md is now moved/editor-moved.md; /editor-move.html still answers, and leads there");
+    await deleteFile();
+    dispose();
+  });
+
+  test("a move that doesn't happen says why, in the dialog", async () => {
+    expect(await moveFile("anywhere")).toBeUndefined();        // nothing open, nothing to move
+    await createFile("/editor-stay.md", "editor-stay.md");
+    expect(await moveFile("index.md")).toBe("index.md already exists");
+    await loadFile("gallery/item.md");
+    expect(await moveFile("gallery/work.md"))
+      .toBe("gallery/item.md is the page every item of its collection gets, and stays with the collection");
+
+    await loadFile("editor-stay.md");
+    let restore = intercept(() => new Response("broken", { status: 500 }));
+    try {
+      expect(await moveFile("elsewhere")).toBe("Couldn't move editor-stay.md");
+      expect(notice.get()).toBe("Couldn't move editor-stay.md: 500 broken");
+      editorContent.set("title: changed");
+      expect(await moveFile("elsewhere")).toBe("Couldn't save editor-stay.md first");
+    } finally {
+      restore();
+    }
+    // A draft had no address, so there is none to tell of.
+    editorContent.set("title: S\ndraft: true\n");
+    expect(await moveFile("editor-stayed")).toBeUndefined();
+    expect(notice.get()).toBe("editor-stay.md is now editor-stayed.md");
+    await deleteFile();
   });
 
   test("opening another file clears the unsaved flag", async () => {

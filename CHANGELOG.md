@@ -2,6 +2,14 @@
 
 ## 0.7.0 — unreleased
 
+- **Rename or move a page in the editor.** A new button in the page's
+  header, beside Earlier versions, asks where it should live (`blog/new-name`).
+  The page moves, its old address goes into its `aliases` so links and
+  bookmarks still lead to it (a 301), and its earlier versions go with it. A
+  page moved back loses the alias that is its address again. Unsaved changes
+  are saved first. It won't move onto a page that exists, change only the case
+  of a name, or move a folder's `index.md` or an each: page. A draft keeps no
+  alias, because it never had a public address.
 - **The 0.4 collection shape is gone, as 0.5 said it would be.**
   - `"layout"` in `collection.json` no longer makes item pages. It is reported
     as a problem (in the log, the editor's message line, and `bun run export`,

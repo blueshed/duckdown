@@ -1,6 +1,6 @@
 import { signal, batch, computed } from "@blueshed/railroad";
 import { api, urlPath } from "./api";
-import { speak } from "./notice";
+import { speak, tell } from "./notice";
 
 // App state as signals
 export const filePath = signal<string | null>(null);
@@ -261,6 +261,28 @@ export async function saveFile(): Promise<boolean> {
   fileContent.set(editorContent.peek());
   reloadBrowser();
   return true;
+}
+
+// A new name, or a new folder, for the open page: `to` is its whole key
+// ("blog/renamed.md"), .md added when it's left off. Unsaved changes are saved
+// first — the move is of the page as you see it. The server keeps the old
+// address among its aliases, and says which, which is news worth telling.
+// Returns a message for the dialog when it didn't move.
+export async function moveFile(to: string): Promise<string | void> {
+  const fp = filePath.peek();
+  if (!fp) return;
+  const trimmed = to.trim().replace(/^\/+/, "");
+  const dest = trimmed.endsWith(".md") ? trimmed : `${trimmed}.md`;
+  if (dest === fp) return `It is already ${fp}`;
+  if (editorContent.peek() !== fileContent.peek() && !(await saveFile())) return `Couldn't save ${fp} first`;
+  const res = await api(`move ${fp}`, `${at(fp)}?move=${encodeURIComponent(dest)}`, { method: "POST" }, [400, 412]);
+  if (res.status === 412) return `${dest} already exists`;
+  if (res.status === 400) return res.text();
+  if (!res.ok) return `Couldn't move ${fp}`;
+  const { kept } = await res.json() as { kept: string | null };
+  reloadBrowser();
+  await loadFile(dest);
+  tell(kept ? `${fp} is now ${dest}; ${kept} still answers, and leads there` : `${fp} is now ${dest}`);
 }
 
 export async function deleteFile(): Promise<boolean> {

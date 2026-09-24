@@ -469,6 +469,12 @@ aliases: /old-place
 aliases: /older-place.html
 ```
 
+Renaming or moving a page in the editor (**Rename or move**, in its header)
+adds its old address to its `aliases` for you, and takes off an alias that is
+its new address (a page moved back). A draft keeps none: it never had an
+address. A folder's `index.md` and an each: page don't move on their own.
+Moving a file by hand, outside the editor, add the line yourself.
+
 They are matched on the **decoded** address, so an old slug holding a quote or
 a curly apostrophe still answers. `bun run export` writes each alias as a small
 redirect page (canonical link plus meta refresh) under the decoded name, so a
@@ -683,6 +689,7 @@ A page's `layout:` chooses the template (`layout: post` → `templates/post.html
 - **With no page open**, whatever you're composing with gets a sample page of its own: for a stylesheet, a bit of everything `site.css` styles; for a template, a sample page put through it, with the site's real navigation. So a template or a stylesheet can be written with nothing else on screen.
 - **Header**: *Resources* (the sidebar), *View* (the page on the site), *Logout*.
 - **Deleting always asks first**, wherever it is — a page, a stylesheet, a template, a work in a collection — and nothing deleted is gone. **Earlier versions** (the clock in every pane's header) lists what a file was before each sitting of saves, newest first, the last 30; **Restore** puts one back, and keeps what it replaces. **Deleted** (at the top of the page tree, and of each resource list) brings back a deleted file. They live in the site's `.history/` folder, beside `pages/` and outside everything the site serves or exports — a site kept in git ignores it (`site/.history/`). The collection pane also has **Undo** and **Redo** for its own changes while it is open.
+- **Rename or move** (the folder-arrow in the page's header) gives a page a new name or folder: type its new place (`blog/new-name`; `.md` is added). Unsaved changes are saved first, the old address goes into its `aliases`, and its Earlier versions go with it. It won't move onto a page that exists, a folder's `index.md` or an each: page, or change only a name's case.
 - When writing files directly (not through the editor), no version is kept: that is git's job.
 - Anything that fails shows in a red notice at the foot of the screen until dismissed; news that isn't a failure (a renamed work keeping its old address) shows there in the accent colour.
 

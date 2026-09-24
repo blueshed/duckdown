@@ -121,6 +121,7 @@ This is the feature map. Bugs and tasks live in `todo.jsonl`.
 - [x] Save button with saved flash (green)
 - [x] Dirty indicator (unsaved changes)
 - [x] Delete button with inline confirmation
+- [x] Rename or move a page; its old address becomes an alias, its versions go with it
 - [x] Earlier versions (restore any) and Deleted (bring one back)
 - [x] Undo / redo in the collection pane (⌘Z, ⇧⌘Z)
 - [x] Keyboard shortcut for save (⌘⏎)

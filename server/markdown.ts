@@ -50,6 +50,41 @@ export function parseFrontMatter(source: string): { meta: Record<string, string[
   return { meta, body };
 }
 
+// Where a page's front matter lines are, as [first, end): inside the fences of
+// a fenced block, the key lines of a bare one; null when it has none (a fence
+// nobody closed is none).
+function metaLines(source: string): [number, number] | null {
+  const lines = source.split("\n");
+  const { meta, body } = parseFrontMatter(source);
+  if (lines[0]?.trim() === "---") {
+    return body === source ? null : [1, lines.findIndex((line, i) => i > 0 && line.trim() === "---")];
+  }
+  const count = Object.values(meta).reduce((n, values) => n + values.length, 0);
+  return count ? [0, count] : null;
+}
+
+// The page with `key: value` said in its front matter, after what is there
+// already; a page with none gets a block of its own, and a blank line to end it.
+export function addMeta(source: string, key: string, value: string): string {
+  const range = metaLines(source);
+  if (!range) return `${key}: ${value}\n\n${source}`;
+  const lines = source.split("\n");
+  lines.splice(range[1], 0, `${key}: ${value}`);
+  return lines.join("\n");
+}
+
+// The page without the front matter lines saying `key:` whose value `drop`
+// picks; nothing outside the front matter is touched.
+export function dropMeta(source: string, key: string, drop: (value: string) => boolean): string {
+  const range = metaLines(source);
+  if (!range) return source;
+  return source.split("\n").filter((line, i) => {
+    if (i < range[0] || i >= range[1]) return true;
+    const match = line.match(/^(\w[\w-]*)\s*:\s*(.*)$/);
+    return !(match && match[1]!.toLowerCase() === key && drop(match[2]!.trim()));
+  }).join("\n");
+}
+
 // Render a page. `path` is where it lives ("guide/pages", or "guide/pages.md"),
 // which its [[wiki links]] are relative to.
 export function renderMarkdown(source: string, path = ""): MarkdownResult {

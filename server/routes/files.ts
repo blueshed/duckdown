@@ -16,9 +16,17 @@ import { after } from "../utils";
 // replaces, a delete keeps what it removes, and the same address answers
 // ?versions, ?version=<id> and ?deleted, and restores with POST ?restore=<id>.
 // The history is per section, so a page's versions are only ever a page's.
+//
+// A section that can say what moving one of its files means passes a Mover,
+// and POST ?move=<to> renames: the file, and its versions with it. It answers
+// the new body (a page adds the address it leaves to its aliases) or a
+// Response refusing, and `kept` is the old address that still answers.
+export type Mover = (from: string, to: string, source: string) => Response | { body: string; kept: string | null };
+
 export function fileRoutes(
   prefix: string, store: Storage, changed: () => void = () => {},
   history = new History(storageAt(`${HISTORY_PATH}${prefix.split("/").filter(Boolean).at(-1)}/`)),
+  mover?: Mover,
 ) {
   const path = (req: BunRequest) => after(req, prefix);
   const query = (req: BunRequest) => new URL(req.url).searchParams;
@@ -27,6 +35,30 @@ export function fileRoutes(
   // What was there, kept before it goes. `force` for a delete or a restore.
   const keep = async (key: string, force: boolean) => {
     if (await store.exists(key)) await history.save(key, await store.readBytes(key), force);
+  };
+
+  // Never onto a file that is there: a move is a new name, not a replace.
+  // What it was before the move is kept as a version at the new name.
+  const move = async (from: string, to: string) => {
+    if (!mover) return new Response("Files here can't be moved", { status: 405 });
+    if (!plainKey(from) || !plainKey(to)) return NOT_A_FILE();
+    // On a filesystem that ignores case (a Mac's, by default) About.md and
+    // about.md are one file: writing the new name and removing the old would
+    // remove the file. Refused everywhere, so it acts the same on every machine.
+    if (from !== to && from.toLowerCase() === to.toLowerCase()) {
+      return new Response("A change of case alone isn't a move every filesystem can make: move it to another name, then back", { status: 400 });
+    }
+    if (!(await store.exists(from))) return new Response("Not Found", { status: 404 });
+    if (await store.exists(to)) return new Response("Already exists", { status: 412 });
+    const was = await store.readBytes(from);
+    const moved = mover(from, to, new TextDecoder().decode(was));
+    if (moved instanceof Response) return moved;
+    await history.move(from, to);
+    await history.save(to, was, true);
+    await store.write(to, moved.body);
+    await store.remove(from);
+    changed();
+    return Response.json({ ok: true, to, kept: moved.kept });
   };
 
   return {
@@ -88,11 +120,13 @@ export function fileRoutes(
     },
 
     // A version put back. What it replaces is kept first, so a restore is
-    // itself something Earlier versions can undo.
+    // itself something Earlier versions can undo. Or, with ?move=, a rename.
     async POST(req: BunRequest) {
       const denied = await requireAuth(req);
       if (denied) return denied;
       const key = path(req);
+      const to = query(req).get("move");
+      if (to !== null) return move(key, to);
       const id = query(req).get("restore");
       if (!id || !plainKey(key)) return NOT_A_FILE();
       const body = await history.read(key, id);

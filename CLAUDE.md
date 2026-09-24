@@ -426,7 +426,15 @@ collection pane writes on every change — leaves one version, the file as it
 was before; a delete or a restore always keeps one; `KEEP` (30) per file. The
 same routes answer `?versions`, `?version=<id>`, `?deleted` and
 `POST ?restore=<id>`, and the editor shows them as Earlier versions (the clock
-in `PaneHeader`) and Deleted (atop the tree and each resource list). A new
+in `PaneHeader`) and Deleted (atop the tree and each resource list).
+`POST ?move=<to>` renames, for a section that passes `fileRoutes()` a `Mover`
+(only pages do: templates and stylesheets are named by pages): never onto a
+file that exists or to a change of case alone, the versions follow
+(`History.move()`), and the page as it was is kept at the new name. The pages'
+`movePage()` adds the old address to the page's `aliases` (`addMeta()`/
+`dropMeta()` in markdown.ts edit front matter lines in place), except for a
+draft, and refuses a folder's `index.md` and an each: page; the editor's
+Rename or move (`moveFile()`) saves first and tells the address it kept. A new
 write path that bypasses `fileRoutes()` bypasses the history too — the
 collection route's picture uploads do, deliberately. The collection pane also
 keeps its own undo stack: every change is a whole new file, so undo writes the
