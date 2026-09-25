@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.12.2 — 2026-09-25
+
+A tidy, with four small corrections it turned up:
+
+- **A folder's title is escaped in the nav**, as it is everywhere else: a
+  title with `<` or `&` in it is shown, not read as markup.
+- **A `-` name is listed nowhere.** A page or folder whose name starts with
+  `-` was already left out of the nav, `{{pages}}` and `{{sitemap}}`; it is
+  now left out of search and `sitemap.xml` too. It is still served, and
+  exported, for anyone with its address.
+- **An `index.md` that says `each: true` isn't in the nav**: its address is
+  its collection's, and a miss as a page.
+- **An export from a bucket skips `.` names**, as one from disk always has.
+
+Underneath: what counts as a page is decided in one place (`listed.ts`) and
+every walk of the site asks it; the site's caches go through one helper
+(`kept.ts`) and one `siteChanged()` drops them all; a storage listing's `path`
+is the key, ready to use. `feature.md` is gone — `todo.jsonl` and this file
+say what it did.
+
 ## 0.12.1 — 2026-09-25
 
 - **The preview on a phone.** Below 768px the preview had no room and was
