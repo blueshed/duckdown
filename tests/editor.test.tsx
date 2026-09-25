@@ -30,6 +30,7 @@ import { Drawers, LeftDrawer } from "../server/edit/components/Drawers";
 import { PublishButton, publishState, refreshPublish } from "../server/edit/components/Publish";
 import { ImageBrowser } from "../server/edit/components/ImageBrowser";
 import { SiteIcon, squarePng } from "../server/edit/components/SiteIcon";
+import { PreviewFrame, withoutScripts } from "../server/edit/components/PreviewFrame";
 import { ResourceList } from "../server/edit/components/ResourceList";
 import { ResourcePane } from "../server/edit/components/ResourcePane";
 import { CollectionPane, itemAddresses, firstWork, same } from "../server/edit/components/CollectionPane";
@@ -626,6 +627,24 @@ describe("ResourcePane", () => {
 });
 
 describe("Browser", () => {
+  test("a folder named like a file (v1.2) lists, and its index offers its collection", async () => {
+    mkdirSync(join(SITE, "pages", "v1.2"), { recursive: true });
+    writeFileSync(join(SITE, "pages", "v1.2", "index.md"), "title: One point two\n");
+    writeFileSync(join(SITE, "pages", "v1.2", "collection.json"), JSON.stringify({ groups: [] }));
+    try {
+      const { host, dispose } = render(() => <Browser />);
+      await waitFor(() => rows(host).includes("v1.2"));
+      click(rowControl(host, "v1.2"));
+      await waitFor(() => rows(host).includes("index.md") && folder.get() === "v1.2");
+      await loadFile("v1.2/index.md");
+      expect(collection.get()).toEqual({ folder: "v1.2" });
+      dispose();
+    } finally {
+      closeCollection();
+      rmSync(join(SITE, "pages", "v1.2"), { recursive: true, force: true });
+    }
+  });
+
   test("lists the site, walks folders, and opens files", async () => {
     const { host, dispose } = render(() => <Browser />);
     await waitFor(() => rows(host).includes("index.md"));
@@ -2818,6 +2837,20 @@ describe("the app", () => {
     window.dispatchEvent(rejected("plain"));
     expect(notice.get()).toBe("Something broke: plain");
     history.replaceState(null, "", "/edit");
+  });
+});
+
+describe("PreviewFrame", () => {
+  test("takes a page's scripts out before the sandbox would block them", async () => {
+    expect(withoutScripts('<p>a</p><script src="/static/search.js"></script><SCRIPT>x()</SCRIPT >b<script\ntype="module">\n</script>'))
+      .toBe("<p>a</p>b");
+    const html = signal('<h1>Hi</h1><script>alert(1)</script>');
+    const { host, dispose } = render(() => <PreviewFrame srcdoc={html} title="t" />);
+    const frame = host.querySelector("iframe")!;
+    expect(frame.getAttribute("srcdoc")).toBe("<h1>Hi</h1>");
+    html.set("<h1>Bye</h1><script></script>");
+    expect(frame.getAttribute("srcdoc")).toBe("<h1>Bye</h1>");
+    dispose();
   });
 });
 
