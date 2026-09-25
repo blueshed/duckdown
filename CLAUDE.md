@@ -149,6 +149,7 @@ duckdown/
 │   ├── serve.test.ts       # serveDist(): traversal, redirects, 404.html, what is logged
 │   ├── setup-script.test.ts # both scaffold modes on scratch folders, and `bun run export` in each
 │   └── compose.yml         # MinIO for manual S3 runs (bun run dev:s3)
+├── bench/                  # bun run bench: a large site made and timed (n163); measures, doesn't check
 ├── bunfig.toml             # Test preload + the 100% coverage threshold
 ├── create/                 # `bun create blueshed/duckdown`: calls the scaffold, keeps code and tests
 ├── package.json
@@ -287,6 +288,7 @@ bun run setup      # What bun create runs after cloning
 bun run test       # Run tests; fails below 100% line/function coverage
 bun run check      # TypeScript check
 bun run export     # Write the whole site to ./dist as plain files
+bun run bench      # A large site made in a scratch folder and timed (bench/)
 ```
 
 The server writes its pid to `duckdown.pid` (`DUCKDOWN_PID` moves it; set it empty to turn it off) and removes it on exit. `bun run stop` (`server/stop.ts` → `stopServer()` in `pid.ts`) SIGTERMs it and waits for it to go; it signals only a process whose command line names `main.ts` (a stale file's number may since belong to something else), clears a stale pid file, and says what it did. That includes a server the desktop app's preview pane started. A second server started while the first is alive stops with a message rather than failing on the port. Tests give each server they spawn its own pid file.

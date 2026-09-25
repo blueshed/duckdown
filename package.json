@@ -43,6 +43,7 @@
     "start": "bun run server/main.ts",
     "stop": "bun run server/stop.ts",
     "check": "bunx tsc --noEmit",
+    "bench": "bun bench/run.ts",
     "test": "bun test --coverage",
     "setup": "bun run create/setup.ts",
     "export": "bun run server/export.ts",
