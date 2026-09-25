@@ -49,7 +49,7 @@ export function PublishButton() {
     <span class="publish">
       {when(() => publishState.get() !== null, () => (
         <button onclick={() => open.set(true)}>
-          <Icon name="cloud-upload" /> Publish
+          <Icon name="cloud-upload" /> <span class="label">Publish</span>
           {when(waiting, () => <span class="badge">{waiting}</span>)}
         </button>
       ))}

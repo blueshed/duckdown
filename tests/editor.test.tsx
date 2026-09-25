@@ -1160,6 +1160,11 @@ describe("EditorsDialog", () => {
     for (const [name, value] of Object.entries(values)) (form.elements.namedItem(name) as HTMLInputElement).value = value;
     submit(form);
   };
+  // Stage an answer for /edit/users alone. The Header's Publish button asks
+  // for its status 400ms after it appears, and an answer staged for every
+  // request handed it {ok: true} as a status whenever the two met.
+  const users = (respond: () => Response) =>
+    intercept((url, init) => (url.startsWith("/edit/users") ? respond() : signedIn(url, init)));
 
   test("opens from the header: adds an editor, sets a password, removes one, and says what the server refused", async () => {
     const { host, dispose } = render(() => <Header />);
@@ -1197,7 +1202,7 @@ describe("EditorsDialog", () => {
     fill(line, { current: "not it", password: "a new password" });
     await waitFor(() => host.querySelector(".dialog-error"));
     expect(host.querySelector(".dialog-error")!.textContent).toBe("That isn't your current password");
-    const restore = intercept(() => Response.json({ ok: true }));          // a change that worked, without changing it
+    const restore = users(() => Response.json({ ok: true }));              // a change that worked, without changing it
     try {
       fill(line, { current: "admin", password: "a new password" });
       await waitFor(() => notice.get().startsWith("Your password changed"));
@@ -1217,7 +1222,7 @@ describe("EditorsDialog", () => {
     expect(notice.get()).toBe("eve can't sign in any more");
 
     // A failure nobody explained speaks on the line, and changes nothing here.
-    const broken = intercept(() => new Response("disk full", { status: 507 }));
+    const broken = users(() => new Response("disk full", { status: 507 }));
     try {
       fill(add, { name: "fay", password: "fay's password" });
       await waitFor(() => notice.get() === "Couldn't add fay: 507 disk full");

@@ -18,19 +18,19 @@ export function Header() {
       <span style="flex: 1;" />
       <PublishButton />
       <button onclick={toggleImages}>
-        <Icon name="layout-template" /> Resources
+        <Icon name="layout-template" /> <span class="label">Resources</span>
       </button>
       <button onclick={() => editors.set(true)}>
-        <Icon name="users" /> Editors
+        <Icon name="users" /> <span class="label">Editors</span>
       </button>
       {when(editors, () => <EditorsDialog oncancel={() => editors.set(false)} />)}
       <a href={viewHref} target="_blank" class="header-link">
-        <Icon name="external-link" /> View
+        <Icon name="external-link" /> <span class="label">View</span>
       </a>
       {/* A POST, so no link or <img> elsewhere on the site can sign you out */}
       <form method="post" action="/logout" class="header-form">
         <button type="submit" class="header-link">
-          <Icon name="log-out" /> Logout
+          <Icon name="log-out" /> <span class="label">Logout</span>
         </button>
       </form>
     </div>

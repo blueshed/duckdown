@@ -82,7 +82,7 @@ export function EditorsDialog(props: { oncancel: () => void }) {
                 <Icon name="key" size={12} /> Password
               </button>}
               {when(() => !me() && !env, () => (
-                <button class="danger-subtle" aria-label={`Remove ${name}`} onclick={() => removing.set(name)}>
+                <button class="icon-btn danger-subtle" aria-label={`Remove ${name}`} title={`Remove ${name}`} onclick={() => removing.set(name)}>
                   <Icon name="trash-2" size={12} />
                 </button>
               ))}

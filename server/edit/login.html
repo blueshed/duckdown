@@ -6,15 +6,16 @@
   <title>duckie — login</title>
   <link rel="stylesheet" href="/edit/styles.css">
   <style>
-    .login { margin: 6em auto; width: 320px; }
-    .login form { padding: 1.5em; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
-    .title { margin: 0 0 1.5em; text-align: center; font-size: 1.2em; font-weight: 600; }
-    .form-input { width: 100%; margin-bottom: 0.75em; }
-    .form-input label { display: block; margin-bottom: 0.25em; font-size: 0.85em; }
-    .form-input input { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 4px; box-sizing: border-box; background: var(--bg); color: var(--text); }
-    .error { color: #c00; margin-bottom: 1em; font-size: 0.9em; }
-    .action { text-align: center; }
-    .action button { padding: 8px 24px; border: none; border-radius: 4px; background: var(--accent); color: #fff; cursor: pointer; }
+    .login { margin: 6em auto; width: min(360px, calc(100vw - 32px)); }
+    .login form { padding: var(--space-5); border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); }
+    .title { margin: 0 0 var(--space-5); text-align: center; font-size: 1.2em; font-weight: 600; }
+    .form-input { width: 100%; margin-bottom: var(--space-4); }
+    .form-input label { display: block; margin-bottom: 6px; font-size: 13px; }
+    .form-input input { width: 100%; height: var(--field-h); padding: 0 var(--space-3); border: 1px solid var(--border); border-radius: var(--radius); box-sizing: border-box; background: var(--bg); color: var(--text); }
+    @media (pointer: coarse) { .form-input input { font-size: 16px; } }
+    .error { color: #c00; margin-bottom: var(--space-4); font-size: 0.9em; }
+    .action { margin-top: var(--space-5); }
+    .action button { width: 100%; min-height: 36px; justify-content: center; border: none; border-radius: var(--radius); background: var(--accent); color: #fff; font-weight: 500; cursor: pointer; }
     .action button:hover { background: var(--accent-hover); }
   </style>
 </head>

@@ -79,7 +79,7 @@ export function PaneHeader(props: {
         <Icon name="trash-2" />
       </button>
       <button class={saveClass} onclick={save}>
-        <Icon name="save" /> {() => flash.get() || "Save"} <kbd>⌘⏎</kbd>
+        <Icon name="save" /> <span class="label">{() => flash.get() || "Save"}</span> <kbd>⌘⏎</kbd>
       </button>
       {props.onclose
         ? <button class="icon-btn" aria-label="Close" title="Close" onclick={props.onclose}><Icon name="x" /></button>
