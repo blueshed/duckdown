@@ -22,8 +22,8 @@ export async function setup(root: string) {
   console.log(`Setting up ${name}...`);
 
   // What is about developing duckdown as a project, not the code or its tests:
-  // its feature checklist, its ledger, and this script.
-  for (const path of ["feature.md", "todo.jsonl", "create"]) {
+  // its ledger, and this script.
+  for (const path of ["todo.jsonl", "create"]) {
     rmSync(join(root, path), { recursive: true, force: true });
   }
 

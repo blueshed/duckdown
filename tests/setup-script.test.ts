@@ -45,7 +45,7 @@ function clone(root: string) {
   writeFileSync(join(root, ".gitignore"), "node_modules\n.dev-site/\n");
   writeFileSync(join(root, "CLAUDE.md"), "duckdown's own notes");
   writeFileSync(join(root, ".claude", "launch.json"), "{}");
-  for (const file of ["feature.md", "todo.jsonl", "bunfig.toml", "create/setup.ts", "tests/server.test.ts", "tests/example/seed"]) writeFileSync(join(root, file), file === "bunfig.toml" ? "# the suite's config\n" : "x");
+  for (const file of ["todo.jsonl", "bunfig.toml", "create/setup.ts", "tests/server.test.ts", "tests/example/seed"]) writeFileSync(join(root, file), file === "bunfig.toml" ? "# the suite's config\n" : "x");
 }
 
 describe("create: bun create blueshed/duckdown, and the code is yours", () => {
@@ -68,7 +68,7 @@ describe("create: bun create blueshed/duckdown, and the code is yours", () => {
       expect(existsSync(join(root, kept))).toBe(true);
     }
     // What was about duckdown as a project, and the script that ran once
-    for (const gone of ["feature.md", "create"]) expect(existsSync(join(root, gone))).toBe(false);
+    expect(existsSync(join(root, "create"))).toBe(false);
     expect(read(root, "todo.jsonl")).toBe("");                        // a fresh ledger, not duckdown's
     expect(read(root, "CLAUDE.md")).toBe("duckdown's own notes");     // theirs to keep: it describes the code they now have
 

@@ -105,7 +105,7 @@ duckdown/
 │           ├── CssPreview.tsx # CSS preview in iframe
 │           ├── Header.tsx    # Top bar: the trail, then the drawers' buttons, view site, logout
 │           ├── Drawer.tsx    # The drawer's frame: over the preview (or, side="left", the tree), not modal, Escape closes it
-│           ├── Drawers.tsx   # Whichever drawer is open: Resources, Editors or Publish; LeftDrawer, a chosen work
+│           ├── Drawers.tsx   # Whichever drawer is open: Resources, Editors, Help or Publish; LeftDrawer, a chosen work
 │           ├── ImageBrowser.tsx # The Resources drawer: images (a grid), css, templates, icon, reports
 │           ├── ReportList.tsx # Its reports tab: reports/ by folder, each a link to its own tab
 │           ├── ResourceList.tsx # One tab of it: the css or template files
@@ -130,6 +130,7 @@ duckdown/
 │   ├── server.test.ts      # HTTP against the in-process server
 │   ├── export.test.ts      # bun run export, onto a scratch folder
 │   ├── search.test.ts      # plainText, the index, its cache, and the aliases from that walk
+│   ├── search-js.test.ts   # The browser half: server/base/search.js in happy-dom, against a staged index
 │   ├── collection.test.ts  # collection.json: slugs, overviews, aliases, collisions
 │   ├── history.test.ts     # History: once a sitting, the limit, what was deleted
 │   ├── users.test.ts       # duckdown user, the password prompt, what a session is checked against
@@ -152,7 +153,6 @@ duckdown/
 ├── .env.s3                 # MinIO/S3 config
 ├── .dev-site/              # Dev working copy of tests/example (gitignored, made on first run)
 ├── duckdown.pid            # Running server's pid (gitignored)
-├── feature.md              # Feature checklist
 ├── todo.jsonl              # Open work — the ledger (see below)
 └── CLAUDE.md
 ```
@@ -170,7 +170,6 @@ duckdown/
 - **Storage:** Local filesystem or `Bun.S3Client` (built-in, swappable via env)
 - **Auth:** JWT (HS256) via `crypto.subtle`, cookie-based
 - **Icons:** Lucide (`lucide-static` named SVG-string exports, via `<Icon name="..." />`)
-- **Database:** `bun:sqlite` (built-in, available for future use)
 
 ## Bun HTML Imports
 
@@ -504,13 +503,13 @@ Front matter takes only the keys duckdown reads (`KEYS` in `markdown.ts`) or an 
 
 The editor is a bento: one trail at the top says where you are (`Trail.tsx`:
 the site, the tree's folder — `folder` in the store, which `loadFile()` moves
-to the page's own — and the page), so the tree has no `..` and a pane's header
-says a name the trail hasn't (`shortName()`). Under it, the three columns are
+to the page's own — and the page), so a pane's header says only a name the
+trail hasn't (`shortName()`). Under it, the three columns are
 compartments cut into one tray: walls meet square, only the tray's corners
 curve (`--wall`, `--radius-tray`, `--radius-cell`), and the preview sits flush.
 Anything a wall in from the tray's corners — a compartment, a drawer — takes
 the tray's radius less the wall (`--radius-cell` is that calc), or the corners
-bulge. The header's Resources, Editors and Publish each open the one drawer
+bulge. The header's Resources, Editors, Help and Publish each open the one drawer
 (`drawer` in the store, `Drawers.tsx`), over the preview, inside the tray; on a
 phone it is a sheet from the foot. Properties come from the other side: a work
 chosen in the collection pane opens in the drawer at the left (`leftDrawer` in
