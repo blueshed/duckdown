@@ -3,10 +3,10 @@ import type { FileEntry, FolderEntry, Listing } from "../../storage";
 import { Icon } from "./Icon";
 import { NewDialog, type NewKind } from "./NewDialog";
 import { openDeleted } from "../past";
-import { apiJson, urlPath } from "../api";
+import { apiJson } from "../api";
 import {
   loadFile, createFile, createCollection, browserRevision, openCollection, reloadBrowser, COLLECTION_FILE,
-  filePath, folder, openFolder, folderOf,
+  filePath, folder, openFolder, folderOf, folderUrl,
 } from "../store";
 
 export const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name);
@@ -29,7 +29,7 @@ export function Browser() {
   // The folder is the store's, so the trail and the tree agree; a listing that
   // comes back after you have moved on is dropped rather than drawn.
   const load = async (at: string) => {
-    const data = await apiJson<Listing>(`list /${at}`, `/edit/pages/${urlPath(at)}`);
+    const data = await apiJson<Listing>(`list /${at}`, folderUrl(at));
     if (!data || at !== folder.peek()) return;
     // Pages, and the one other file that lives in pages/: a folder's
     // collection.json, which is pages too — a hundred of them, written once.

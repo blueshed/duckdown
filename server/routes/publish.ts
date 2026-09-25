@@ -6,7 +6,9 @@ import { changed } from "./pages";
 // /edit/publish — this copy of the site and where it is published (remote.ts).
 // GET is what would be published; POST publishes it, checked first; POST
 // ?pull brings in what the published side has. With no DUCKDOWN_REMOTE there
-// is nothing here, and the editor shows no Publish.
+// is nothing here: GET answers null, which is how the editor knows to show no
+// Publish (a 404 would say the same, in red, in the console of every site
+// that doesn't publish from here), and a POST is a 404.
 export function publishRoutes(
   remote: Remote | null,
   checks?: () => Promise<string[]>,
@@ -27,7 +29,7 @@ export function publishRoutes(
     async GET(req: BunRequest) {
       const denied = await requireAuth(req);
       if (denied) return denied;
-      if (!remote) return none();
+      if (!remote) return Response.json(null);
       return answer(() => remote.status());
     },
 

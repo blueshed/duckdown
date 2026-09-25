@@ -13,7 +13,7 @@ import {
 // edited on one machine and published by a push: a button in the header that
 // says how much is waiting, and a drawer that shows it, publishes it, or
 // pulls in what was published from somewhere else. With no DUCKDOWN_REMOTE
-// the server answers 404 and there is no button at all.
+// the server's status is null and there is no button at all.
 
 type Change = { path: string; state: "added" | "changed" | "deleted" };
 type Status = { remote: string; changes: Change[]; ahead: number; behind: number; problem?: string };
@@ -31,9 +31,8 @@ const waiting = computed(() => {
 });
 
 export async function refreshPublish(): Promise<void> {
-  const res = await api("check what would be published", URL_, undefined, EXPLAINED);
-  if (res.status === 404) return publishState.set(null);
-  publishState.set(res.status === 409 ? await res.text() : res.ok ? await res.json() as Status : publishState.peek());
+  const res = await api("check what would be published", URL_, undefined, [409]);
+  publishState.set(res.status === 409 ? await res.text() : res.ok ? await res.json() as Status | null : publishState.peek());
 }
 
 export function PublishButton() {

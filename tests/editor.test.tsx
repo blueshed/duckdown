@@ -1215,7 +1215,7 @@ describe("Publish", () => {
 
   test("no remote, no button", async () => {
     publishState.set({ remote: "x", changes: [], ahead: 0, behind: 0 });
-    await refreshPublish();                                             // the real server: 404
+    await refreshPublish();                                             // the real server: null
     expect(publishState.get()).toBeNull();
     const { host, dispose } = render(() => <Header />);
     await settle(450);

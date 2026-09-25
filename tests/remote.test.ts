@@ -276,9 +276,12 @@ describe("publishing", () => {
     const broken = { name: "x", status: async () => { throw new Error("disk on fire"); } } as unknown as Remote;
     await expect(publishRoutes(broken).GET(request("GET"))).rejects.toThrow("disk on fire");
     // This server has no remote: nothing to publish, and signed out, nothing at all.
-    expect((await fetch(`${BASE}/edit/publish`, authed())).status).toBe(404);
-    expect((await fetch(`${BASE}/edit/publish`, authed({ method: "POST" }))).status).toBe(404);
-    expect(await (await fetch(`${BASE}/edit/publish`, authed())).text()).toBe("This site isn't published from here: set DUCKDOWN_REMOTE");
+    const status = await fetch(`${BASE}/edit/publish`, authed());
+    expect(status.status).toBe(200);                    // nothing to publish is an answer, not a miss
+    expect(await status.json()).toBeNull();
+    const publish = await fetch(`${BASE}/edit/publish`, authed({ method: "POST" }));
+    expect(publish.status).toBe(404);
+    expect(await publish.text()).toBe("This site isn't published from here: set DUCKDOWN_REMOTE");
     expect((await fetch(`${BASE}/edit/publish`)).status).toBe(401);
     expect((await fetch(`${BASE}/edit/publish`, { method: "POST" })).status).toBe(401);
   });

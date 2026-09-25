@@ -7,6 +7,10 @@
   writing, full height, with your unsaved words in it; **Edit** (or Escape)
   goes back to the page just as you left it. The header's icon buttons are
   square on a phone too, so the page's name in the trail has room.
+- **A quiet console.** The editor no longer leaves red lines in the
+  browser's console for things that aren't failures: a folder with no
+  collection, a site that doesn't publish from here, a page's scripts the
+  preview never runs. A folder named like a file (`v1.2`) now lists.
 
 ## 0.12.0 — 2026-09-25
 

@@ -1,5 +1,6 @@
 import { signal, batch, computed } from "@blueshed/railroad";
-import { api, urlPath } from "./api";
+import { api, apiJson, urlPath } from "./api";
+import type { Listing } from "../storage";
 import { speak, tell } from "./notice";
 
 // App state as signals
@@ -90,6 +91,9 @@ export const collection = signal<{ folder: string } | null>(null);
 export const collectionRevision = signal(0);
 
 const at = (path: string) => `/edit/pages/${urlPath(path)}`;
+// A folder's listing, ending in a slash: without one the server takes a name
+// like "v1.2" (or ".drafts") for a file with an extension, and 404s it.
+export const folderUrl = (folder: string) => `/edit/pages/${folder ? `${urlPath(folder)}/` : ""}`;
 const resourceUrl = (r: Resource) => `/edit/${r.section}/${urlPath(r.path)}`;
 export const collectionKey = (folder: string) => `${folder ? `${folder}/` : ""}${COLLECTION_FILE}`;
 
@@ -117,8 +121,10 @@ async function offerCollection(fp: string): Promise<void> {
   const own = folderOf(fp);
   if (collection.peek() && collection.peek()!.folder !== own) closeCollection();
   if (!fp.endsWith("index.md") || resource.peek() || collection.peek()) return;
-  const res = await api(`look for ${collectionKey(own)}`, at(collectionKey(own)), undefined, [404]);
-  if (res.ok) openCollection(own);
+  // Asked of the folder's listing, not the file: a folder without one is the
+  // usual case, and a 404 for it is red in every browser's console.
+  const listing = await apiJson<Listing>(`list /${own}`, folderUrl(own));
+  if (listing?.files.some((f) => f.name === COLLECTION_FILE)) openCollection(own);
 }
 
 // Transient: a resource is open for as long as you are working on it, and the
