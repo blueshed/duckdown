@@ -6,27 +6,31 @@
   <title>duckie — login</title>
   <link rel="stylesheet" href="/edit/styles.css">
   <style>
-    .login { margin: 6em auto; width: 320px; }
-    .login form { padding: 1.5em; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
-    .title { margin-bottom: 1.5em; text-align: center; font-size: 1.2em; font-weight: 600; }
-    .form-input { width: 100%; margin-bottom: 0.75em; }
-    .form-input input { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 4px; box-sizing: border-box; background: var(--bg); color: var(--text); }
-    .error { color: #c00; margin-bottom: 1em; font-size: 0.9em; }
-    .action { text-align: center; }
-    .action button { padding: 8px 24px; border: none; border-radius: 4px; background: var(--accent); color: #fff; cursor: pointer; }
+    .login { margin: 6em auto; width: min(360px, calc(100vw - 32px)); }
+    .login form { padding: var(--space-5); border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); }
+    .title { margin: 0 0 var(--space-5); text-align: center; font-size: 1.2em; font-weight: 600; }
+    .form-input { width: 100%; margin-bottom: var(--space-4); }
+    .form-input label { display: block; margin-bottom: 6px; font-size: var(--text-base); }
+    .form-input input { width: 100%; height: var(--field-h); padding: 0 var(--space-3); border: 1px solid var(--field-border); border-radius: var(--radius); box-sizing: border-box; background: var(--bg); color: var(--text); }
+    @media (pointer: coarse) { .form-input input { font-size: max(1rem, 16px); } }
+    .error { color: var(--danger-text); margin-bottom: var(--space-4); font-size: 0.9em; }
+    .action { margin-top: var(--space-5); }
+    .action button { width: 100%; min-height: 36px; justify-content: center; border: none; border-radius: var(--radius); background: var(--accent); color: var(--on-accent); font-weight: 500; cursor: pointer; }
     .action button:hover { background: var(--accent-hover); }
   </style>
 </head>
 <body>
   <div class="login">
     <form method="post">
-      <div class="title">duckie</div>
+      <h1 class="title">duckie</h1>
       <div id="error"></div>
       <div class="form-input">
-        <input type="text" name="email" placeholder="email" required autofocus>
+        <label for="email">Name or email</label>
+        <input type="text" id="email" name="email" autocomplete="username" required autofocus>
       </div>
       <div class="form-input">
-        <input type="password" name="password" placeholder="password" required>
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" autocomplete="current-password" required>
       </div>
       <input type="hidden" name="next" value="/edit">
       <div class="action">

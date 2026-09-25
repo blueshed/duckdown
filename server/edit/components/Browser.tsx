@@ -1,4 +1,4 @@
-import { createElement, signal, effect, list, when } from "@blueshed/railroad";
+import { createElement, signal, computed, effect, list, when } from "@blueshed/railroad";
 import type { FileEntry, FolderEntry, Listing } from "../../storage";
 import { Icon } from "./Icon";
 import { NewDialog, type NewKind } from "./NewDialog";
@@ -6,6 +6,7 @@ import { DeletedDialog } from "./History";
 import { apiJson, urlPath } from "../api";
 import {
   loadFile, createFile, createCollection, browserRevision, openCollection, reloadBrowser, COLLECTION_FILE,
+  filePath,
 } from "../store";
 
 export const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name);
@@ -81,25 +82,33 @@ export function Browser() {
           <Icon name="archive-restore" />
         </button>
       </div>
+      {/* Every row is a button, so the tree is Tab and Enter as well as a click. */}
       <ul class="file-list">
         {when(
           () => path.get() !== "",
           () => (
-            <li class="folder" onclick={() => load(path.peek().split("/").slice(0, -1).join("/"))}>
-              <Icon name="corner-left-up" size={12} /> ..
+            <li class="folder">
+              <button class="row" aria-label="Up a folder" title="Up a folder" onclick={() => load(path.peek().split("/").slice(0, -1).join("/"))}>
+                <Icon name="corner-left-up" size={12} /> ..
+              </button>
             </li>
           ),
         )}
         {/* Keyed rows get a signal per row, not the item: read it with .map/.peek */}
         {list(folders, (f) => f.path, (f$) => (
-          <li class="folder" onclick={() => load(f$.peek().path.replace(/^\//, ""))}>
-            <Icon name="folder" size={12} /> {f$.map((f) => f.name)}
+          <li class="folder">
+            <button class="row" onclick={() => load(f$.peek().path.replace(/^\//, ""))}>
+              <Icon name="folder" size={12} /> {f$.map((f) => f.name)}
+            </button>
           </li>
         ))}
         {list(files, (f) => f.path, (f$) => (
-          <li onclick={() => open(f$.peek())}>
-            <Icon name={f$.peek().name === COLLECTION_FILE ? "layout-grid" : "file-text"} size={12} />
-            {" "}{f$.map((f) => f.name)}
+          <li>
+            <button class="row" onclick={() => open(f$.peek())}
+              aria-current={computed(() => filePath.get() === f$.get().path.replace(/^\//, "") ? "page" : null)}>
+              <Icon name={f$.peek().name === COLLECTION_FILE ? "layout-grid" : "file-text"} size={12} />
+              {" "}{f$.map((f) => f.name)}
+            </button>
           </li>
         ))}
       </ul>

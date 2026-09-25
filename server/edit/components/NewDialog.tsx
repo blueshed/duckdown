@@ -1,4 +1,5 @@
 import { createElement, signal, when } from "@blueshed/railroad";
+import { modal } from "../modal";
 
 export type NewKind = "page" | "folder" | "collection" | "stylesheet" | "template";
 
@@ -26,11 +27,9 @@ interface NewDialogProps {
 // choose page or folder was a step between you and the only thing you came to
 // type.
 export function NewDialog({ kind, heading, initial = "", action = "Create", oncreate, oncancel }: NewDialogProps) {
-  let dialogRef: HTMLDialogElement | null = null;
+  const dialog = modal();
   const name = signal(initial);
   const error = signal("");
-
-  queueMicrotask(() => dialogRef?.showModal());
 
   const create = async () => {
     const n = name.peek();
@@ -40,26 +39,23 @@ export function NewDialog({ kind, heading, initial = "", action = "Create", oncr
   };
 
   return (
-    <dialog
-      ref={(el: HTMLDialogElement) => { dialogRef = el; }}
-      class="dialog"
-      onclose={oncancel}
-    >
+    <dialog ref={dialog.ref} class="dialog" aria-labelledby={dialog.title} onclose={oncancel}>
       <form onsubmit={(e: Event) => { e.preventDefault(); create(); }}>
-        <h3>{heading ?? `New ${kind}`}</h3>
+        <h3 id={dialog.title}>{heading ?? `New ${kind}`}</h3>
         <input
           type="text"
+          aria-label="Name"
           value={initial}
           placeholder={PLACEHOLDER[kind]}
           autofocus
           oninput={(e: Event) => { name.set((e.target as HTMLInputElement).value); error.set(""); }}
         />
         <div class="dialog-actions">
-          <button type="button" onclick={() => { dialogRef?.close(); oncancel(); }}>Cancel</button>
+          <button type="button" onclick={() => { dialog.close(); oncancel(); }}>Cancel</button>
           <button type="submit" class="primary">{action}</button>
         </div>
       </form>
-      {when(error, () => <p class="dialog-error">{error}</p>)}
+      {when(error, () => <p class="dialog-error" role="alert">{error}</p>)}
     </dialog>
   );
 }

@@ -168,6 +168,7 @@ function renderLogin(status: number, next: string, error?: string, email?: strin
         if (error) {
           el.setInnerContent(error);
           el.setAttribute("class", "error");
+          el.setAttribute("role", "alert");
         }
       },
     })

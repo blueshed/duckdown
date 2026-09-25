@@ -43,5 +43,5 @@ export function TemplatePreview() {
     return () => clearTimeout(timer);
   });
 
-  return <PreviewFrame srcdoc={html} />;
+  return <PreviewFrame srcdoc={html} title="Preview of the template" />;
 }

@@ -1,7 +1,7 @@
 // The editor's own code, in happy-dom, talking to the real server in this
 // process (signed in). Failures are staged with intercept().
 import { describe, test, expect, beforeAll, afterAll, afterEach, spyOn, mock } from "bun:test";
-import { createElement, mount, batch } from "@blueshed/railroad";
+import { createElement, mount, batch, signal, when } from "@blueshed/railroad";
 import { BASE, SITE, signIn, waitFor, keepSite } from "./helpers";
 import { mkdirSync, writeFileSync, rmSync } from "fs";
 import { join } from "path";
@@ -86,6 +86,9 @@ function render(node: () => Node) {
 const rows = (root: ParentNode) => [...root.querySelectorAll(".file-list li")].map((li) => li.textContent!.trim());
 const row = (root: ParentNode, text: string) =>
   [...root.querySelectorAll(".file-list li")].find((li) => li.textContent!.trim() === text) as HTMLElement;
+// A row's control: a button, so the tree is reachable by Tab (a report's is its link).
+const rowControl = (root: ParentNode, text: string) =>
+  row(root, text).querySelector("button.row, a.report") as HTMLElement;
 const button = (root: ParentNode, text: string) =>
   [...root.querySelectorAll("button")].find((b) => b.textContent!.trim().startsWith(text)) as HTMLButtonElement | undefined;
 const click = (el: Element) => (el as HTMLElement).click();
@@ -291,8 +294,10 @@ describe("Notice", () => {
   test("shows a failure as an alert until dismissed", () => {
     const { host, dispose } = render(() => <Notice />);
     expect(host.querySelector(".notice")).toBeNull();
+    // The regions are there before anything is said in them.
+    expect(host.querySelectorAll('[role="alert"], [role="status"]')).toHaveLength(2);
     speak("Couldn't save a.md: 500 boom");
-    const alert = host.querySelector('.notice[role="alert"]')!;
+    const alert = host.querySelector('[role="alert"] > .notice')!;
     expect(alert.textContent).toContain("Couldn't save a.md: 500 boom");
     click(host.querySelector('[aria-label="Dismiss"]')!);
     expect(host.querySelector(".notice")).toBeNull();
@@ -303,11 +308,12 @@ describe("Notice", () => {
     const { host, dispose } = render(() => <Notice />);
     tell("First is now /gallery/first-light/; the old address still leads there.");
     const status = host.querySelector(".notice")!;
-    expect(status.getAttribute("role")).toBe("status");
+    expect(status.parentElement!.getAttribute("role")).toBe("status");
     expect(status.className).toBe("notice news");
     expect(told).toHaveBeenCalledWith("First is now /gallery/first-light/; the old address still leads there.");
     speak("Couldn't save a.md: 500 boom");
-    expect(host.querySelector(".notice")!.getAttribute("role")).toBe("alert");
+    expect(host.querySelectorAll(".notice")).toHaveLength(1);
+    expect(host.querySelector(".notice")!.parentElement!.getAttribute("role")).toBe("alert");
     expect(host.querySelector(".notice")!.className).toBe("notice");
     expect(news.get()).toBe(false);
     dispose();
@@ -331,6 +337,37 @@ describe("ConfirmDialog", () => {
     dispose();
   });
 
+  test("is named by its heading, and gives focus back when it is taken away", async () => {
+    // What a confirmed dialog does: the when() that made it drops it, without
+    // a close() — which left focus on <body>. It goes back to what opened it.
+    const asking = signal(false);
+    const { host, dispose } = render(() => (
+      <div>
+        <button onclick={() => asking.set(true)}>Delete</button>
+        {when(asking, () => <ConfirmDialog title="Delete a.md?" onconfirm={() => asking.set(false)} oncancel={() => asking.set(false)} />)}
+      </div>
+    ));
+    const opener = host.querySelector("button")!;
+    opener.focus();
+    click(opener);
+    await waitFor(() => host.querySelector("dialog")?.open);
+    const dialog = host.querySelector("dialog")!;
+    expect(document.getElementById(dialog.getAttribute("aria-labelledby")!)!.textContent).toBe("Delete a.md?");
+    (dialog.querySelector("button.danger") as HTMLElement).focus();
+    click(dialog.querySelector("button.danger")!);
+    expect(host.querySelector("dialog")).toBeNull();
+    expect(dialog.open).toBe(false);
+    expect(document.activeElement).toBe(opener);
+
+    // An opener that has gone meanwhile gets nothing: focus is not forced anywhere.
+    click(opener);
+    await waitFor(() => host.querySelector("dialog")?.open);
+    opener.remove();
+    asking.set(false);
+    expect(document.activeElement).not.toBe(opener);
+    dispose();
+  });
+
   test("takes its own label and class, and needs no message", () => {
     const { host, dispose } = render(() => (
       <ConfirmDialog title="Go?" confirmLabel="Go" confirmClass="primary" onconfirm={() => {}} oncancel={() => {}} />
@@ -351,6 +388,8 @@ describe("NewDialog", () => {
 
     const input = dialog.querySelector("input")!;
     expect(dialog.querySelector("h3")!.textContent).toBe("New page");
+    expect(dialog.getAttribute("aria-labelledby")).toBe(dialog.querySelector("h3")!.id);
+    expect(input.getAttribute("aria-label")).toBe("Name");
     expect(input.placeholder).toBe("my-page.md");
 
     submit(dialog.querySelector("form")!); // no name yet: nothing to create
@@ -359,6 +398,7 @@ describe("NewDialog", () => {
     submit(dialog.querySelector("form")!);
     await waitFor(() => dialog.querySelector(".dialog-error"));
     expect(dialog.querySelector(".dialog-error")!.textContent).toBe("taken.md already exists");
+    expect(dialog.querySelector(".dialog-error")!.getAttribute("role")).toBe("alert");
     type(input, "fine");
     expect(dialog.querySelector(".dialog-error")).toBeNull();
     submit(dialog.querySelector("form")!);
@@ -447,7 +487,7 @@ describe("ResourceList", () => {
     expect(host.querySelector(".pane-path")!.textContent).toBe("/templates");
     expect(rows(host)).not.toContain("favicon.ico");
 
-    click(row(host, "site.html"));
+    click(rowControl(host, "site.html"));
     await waitFor(() => resource.peek()?.path === "site.html");
     expect(resource.peek()?.section).toBe("templates");
     dispose();
@@ -499,6 +539,7 @@ describe("ResourcePane", () => {
     expect(host.querySelector(".lucide-droplet")).not.toBeNull();
 
     const area = host.querySelector("textarea")!;
+    expect(area.getAttribute("aria-label")).toBe("Contents of poster.css");
     type(area, `${resourceDraft.peek()}\n/* pane */\n`);
     expect(resourceDirty.peek()).toBe(true);
     area.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", metaKey: true }));
@@ -580,14 +621,18 @@ describe("Browser", () => {
     expect(rows(host).some((r) => r.endsWith(".css"))).toBe(false);
     expect(row(host, "index.md").querySelector(".lucide-file-text")).not.toBeNull();
 
-    click(row(host, "guide"));
+    click(rowControl(host, "guide"));
     await waitFor(() => rows(host).includes("pages.md"));
     expect(host.querySelector(".browser-header")!.textContent).toContain("/guide");
-    click(row(host, ".."));
+    click(rowControl(host, ".."));
     await waitFor(() => rows(host).includes("guide")); // guide/ has an index.md too: wait for the root
 
-    click(row(host, "index.md"));
+    // Every row is a button, so the tree is Tab and Enter; the open page says so.
+    expect([...host.querySelectorAll(".file-list li")].every((li) => li.querySelector("button.row"))).toBe(true);
+    click(rowControl(host, "index.md"));
     await waitFor(() => filePath.get() === "index.md");
+    await waitFor(() => rowControl(host, "index.md").getAttribute("aria-current") === "page");
+    expect(host.querySelectorAll("[aria-current]")).toHaveLength(1);
     dispose();
   });
 
@@ -737,13 +782,22 @@ describe("Editor", () => {
     const area = host.querySelector("textarea")!;
     const save = button(host, "Save")!;
     expect(host.querySelector(".pane-header .pane-name")!.textContent).toBe("editor-test.md");
+    expect(area.getAttribute("aria-label")).toBe("Contents of editor-test.md");
     expect(area.value).toBe("title: editor-test\n\n");
 
+    const status = host.querySelector('.pane-header [role="status"]')!;
+    expect(status.textContent).toBe("");
+    expect(host.querySelector(".pane-header .dot")).toBeNull();
     type(area, "title: editor-test\n\n# Edited");
     expect(save.className).toBe("primary"); // dirty
+    // Unsaved, as a picture a screen reader can name, not "black circle".
+    const dot = host.querySelector(".pane-header .dot")!;
+    expect(dot.getAttribute("role")).toBe("img");
+    expect(dot.getAttribute("aria-label")).toBe("Unsaved changes");
     click(save);
     await waitFor(() => save.textContent!.includes("Saved"));
     expect(save.className).toBe("saved");
+    expect(status.textContent).toBe("Saved"); // said, as well as shown
     expect(fileContent.get()).toBe("title: editor-test\n\n# Edited");
     await waitFor(() => save.textContent!.includes("Save") && !save.textContent!.includes("Saved"), 2500);
     expect(save.className).toBe("");
@@ -754,6 +808,7 @@ describe("Editor", () => {
       click(save);
       await waitFor(() => save.textContent!.includes("Not saved"));
       expect(save.className).toBe("danger");
+      expect(status.textContent).toBe("Not saved");
       expect(notice.get()).toBe("Couldn't save editor-test.md: 507 disk full");
     } finally {
       restore();
@@ -869,6 +924,7 @@ describe("Preview", () => {
     });
     const { host, dispose } = render(() => <Preview />);
     expect(frame(host).getAttribute("sandbox")).toBe("allow-same-origin");
+    expect(frame(host).title).toBe("Preview of the page");
     editorContent.set("title: Typed\ntheme: dark\n\n# Hello [[other]]"); // within the debounce: replaces the first
     await waitFor(() => frame(host).srcdoc.includes("Hello"));
     const doc = frame(host).srcdoc;
@@ -980,8 +1036,11 @@ describe("Header", () => {
     expect(view.getAttribute("href")).toBe("/");
     filePath.set("My folder/a b.md");
     expect(view.getAttribute("href")).toBe("/My%20folder/a%20b.html");
-    click(button(host, "Resources")!);
+    const resources = button(host, "Resources")!;
+    expect(resources.getAttribute("aria-expanded")).toBe("false");
+    click(resources);
     expect(showImages.get()).toBe(true);
+    expect(resources.getAttribute("aria-expanded")).toBe("true");
     const logout = host.querySelector("form.header-form") as HTMLFormElement;
     expect(logout.getAttribute("method")).toBe("post");
     expect(logout.getAttribute("action")).toBe("/logout");
@@ -1116,6 +1175,11 @@ describe("EditorsDialog", () => {
     for (const [name, value] of Object.entries(values)) (form.elements.namedItem(name) as HTMLInputElement).value = value;
     submit(form);
   };
+  // Stage an answer for /edit/users alone. The Header's Publish button asks
+  // for its status 400ms after it appears, and an answer staged for every
+  // request handed it {ok: true} as a status whenever the two met.
+  const users = (respond: () => Response) =>
+    intercept((url, init) => (url.startsWith("/edit/users") ? respond() : signedIn(url, init)));
 
   test("opens from the header: adds an editor, sets a password, removes one, and says what the server refused", async () => {
     const { host, dispose } = render(() => <Header />);
@@ -1153,7 +1217,7 @@ describe("EditorsDialog", () => {
     fill(line, { current: "not it", password: "a new password" });
     await waitFor(() => host.querySelector(".dialog-error"));
     expect(host.querySelector(".dialog-error")!.textContent).toBe("That isn't your current password");
-    const restore = intercept(() => Response.json({ ok: true }));          // a change that worked, without changing it
+    const restore = users(() => Response.json({ ok: true }));              // a change that worked, without changing it
     try {
       fill(line, { current: "admin", password: "a new password" });
       await waitFor(() => notice.get().startsWith("Your password changed"));
@@ -1173,7 +1237,7 @@ describe("EditorsDialog", () => {
     expect(notice.get()).toBe("eve can't sign in any more");
 
     // A failure nobody explained speaks on the line, and changes nothing here.
-    const broken = intercept(() => new Response("disk full", { status: 507 }));
+    const broken = users(() => new Response("disk full", { status: 507 }));
     try {
       fill(add, { name: "fay", password: "fay's password" });
       await waitFor(() => notice.get() === "Couldn't add fay: 507 disk full");
@@ -1212,8 +1276,10 @@ describe("ImageBrowser", () => {
     await waitFor(() => rows(host).includes("logo.svg"));
     expect(row(host, "logo.svg").querySelector("img")!.getAttribute("src")).toBe("/edit/browse/logo.svg?thumb=32");
 
-    click(row(host, "logo.svg"));
+    expect(rowControl(host, "logo.svg").getAttribute("aria-pressed")).toBe("false");
+    click(rowControl(host, "logo.svg"));
     await waitFor(() => host.querySelector(".image-preview"));
+    expect(rowControl(host, "logo.svg").getAttribute("aria-pressed")).toBe("true");
     expect(host.querySelector(".image-preview img")!.getAttribute("src")).toBe("/static/images/logo.svg");
     click(button(host, "Copy Markdown")!);
     expect(writeText).toHaveBeenCalledWith("![logo.svg](/static/images/logo.svg)");
@@ -1238,19 +1304,22 @@ describe("ImageBrowser", () => {
 
     // Upload into it: nothing chosen does nothing; a file lands and is listed
     const input = host.querySelector('input[type="file"]') as HTMLInputElement;
+    // Out of sight but not display:none, which would take it out of the tab order.
+    expect(input.className).toBe("visually-hidden");
+    expect(input.closest("label")!.textContent).toContain("Upload");
     Object.defineProperty(input, "files", { value: [], configurable: true });
     input.dispatchEvent(new Event("change"));
     Object.defineProperty(input, "files", { value: [new File(["<svg/>"], "a b.svg", { type: "image/svg+xml" })], configurable: true });
     input.dispatchEvent(new Event("change"));
     await waitFor(() => rows(host).includes("a b.svg"));
     expect(row(host, "a b.svg").querySelector("img")!.getAttribute("src")).toBe("/edit/browse/My%20shots/a%20b.svg?thumb=32");
-    click(row(host, "a b.svg"));
+    click(rowControl(host, "a b.svg"));
     await waitFor(() => host.querySelector(".image-preview"));
     expect(host.querySelector(".image-preview img")!.getAttribute("src")).toBe("/static/images/My%20shots/a%20b.svg");
 
-    click(row(host, ".."));
+    click(rowControl(host, ".."));
     await waitFor(() => rows(host).includes("My shots"));
-    click(row(host, "My shots"));
+    click(rowControl(host, "My shots"));
     await waitFor(() => rows(host).includes("a b.svg"));
 
     click(host.querySelector('[aria-label="Close resources"]')!);
@@ -1263,6 +1332,29 @@ describe("ImageBrowser", () => {
     await waitFor(() => rows(host).includes("logo.svg"));
     const tab = (name: string) => button(host.querySelector(".browser-sections")!, name)!;
     expect(tab("images").className).toBe("section on");
+    // Tabs to a screen reader: the chosen one selected, the only one Tab reaches,
+    // and naming the panel under them.
+    const list = host.querySelector('[role="tablist"]')!;
+    expect(list.getAttribute("aria-label")).toBe("Resources");
+    expect(tab("images").getAttribute("aria-selected")).toBe("true");
+    expect(tab("css").getAttribute("aria-selected")).toBe("false");
+    expect(tab("images").getAttribute("tabindex")).toBe("0");
+    expect(tab("css").getAttribute("tabindex")).toBe("-1");
+    expect(host.querySelector('[role="tabpanel"]')!.getAttribute("aria-labelledby")).toBe("tab-images");
+    // The arrows move along them, round the ends; Home and End go to the ends.
+    const press = (key: string) => list.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
+    press("ArrowLeft");
+    expect(tab("reports").getAttribute("aria-selected")).toBe("true");
+    expect(document.activeElement).toBe(tab("reports"));
+    press("ArrowRight");
+    expect(tab("images").getAttribute("aria-selected")).toBe("true");
+    press("End");
+    expect(tab("reports").getAttribute("aria-selected")).toBe("true");
+    press("Home");
+    expect(tab("images").getAttribute("aria-selected")).toBe("true");
+    press("a");                                         // any other key is the page's
+    expect(tab("images").getAttribute("aria-selected")).toBe("true");
+    await waitFor(() => rows(host).includes("logo.svg"));
 
     click(tab("css"));
     await waitFor(() => rows(host).includes("theme.css"));
@@ -1286,13 +1378,13 @@ describe("ImageBrowser", () => {
     click(tab("reports"));
     await waitFor(() => rows(host).includes("2026-09"));
     expect(rows(host)).toEqual(["2026-09", "2026-08"]);
-    click(row(host, "2026-09"));
+    click(rowControl(host, "2026-09"));
     await waitFor(() => rows(host).includes("2026-09-24.md"));
     expect(rows(host)).toEqual(["..", "2026-09-24.md", "2026-09-23.md"]);
     const link = row(host, "2026-09-24.md").querySelector("a")!;
     expect(link.getAttribute("href")).toBe("/edit/reports/2026-09/2026-09-24.md");
     expect(link.getAttribute("target")).toBe("_blank");
-    click(row(host, ".."));                                   // and back up to the months
+    click(rowControl(host, ".."));                                   // and back up to the months
     await waitFor(() => rows(host).includes("2026-08"));
     expect(rows(host)).toEqual(["2026-09", "2026-08"]);
     rmSync(join(SITE, "reports"), { recursive: true, force: true });
@@ -1544,6 +1636,15 @@ describe("CollectionPane", () => {
     expect(titles(host)).toHaveLength(4);
 
     click(drop);  // opens the chooser; the choosing is the next line
+    // And from the keyboard, as a button: Enter and Space open it, other keys don't.
+    expect(drop.getAttribute("role")).toBe("button");
+    expect(drop.getAttribute("tabindex")).toBe("0");
+    const chooser = drop.querySelector("input")!;
+    const opened = mock(() => {});
+    chooser.click = opened;
+    for (const key of ["Enter", " ", "a"]) drop.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
+    expect(opened).toHaveBeenCalledTimes(2);
+    delete (chooser as { click?: unknown }).click;
     choose(drop.querySelector("input")!, picture("Fifth Work.svg"));
     await storedWhen((f) => f.groups[0].items.length === 3);
     const added = (await stored()).groups[0].items[2];
@@ -1879,9 +1980,9 @@ describe("CollectionPane", () => {
     // And the file itself is in the tree, opening as a pane rather than as JSON.
     const { host, dispose } = render(() => <Browser />);
     await waitFor(() => rows(host).includes("gallery"));
-    click(row(host, "gallery"));
+    click(rowControl(host, "gallery"));
     await waitFor(() => rows(host).includes("collection.json"));
-    click(row(host, "collection.json"));
+    click(rowControl(host, "collection.json"));
     expect(collection.get()).toEqual({ folder: "gallery" });
     expect(filePath.get()).toBe(`${FOLDER}/index.md`);   // the page in the middle stayed put
     closeCollection();

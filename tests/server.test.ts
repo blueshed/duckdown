@@ -31,6 +31,13 @@ describe("auth", () => {
     const html = await res.text();
     expect(html).toContain("Sign In");
     expect(html).toContain('name="next" value="/edit"');
+    // Labelled fields a password manager recognises, under a heading.
+    expect(html).toContain('<label for="email">Name or email</label>');
+    expect(html).toContain('id="email" name="email" autocomplete="username"');
+    expect(html).toContain('<label for="password">Password</label>');
+    expect(html).toContain('autocomplete="current-password"');
+    expect(html).toContain('<h1 class="title">');
+    expect(html).not.toContain('role="alert"');
   });
 
   test("GET /login keeps a same-site next and drops any other", async () => {
@@ -59,7 +66,9 @@ describe("auth", () => {
   test("POST /login with bad creds returns 401", async () => {
     const res = await login({ email: "admin", password: "wrong" });
     expect(res.status).toBe(401);
-    expect(await res.text()).toContain("Invalid");
+    const html = await res.text();
+    expect(html).toContain("Invalid");
+    expect(html).toContain('role="alert"'); // said aloud, not only shown in red
   });
 
   test("POST /login without a password returns 400", async () => {
@@ -737,6 +746,9 @@ describe("site rendering", () => {
     // cached once rather than inlined into every page.
     expect(html).toContain(`<link href="/static/theme.css" rel="stylesheet">`);
     expect(html).not.toContain("<style>");
+    // The seed's template: a skip link first, past the nav to <main>.
+    expect(html).toMatch(/<body>\s*<a class="skip" href="#content">Skip to content<\/a>/);
+    expect(html).toMatch(/<main id="content">\s*<h1/);
   });
 
   test("marks the page in the nav, and the section it is in", async () => {
@@ -794,7 +806,7 @@ describe("site rendering", () => {
     renameSync(tmpl, `${tmpl}.away`);
     try {
       const html = await (await fetch(`${BASE}/index.html`)).text();
-      expect(html).toStartWith("<!DOCTYPE html><html><head><title>duckdown</title>");
+      expect(html).toStartWith('<!DOCTYPE html><html lang="en"><head><title>duckdown</title></head><body><main><h1');
     } finally {
       renameSync(`${tmpl}.away`, tmpl);
     }

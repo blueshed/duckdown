@@ -9,7 +9,7 @@ import { escapeHtml, outsideCode, canonicalPath, dateHtml } from "./utils";
 const site = createStorage();
 const pages = createPageStorage();
 
-const BARE = "<!DOCTYPE html><html><head><title>{{title}}</title></head><body>{{content}}</body></html>";
+const BARE = '<!DOCTYPE html><html lang="en"><head><title>{{title}}</title></head><body><main>{{content}}</main></body></html>';
 
 // A plain word: letters, digits, dash, underscore. `layout:` and `css:` each
 // name a file in a folder a page must not be able to climb out of, and one

@@ -373,9 +373,13 @@ describe("renderMarkdown", () => {
     expect(content).toContain("Heading");
   });
 
-  test("renders GFM tables", () => {
-    const { content } = renderMarkdown("| a | b |\n|---|---|\n| 1 | 2 |");
-    expect(content).toContain("<table>");
+  test("renders GFM tables, each in a box that scrolls when it is too wide", () => {
+    const { content } = renderMarkdown("| a | b |\n|---|---|\n| 1 | 2 |\n\ntext\n\n| c |\n|---|\n| 3 |");
+    expect(content).toStartWith('<div class="table-scroll"><table>');
+    expect(content.match(/<div class="table-scroll"><table>[\s\S]*?<\/table><\/div>/g)).toHaveLength(2);
+    // A table an author wrote in HTML is theirs: left as written.
+    const raw = renderMarkdown('<table class="mine"><tr><td>x</td></tr></table>').content;
+    expect(raw).not.toContain("table-scroll");
   });
 
   test("renders strikethrough", () => {

@@ -2,6 +2,7 @@ import { createElement, signal, computed, list, when, type ReadonlySignal } from
 import { api, apiJson, urlPath } from "../api";
 import { tell } from "../notice";
 import { Icon } from "./Icon";
+import { modal } from "../modal";
 
 // Earlier versions, and files that were deleted: the server keeps them
 // (history.ts) and these put them back. Restoring is a write like any other,
@@ -28,10 +29,9 @@ async function restore(url: string, id: string, what: string): Promise<boolean> 
 }
 
 function RestoreDialog(props: { title: string; empty: string; rows: ReadonlySignal<Row[] | null>; oncancel: () => void }) {
-  let dialogRef: HTMLDialogElement | null = null;
+  const dialog = modal();
   const busy = signal(false);
   const rows = computed(() => props.rows.get() ?? []);
-  queueMicrotask(() => dialogRef?.showModal());
 
   const run = async (row: Row) => {
     busy.set(true);
@@ -40,8 +40,8 @@ function RestoreDialog(props: { title: string; empty: string; rows: ReadonlySign
   };
 
   return (
-    <dialog ref={(el: HTMLDialogElement) => { dialogRef = el; }} class="dialog dialog-history" onclose={props.oncancel}>
-      <h3>{props.title}</h3>
+    <dialog ref={dialog.ref} class="dialog dialog-history" aria-labelledby={dialog.title} onclose={props.oncancel}>
+      <h3 id={dialog.title}>{props.title}</h3>
       {when(() => props.rows.get() === null, () => <p class="dialog-hint">Looking…</p>)}
       {when(() => props.rows.get()?.length === 0, () => <p class="dialog-hint">{props.empty}</p>)}
       <ul class="history-list">
@@ -56,7 +56,7 @@ function RestoreDialog(props: { title: string; empty: string; rows: ReadonlySign
         ))}
       </ul>
       <div class="dialog-actions">
-        <button type="button" onclick={() => { dialogRef?.close(); props.oncancel(); }}>Close</button>
+        <button type="button" onclick={() => { dialog.close(); props.oncancel(); }}>Close</button>
       </div>
     </dialog>
   );

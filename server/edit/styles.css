@@ -8,16 +8,65 @@
 
 :root {
   --sidebar-w: 240px;
-  --pane-header-h: 45px;
+  --pane-header-h: 48px;   /* a 30px control and 9px either side */
+  /* The sizes everything is drawn from: space on a 4px grid, and one height
+     per kind of control, so a bar's buttons and a dialog's fields line up. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --control-h: 30px;       /* a text button */
+  --icon-btn: 30px;        /* an icon button: square, well over WCAG's 24px */
+  --field-h: 34px;         /* a dialog's inputs, and the buttons beside them */
+  --row-h: 28px;           /* a row in a tree */
+  --icon: 16px;            /* the glyph in an icon button */
+  --icon-gap: 4px;         /* between icon buttons: separate hovers, one group */
+  /* Type, in rem: the reader's own default size decides (16px unless they
+     have set more), so a larger setting enlarges the editor as it does the
+     site. At 16px these are 11, 12, 13, 14, 15 and 16px. */
+  --text-xs: 0.6875rem;
+  --text-sm: 0.75rem;
+  --text-base: 0.8125rem;
+  --text-md: 0.875rem;
+  --text-lg: 0.9375rem;
+  --text-xl: 1rem;
+  --control-font: var(--text-base);
+  --radius-sm: 4px;
+  --radius: 6px;
+  --radius-lg: 10px;
   --preview-w: 1fr;
   --editor-w: 1fr;
+  /* Colours, each named for what it does, because one colour can't do two
+     of these jobs in both schemes: tests/contrast.test.ts holds every pair
+     to WCAG AA — 4.5:1 for text, 3:1 for a field's edge and a focus ring. */
   --bg: #f5f5f7;
   --surface: #ffffff;
-  --border: #d1d1d6;
+  --border: #d1d1d6;        /* dividers and hover shades: decoration only */
+  --field-border: #86868b;  /* the edge of a text field: 3:1 */
   --text: #1d1d1f;
-  --text-dim: #86868b;
-  --accent: #5856d6;
+  --text-dim: #6e6e73;      /* quieter text: still 4.5:1 */
+  --accent: #5856d6;        /* a fill, with --on-accent text on it */
   --accent-hover: #3634a3;
+  --accent-text: #5856d6;   /* the accent as text on --bg and --surface */
+  --focus: #5856d6;         /* focus rings and "this one" marks: 3:1 */
+  --on-accent: #ffffff;
+  --danger: #dc2626;        /* a fill, with --on-accent text on it */
+  --danger-hover: #b91c1c;
+  --danger-text: #c81e1e;   /* red text on --bg and --surface */
+  --ok: #15803d;            /* Saved: a fill, with --on-accent text on it */
+  --news: #3634a3;          /* the notice's news: a fill */
+}
+
+/* A finger, not a pointer: everything a size up. */
+@media (pointer: coarse) {
+  :root {
+    --control-h: 32px;
+    --icon-btn: 32px;
+    --field-h: 40px;
+    --row-h: 32px;
+  }
 }
 
 @media (prefers-color-scheme: dark) {
@@ -25,19 +74,34 @@
     --bg: #1e1e2e;
     --surface: #282840;
     --border: #3a3a5c;
+    --field-border: #71719b;
     --text: #e0e0f0;
-    --text-dim: #8888aa;
-    --accent: #7c6ff7;
-    --accent-hover: #9b8fff;
+    --text-dim: #9d9dbf;
+    /* The one place the jobs part: white text needs a darker violet than
+       violet text on this surface does, so the fill and the text differ. */
+    --accent: #6458e8;
+    --accent-hover: #5043d0;
+    --accent-text: #a59cfa;
+    --focus: #a59cfa;
+    --danger-text: #f87171;
   }
 }
 
 html, body {
   height: 100%;
   font-family: system-ui, -apple-system, sans-serif;
-  font-size: 14px;
   color: var(--text);
   background: var(--bg);
+}
+
+/* Not on html: that would set what a rem is, and override the reader. */
+body {
+  font-size: var(--text-md);
+}
+
+/* Controls take the page's font, not the browser's own. */
+button, input, textarea, select {
+  font: inherit;
 }
 
 #app {
@@ -53,14 +117,15 @@ html, body {
   grid-column: 1 / -1;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 8px 16px;
+  gap: var(--space-2);
+  min-height: var(--pane-header-h);
+  padding: 0 var(--space-2) 0 var(--space-4);
   background: var(--surface);
   border-bottom: 1px solid var(--border);
 }
 
 .header h1 {
-  font-size: 16px;
+  font-size: var(--text-xl);
   font-weight: 600;
   letter-spacing: 0.5px;
 }
@@ -68,13 +133,17 @@ html, body {
 .header-link {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
+  min-height: var(--control-h);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius);
   color: var(--text-dim);
-  font-size: 12px;
+  font-size: var(--control-font);
   text-decoration: none;
 }
 
 .header-link:hover {
+  background: var(--border);
   color: var(--text);
 }
 
@@ -83,11 +152,13 @@ html, body {
   display: contents;
 }
 
-button.header-link,
-button.header-link:hover {
-  padding: 0;
+button.header-link {
   border: none;
   background: none;
+}
+
+button.header-link:hover {
+  background: var(--border);
 }
 
 /* --- Panels --- */
@@ -135,32 +206,66 @@ button.header-link:hover {
   list-style: none;
 }
 
+/* One gutter for both lists, so a highlighted row stands clear of the
+   column's edge and its text lines up with the header's. */
+.panel-browser > .file-list {
+  padding: var(--space-1);
+}
+
 .file-list li {
   display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 8px;
-  cursor: pointer;
   border-radius: 4px;
-  font-size: 13px;
+  font-size: var(--text-base);
 }
 
+/* Lighter than the open row's shade, so hovering never looks like opening. */
 .file-list li:hover {
-  background: var(--border);
+  background: color-mix(in srgb, var(--border) 50%, transparent);
 }
 
-/* A report is a link to its own tab: the whole row, in the row's colour. */
-.file-list a.report {
+/* A row is a button (a report, a link to its own tab): the whole row, in the
+   row's colour, reachable by Tab and opened by Enter. */
+.file-list :is(button.row, a.report) {
   display: flex;
   align-items: center;
   gap: 6px;
   flex: 1;
+  min-width: 0;
+  min-height: var(--row-h);
+  padding: 0 var(--space-2);
+  gap: var(--space-2);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
   color: inherit;
+  font: inherit;
+  text-align: left;
   text-decoration: none;
+  cursor: pointer;
+}
+
+.file-list :is(button.row, a.report):focus-visible,
+.item-drop:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+
+/* The page that is open, and the image that is chosen: shaded, and in bold,
+   because forced colours (Windows High Contrast) takes the shade away. */
+.file-list button.row:is([aria-current], [aria-pressed="true"]) {
+  background: var(--border);
+  font-weight: 600;
+}
+
+@media (forced-colors: active) {
+  .file-list button.row:is([aria-current], [aria-pressed="true"]) {
+    outline: 1px solid CanvasText;
+    outline-offset: -1px;
+  }
 }
 
 .file-list .folder {
-  color: var(--accent);
+  color: var(--accent-text);
   font-weight: 500;
 }
 
@@ -197,10 +302,25 @@ button.header-link:hover {
   color: var(--text);
   border: none;
   font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
-  font-size: 13px;
+  font-size: var(--text-base);
   line-height: 1.6;
   outline: none;
   tab-size: 2;
+}
+
+/* The pane fills its column, so an outline outside it would be cut off at
+   the edges: this one is drawn inside. An outline, not a shadow, because
+   forced colours removes shadows. */
+.editor-area textarea:focus-visible,
+.panel-resource textarea:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+
+/* One focus ring for everything else you can reach with Tab. */
+:is(button, a, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
 }
 
 /* --- Buttons --- */
@@ -208,13 +328,16 @@ button.header-link:hover {
 button {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 6px 14px;
+  gap: 6px;
+  min-height: var(--control-h);
+  padding: 0 var(--space-3);
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: var(--radius);
   background: var(--surface);
   color: var(--text);
-  font-size: 12px;
+  font-size: var(--control-font);
+  line-height: 1;
+  white-space: nowrap;
   cursor: pointer;
   transition: background 0.15s;
   vertical-align: middle;
@@ -233,7 +356,7 @@ button:disabled {
 button.primary {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
 }
 
 button.primary:hover {
@@ -241,33 +364,36 @@ button.primary:hover {
 }
 
 button.saved {
-  background: #34c759;
-  border-color: #34c759;
-  color: #fff;
+  background: var(--ok);
+  border-color: var(--ok);
+  color: var(--on-accent);
   transition: background 0.3s;
 }
 
 button kbd {
   font-family: inherit;
-  font-size: 10px;
+  font-size: 0.625rem;
   opacity: 0.7;
   margin-left: 4px;
 }
 
 button.danger {
-  background: #dc2626;
-  border-color: #dc2626;
-  color: #fff;
+  background: var(--danger);
+  border-color: var(--danger);
+  color: var(--on-accent);
 }
 
 button.danger:hover {
-  background: #b91c1c;
+  background: var(--danger-hover);
 }
 
 /* An action with no room for a word: square, quiet until you reach for it.
    The icon plus a title and an aria-label say what it does. */
 button.icon-btn {
-  width: 28px;
+  flex: 0 0 auto;
+  width: var(--icon-btn);
+  height: var(--icon-btn);
+  min-height: 0;
   justify-content: center;
   padding: 0;
   border-color: transparent;
@@ -280,14 +406,20 @@ button.icon-btn:hover {
   color: var(--text);
 }
 
+/* The glyph's size is the bar's, whatever size the markup asked for. */
+button.icon-btn .icon svg {
+  width: var(--icon);
+  height: var(--icon);
+}
+
 button.danger-subtle {
-  color: #dc2626;
+  color: var(--danger-text);
   border-color: transparent;
   background: transparent;
 }
 
 button.danger-subtle:hover {
-  background: rgba(220, 38, 38, 0.1);
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
 }
 
 /* --- Notice: failures speak --- */
@@ -304,23 +436,27 @@ button.danger-subtle:hover {
   max-width: min(640px, calc(100vw - 32px));
   padding: 8px 8px 8px 14px;
   border-radius: 6px;
-  background: #dc2626;
-  color: #fff;
-  font-size: 13px;
+  background: var(--danger);
+  color: var(--on-accent);
+  font-size: var(--text-base);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
   animation: notice-in 0.2s ease-out;
 }
 
 /* Something done on your behalf, not something gone wrong. */
 .notice.news {
-  background: #3634a3;
+  background: var(--news);
 }
 
 .notice button {
-  padding: 4px;
+  width: 28px;
+  height: 28px;
+  min-height: 0;
+  justify-content: center;
+  padding: 0;
   border: none;
   background: transparent;
-  color: #fff;
+  color: var(--on-accent);
 }
 
 .notice button:hover {
@@ -345,10 +481,33 @@ button.danger-subtle:hover {
   display: flex;
   flex: 0 0 var(--pane-header-h);
   align-items: center;
-  gap: 8px;
+  gap: var(--icon-gap);
   height: var(--pane-header-h);
-  padding: 0 12px;
+  /* 8px on the right, plus the icon's own air, reads as the left's 12px */
+  padding: 0 var(--space-2) 0 var(--space-3);
   border-bottom: 1px solid var(--border);
+}
+
+.pane-header > .icon:first-child {
+  margin-right: var(--space-1);
+}
+
+/* Save stands apart from the icons, with a hairline before it: a missed
+   click beside it should not land on Delete. */
+.pane-header > button:not(.icon-btn) {
+  position: relative;
+  margin: 0 var(--space-2) 0 var(--space-3);
+}
+
+.pane-header > button:not(.icon-btn)::before {
+  content: "";
+  position: absolute;
+  left: calc(-1 * var(--space-2) - 1px);
+  top: 50%;
+  height: 18px;
+  margin-top: -9px;
+  border-left: 1px solid var(--border);
+  pointer-events: none;
 }
 
 /* What a pane is showing: a file's name, or the folder a list is in. Same
@@ -356,7 +515,7 @@ button.danger-subtle:hover {
 .pane-name,
 .pane-path {
   font-family: var(--font-mono, ui-monospace, monospace);
-  font-size: 12px;
+  font-size: var(--text-sm);
   color: var(--text-dim);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -379,35 +538,22 @@ button.danger-subtle:hover {
   padding: 6px 12px;
   border-bottom: 1px solid var(--border);
   color: var(--text-dim);
-  font-size: 12px;
+  font-size: var(--text-sm);
 }
 
 .pane-note code {
-  font-size: 11px;
-}
-
-/* A label over a group of rows: quieter than the rows it introduces. */
-.file-group {
-  margin: 12px 0 4px;
-  padding: 0 8px;
-  font-size: 11px;
-  color: var(--text-dim);
+  font-size: var(--text-xs);
 }
 
 .pane-header .dot {
-  color: var(--accent);
-  font-size: 9px;
+  margin-left: var(--space-1);
+  color: var(--accent-text);
+  font-size: 0.5625rem;
   line-height: 1;
 }
 
 .pane-gap {
   flex: 1;
-}
-
-.browser-list {
-  flex: 1;
-  overflow-y: auto;
-  padding: 8px 12px;
 }
 
 /* --- Preview --- */
@@ -432,7 +578,7 @@ button.danger-subtle:hover {
   background: var(--bg);
   padding: 2px 6px;
   border-radius: 3px;
-  font-size: 12px;
+  font-size: var(--text-sm);
 }
 
 /* --- Sidebar (Image Browser) --- */
@@ -454,16 +600,11 @@ button.danger-subtle:hover {
 .sidebar-content {
   flex: 1;
   overflow-y: auto;
-  padding: 8px 12px;
-}
-
-.file-list .selected {
-  background: var(--accent);
-  color: #fff;
-  border-radius: 4px;
+  padding: var(--space-1) var(--space-1) var(--space-3);
 }
 
 .image-preview {
+  margin: 0 var(--space-2);
   padding: 8px 0;
   text-align: center;
 }
@@ -476,21 +617,24 @@ button.danger-subtle:hover {
 }
 
 .upload-area {
+  margin: 0 var(--space-2);
   padding: 8px 0;
   border-top: 1px solid var(--border);
   margin-top: 8px;
 }
 
 .upload-label {
+  position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 6px 14px;
+  gap: 6px;
+  min-height: var(--control-h);
+  padding: 0 var(--space-3);
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: var(--radius);
   background: var(--surface);
   color: var(--text);
-  font-size: 12px;
+  font-size: var(--control-font);
   cursor: pointer;
 }
 
@@ -498,12 +642,28 @@ button.danger-subtle:hover {
   background: var(--border);
 }
 
+.upload-label:focus-within {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* Out of sight, still in the tab order and the accessibility tree. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 /* --- Dialog --- */
 
 .dialog {
   border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 24px;
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  max-width: calc(100vw - 32px);
   background: var(--surface);
   color: var(--text);
   min-width: 300px;
@@ -519,47 +679,40 @@ button.danger-subtle:hover {
 }
 
 .dialog h3 {
-  margin: 0 0 16px;
-  font-size: 14px;
+  margin: 0 0 var(--space-4);
+  font-size: var(--text-lg);
   font-weight: 600;
 }
 
 .dialog input {
   width: 100%;
-  padding: 8px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
+  height: var(--field-h);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--field-border);
+  border-radius: var(--radius);
   background: var(--bg);
   color: var(--text);
-  font-size: 13px;
+  font-size: var(--text-md);
   box-sizing: border-box;
+}
+
+/* A dialog's buttons are as tall as its fields, so a row of both lines up. */
+.dialog button:not(.icon-btn) {
+  min-height: var(--field-h);
+  padding: 0 var(--space-4);
 }
 
 .dialog-hint {
   margin-top: 12px;
-  font-size: 12px;
+  font-size: var(--text-sm);
   color: var(--text-dim);
   line-height: 1.5;
 }
 
 .dialog-error {
   margin-top: 12px;
-  font-size: 12px;
-  color: #dc2626;
-}
-
-.new-options {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 16px;
-}
-
-.new-options button {
-  flex: 1;
-  padding: 12px;
-  flex-direction: column;
-  gap: 6px;
-  font-size: 13px;
+  font-size: var(--text-sm);
+  color: var(--danger-text);
 }
 
 /* Earlier versions and Deleted: a list of times (or names), each with Restore. */
@@ -578,10 +731,10 @@ button.danger-subtle:hover {
 .history-list li {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 0;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
   border-bottom: 1px solid var(--border);
-  font-size: 13px;
+  font-size: var(--text-base);
 }
 
 .history-label {
@@ -591,7 +744,7 @@ button.danger-subtle:hover {
 }
 
 .history-detail {
-  font-size: 12px;
+  font-size: var(--text-sm);
   color: var(--text-dim);
   white-space: nowrap;
 }
@@ -602,8 +755,8 @@ button.danger-subtle:hover {
   padding: 0 6px;
   border-radius: 8px;
   background: var(--accent);
-  color: #fff;
-  font-size: 11px;
+  color: var(--on-accent);
+  font-size: var(--text-xs);
   line-height: 16px;
 }
 
@@ -615,9 +768,9 @@ button.danger-subtle:hover {
 .editor-password,
 .editor-add {
   display: flex;
-  gap: 8px;
+  gap: var(--space-2);
   width: 100%;
-  margin-top: 8px;
+  margin-top: var(--space-3);
 }
 
 .editor-add {
@@ -633,8 +786,8 @@ button.danger-subtle:hover {
 .dialog-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
-  margin-top: 16px;
+  gap: var(--space-2);
+  margin-top: var(--space-5);
 }
 
 /* --- Placeholder --- */
@@ -655,14 +808,15 @@ button.danger-subtle:hover {
 .browser-sections {
   display: flex;
   flex: 0 0 var(--pane-header-h);
-  gap: 4px;
-  padding: 0 12px;
+  gap: 0;
+  padding: 0 var(--space-2);
   border-bottom: 1px solid var(--border);
 }
 
 .browser-sections .section {
   flex: 1;
   justify-content: center;
+  min-height: 0;
   padding: 0;
   margin-bottom: -1px;
   border: 0;
@@ -671,8 +825,12 @@ button.danger-subtle:hover {
   background: transparent;
   color: var(--text-dim);
   font: inherit;
-  font-size: 12px;
+  font-size: var(--control-font);
   cursor: pointer;
+}
+
+.browser-sections .section:focus-visible {
+  outline-offset: -2px;
 }
 
 .browser-sections .section:hover {
@@ -683,7 +841,7 @@ button.danger-subtle:hover {
 
 .browser-sections .section.on {
   color: var(--text);
-  border-bottom-color: var(--accent);
+  border-bottom-color: var(--focus);
 }
 
 /* --- The two right-hand columns ---
@@ -737,7 +895,7 @@ button.danger-subtle:hover {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 12px;
+  padding: var(--space-3) var(--space-3) var(--space-5);
 }
 
 .collection-group {
@@ -750,17 +908,25 @@ button.danger-subtle:hover {
   border-left: 2px solid var(--border);
 }
 
+/* The tools repeat on every item, so they are a size quieter than a bar's. */
+.group-head,
+.item-tools {
+  --icon-btn: 28px;
+  --icon: 14px;
+}
+
 .group-head {
   display: flex;
   align-items: center;
-  gap: 2px;
-  margin-bottom: 8px;
+  gap: var(--icon-gap);
+  margin-bottom: var(--space-2);
 }
 
 .group-name,
 .item-input {
   min-width: 0;
-  padding: 4px 6px;
+  min-height: 28px;
+  padding: var(--space-1) var(--space-2);
   border: 1px solid transparent;
   border-radius: 4px;
   background: transparent;
@@ -776,12 +942,12 @@ button.danger-subtle:hover {
 
 .group-name:hover,
 .item-input:hover {
-  border-color: var(--border);
+  border-color: var(--field-border);
 }
 
 .group-name:focus,
 .item-input:focus {
-  border-color: var(--accent);
+  border-color: var(--focus);
   background: var(--surface);
 }
 
@@ -796,10 +962,10 @@ button.danger-subtle:hover {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
-  gap: 8px;
-  padding: 8px;
+  gap: var(--space-3);
+  padding: var(--space-3);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius);
   background: var(--surface);
 }
 
@@ -850,20 +1016,20 @@ button.danger-subtle:hover {
 
 .item-long {
   resize: vertical;
-  font-size: 12px;
+  font-size: var(--text-sm);
   line-height: 1.4;
 }
 
 .item-src {
   font-family: "SF Mono", "Fira Code", monospace;
-  font-size: 11px;
+  font-size: var(--text-xs);
   color: var(--text-dim);
   overflow-wrap: anywhere;
 }
 
 .item-tools {
   display: flex;
-  gap: 2px;
+  gap: var(--icon-gap);
   margin-left: auto;
 }
 
@@ -877,13 +1043,13 @@ button.danger-subtle:hover {
   border: 1px dashed var(--border);
   border-radius: 6px;
   color: var(--text-dim);
-  font-size: 12px;
+  font-size: var(--text-sm);
   text-align: center;
   cursor: pointer;
 }
 
 .item-drop:hover {
-  border-color: var(--accent);
+  border-color: var(--focus);
   color: var(--text);
 }
 
@@ -914,11 +1080,25 @@ button.item-drop {
     grid-template-rows: auto minmax(0, 11rem) minmax(0, 1fr);
   }
 
-  /* The bar's four things want 339px at the desktop's spacing, which at
-     320px widens the whole page into a sideways scroll. */
+  /* The bar's things want more than a phone has at the desktop's spacing,
+     which widens the whole page into a sideways scroll: View and Logout
+     keep only their icons here (their names stay for a screen reader). */
   .header {
-    gap: 8px;
-    padding: 8px 12px;
+    gap: var(--space-1);
+    padding: 0 var(--space-2) 0 var(--space-3);
+  }
+
+  .header-link .label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .dialog {
+    padding: 20px;
   }
 
   .panel-browser {
@@ -941,3 +1121,114 @@ button.item-drop {
   }
 }
 
+/* Below 420px, Resources and Editors are icons as well. */
+@media (max-width: 419px) {
+  .header .label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+/* On a touch screen: the collection's tools a size up, no ⌘⏎ (there is no
+   keyboard to press it on), and fields at 16px, below which iOS zooms the
+   whole page on every tap into one. */
+@media (pointer: coarse) {
+  .group-head,
+  .item-tools {
+    --icon-btn: 32px;
+    --icon: 16px;
+  }
+
+  button kbd {
+    display: none;
+  }
+
+  .dialog input,
+  .group-name,
+  .item-input,
+  .editor-area textarea,
+  .panel-resource textarea {
+    font-size: max(1rem, 16px);
+  }
+}
+
+/* A pane's header answers to the pane's width, not the window's: between
+   768px and about 1000px the middle column is 260-330px, narrower than on a
+   phone. Each pane is a container, and its header gives up, in turn, the
+   shortcut, then a row: the name above, the tools below, Save as its icon
+   (its colour still says Saved or Not saved, and the notice says why). */
+.editor-area,
+.panel-resource,
+.panel-collection {
+  container: pane / inline-size;
+}
+
+@container pane (max-width: 479px) {
+  .pane-header kbd {
+    display: none;
+  }
+}
+
+@container pane (max-width: 359px) {
+  .pane-header {
+    flex-wrap: wrap;
+    flex-basis: auto;
+    height: auto;
+    row-gap: var(--space-1);
+    padding-block: var(--space-2);
+  }
+
+  .pane-header .pane-gap {
+    flex-basis: 100%;
+    height: 0;
+  }
+
+  .pane-header > button:not(.icon-btn) {
+    margin: 0 var(--space-1);
+  }
+
+  .pane-header > button:not(.icon-btn)::before {
+    display: none;
+  }
+
+  .pane-header .label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+/* The notice's two live regions (components/Notice.tsx): always in the page,
+   so a screen reader is listening before anything is said, and out of the
+   grid they sit in. The notice itself is fixed where it has always been. */
+.notice-live {
+  position: fixed;
+}
+
+/* The resources sidebar's panel under its tabs: the column the tabs head. */
+.tab-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+/* A reader who has asked for less motion gets none: the notice doesn't slide
+   in, and hovers change at once. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

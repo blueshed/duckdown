@@ -41,5 +41,5 @@ export function CssPreview({ css }: { css: () => string }) {
 </html>`;
   });
 
-  return <PreviewFrame srcdoc={srcdoc} />;
+  return <PreviewFrame srcdoc={srcdoc} title="Preview of the stylesheet" />;
 }

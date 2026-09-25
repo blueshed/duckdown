@@ -38,6 +38,7 @@ to touch it.
 | `--muted` | Quieter text: quotes, the navigation |
 | `--accent` | Links, the page you're on in the navigation, the contents list |
 | `--border`, `--surface` | Lines, and the background of code, table headings and the contents list |
+| `--field-border` | The search box's edge, darker than the lines so it can be seen |
 | `--font-body`, `--font-mono` | Fonts for text and for code |
 | `--font-heading` | Headings' font (they use `--font-body` unless you set it) |
 | `--measure` | How wide the text runs |
@@ -47,6 +48,16 @@ to touch it.
 Any other CSS may follow; the variables are just the easy part. Change a colour
 through its variable rather than by restyling elements, and everything that
 uses it — links, callouts, the navigation — changes together.
+
+When you change a colour, check it can still be read: text wants 4.5 times the
+contrast of its background (any contrast checker will say), on `--bg` and on
+`--surface`, in light and in dark. duckdown's own colours all pass.
+
+A rule of yours in `theme.css` beats duckdown's however plain it is: the base's
+rules sit in a cascade layer, and yours don't, so `h1 { color: teal; }` is
+enough. And if you animate something — the duck on the home page wobbles —
+put it inside `@media (prefers-reduced-motion: no-preference) { … }`: some
+readers ask their system for less motion, and duckdown stops it for them anyway.
 
 ## Dark mode
 

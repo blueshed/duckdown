@@ -396,8 +396,10 @@ export async function collectionProblems(pages: Storage, folder: string, debug =
 
 // --- Rendering ---------------------------------------------------------
 
+// alt="": the title is beside it, inside the same link, and a screen reader
+// read it twice ("Sunflowers Sunflowers") when the picture said it as well.
 const img = (item: Item) => item.thumb
-  ? `<img class="thumb" src="${escapeHtml(item.thumb)}" alt="${escapeHtml(item.title)}" loading="lazy">`
+  ? `<img class="thumb" src="${escapeHtml(item.thumb)}" alt="" loading="lazy">`
   : "";
 
 // A thumbnail links to its item's page — when items have pages. A collection

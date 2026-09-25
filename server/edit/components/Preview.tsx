@@ -68,5 +68,5 @@ export function Preview() {
     return html.includes("</head>") ? html.replace("</head>", `${css}</head>`) : css + html;
   });
 
-  return <PreviewFrame srcdoc={srcdoc} />;
+  return <PreviewFrame srcdoc={srcdoc} title="Preview of the page" />;
 }
