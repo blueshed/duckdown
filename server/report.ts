@@ -67,8 +67,14 @@ function table(heading: string, rows: [string, number][], empty: string): string
   return `| ${heading} | Views |\n|---|---:|\n${rows.map(([k, v]) => `| ${cell(k)} | ${number(v)} |`).join("\n")}\n`;
 }
 
-export function reportMarkdown(views: View[], now: Date): string {
-  const probes = views.filter((v) => isProbe(v.path)).length;
+// A day's counts, whole: what its report says, kept beside it as <day>.json
+// so a month's page is made from its days, keeping no count of its own.
+export type Counts = {
+  lines: number; readers: number; crawlers: number; missing: number; errors: number; files: number; probes: number;
+  read: Record<string, number>; notFound: Record<string, number>; from: Record<string, number>;
+};
+
+export function countViews(views: View[]): Counts {
   const asked = views.filter((v) => !isProbe(v.path));
   const pages = asked.filter((v) => !FILE.test(v.path.split("?")[0]!));
   const readers = pages.filter((v) => !v.crawler && !ACME.test(v.path));
@@ -84,6 +90,47 @@ export function reportMarkdown(views: View[], now: Date): string {
     if (v.status < 400) count(read, v.path);
     if (v.from) count(from, v.from);
   }
+  return {
+    lines: views.length, readers: readers.length, crawlers: pages.length - readers.length,
+    missing: [...missing.values()].reduce((a, b) => a + b, 0), errors,
+    files: asked.length - pages.length, probes: views.length - asked.length,
+    read: Object.fromEntries(read), notFound: Object.fromEntries(missing), from: Object.fromEntries(from),
+  };
+}
+
+// The totals and the three tables, as a day's page and a month's both show them.
+function body(c: Counts): string[] {
+  const tally = (o: Record<string, number>): Tally => new Map(Object.entries(o));
+  return [
+    "| | |",
+    "|---|---:|",
+    `| Views by readers | ${number(c.readers)} |`,
+    `| Views by crawlers | ${number(c.crawlers)} |`,
+    `| Not found (404) | ${number(c.missing)} |`,
+    ...(c.errors ? [`| Server errors (5xx) | ${number(c.errors)} |`] : []),
+    ...(c.files ? [`| Files a page pulled in | ${number(c.files)} |`] : []),
+    ...(c.probes ? [`| Probes by scanners | ${number(c.probes)} |`] : []),
+    "",
+    ...(c.probes ? [
+      `${number(c.probes)} request(s) were probes: a scanner asking for files no site like this has (\`.env\`, \`.git\`, \`.php\`…).`,
+      "They're counted here and left out of everything else.",
+      "",
+    ] : []),
+    "## Most read",
+    "",
+    table("Page", top(tally(c.read)), "No page was read by a reader."),
+    "## Not found",
+    "",
+    "Addresses asked for that aren't there — worth a page, or an `aliases:` line on the page they meant.",
+    "",
+    table("Address", top(tally(c.notFound)), "Nothing was missing."),
+    "## Where readers came from",
+    "",
+    table("Site", top(tally(c.from)), "No reader followed a link from another site."),
+  ];
+}
+
+export function reportMarkdown(views: View[], now: Date): string {
   const stamps = views.map((v) => v.at).filter(Boolean).sort();
   const span = stamps.length ? `, from ${stamps[0]} to ${stamps.at(-1)}` : "";
   return [
@@ -94,31 +141,42 @@ export function reportMarkdown(views: View[], now: Date): string {
     `Made by \`duckdown report\` from ${number(views.length)} view line(s)${span} — exactly the lines it was given, so it`,
     "counts nothing twice. No reader is identified: the log records no address, browser or cookie.",
     "",
-    "| | |",
-    "|---|---:|",
-    `| Views by readers | ${number(readers.length)} |`,
-    `| Views by crawlers | ${number(pages.length - readers.length)} |`,
-    `| Not found (404) | ${number([...missing.values()].reduce((a, b) => a + b, 0))} |`,
-    ...(errors ? [`| Server errors (5xx) | ${number(errors)} |`] : []),
-    ...(asked.length > pages.length ? [`| Files a page pulled in | ${number(asked.length - pages.length)} |`] : []),
-    ...(probes ? [`| Probes by scanners | ${number(probes)} |`] : []),
+    ...body(countViews(views)),
+  ].join("\n");
+}
+
+const month = new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
+const short = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", timeZone: "UTC" });
+const noon = (date: string) => new Date(`${date}T12:00:00Z`);
+
+// A month's page: each day's line, linked to its report, then the month's
+// totals and tables, summed from the days' own counts.
+export function monthMarkdown(yyyymm: string, days: [string, Counts][]): string {
+  const sorted = [...days].sort(([a], [b]) => a.localeCompare(b));
+  const sum = (key: keyof Counts) => sorted.reduce((n, [, c]) => n + (c[key] as number), 0);
+  const merge = (key: "read" | "notFound" | "from") => {
+    const all: Record<string, number> = {};
+    for (const [, c] of sorted) for (const [k, v] of Object.entries(c[key])) all[k] = (all[k] ?? 0) + v;
+    return all;
+  };
+  const total: Counts = {
+    lines: sum("lines"), readers: sum("readers"), crawlers: sum("crawlers"), missing: sum("missing"),
+    errors: sum("errors"), files: sum("files"), probes: sum("probes"),
+    read: merge("read"), notFound: merge("notFound"), from: merge("from"),
+  };
+  return [
+    `title: Visitors, ${month.format(noon(`${yyyymm}-01`))}`,
     "",
-    ...(probes ? [
-      `${number(probes)} request(s) were probes: a scanner asking for files no site like this has (\`.env\`, \`.git\`, \`.php\`…).`,
-      "They're counted here and left out of everything else.",
-      "",
-    ] : []),
-    "## Most read",
+    `# Visitors, ${month.format(noon(`${yyyymm}-01`))}`,
     "",
-    table("Page", top(read), "No page was read by a reader."),
-    "## Not found",
+    `The month so far, from the reports of ${number(sorted.length)} day(s); each day's report has its own detail.`,
     "",
-    "Addresses asked for that aren't there — worth a page, or an `aliases:` line on the page they meant.",
+    "| Day | Readers | Crawlers | Not found | Probes |",
+    "|---|---:|---:|---:|---:|",
+    ...sorted.map(([date, c]) =>
+      `| [${short.format(noon(date))}](${date}.md) | ${number(c.readers)} | ${number(c.crawlers)} | ${number(c.missing)} | ${number(c.probes)} |`),
     "",
-    table("Address", top(missing), "Nothing was missing."),
-    "## Where readers came from",
-    "",
-    table("Site", top(from), "No reader followed a link from another site."),
+    ...body(total),
   ].join("\n");
 }
 
@@ -151,11 +209,24 @@ export async function reportCommand(
     const date = dayOf(v.at) ?? today;
     days.set(date, [...(days.get(date) ?? []), v]);
   }
+  const months = new Set<string>();
   for (const [date, lines] of [...days].sort(([a], [b]) => a.localeCompare(b))) {
     const key = `${date.slice(0, 7)}/${date}.md`;
     const replacing = await store.exists(key);
-    await store.write(key, reportMarkdown(lines, new Date(`${date}T12:00:00Z`)));
+    await store.write(key, reportMarkdown(lines, noon(date)));
+    await store.write(key.replace(/\.md$/, ".json"), JSON.stringify(countViews(lines)));
     say(`${replacing ? "replaced" : "wrote"} reports/${key}, from ${number(lines.length)} view line(s)`);
+    months.add(date.slice(0, 7));
+  }
+  // Each month touched, made again from every day it has counts for.
+  for (const yyyymm of months) {
+    const { files } = await store.list(yyyymm);
+    const counted: [string, Counts][] = [];
+    for (const f of files.filter((f) => /^\d{4}-\d{2}-\d{2}\.json$/.test(f.name))) {
+      counted.push([f.name.slice(0, 10), JSON.parse(await store.read(f.path)) as Counts]);
+    }
+    await store.write(`${yyyymm}/index.md`, monthMarkdown(yyyymm, counted));
+    say(`wrote reports/${yyyymm}/index.md, from ${number(counted.length)} day(s)`);
   }
   return 0;
 }

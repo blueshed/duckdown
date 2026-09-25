@@ -4,7 +4,7 @@ import { mkdtempSync, writeFileSync, readFileSync, existsSync, rmSync } from "fs
 import { join } from "path";
 import { RUN, SITE } from "./helpers";
 import { viewLine, parseView } from "../server/log";
-import { reportMarkdown, reportCommand, isProbe, dayOf } from "../server/report";
+import { reportMarkdown, reportCommand, isProbe, dayOf, monthMarkdown, countViews } from "../server/report";
 import { LocalStorage } from "../server/storage";
 import { cli } from "../server/cli";
 
@@ -122,7 +122,10 @@ describe("the report", () => {
     expect(await reportCommand([], async () => log, store, NOW, (l) => said.push(l))).toBe(0);
     expect(readFileSync(join(root, "2026-09/2026-09-24.md"), "utf8")).toContain("| Views by readers | 2 |");
     expect(await reportCommand([], async () => "view / 200 3ms\r\n", store, NOW, (l) => said.push(l))).toBe(0);
-    expect(said).toEqual(["wrote reports/2026-09/2026-09-24.md, from 2 view line(s)", "replaced reports/2026-09/2026-09-24.md, from 1 view line(s)"]);
+    expect(said).toEqual([
+      "wrote reports/2026-09/2026-09-24.md, from 2 view line(s)", "wrote reports/2026-09/index.md, from 1 day(s)",
+      "replaced reports/2026-09/2026-09-24.md, from 1 view line(s)", "wrote reports/2026-09/index.md, from 1 day(s)",
+    ]);
     await expect(reportCommand([], async () => "listening\n", store, NOW)).rejects.toThrow(
       "No view lines in what was read: pipe in the site's log, and check DUCKDOWN_LOG=1 is set where it runs");
   });
@@ -142,11 +145,41 @@ describe("the report", () => {
       "wrote reports/2026-09/2026-09-22.md, from 1 view line(s)",
       "wrote reports/2026-09/2026-09-23.md, from 2 view line(s)",
       "wrote reports/2026-09/2026-09-24.md, from 1 view line(s)",
+      "wrote reports/2026-09/index.md, from 3 day(s)",
     ]);
     const day = readFileSync(join(root, "2026-09/2026-09-23.md"), "utf8");
     expect(day).toStartWith("title: Visitors, 23 September 2026\n");
     expect(day).toContain("| Views by readers | 2 |");
     expect(readFileSync(join(root, "2026-09/2026-09-24.md"), "utf8")).toContain("/untimed.html");
+  });
+
+  test("a month's page: its days, linked, and their sums; a day reported again isn't counted twice", async () => {
+    const root = mkdtempSync(join(RUN, "reports-month-"));
+    const store = new LocalStorage(root);
+    const said: string[] = [];
+    const line = (path: string, at: string, extra = "") => JSON.stringify({ message: `view ${path} 200 3ms${extra}`, timestamp: at });
+    await reportCommand([], async () => [
+      line("/", "2026-09-20T10:00:00Z"), line("/a.html", "2026-09-20T11:00:00Z", " from=news.example.com"),
+      line("/", "2026-09-21T10:00:00Z"), JSON.stringify({ message: "view /.env 404 1ms", timestamp: "2026-09-21T10:00:00Z" }),
+      line("/", "2026-10-01T10:00:00Z"),
+    ].join("\n"), store, NOW, (l) => said.push(l));
+    expect(said.filter((l) => l.includes("index.md"))).toEqual([
+      "wrote reports/2026-09/index.md, from 2 day(s)", "wrote reports/2026-10/index.md, from 1 day(s)"]);
+    const month = () => readFileSync(join(root, "2026-09/index.md"), "utf8");
+    expect(month()).toStartWith("title: Visitors, September 2026\n\n# Visitors, September 2026\n");
+    expect(month()).toContain("| [20 September](2026-09-20.md) | 2 | 0 | 0 | 0 |");
+    expect(month()).toContain("| [21 September](2026-09-21.md) | 1 | 0 | 0 | 1 |");
+    expect(month()).toContain("| Views by readers | 3 |");
+    expect(month()).toContain("| Probes by scanners | 1 |");
+    expect(month()).toContain("| / | 2 |");
+    expect(month()).toContain("| news.example.com | 1 |");
+    // The 21st again, with more of its day: replaced, and the month with it — never added to.
+    await reportCommand([], async () => [line("/", "2026-09-21T10:00:00Z"), line("/b.html", "2026-09-21T12:00:00Z")].join("\n"), store, NOW, () => {});
+    expect(month()).toContain("| [21 September](2026-09-21.md) | 2 | 0 | 0 | 0 |");
+    expect(month()).toContain("| Views by readers | 4 |");
+    expect(JSON.parse(readFileSync(join(root, "2026-09/2026-09-21.json"), "utf8"))).toEqual(countViews(
+      [line("/", "2026-09-21T10:00:00Z"), line("/b.html", "2026-09-21T12:00:00Z")].map((l) => parseView(l)!)));
+    expect(monthMarkdown("2026-02", [])).toContain("from the reports of 0 day(s)");
   });
 
   test("is a duckdown command, reading a saved log into this site's reports/", async () => {

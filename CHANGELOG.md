@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- **A month's report.** `duckdown report` now writes each month an
+  `index.md` beside its days: each day's line, linked to its report, and
+  the month's totals, most read, not found and referring sites. It is made
+  again from the days' own counts (kept as `<day>.json` beside each report)
+  on every run, so a day reported twice is never counted twice.
+
 ## 0.13.3 — 2026-09-25
 
 - **Reports tell readers from scanners.** Bots probing for `/.env`,
