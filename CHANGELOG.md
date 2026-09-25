@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- **`duckdown upgrade`.** In a site that has duckdown as a dependency,
+  `bunx duckdown upgrade` moves it to the newest tag (or `upgrade 0.12.3`, the
+  one named): it exports the site as it is, re-pins, installs, refreshes the
+  skill's copy, exports again and compares every file, then prints the
+  changelog in between. A version that won't install or can't export the site
+  is put back. It commits nothing.
+
 ## 0.12.2 — 2026-09-25
 
 A tidy, with four small corrections it turned up:

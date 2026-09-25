@@ -64,7 +64,8 @@ duckdown/
 │   ├── base/               # site.css, search.js: served and exported when a site has none of its own
 │   ├── help/               # The editor's Help, one markdown page per topic, for the person editing
 │   ├── init.ts             # scaffold(root, {vendored}): what both ways in write (see below)
-│   ├── cli.ts              # bin `duckdown`: the server, or `duckdown init`
+│   ├── cli.ts              # bin `duckdown`: the server, or `duckdown init|user|publish|pull|report|upgrade`
+│   ├── upgrade.ts          # duckdown upgrade [tag]: export, re-pin, install, refresh the skill, export, compare
 │   ├── serve.ts            # The published flavour's server: a dist/ folder, nothing else
 │   ├── hosts.ts            # One site, one address: which names move to DUCKDOWN_ORIGIN, which are noindex
 │   ├── scaffold.ts         # Says so when `bun create` left a half-scaffold
@@ -138,6 +139,7 @@ duckdown/
 │   ├── users.test.ts       # duckdown user, the password prompt, what a session is checked against
 │   ├── remote.test.ts      # The git kind against real repositories; the publish route; duckdown publish|pull
 │   ├── report.test.ts      # parseView, the report, duckdown report
+│   ├── upgrade.test.ts     # duckdown upgrade against scratch sites, git/install/export stood in
 │   ├── editor.test.tsx     # The editor's code in happy-dom, against that server
 │   ├── units.test.ts       # pid, config, storage, auth, error handler
 │   ├── s3.test.ts          # S3Storage via Bun's S3 client + fake-s3.ts
@@ -572,7 +574,7 @@ Paths: storage keys are real names. The server decodes the URL path (`after()`);
 
 ## Two ways in, one scaffold
 
-`server/init.ts` exports `scaffold(root, { vendored })`, which writes everything a site needs around the code: `site/` (index, theme.css, the seed's template, users.json), `.env`, `.gitignore` lines, `.railway/railway.ts` (Railway's infrastructure-as-code, plus a `railway` devDependency to resolve its `railway/iac` import), the authoring skill, `launch.json`, a CLAUDE.md, and package.json's scripts. **Install** (`bun add` then `bunx duckdown init`, via `cli.ts`) runs it with `vendored: false`; **create** (`create/setup.ts`) with `vendored: true`. The only difference in what it writes is the scripts' paths (`scripts()`): `node_modules/duckdown/server/…` or `server/…`. It never overwrites and returns what it wrote and what it left alone. Create mode keeps `server/`, `tests/` and `bunfig.toml`: an owner starts with the suite. There is no upgrade path from create; the README says to fork on GitHub for that.
+`server/init.ts` exports `scaffold(root, { vendored })`, which writes everything a site needs around the code: `site/` (index, theme.css, the seed's template, users.json), `.env`, `.gitignore` lines, `.railway/railway.ts` (Railway's infrastructure-as-code, plus a `railway` devDependency to resolve its `railway/iac` import), the authoring skill, `launch.json`, a CLAUDE.md, and package.json's scripts. **Install** (`bun add` then `bunx duckdown init`, via `cli.ts`) runs it with `vendored: false`; **create** (`create/setup.ts`) with `vendored: true`. The only difference in what it writes is the scripts' paths (`scripts()`): `node_modules/duckdown/server/…` or `server/…`. It never overwrites and returns what it wrote and what it left alone. Create mode keeps `server/`, `tests/` and `bunfig.toml`: an owner starts with the suite. There is no upgrade path from create; the README says to fork on GitHub for that. An installed site upgrades with `duckdown upgrade [tag]` (`upgrade.ts`): it exports with the version it has, re-pins (in `dependencies` or `devDependencies`, as init takes either), installs, refreshes the skill's copy, exports again and compares every file, and prints the changelog in between; a version that won't install or export the site is put back, and nothing is committed. Its `git`, `bun install` and export go through a `Run` the tests stand in for.
 
 ## What a site gets without asking
 

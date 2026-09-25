@@ -190,7 +190,7 @@ export default defineRailway(() => {
 
 A duckdown site: markdown in \`site/\`, published as files. ${vendored
     ? "duckdown's code is `server/` — yours to change, with its tests. There is no upgrade path: to follow upstream, fork duckdown on GitHub instead."
-    : "duckdown is a pinned dependency (`package.json`), not a copy: upgrade it by changing the tag and running `bun install`."}
+    : "duckdown is a pinned dependency (`package.json`), not a copy: upgrade it with `bunx duckdown upgrade` (the newest tag, or name one), which re-pins, installs, refreshes the skill and compares the export before and after, then commit what it changed. If the content lives somewhere else too (a bucket), bring it here first."}
 
 Read \`.claude/skills/duckdown/\` before writing content: front matter, callouts,
 navigation, templates and styling, and what publishing does.

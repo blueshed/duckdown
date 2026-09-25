@@ -10,7 +10,7 @@ There are two ways in. They share one scaffold and differ in one thing: where
 duckdown's code lives. Your content (`site/`: pages, templates, static files)
 never depends on which you chose.
 
-**Install it** — the default. duckdown is a dependency; an upgrade is a tag bump.
+**Install it** — the default. duckdown is a dependency; an upgrade is `bunx duckdown upgrade`.
 
 ```sh
 mkdir my-site && cd my-site
@@ -44,9 +44,9 @@ the code *and* merge upstream, fork duckdown on GitHub instead.
 |---|---|---|
 | duckdown's code | `node_modules/duckdown/server/` | `./server/` |
 | Scripts run | `node_modules/duckdown/server/main.ts`… | `server/main.ts`… |
-| Upgrading | change the tag, `bun install` | none: it's your code |
+| Upgrading | `bunx duckdown upgrade [tag]`: re-pins, installs, refreshes the skill, and compares the export before and after | none: it's your code |
 | duckdown's tests | not included | `./tests/`, at 100% |
-| The authoring skill | copied once; refresh with `cp -r node_modules/duckdown/.claude/skills/duckdown .claude/skills/` | in the clone |
+| The authoring skill | copied once; `duckdown upgrade` refreshes it | in the clone |
 
 Moving between them is one paragraph, not a command. To take ownership: copy
 `node_modules/duckdown/server` to `./server` and point the scripts at it. To go

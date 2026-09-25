@@ -13,7 +13,8 @@
 11. [The editor](#the-editor)
 12. [Search](#search)
 13. [Publishing](#publishing)
-14. [Troubleshooting](#troubleshooting)
+14. [Upgrading duckdown](#upgrading-duckdown)
+15. [Troubleshooting](#troubleshooting)
 
 ## The content folder
 
@@ -829,6 +830,26 @@ published from the editor on the machine where it is edited. Set
 Where the output goes is otherwise the site's own business, not duckdown's:
 its README.md or CLAUDE.md says how it's deployed — read whichever it has.
 Don't invent a deployment step that isn't written down.
+
+## Upgrading duckdown
+
+A site that has duckdown as a dependency (`github:blueshed/duckdown#vX.Y.Z` in
+`package.json`) moves to another version with one command, in the site's folder:
+
+```sh
+bunx duckdown upgrade            # the newest tag
+bunx duckdown upgrade 0.12.3     # or the one named
+```
+
+It exports the site with the version it has, re-pins, runs `bun install`,
+refreshes `.claude/skills/duckdown/` (this skill), exports again, and compares
+every file: it says how many are the same and names each one added, gone or
+changed, then prints the changelog entries in between. A version that won't
+install, or can't export the site, is put back. It commits nothing — look at
+what it reports, then commit `package.json`, `bun.lock` and the skill. A site
+whose content also lives somewhere else (a served site's bucket) should bring
+that here first, so the comparison is of the content that is live. A site made
+by `bun create` owns its code and has no upgrade.
 
 ## Troubleshooting
 
