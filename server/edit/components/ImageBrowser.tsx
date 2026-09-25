@@ -9,6 +9,9 @@ import { modal } from "../modal";
 import { ResourceList } from "./ResourceList";
 import { ReportList } from "./ReportList";
 
+type Tab = "images" | "styles" | "templates" | "reports";
+const TABS: [Tab, string][] = [["images", "images"], ["styles", "css"], ["templates", "templates"], ["reports", "reports"]];
+
 export function ImageBrowser() {
   const files = signal<FileEntry[]>([]);
   const folders = signal<FolderEntry[]>([]);
@@ -75,8 +78,21 @@ export function ImageBrowser() {
   // Three kinds of resource, one chooser. Images are inserted into the page at
   // the cursor; a stylesheet or a template opens below the page to be edited.
   // And what the site's own tasks reported, to read.
-  const tab = signal<"images" | "styles" | "templates" | "reports">("images");
+  const tab = signal<Tab>("images");
   const on = (name: string) => tab.map((t) => (t === name ? "section on" : "section"));
+
+  // Tabs as a screen reader knows them (role=tab, the chosen one selected),
+  // and as a keyboard expects: Tab reaches the chosen one, the arrows (and
+  // Home, End) move along them.
+  const arrows = (e: KeyboardEvent) => {
+    const at = TABS.findIndex(([name]) => name === tab.peek());
+    const to = { ArrowRight: at + 1, ArrowLeft: at - 1, Home: 0, End: TABS.length - 1 }[e.key];
+    if (to === undefined) return;
+    e.preventDefault();
+    const [name] = TABS[(to + TABS.length) % TABS.length]!;
+    tab.set(name);
+    (e.currentTarget as HTMLElement).querySelector<HTMLElement>(`#tab-${name}`)!.focus();
+  };
 
   return (
     <div class="sidebar">
@@ -87,13 +103,15 @@ export function ImageBrowser() {
         </button>
       </div>
 
-      <div class="browser-sections">
-        <button class={on("images")} onclick={() => tab.set("images")}>images</button>
-        <button class={on("styles")} onclick={() => tab.set("styles")}>css</button>
-        <button class={on("templates")} onclick={() => tab.set("templates")}>templates</button>
-        <button class={on("reports")} onclick={() => tab.set("reports")}>reports</button>
+      <div class="browser-sections" role="tablist" aria-label="Resources" onkeydown={arrows}>
+        {TABS.map(([name, label]) => (
+          <button class={on(name)} role="tab" id={`tab-${name}`} onclick={() => tab.set(name)}
+            aria-selected={tab.map((t) => String(t === name))}
+            tabindex={tab.map((t) => (t === name ? "0" : "-1"))}>{label}</button>
+        ))}
       </div>
 
+      <div class="tab-panel" role="tabpanel" aria-labelledby={tab.map((t) => `tab-${t}`)}>
       {when(tab.map((t) => t === "styles"), () => <ResourceList section="static" />)}
       {when(tab.map((t) => t === "templates"), () => <ResourceList section="templates" />)}
       {when(tab.map((t) => t === "reports"), () => <ReportList />)}
@@ -154,6 +172,7 @@ export function ImageBrowser() {
         </div>
       </div>
       </>)}
+      </div>
 
       {when(showFolderInput, () => {
         const dialog = modal();

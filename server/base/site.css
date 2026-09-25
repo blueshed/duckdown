@@ -10,6 +10,7 @@
   --muted: #59636e;
   --accent: #0969da;
   --border: #d1d9e0;
+  --field-border: #818b98; /* the search box's edge: 3:1, where --border is decoration */
   --surface: #f6f8fa; /* code, table headings, the contents list */
 
   --font-body: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -41,6 +42,7 @@
     --muted: #9198a1;
     --accent: #4493f8;
     --border: #3d444d;
+    --field-border: #656c76;
     --surface: #151b23;
     --note: #4493f8;
     --tip: #3fb950;
@@ -50,663 +52,714 @@
   }
 }
 
-/* --- Page --- */
+/* Every rule below is in the base layer, and a theme's (theme.css, a page's
+   css:) are not in any layer, so a theme's rule wins by coming later, however
+   plain its selector — a theme overrides by saying so, not by out-specifying
+   the base. The variables above stay outside it: they are the interface. */
+@layer base {
+  /* --- Page --- */
 
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-}
-
-html {
-  -webkit-text-size-adjust: 100%;
-}
-
-body {
-  max-width: var(--measure);
-  margin: 0 auto;
-  padding: 2rem 1.25rem 5rem;
-  background: var(--bg);
-  color: var(--text);
-  font: 1.0625rem/1.65 var(--font-body);
-  -webkit-font-smoothing: antialiased;
-  text-rendering: optimizeLegibility;
-}
-
-/* --- Headings: each links to itself (#…), quietly --- */
-
-h1, h2, h3, h4, h5, h6 {
-  margin: 2.2em 0 0.6em;
-  font-family: var(--font-heading, var(--font-body));
-  line-height: 1.25;
-  scroll-margin-top: 1rem; /* a #heading link lands with room above */
-}
-
-h1 {
-  margin-top: 0.5em;
-  font-size: clamp(1.9rem, 1.5rem + 1.6vw, 2.5rem);
-  letter-spacing: -0.01em;
-}
-
-h2 { font-size: 1.5rem; }
-h3 { font-size: 1.2rem; }
-h4 { font-size: 1rem; }
-h5, h6 { font-size: 0.9rem; color: var(--muted); }
-
-:is(h1, h2, h3, h4, h5, h6) > a {
-  color: inherit;
-  text-decoration: none;
-}
-
-:is(h2, h3, h4) > a:hover::after {
-  content: " #";
-  color: var(--muted);
-  font-weight: 400;
-}
-
-/* --- Text --- */
-
-p, ul, ol, dl, table, pre, blockquote, figure {
-  margin: 0 0 1.1em;
-}
-
-a {
-  color: var(--accent);
-  text-decoration-thickness: 1px;
-  text-underline-offset: 0.15em;
-}
-
-a:hover {
-  text-decoration-thickness: 2px;
-}
-
-ul, ol {
-  padding-left: 1.5em;
-}
-
-li {
-  margin: 0.25em 0;
-}
-
-li > ul, li > ol {
-  margin: 0.25em 0;
-}
-
-/* Task lists: - [x] done */
-li:has(> input[type="checkbox"]) {
-  margin-left: -1.4em;
-  list-style: none;
-}
-
-li > input[type="checkbox"] {
-  margin: 0 0.45em 0 0;
-  vertical-align: -0.1em;
-  accent-color: var(--accent);
-}
-
-hr {
-  margin: 2.5rem 0;
-  border: 0;
-  border-top: 1px solid var(--border);
-}
-
-img, video {
-  max-width: 100%;
-  height: auto;
-}
-
-::selection {
-  background: color-mix(in srgb, var(--accent) 25%, transparent);
-}
-
-:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
-/* --- The site navigation (each folder's index.md) --- */
-
-/* The navigation and the search button share a row; the rule under it belongs
-   to the row, not to the list, so the button sits above it too. */
-.topbar {
-  position: relative;      /* the search panel hangs off it on a narrow screen */
-  display: flex;
-  align-items: baseline;
-  gap: 1.5rem;
-  margin: 0 0 3rem;
-  padding: 0 0 0.9rem;
-  border-bottom: 1px solid var(--border);
-}
-
-.topbar > nav {
-  flex: 1;
-  min-width: 0;
-}
-
-ul.nav {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.25rem 1.5rem;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-ul.nav li {
-  margin: 0;
-}
-
-ul.nav a {
-  color: var(--muted);
-  font-weight: 500;
-  text-decoration: none;
-}
-
-ul.nav a:hover,
-ul.nav a[aria-current] {
-  color: var(--text);
-}
-
-/* This page, or the section it's in */
-ul.nav a[aria-current] {
-  text-decoration: underline 2px var(--accent);
-  text-underline-offset: 0.55em;
-}
-
-/* --- The contents list (toc: true) --- */
-
-nav.toc {
-  margin: 1.5rem 0 2.25rem;
-  padding: 0.85rem 1.1rem;
-  border-left: 3px solid var(--accent);
-  border-radius: 0 var(--radius) var(--radius) 0;
-  background: var(--surface);
-  font-size: 0.95em;
-}
-
-nav.toc ul {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-nav.toc li {
-  margin: 0.2em 0;
-}
-
-nav.toc .toc-h3 {
-  padding-left: 1.1rem;
-  font-size: 0.95em;
-}
-
-nav.toc a {
-  color: var(--text);
-  text-decoration: none;
-}
-
-nav.toc a:hover {
-  color: var(--accent);
-  text-decoration: underline;
-}
-
-/* --- Every page, by folder ({{sitemap}}) --- */
-
-ul.sitemap {
-  margin: 1rem 0;
-  padding-left: 1.25em;
-}
-
-ul.sitemap ul.sitemap {
-  margin: 0.25em 0 0.5em;
-}
-
-ul.sitemap li {
-  margin: 0.25em 0;
-}
-
-/* --- A folder's pages ({{pages}}) --- */
-
-ul.pages {
-  margin: 1.5rem 0;
-  padding: 0;
-  list-style: none;
-}
-
-ul.pages li {
-  margin: 0 0 1.4em;
-}
-
-ul.pages a {
-  font-size: 1.1em;
-  font-weight: 600;
-  text-decoration: none;
-}
-
-ul.pages a:hover {
-  text-decoration: underline;
-}
-
-ul.pages time {
-  display: block;
-  color: var(--muted);
-  font-size: 0.9em;
-}
-
-ul.pages p {
-  margin: 0.2em 0 0;
-  color: var(--muted);
-}
-
-/* --- Edit this page (signed in) --- */
-
-.user-edit {
-  position: fixed;
-  right: 1rem;
-  bottom: 1rem;
-  padding: 0.4em 0.9em;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
-  color: var(--muted);
-  font-size: 0.85rem;
-  text-decoration: none;
-}
-
-.user-edit:hover {
-  color: var(--text);
-  border-color: var(--accent);
-}
-
-/* On a narrow screen there is no corner to spare: floating it puts it on top
-   of whatever the reader is reading. It goes back into the flow at the foot
-   of the page, where it is still the last thing and covers nothing. */
-@media (max-width: 34rem) {
-  .user-edit {
-    position: static;
-    display: inline-block;
-    margin-top: 2.5rem;
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
   }
-}
 
-/* A bare URL is one long unbreakable word. Markdown turns it into a link, and
-   on a phone it sets the page's minimum width and drags everything sideways.
-   Let a link break wherever it has to; nothing else about it changes. */
-a {
-  overflow-wrap: anywhere;
-}
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
 
-/* --- Code --- */
+  body {
+    max-width: var(--measure);
+    margin: 0 auto;
+    padding: 2rem 1.25rem 5rem;
+    background: var(--bg);
+    color: var(--text);
+    font: 1.0625rem/1.65 var(--font-body);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
 
-code, kbd, pre {
-  font-family: var(--font-mono);
-}
+  /* The first thing Tab reaches, on a template that has one: past the nav to
+     the page. Out of sight until it has focus. */
+  .skip {
+    position: absolute;
+    top: 0.5rem;
+    left: 0.5rem;
+    z-index: 10;
+    padding: 0.5rem 0.9rem;
+    border: 2px solid var(--accent);
+    border-radius: var(--radius);
+    background: var(--bg);
+    color: var(--accent);
+    transform: translateY(-200%);
+  }
 
-code {
-  padding: 0.12em 0.35em;
-  border-radius: 4px;
-  background: var(--surface);
-  font-size: 0.875em;
-  /* A path like templates/post.html is one unbreakable word, and in a table
-     cell on a narrow phone it sets the column's minimum width and pushes the
-     whole page sideways. `anywhere` lets it wrap and, unlike `break-word`,
-     counts for the minimum too — which is the half that fixes the table. */
-  overflow-wrap: anywhere;
-}
+  .skip:focus {
+    transform: none;
+  }
 
-pre {
-  padding: 1rem 1.1rem;
-  overflow-x: auto;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
-  font-size: 0.875rem;
-  line-height: 1.55;
-}
+  /* --- Headings: each links to itself (#…), quietly --- */
 
-pre code {
-  padding: 0;
-  background: none;
-  font-size: inherit;
-  overflow-wrap: normal;   /* a fenced block scrolls; it must not rewrap */
-}
+  h1, h2, h3, h4, h5, h6 {
+    margin: 2.2em 0 0.6em;
+    text-wrap: balance; /* no heading ends on one lonely word */
+    font-family: var(--font-heading, var(--font-body));
+    line-height: 1.25;
+    scroll-margin-top: 1rem; /* a #heading link lands with room above */
+  }
 
-kbd {
-  padding: 0.1em 0.4em;
-  border: 1px solid var(--border);
-  border-bottom-width: 2px;
-  border-radius: 4px;
-  font-size: 0.85em;
-}
+  h1 {
+    margin-top: 0.5em;
+    font-size: clamp(1.9rem, 1.5rem + 1.6vw, 2.5rem);
+    letter-spacing: -0.01em;
+  }
 
-/* --- Quotes and callouts --- */
+  h2 { font-size: 1.5rem; }
+  h3 { font-size: 1.2rem; }
+  h4 { font-size: 1rem; }
+  h5, h6 { font-size: 0.9rem; color: var(--muted); }
 
-blockquote {
-  margin-right: 0;
-  margin-left: 0;
-  padding: 0.1em 1.1em;
-  border-left: 3px solid var(--border);
-  color: var(--muted);
-}
+  :is(h1, h2, h3, h4, h5, h6) > a {
+    color: inherit;
+    text-decoration: none;
+  }
 
-blockquote > :last-child {
-  margin-bottom: 0;
-}
+  :is(h2, h3, h4) > a:hover::after {
+    content: " #";
+    color: var(--muted);
+    font-weight: 400;
+  }
 
-.callout {
-  --tone: var(--note);
-  padding: 0.7em 1.1em;
-  border-left-color: var(--tone);
-  border-radius: 0 var(--radius) var(--radius) 0;
-  background: color-mix(in srgb, var(--tone) 8%, transparent);
-  color: var(--text);
-}
+  /* --- Text --- */
 
-.callout.tip { --tone: var(--tip); }
-.callout.important { --tone: var(--important); }
-.callout.warning { --tone: var(--warning); }
-.callout.caution { --tone: var(--caution); }
+  p, ul, ol, dl, table, pre, blockquote, figure {
+    margin: 0 0 1.1em;
+  }
 
-.callout-title {
-  margin-bottom: 0.3em;
-  color: var(--tone);
-  font-weight: 600;
-}
+  a {
+    color: var(--accent);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.15em;
+  }
 
-/* --- Tables --- */
+  a:hover {
+    text-decoration-thickness: 2px;
+  }
 
-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.95em;
-}
+  ul, ol {
+    padding-left: 1.5em;
+  }
 
-th, td {
-  padding: 0.5em 0.75em;
-  border-bottom: 1px solid var(--border);
-  text-align: left;
-  vertical-align: top;
-}
+  li {
+    margin: 0.25em 0;
+  }
 
-th {
-  background: var(--surface);
-  font-weight: 600;
-}
+  li > ul, li > ol {
+    margin: 0.25em 0;
+  }
 
-/* A post: the way back, and when it was written (templates/post.html). */
-.back {
-  margin-bottom: 2rem;
-  font-size: 0.9rem;
-}
+  /* Task lists: - [x] done */
+  li:has(> input[type="checkbox"]) {
+    margin-left: -1.4em;
+    list-style: none;
+  }
 
-.posted {
-  margin-top: 3rem;
-  padding-top: 1rem;
-  border-top: 1px solid var(--border);
-  color: var(--muted);
-  font-size: 0.9rem;
-}
+  li > input[type="checkbox"] {
+    margin: 0 0.45em 0 0;
+    vertical-align: -0.1em;
+    accent-color: var(--accent);
+  }
 
-.posted::before {
-  content: "Posted ";
-}
+  hr {
+    margin: 2.5rem 0;
+    border: 0;
+    border-top: 1px solid var(--border);
+  }
 
-/* A post with no date: leave nothing behind, not a rule and a lone label. */
-.posted:empty {
-  display: none;
-}
+  img, video {
+    max-width: 100%;
+    height: auto;
+  }
 
+  ::selection {
+    background: color-mix(in srgb, var(--accent) 25%, transparent);
+  }
 
-/* --- Search ---
-   A button until you want it. The index arrives as one file and
-   static/search.js does the matching; this is only where it sits. */
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
 
-.search {
-  position: relative;
-  flex: none;
-}
+  /* --- The site navigation (each folder's index.md) --- */
 
-.search-toggle {
-  display: flex;
-  align-items: center;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--muted);
-  cursor: pointer;
-}
-
-.search-toggle:hover,
-.search[data-open] .search-toggle {
-  color: var(--text);
-}
-
-.search-toggle svg {
-  width: 1.05rem;
-  height: 1.05rem;
-}
-
-.search:not([data-open]) .search-panel {
-  display: none;
-}
-
-.search-panel {
-  position: absolute;
-  z-index: 5;
-  top: calc(100% + 0.6rem);
-  right: 0;
-  width: min(24rem, 78vw);
-  padding: 0.5rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg);
-  box-shadow: 0 6px 24px rgb(0 0 0 / 0.12);
-}
-
-.search-panel input {
-  width: 100%;
-  padding: 0.45rem 0.6rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg);
-  color: var(--text);
-  font: inherit;
-  /* Never below 16px. Safari on iOS zooms the whole page when you focus an
-     input smaller than that, and the reader is left scrolled sideways on a
-     page they were only trying to search. max() so a reader who has set a
-     larger base size still gets it. */
-  font-size: max(1rem, 16px);
-}
-
-.search-results:not(:empty) {
-  margin-top: 0.5rem;
-}
-
-/* The panel is absolute, so eight results grew the page and pushed the input
-   away from them. Let the list scroll instead, inside the panel. */
-.search-results {
-  max-height: min(60vh, 28rem);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-}
-
-.search-results ul {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.search-results li + li {
-  margin-top: 0.5rem;
-  padding-top: 0.5rem;
-  border-top: 1px solid var(--border);
-}
-
-.search-results a {
-  font-weight: 600;
-}
-
-.search-results p,
-.search-none {
-  margin: 0.15rem 0 0;
-  color: var(--muted);
-  font-size: 0.85rem;
-  line-height: 1.4;
-}
-
-
-/* On a narrow screen the navigation has to wrap, and a panel pinned to the
-   magnifier lands on top of it. Below the row instead, the full width of it,
-   so nothing a reader needs is covered while they type. */
-@media (max-width: 34rem) {
+  /* The navigation and the search button share a row; the rule under it belongs
+     to the row, not to the list, so the button sits above it too. */
   .topbar {
-    gap: 0.8rem;
+    position: relative;      /* the search panel hangs off it on a narrow screen */
+    display: flex;
+    align-items: baseline;
+    gap: 1.5rem;
+    margin: 0 0 3rem;
+    padding: 0 0 0.9rem;
+    border-bottom: 1px solid var(--border);
   }
+
+  .topbar > nav {
+    flex: 1;
+    min-width: 0;
+  }
+
+  ul.nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 1.5rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  ul.nav li {
+    margin: 0;
+  }
+
+  ul.nav a {
+    color: var(--muted);
+    font-weight: 500;
+    text-decoration: none;
+  }
+
+  ul.nav a:hover,
+  ul.nav a[aria-current] {
+    color: var(--text);
+  }
+
+  /* This page, or the section it's in */
+  ul.nav a[aria-current] {
+    text-decoration: underline 2px var(--accent);
+    text-underline-offset: 0.55em;
+  }
+
+  /* --- The contents list (toc: true) --- */
+
+  nav.toc {
+    margin: 1.5rem 0 2.25rem;
+    padding: 0.85rem 1.1rem;
+    border-left: 3px solid var(--accent);
+    border-radius: 0 var(--radius) var(--radius) 0;
+    background: var(--surface);
+    font-size: 0.95em;
+  }
+
+  nav.toc ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  nav.toc li {
+    margin: 0.2em 0;
+  }
+
+  nav.toc .toc-h3 {
+    padding-left: 1.1rem;
+    font-size: 0.95em;
+  }
+
+  nav.toc a {
+    color: var(--text);
+    text-decoration: none;
+  }
+
+  nav.toc a:hover {
+    color: var(--accent);
+    text-decoration: underline;
+  }
+
+  /* --- Every page, by folder ({{sitemap}}) --- */
+
+  ul.sitemap {
+    margin: 1rem 0;
+    padding-left: 1.25em;
+  }
+
+  ul.sitemap ul.sitemap {
+    margin: 0.25em 0 0.5em;
+  }
+
+  ul.sitemap li {
+    margin: 0.25em 0;
+  }
+
+  /* --- A folder's pages ({{pages}}) --- */
+
+  ul.pages {
+    margin: 1.5rem 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  ul.pages li {
+    margin: 0 0 1.4em;
+  }
+
+  ul.pages a {
+    font-size: 1.1em;
+    font-weight: 600;
+    text-decoration: none;
+  }
+
+  ul.pages a:hover {
+    text-decoration: underline;
+  }
+
+  ul.pages time {
+    display: block;
+    color: var(--muted);
+    font-size: 0.9em;
+  }
+
+  ul.pages p {
+    margin: 0.2em 0 0;
+    color: var(--muted);
+  }
+
+  /* --- Edit this page (signed in) --- */
+
+  .user-edit {
+    position: fixed;
+    right: 1rem;
+    bottom: 1rem;
+    padding: 0.4em 0.9em;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    color: var(--muted);
+    font-size: 0.85rem;
+    text-decoration: none;
+  }
+
+  .user-edit:hover {
+    color: var(--text);
+    border-color: var(--accent);
+  }
+
+  /* On a narrow screen there is no corner to spare: floating it puts it on top
+     of whatever the reader is reading. It goes back into the flow at the foot
+     of the page, where it is still the last thing and covers nothing. */
+  @media (max-width: 34rem) {
+    .user-edit {
+      position: static;
+      display: inline-block;
+      margin-top: 2.5rem;
+    }
+  }
+
+  /* A bare URL is one long unbreakable word. Markdown turns it into a link, and
+     on a phone it sets the page's minimum width and drags everything sideways.
+     Let a link break wherever it has to; nothing else about it changes. */
+  a {
+    overflow-wrap: anywhere;
+  }
+
+  /* --- Code --- */
+
+  code, kbd, pre {
+    font-family: var(--font-mono);
+  }
+
+  code {
+    padding: 0.12em 0.35em;
+    border-radius: 4px;
+    background: var(--surface);
+    font-size: 0.875em;
+    /* A path like templates/post.html is one unbreakable word, and in a table
+       cell on a narrow phone it sets the column's minimum width and pushes the
+       whole page sideways. `anywhere` lets it wrap and, unlike `break-word`,
+       counts for the minimum too — which is the half that fixes the table. */
+    overflow-wrap: anywhere;
+  }
+
+  pre {
+    padding: 1rem 1.1rem;
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    font-size: 0.875rem;
+    line-height: 1.55;
+  }
+
+  pre code {
+    padding: 0;
+    background: none;
+    font-size: inherit;
+    overflow-wrap: normal;   /* a fenced block scrolls; it must not rewrap */
+  }
+
+  kbd {
+    padding: 0.1em 0.4em;
+    border: 1px solid var(--border);
+    border-bottom-width: 2px;
+    border-radius: 4px;
+    font-size: 0.85em;
+  }
+
+  /* --- Quotes and callouts --- */
+
+  blockquote {
+    margin-right: 0;
+    margin-left: 0;
+    padding: 0.1em 1.1em;
+    border-left: 3px solid var(--border);
+    color: var(--muted);
+  }
+
+  blockquote > :last-child {
+    margin-bottom: 0;
+  }
+
+  .callout {
+    --tone: var(--note);
+    padding: 0.7em 1.1em;
+    border-left-color: var(--tone);
+    border-radius: 0 var(--radius) var(--radius) 0;
+    background: color-mix(in srgb, var(--tone) 8%, transparent);
+    color: var(--text);
+  }
+
+  .callout.tip { --tone: var(--tip); }
+  .callout.important { --tone: var(--important); }
+  .callout.warning { --tone: var(--warning); }
+  .callout.caution { --tone: var(--caution); }
+
+  .callout-title {
+    margin-bottom: 0.3em;
+    color: var(--tone);
+    font-weight: 600;
+  }
+
+  /* --- Tables --- */
+
+  /* A markdown table wider than the screen scrolls in here (markdown.ts puts
+     it in one), rather than pushing the whole page sideways. */
+  .table-scroll {
+    overflow-x: auto;
+    margin: 0 0 1.1em;
+  }
+
+  .table-scroll > table {
+    margin: 0;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.95em;
+  }
+
+  th, td {
+    padding: 0.5em 0.75em;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+    vertical-align: top;
+  }
+
+  th {
+    background: var(--surface);
+    font-weight: 600;
+  }
+
+  /* A post: the way back, and when it was written (templates/post.html). */
+  .back {
+    margin-bottom: 2rem;
+    font-size: 0.9rem;
+  }
+
+  .posted {
+    margin-top: 3rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+
+  .posted::before {
+    content: "Posted ";
+  }
+
+  /* A post with no date: leave nothing behind, not a rule and a lone label. */
+  .posted:empty {
+    display: none;
+  }
+
+
+  /* --- Search ---
+     A button until you want it. The index arrives as one file and
+     static/search.js does the matching; this is only where it sits. */
 
   .search {
-    position: static;
+    position: relative;
+    flex: none;
+  }
+
+  .search-toggle {
+    display: flex;
+    align-items: center;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--muted);
+    cursor: pointer;
+  }
+
+  .search-toggle:hover,
+  .search[data-open] .search-toggle {
+    color: var(--text);
+  }
+
+  .search-toggle svg {
+    width: 1.05rem;
+    height: 1.05rem;
+  }
+
+  .search:not([data-open]) .search-panel {
+    display: none;
   }
 
   .search-panel {
-    top: calc(100% + 0.4rem);
+    position: absolute;
+    z-index: 5;
+    top: calc(100% + 0.6rem);
     right: 0;
-    left: 0;
-    width: auto;
+    width: min(24rem, 78vw);
+    padding: 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--bg);
+    box-shadow: 0 6px 24px rgb(0 0 0 / 0.12);
   }
-}
+
+  .search-panel input {
+    width: 100%;
+    padding: 0.45rem 0.6rem;
+    border: 1px solid var(--field-border);
+    border-radius: var(--radius);
+    background: var(--bg);
+    color: var(--text);
+    font: inherit;
+    /* Never below 16px. Safari on iOS zooms the whole page when you focus an
+       input smaller than that, and the reader is left scrolled sideways on a
+       page they were only trying to search. max() so a reader who has set a
+       larger base size still gets it. */
+    font-size: max(1rem, 16px);
+  }
+
+  .search-results:not(:empty) {
+    margin-top: 0.5rem;
+  }
+
+  /* The panel is absolute, so eight results grew the page and pushed the input
+     away from them. Let the list scroll instead, inside the panel. */
+  .search-results {
+    max-height: min(60vh, 28rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .search-results ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .search-results li + li {
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--border);
+  }
+
+  .search-results a {
+    font-weight: 600;
+  }
+
+  .search-results p,
+  .search-none {
+    margin: 0.15rem 0 0;
+    color: var(--muted);
+    font-size: 0.85rem;
+    line-height: 1.4;
+  }
 
 
-/* --- Collections ---------------------------------------------------------
+  /* On a narrow screen the navigation has to wrap, and a panel pinned to the
+     magnifier lands on top of it. Below the row instead, the full width of it,
+     so nothing a reader needs is covered while they type. */
+  @media (max-width: 34rem) {
+    .topbar {
+      gap: 0.8rem;
+    }
 
-   {{items}} and {{groups}} over a folder's collection.json. Everything here
-   is drawn from the variables above, so a theme reaches it: --thumb for the
-   size of a thumbnail, --accent, --border, --muted for the rest. */
+    .search {
+      position: static;
+    }
 
-.collection {
-  margin: 1.5rem 0;
-}
+    .search-panel {
+      top: calc(100% + 0.4rem);
+      right: 0;
+      left: 0;
+      width: auto;
+    }
+  }
 
-.collection .group {
-  margin: 2rem 0;
-}
 
-.collection .group .group {
-  margin-left: 0;
-}
+  /* --- Collections ---------------------------------------------------------
 
-.items {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(var(--thumb), 1fr));
-  gap: var(--thumb-gap);
-  margin: 1rem 0;
-}
+     {{items}} and {{groups}} over a folder's collection.json. Everything here
+     is drawn from the variables above, so a theme reaches it: --thumb for the
+     size of a thumbnail, --accent, --border, --muted for the rest. */
 
-.item {
-  display: block;
-  color: inherit;
-  text-decoration: none;
-}
+  .collection {
+    margin: 1.5rem 0;
+  }
 
-.item:hover .item-title,
-.item:focus-visible .item-title {
-  color: var(--accent);
-  text-decoration: underline;
-}
+  .collection .group {
+    margin: 2rem 0;
+  }
 
-.item .thumb {
-  display: block;
-  width: 100%;
-  aspect-ratio: 1;
-  object-fit: contain;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-}
+  .collection .group .group {
+    margin-left: 0;
+  }
 
-.item-title {
-  display: block;
-  margin-top: 0.4rem;
-  font-size: 0.85rem;
-  line-height: 1.3;
-  color: var(--muted);
-}
+  .items {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(var(--thumb), 1fr));
+    gap: var(--thumb-gap);
+    margin: 1rem 0;
+  }
 
-/* The section menu: each group linking to its first item, the one being
-   read marked. */
-.groups ul {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
+  .item {
+    display: block;
+    color: inherit;
+    text-decoration: none;
+  }
 
-.groups > ul {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem 1rem;
-  margin: 1.5rem 0;
-  padding-top: 1rem;
-  border-top: 1px solid var(--border);
-}
+  .item:hover .item-title,
+  .item:focus-visible .item-title {
+    color: var(--accent);
+    text-decoration: underline;
+  }
 
-/* A group's subgroups belong beside it, not on a line of their own: display
-   contents lets them join their parent's row, smaller and quieter, so
-   "Paintings Studies" reads as one section and "Prints" as another. */
-.groups > ul > li {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0.3rem 0.7rem;
-  font-size: 0.9rem;
-}
+  .item .thumb {
+    display: block;
+    width: 100%;
+    aspect-ratio: 1;
+    object-fit: contain;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
 
-.groups li ul {
-  display: contents;
-}
+  .item-title {
+    display: block;
+    margin-top: 0.4rem;
+    font-size: 0.85rem;
+    line-height: 1.3;
+    color: var(--muted);
+  }
 
-.groups li li {
-  font-size: 0.8rem;
-  color: var(--muted);
-}
+  /* The section menu: each group linking to its first item, the one being
+     read marked. */
+  .groups ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
 
-.groups [aria-current] {
-  font-weight: 600;
-}
+  .groups > ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 1rem;
+    margin: 1.5rem 0;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+  }
 
-/* One work, and the way out of it. prev and next wrap, so a collection is a
-   ring and a reader never reaches a dead end. */
-.work {
-  margin: 1.5rem 0;
-}
+  /* A group's subgroups belong beside it, not on a line of their own: display
+     contents lets them join their parent's row, smaller and quieter, so
+     "Paintings Studies" reads as one section and "Prints" as another. */
+  .groups > ul > li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.3rem 0.7rem;
+    font-size: 0.9rem;
+  }
 
-.work img {
-  display: block;
-  max-width: 100%;
-  height: auto;
-  border-radius: var(--radius);
-}
+  .groups li ul {
+    display: contents;
+  }
 
-.work figcaption {
-  margin-top: 0.6rem;
-  color: var(--muted);
-  font-size: 0.9rem;
-}
+  .groups li li {
+    font-size: 0.8rem;
+    color: var(--muted);
+  }
 
-.item-nav {
-  display: flex;
-  justify-content: space-between;
-  gap: 1rem;
-  margin: 1.5rem 0;
-  font-size: 0.9rem;
-}
+  .groups [aria-current] {
+    font-weight: 600;
+  }
 
-.item-nav .prev::before {
-  content: "← ";
-}
+  /* One work, and the way out of it. prev and next wrap, so a collection is a
+     ring and a reader never reaches a dead end. */
+  .work {
+    margin: 1.5rem 0;
+  }
 
-.item-nav .next::after {
-  content: " →";
-}
+  .work img {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    border-radius: var(--radius);
+  }
 
-.item-nav .next {
-  margin-left: auto;
-  text-align: right;
+  .work figcaption {
+    margin-top: 0.6rem;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+
+  .item-nav {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    margin: 1.5rem 0;
+    font-size: 0.9rem;
+  }
+
+  .item-nav .prev::before {
+    content: "← ";
+  }
+
+  .item-nav .next::after {
+    content: " →";
+  }
+
+  .item-nav .next {
+    margin-left: auto;
+    text-align: right;
+  }
+
+  /* A reader who has asked for less motion gets none: no animation, no
+     transition, no smooth scrolling (WCAG 2.3.3). Important, so a theme's
+     animation stops too. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
 }

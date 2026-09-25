@@ -97,7 +97,7 @@ export function renderMarkdown(source: string, path = ""): MarkdownResult {
     wikiLinks: true,
     headings: { ids: true, autolink: true }, // <h2 id="x"><a href="#x">…</a></h2>
   });
-  content = wikiLinks(callouts(content), folderOf(path));
+  content = wikiLinks(callouts(scrollingTables(content)), folderOf(path));
   if (yes(meta.toc)) content = withContents(content);
   return { content, meta, body };
 }
@@ -110,6 +110,13 @@ export function yes(value?: string[]): boolean {
 // The folder part of a page path: "guide/pages" → "guide", "index" → "".
 export function folderOf(path: string): string {
   return path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "";
+}
+
+// A markdown table wider than the screen scrolls inside a box of its own, not
+// the whole page sideways (WCAG 1.4.10). Bun writes a table as a bare <table>;
+// one an author wrote in HTML is theirs, and left as it is.
+function scrollingTables(html: string): string {
+  return html.replace(/<table>[\s\S]*?<\/table>/g, (table) => `<div class="table-scroll">${table}</div>`);
 }
 
 // GitHub's alerts: a quote that opens with [!NOTE] (or TIP, IMPORTANT, WARNING,

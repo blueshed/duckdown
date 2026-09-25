@@ -23,7 +23,16 @@
   --row-h: 28px;           /* a row in a tree */
   --icon: 16px;            /* the glyph in an icon button */
   --icon-gap: 4px;         /* between icon buttons: separate hovers, one group */
-  --control-font: 13px;
+  /* Type, in rem: the reader's own default size decides (16px unless they
+     have set more), so a larger setting enlarges the editor as it does the
+     site. At 16px these are 11, 12, 13, 14, 15 and 16px. */
+  --text-xs: 0.6875rem;
+  --text-sm: 0.75rem;
+  --text-base: 0.8125rem;
+  --text-md: 0.875rem;
+  --text-lg: 0.9375rem;
+  --text-xl: 1rem;
+  --control-font: var(--text-base);
   --radius-sm: 4px;
   --radius: 6px;
   --radius-lg: 10px;
@@ -81,9 +90,13 @@
 html, body {
   height: 100%;
   font-family: system-ui, -apple-system, sans-serif;
-  font-size: 14px;
   color: var(--text);
   background: var(--bg);
+}
+
+/* Not on html: that would set what a rem is, and override the reader. */
+body {
+  font-size: var(--text-md);
 }
 
 /* Controls take the page's font, not the browser's own. */
@@ -112,7 +125,7 @@ button, input, textarea, select {
 }
 
 .header h1 {
-  font-size: 16px;
+  font-size: var(--text-xl);
   font-weight: 600;
   letter-spacing: 0.5px;
 }
@@ -202,7 +215,7 @@ button.header-link:hover {
 .file-list li {
   display: flex;
   border-radius: 4px;
-  font-size: 13px;
+  font-size: var(--text-base);
 }
 
 /* Lighter than the open row's shade, so hovering never looks like opening. */
@@ -289,7 +302,7 @@ button.header-link:hover {
   color: var(--text);
   border: none;
   font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
-  font-size: 13px;
+  font-size: var(--text-base);
   line-height: 1.6;
   outline: none;
   tab-size: 2;
@@ -359,7 +372,7 @@ button.saved {
 
 button kbd {
   font-family: inherit;
-  font-size: 10px;
+  font-size: 0.625rem;
   opacity: 0.7;
   margin-left: 4px;
 }
@@ -425,7 +438,7 @@ button.danger-subtle:hover {
   border-radius: 6px;
   background: var(--danger);
   color: var(--on-accent);
-  font-size: 13px;
+  font-size: var(--text-base);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
   animation: notice-in 0.2s ease-out;
 }
@@ -502,7 +515,7 @@ button.danger-subtle:hover {
 .pane-name,
 .pane-path {
   font-family: var(--font-mono, ui-monospace, monospace);
-  font-size: 12px;
+  font-size: var(--text-sm);
   color: var(--text-dim);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -525,17 +538,17 @@ button.danger-subtle:hover {
   padding: 6px 12px;
   border-bottom: 1px solid var(--border);
   color: var(--text-dim);
-  font-size: 12px;
+  font-size: var(--text-sm);
 }
 
 .pane-note code {
-  font-size: 11px;
+  font-size: var(--text-xs);
 }
 
 .pane-header .dot {
   margin-left: var(--space-1);
   color: var(--accent-text);
-  font-size: 9px;
+  font-size: 0.5625rem;
   line-height: 1;
 }
 
@@ -565,7 +578,7 @@ button.danger-subtle:hover {
   background: var(--bg);
   padding: 2px 6px;
   border-radius: 3px;
-  font-size: 12px;
+  font-size: var(--text-sm);
 }
 
 /* --- Sidebar (Image Browser) --- */
@@ -667,7 +680,7 @@ button.danger-subtle:hover {
 
 .dialog h3 {
   margin: 0 0 var(--space-4);
-  font-size: 15px;
+  font-size: var(--text-lg);
   font-weight: 600;
 }
 
@@ -679,7 +692,7 @@ button.danger-subtle:hover {
   border-radius: var(--radius);
   background: var(--bg);
   color: var(--text);
-  font-size: 14px;
+  font-size: var(--text-md);
   box-sizing: border-box;
 }
 
@@ -691,14 +704,14 @@ button.danger-subtle:hover {
 
 .dialog-hint {
   margin-top: 12px;
-  font-size: 12px;
+  font-size: var(--text-sm);
   color: var(--text-dim);
   line-height: 1.5;
 }
 
 .dialog-error {
   margin-top: 12px;
-  font-size: 12px;
+  font-size: var(--text-sm);
   color: var(--danger-text);
 }
 
@@ -721,7 +734,7 @@ button.danger-subtle:hover {
   gap: var(--space-3);
   padding: var(--space-2) 0;
   border-bottom: 1px solid var(--border);
-  font-size: 13px;
+  font-size: var(--text-base);
 }
 
 .history-label {
@@ -731,7 +744,7 @@ button.danger-subtle:hover {
 }
 
 .history-detail {
-  font-size: 12px;
+  font-size: var(--text-sm);
   color: var(--text-dim);
   white-space: nowrap;
 }
@@ -743,7 +756,7 @@ button.danger-subtle:hover {
   border-radius: 8px;
   background: var(--accent);
   color: var(--on-accent);
-  font-size: 11px;
+  font-size: var(--text-xs);
   line-height: 16px;
 }
 
@@ -1003,13 +1016,13 @@ button.danger-subtle:hover {
 
 .item-long {
   resize: vertical;
-  font-size: 12px;
+  font-size: var(--text-sm);
   line-height: 1.4;
 }
 
 .item-src {
   font-family: "SF Mono", "Fira Code", monospace;
-  font-size: 11px;
+  font-size: var(--text-xs);
   color: var(--text-dim);
   overflow-wrap: anywhere;
 }
@@ -1030,7 +1043,7 @@ button.danger-subtle:hover {
   border: 1px dashed var(--border);
   border-radius: 6px;
   color: var(--text-dim);
-  font-size: 12px;
+  font-size: var(--text-sm);
   text-align: center;
   cursor: pointer;
 }
@@ -1139,7 +1152,7 @@ button.item-drop {
   .item-input,
   .editor-area textarea,
   .panel-resource textarea {
-    font-size: 16px;
+    font-size: max(1rem, 16px);
   }
 }
 
@@ -1189,5 +1202,33 @@ button.item-drop {
     overflow: hidden;
     clip-path: inset(50%);
     white-space: nowrap;
+  }
+}
+
+/* The notice's two live regions (components/Notice.tsx): always in the page,
+   so a screen reader is listening before anything is said, and out of the
+   grid they sit in. The notice itself is fixed where it has always been. */
+.notice-live {
+  position: fixed;
+}
+
+/* The resources sidebar's panel under its tabs: the column the tabs head. */
+.tab-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+/* A reader who has asked for less motion gets none: the notice doesn't slide
+   in, and hovers change at once. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

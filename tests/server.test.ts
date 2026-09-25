@@ -746,6 +746,9 @@ describe("site rendering", () => {
     // cached once rather than inlined into every page.
     expect(html).toContain(`<link href="/static/theme.css" rel="stylesheet">`);
     expect(html).not.toContain("<style>");
+    // The seed's template: a skip link first, past the nav to <main>.
+    expect(html).toMatch(/<body>\s*<a class="skip" href="#content">Skip to content<\/a>/);
+    expect(html).toMatch(/<main id="content">\s*<h1/);
   });
 
   test("marks the page in the nav, and the section it is in", async () => {
@@ -803,7 +806,7 @@ describe("site rendering", () => {
     renameSync(tmpl, `${tmpl}.away`);
     try {
       const html = await (await fetch(`${BASE}/index.html`)).text();
-      expect(html).toStartWith("<!DOCTYPE html><html><head><title>duckdown</title>");
+      expect(html).toStartWith('<!DOCTYPE html><html lang="en"><head><title>duckdown</title></head><body><main><h1');
     } finally {
       renameSync(`${tmpl}.away`, tmpl);
     }

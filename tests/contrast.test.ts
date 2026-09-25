@@ -108,6 +108,7 @@ describe("the base site, and the seed's theme over it", () => {
       [`text on ${bg}`, token("text"), token(bg), TEXT],
       [`muted text on ${bg}`, token("muted"), token(bg), TEXT],
       [`a link on ${bg}`, token("accent"), token(bg), TEXT],
+      [`the search box's edge on ${bg}`, token("field-border"), token(bg), EDGE],
     ]),
     ["the focus ring", token("accent"), token("bg"), EDGE],
     // A callout is its tone at 8% over the page, titled in the tone itself.

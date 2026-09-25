@@ -12,10 +12,13 @@
   {{css}}
 </head>
 <body>
+  <a class="skip" href="#content">Skip to content</a>
   {{include topbar}}
-  <p class="back"><a href="/by-year.html#{{item-year}}">← {{group}}</a></p>
-  {{content}}
-  <nav class="item-nav" aria-label="This collection">{{prev}}{{next}}</nav>
+  <main id="content">
+    <p class="back"><a href="/by-year.html#{{item-year}}">← {{group}}</a></p>
+    {{content}}
+    <nav class="item-nav" aria-label="This collection">{{prev}}{{next}}</nav>
+  </main>
   {{groups}}
   {{edit}}
   <script src="/static/search.js" defer></script>

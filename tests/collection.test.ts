@@ -250,7 +250,8 @@ describe("itemsHtml", () => {
     expect(html).toContain("<h2>1960-1969</h2>");
     expect(html).toContain('<h3>London</h3>');                    // a subgroup, one level down
     expect(html).toContain('<a class="item" href="/works/battersea/">');
-    expect(html).toContain('<img class="thumb" src="/static/images/b_tn.jpg" alt="Battersea" loading="lazy">');
+    // alt="": the title is printed beside it in the same link; said twice otherwise.
+    expect(html).toContain('<img class="thumb" src="/static/images/b_tn.jpg" alt="" loading="lazy"><span class="item-title">Battersea</span>');
   });
 
   test("by a field: one grid per value, in the order the values first appear, and skip means skip", () => {

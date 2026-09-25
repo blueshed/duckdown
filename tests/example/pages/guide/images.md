@@ -21,12 +21,17 @@ Paste it into your page:
 ![My photo](/static/images/my-photo.jpg)
 ```
 
+The words in the brackets start as the file's name. Replace them with what the
+picture shows — "A hermit crab in a whelk shell" — because they are what a
+screen reader says instead of it, and what shows if it doesn't load. A picture
+that is only decoration gets none: `![](/static/images/flourish.svg)`.
+
 ### With HTML
 
 For more control, use an `<img>` tag:
 
 ```html
-<img id="hero" src="/static/images/hero.svg" alt="Hero image">
+<img id="hero" src="/static/images/hero.svg" alt="A duck on a pond at sunrise">
 ```
 
 Then style it in your theme:

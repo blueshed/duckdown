@@ -294,8 +294,10 @@ describe("Notice", () => {
   test("shows a failure as an alert until dismissed", () => {
     const { host, dispose } = render(() => <Notice />);
     expect(host.querySelector(".notice")).toBeNull();
+    // The regions are there before anything is said in them.
+    expect(host.querySelectorAll('[role="alert"], [role="status"]')).toHaveLength(2);
     speak("Couldn't save a.md: 500 boom");
-    const alert = host.querySelector('.notice[role="alert"]')!;
+    const alert = host.querySelector('[role="alert"] > .notice')!;
     expect(alert.textContent).toContain("Couldn't save a.md: 500 boom");
     click(host.querySelector('[aria-label="Dismiss"]')!);
     expect(host.querySelector(".notice")).toBeNull();
@@ -306,11 +308,12 @@ describe("Notice", () => {
     const { host, dispose } = render(() => <Notice />);
     tell("First is now /gallery/first-light/; the old address still leads there.");
     const status = host.querySelector(".notice")!;
-    expect(status.getAttribute("role")).toBe("status");
+    expect(status.parentElement!.getAttribute("role")).toBe("status");
     expect(status.className).toBe("notice news");
     expect(told).toHaveBeenCalledWith("First is now /gallery/first-light/; the old address still leads there.");
     speak("Couldn't save a.md: 500 boom");
-    expect(host.querySelector(".notice")!.getAttribute("role")).toBe("alert");
+    expect(host.querySelectorAll(".notice")).toHaveLength(1);
+    expect(host.querySelector(".notice")!.parentElement!.getAttribute("role")).toBe("alert");
     expect(host.querySelector(".notice")!.className).toBe("notice");
     expect(news.get()).toBe(false);
     dispose();
@@ -782,11 +785,19 @@ describe("Editor", () => {
     expect(area.getAttribute("aria-label")).toBe("Contents of editor-test.md");
     expect(area.value).toBe("title: editor-test\n\n");
 
+    const status = host.querySelector('.pane-header [role="status"]')!;
+    expect(status.textContent).toBe("");
+    expect(host.querySelector(".pane-header .dot")).toBeNull();
     type(area, "title: editor-test\n\n# Edited");
     expect(save.className).toBe("primary"); // dirty
+    // Unsaved, as a picture a screen reader can name, not "black circle".
+    const dot = host.querySelector(".pane-header .dot")!;
+    expect(dot.getAttribute("role")).toBe("img");
+    expect(dot.getAttribute("aria-label")).toBe("Unsaved changes");
     click(save);
     await waitFor(() => save.textContent!.includes("Saved"));
     expect(save.className).toBe("saved");
+    expect(status.textContent).toBe("Saved"); // said, as well as shown
     expect(fileContent.get()).toBe("title: editor-test\n\n# Edited");
     await waitFor(() => save.textContent!.includes("Save") && !save.textContent!.includes("Saved"), 2500);
     expect(save.className).toBe("");
@@ -797,6 +808,7 @@ describe("Editor", () => {
       click(save);
       await waitFor(() => save.textContent!.includes("Not saved"));
       expect(save.className).toBe("danger");
+      expect(status.textContent).toBe("Not saved");
       expect(notice.get()).toBe("Couldn't save editor-test.md: 507 disk full");
     } finally {
       restore();
@@ -1024,8 +1036,11 @@ describe("Header", () => {
     expect(view.getAttribute("href")).toBe("/");
     filePath.set("My folder/a b.md");
     expect(view.getAttribute("href")).toBe("/My%20folder/a%20b.html");
-    click(button(host, "Resources")!);
+    const resources = button(host, "Resources")!;
+    expect(resources.getAttribute("aria-expanded")).toBe("false");
+    click(resources);
     expect(showImages.get()).toBe(true);
+    expect(resources.getAttribute("aria-expanded")).toBe("true");
     const logout = host.querySelector("form.header-form") as HTMLFormElement;
     expect(logout.getAttribute("method")).toBe("post");
     expect(logout.getAttribute("action")).toBe("/logout");
@@ -1317,6 +1332,29 @@ describe("ImageBrowser", () => {
     await waitFor(() => rows(host).includes("logo.svg"));
     const tab = (name: string) => button(host.querySelector(".browser-sections")!, name)!;
     expect(tab("images").className).toBe("section on");
+    // Tabs to a screen reader: the chosen one selected, the only one Tab reaches,
+    // and naming the panel under them.
+    const list = host.querySelector('[role="tablist"]')!;
+    expect(list.getAttribute("aria-label")).toBe("Resources");
+    expect(tab("images").getAttribute("aria-selected")).toBe("true");
+    expect(tab("css").getAttribute("aria-selected")).toBe("false");
+    expect(tab("images").getAttribute("tabindex")).toBe("0");
+    expect(tab("css").getAttribute("tabindex")).toBe("-1");
+    expect(host.querySelector('[role="tabpanel"]')!.getAttribute("aria-labelledby")).toBe("tab-images");
+    // The arrows move along them, round the ends; Home and End go to the ends.
+    const press = (key: string) => list.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
+    press("ArrowLeft");
+    expect(tab("reports").getAttribute("aria-selected")).toBe("true");
+    expect(document.activeElement).toBe(tab("reports"));
+    press("ArrowRight");
+    expect(tab("images").getAttribute("aria-selected")).toBe("true");
+    press("End");
+    expect(tab("reports").getAttribute("aria-selected")).toBe("true");
+    press("Home");
+    expect(tab("images").getAttribute("aria-selected")).toBe("true");
+    press("a");                                         // any other key is the page's
+    expect(tab("images").getAttribute("aria-selected")).toBe("true");
+    await waitFor(() => rows(host).includes("logo.svg"));
 
     click(tab("css"));
     await waitFor(() => rows(host).includes("theme.css"));

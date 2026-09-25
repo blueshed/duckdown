@@ -147,7 +147,7 @@ per work with the same placeholders an each: page takes:
 
 ```html
 <a class="item" href="{{item-href}}">
-  <img class="thumb" src="{{item-thumb}}" alt="{{item-title}}" loading="lazy">
+  <img class="thumb" src="{{item-thumb}}" alt="" loading="lazy">
   <span class="item-title">{{item-title}}</span>
   <span class="item-caption">{{item-caption}}</span>
 </a>

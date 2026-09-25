@@ -46,6 +46,7 @@ users.json    who can sign in (password hashes)
    - `{{pages}}` in a folder's `index.md` lists the pages beside it, newest first by `date:`
    - `draft: true` keeps a page off the site until it's ready (you can still read it signed in)
    - `aliases: /old-address` keeps an address that has moved working, as a 301 — the editor's Rename or move adds it; when you move a file yourself, add it yourself
+4. Give every picture words that say what it shows: `![Hermit crab in a whelk shell](/static/images/crab.jpg)`, not `![image](…)`. A screen reader says them instead of the picture. Only decoration gets none: `![](…)`.
 
 ## What catches people out
 

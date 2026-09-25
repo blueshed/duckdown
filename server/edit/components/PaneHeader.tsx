@@ -53,7 +53,10 @@ export function PaneHeader(props: {
     <div class="pane-header">
       <Icon name={props.icon} size={13} />
       <span class="pane-name">{label}</span>
-      {when(props.dirty as never, () => <span class="dot" title="Unsaved changes">●</span>)}
+      {when(props.dirty as never, () => <span class="dot" role="img" aria-label="Unsaved changes" title="Unsaved changes">●</span>)}
+      {/* Saved, or Not saved, said as well as shown: the button's own words
+          change, but a screen reader isn't told a button's words changed. */}
+      <span class="visually-hidden" role="status">{flash}</span>
       <span class="pane-gap" />
       {props.undo ? <>
         <button class="icon-btn" aria-label="Undo" title="Undo (⌘Z)"

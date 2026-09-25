@@ -91,7 +91,7 @@ tags: shop, opening
 
 ## Markdown
 
-GitHub-flavoured markdown: headings, emphasis, `~~strikethrough~~`, links, lists, `- [x]` task lists, tables, fenced code (shown plain — no syntax highlighting), quotes and bare URLs, which become links.
+GitHub-flavoured markdown: headings, emphasis, `~~strikethrough~~`, links, lists, `- [x]` task lists, tables (a wide one scrolls sideways in a box of its own on a narrow screen), fenced code (shown plain — no syntax highlighting), quotes and bare URLs, which become links.
 
 ### Headings and contents lists
 
@@ -135,6 +135,8 @@ The five markers are `[!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]` and `[!CA
 ```
 
 Markdown images take the width of the text at most; use HTML to size one.
+
+**Say what the picture shows.** The words in `![…]` (or `alt="…"`) are what a screen reader says instead of the picture, and what shows if it doesn't load: "Hermit crab in a whelk shell", not "image" or the file name. A picture that is only decoration — a flourish, or a thumbnail whose title is printed right beside it — gets empty words, `![](…)` or `alt=""`, so it isn't read out at all.
 
 **Colouring an SVG with CSS.** An SVG shown with `![…](…)` or `<img>` is sealed off: the page's CSS can't recolour it. Use it as a mask instead — an empty element on the page, painted by CSS:
 
@@ -438,7 +440,7 @@ filled for each item with the same placeholders:
 
 ```html
 <a class="item" href="{{item-href}}">
-  <img class="thumb" src="{{item-thumb}}" alt="{{item-title}}" loading="lazy">
+  <img class="thumb" src="{{item-thumb}}" alt="" loading="lazy">
   <span class="item-title">{{item-title}}</span>
   <span class="item-caption">{{item-caption}}</span>
 </a>
@@ -563,13 +565,18 @@ reaches it:
 | `--muted` | Quieter text: quotes, the navigation |
 | `--accent` | Links, the navigation's current page, the contents list |
 | `--border`, `--surface` | Lines, and the background of code, table headings and the contents list |
+| `--field-border` | The search box's edge — darker than `--border`, because a box you type in has to be seen (3:1) |
 | `--font-body`, `--font-mono` | Fonts for text and for code |
 | `--font-heading` | Headings' font; unset, they use `--font-body` |
 | `--measure` | How wide the text runs (`46rem`) |
 | `--radius` | Corner roundness (`6px`) |
 | `--note`, `--tip`, `--important`, `--warning`, `--caution` | Callout colours |
 
-It follows each reader's light or dark setting (`prefers-color-scheme`), with its own dark values for the colours.
+It follows each reader's light or dark setting (`prefers-color-scheme`), with its own dark values for the colours. Every pair it draws text with passes WCAG AA (4.5:1) in both, and duckdown's tests keep it so — a theme that changes a colour should check its own (any contrast checker, text on `--bg` and on `--surface`).
+
+Its rules sit in a cascade layer, `@layer base`; the variables don't. A theme's rules aren't in a layer, so they win by coming later, however plain the selector: `h1 { … }` in `theme.css` restyles every heading without having to out-specify anything.
+
+It also honours a reader's *reduce motion* setting — every animation and transition stops, a theme's included. A theme that animates something should do it inside `@media (prefers-reduced-motion: no-preference) { … }` anyway, as the seed's wobbling duck does.
 
 ### The site's look
 
@@ -652,11 +659,16 @@ A page's `layout:` chooses the template (`layout: post` → `templates/post.html
   {{css}}
 </head>
 <body>
+  <a class="skip" href="#content">Skip to content</a>
   {{nav}}
-  {{content}}
+  <main id="content">
+    {{content}}
+  </main>
 </body>
 </html>
 ```
+
+Keep the page's own content in `<main>`, and — when there's a nav before it — the skip link first in `<body>`: the first thing a keyboard reaches, invisible until it has focus, so a reader doesn't tab through the whole nav on every page. `site.css` styles `.skip`. Set `lang` to the language the site is written in.
 
 ## Static files and images
 

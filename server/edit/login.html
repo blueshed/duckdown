@@ -10,9 +10,9 @@
     .login form { padding: var(--space-5); border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); }
     .title { margin: 0 0 var(--space-5); text-align: center; font-size: 1.2em; font-weight: 600; }
     .form-input { width: 100%; margin-bottom: var(--space-4); }
-    .form-input label { display: block; margin-bottom: 6px; font-size: 13px; }
+    .form-input label { display: block; margin-bottom: 6px; font-size: var(--text-base); }
     .form-input input { width: 100%; height: var(--field-h); padding: 0 var(--space-3); border: 1px solid var(--field-border); border-radius: var(--radius); box-sizing: border-box; background: var(--bg); color: var(--text); }
-    @media (pointer: coarse) { .form-input input { font-size: 16px; } }
+    @media (pointer: coarse) { .form-input input { font-size: max(1rem, 16px); } }
     .error { color: var(--danger-text); margin-bottom: var(--space-4); font-size: 0.9em; }
     .action { margin-top: var(--space-5); }
     .action button { width: 100%; min-height: 36px; justify-content: center; border: none; border-radius: var(--radius); background: var(--accent); color: var(--on-accent); font-weight: 500; cursor: pointer; }

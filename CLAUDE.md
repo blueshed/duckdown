@@ -333,6 +333,18 @@ privacy notice and a retention policy.
 
 Nothing fails silently. In the editor, every request goes through `api(what, url, init?, allow?)`: a failed one speaks — `speak()` in `edit/notice.ts` shows it (the `Notice` alert) and logs it — naming what was attempted ("Couldn't save hello.md: 500 …"); `allow` lists statuses the caller handles itself (New's 412). A request that never arrives resolves to `Response.error()`, so callers check `res.ok` and need no `catch`. `app.tsx` speaks for anything uncaught. The same line carries news — `tell()`, not red, `role=status` — for the rare thing the editor did on your behalf that you'd want to know (a renamed work kept its old address); it is not a second channel for failures. On the server, `routes/error.ts` logs what a handler throws and answers 500 with a line (the detail only in development). No bare `catch {}`: if a failure is deliberately survived (a theme that won't load), log why.
 
+## Accessible by default
+
+A reader or an editor who uses a keyboard, a screen reader, a larger text size, less motion or High Contrast gets the same site and the same editor. Keep it that way; each of these has a test.
+
+- **Everything is reachable by keyboard.** A tree row is a `<button class="row">`, never an `<li onclick>`; a control that can't be a `<button>` (it holds a file chooser) is `role=button tabindex=0` with Enter and Space (`onpress()` in CollectionPane). Resources' tabs are `role=tab` with the arrows.
+- **Every dialog goes through `modal()`** (`edit/modal.ts`): shown modally, named by its heading, and focus goes back to what opened it when the dialog is dropped, not only when it is closed.
+- **Everything has a name**: `aria-label` on an icon-only button, a text field, a textarea, an iframe (`title`); a state says itself (`aria-current`, `aria-pressed`, `aria-expanded`, `aria-selected`; the unsaved dot is `role=img`). What changes without a click — the notice, Saved — is said from a live region already in the page.
+- **Sizes are tokens** (`:root` in styles.css): space on a 4px grid, controls 30px, never under 28px (WCAG's minimum is 24), type in rem so the reader's own size setting reaches the editor. A pane's header answers to the pane (`@container pane`), not the window.
+- **Colours are tokens, and their pairs are tested** (below, under Testing). A state is never shown by colour or shade alone: forced colours (High Contrast) removes shades and shadows, so a focus ring is an outline, and the open row is bold and outlined there too.
+- **Motion stops** under `prefers-reduced-motion: reduce`, in the editor and in `site.css` (and a theme's animation with it).
+- **The site**: the seed's templates open with a skip link to `<main id="content">`; `site.css`'s rules are in `@layer base` so a theme wins by coming later; a markdown table scrolls in its own `.table-scroll` box (markdown.ts); a thumbnail printed beside its title is `alt=""`. The authoring skill tells a writer to give every picture words.
+
 ## Pages: markdown and themes
 
 `renderMarkdown(source, path)` in `markdown.ts` is Bun.markdown (GFM, heading ids and self-links, wiki links) plus three passes over its HTML: callouts (`> [!NOTE]` …), `<x-wikilink>` → `<a>`, and the contents list for `toc: true`. `path` is where the page lives, for relative wiki links: the site passes it, and so does the preview (`PUT /edit/mark/?path=`). Keep new syntax opt-in and readable as plain markdown.
