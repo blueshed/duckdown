@@ -1,6 +1,6 @@
 import type { Storage } from "./storage";
 import { DEBUG } from "./config";
-import { canonicalPath } from "./utils";
+import { canonicalPath, escapeHtml } from "./utils";
 
 // Front-matter parser + Bun.markdown wrapper
 
@@ -201,7 +201,7 @@ export async function buildNav(pages: Storage, prefix = ""): Promise<string> {
       const title = meta.nav?.[0] || meta.title?.[0];
       if (title && !yes(meta.draft)) { // a draft stays out of the nav
         const href = encodeURI(canonicalPath(f.path.replace(/^\//, "")));
-        items.push(`<li><a href="${href}">${title}</a></li>`);
+        items.push(`<li><a href="${href}">${escapeHtml(title)}</a></li>`);
       }
     }
   }

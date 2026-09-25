@@ -57,6 +57,11 @@ describe("buildNav", () => {
   test("is empty for an empty site", async () => {
     expect(await buildNav(memory({}))).toBe("");
   });
+
+  test("escapes a folder's title, as every other walk does", async () => {
+    const nav = await buildNav(memory({ "x/index.md": 'title: A <b>bold</b> & "co"\n\n' }));
+    expect(nav).toBe('<li><a href="/x/">A &lt;b&gt;bold&lt;/b&gt; &amp; &quot;co&quot;</a></li>');
+  });
 });
 
 describe("buildNav: order:", () => {
