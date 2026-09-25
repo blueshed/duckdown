@@ -16,6 +16,13 @@ import { USERS_PATH } from "./config";
 
 export type Users = Record<string, string>;
 
+// The names, as a table with nothing in it but them. Parsed JSON is a plain
+// object, so users["constructor"] or users["__proto__"] would find Object's
+// own properties and read as someone who can sign in (n118): with no
+// prototype, a name is there only when the file says so. The file's shape
+// doesn't change — it is written and read as the same JSON.
+export const usersFrom = (entries: object = {}): Users => Object.assign(Object.create(null), entries);
+
 const site = createStorage();
 
 // No users file means nobody can sign in: said in the log, rather than every
@@ -24,9 +31,9 @@ const site = createStorage();
 export async function readUsers(store: Storage = site): Promise<Users> {
   if (!(await store.exists(USERS_PATH))) {
     console.error(`No ${USERS_PATH} in the site folder, so nobody can sign in.`);
-    return {};
+    return usersFrom();
   }
-  return JSON.parse(await store.read(USERS_PATH));
+  return usersFrom(JSON.parse(await store.read(USERS_PATH)));
 }
 
 export async function writeUsers(users: Users, store: Storage = site): Promise<void> {
@@ -123,7 +130,7 @@ export async function userCommand(
 ): Promise<number> {
   const [verb, name] = args;
   // No file yet is a site whose first editor this is, not a problem to report.
-  const users = (await store.exists(USERS_PATH)) ? await readUsers(store) : {};
+  const users = (await store.exists(USERS_PATH)) ? await readUsers(store) : usersFrom();
   if (verb === "list") {
     for (const known of Object.keys(users).sort()) say(known);
     return 0;

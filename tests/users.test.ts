@@ -6,7 +6,7 @@ import { join } from "path";
 import { RUN } from "./helpers";
 import { LocalStorage } from "../server/storage";
 import {
-  askPassword, userCommand, currentUsers, usersChanged, envAdmin, fingerprint, nameProblem, FRESH,
+  askPassword, userCommand, currentUsers, usersChanged, envAdmin, fingerprint, nameProblem, FRESH, usersFrom,
 } from "../server/users";
 import { cli } from "../server/cli";
 
@@ -74,6 +74,17 @@ describe("duckdown user", () => {
       "ann", "bea",
       "bea removed: they can't sign in, and any session they had has ended",
     ]);
+  });
+
+  test("a name Object already has is no one until it's added (n118)", async () => {
+    const store = site();
+    const say = () => {};
+    await expect(userCommand(["remove", "constructor"], async () => "", store, say)).rejects.toThrow("No one called constructor can sign in");
+    await expect(userCommand(["passwd", "toString"], async () => "long enough", store, say)).rejects.toThrow("No one called toString can sign in");
+    expect(await userCommand(["add", "constructor"], async () => "long enough", store, say)).toBe(0);
+    expect(Object.keys(file(store))).toContain("constructor");
+    expect(usersFrom()["hasOwnProperty"]).toBeUndefined();
+    expect(usersFrom(JSON.parse('{"__proto__": "h"}'))["__proto__"]).toBe("h");   // a name, not a prototype
   });
 
   test("refuses what it can't do, and says why", async () => {

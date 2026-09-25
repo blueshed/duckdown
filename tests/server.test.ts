@@ -1929,6 +1929,25 @@ describe("editors", () => {
   const said = async (res: Response) => [res.status, await res.text()];
   const users = () => JSON.parse(readFileSync(join(SITE, "users.json"), "utf8"));
 
+  // n118: a name JavaScript's objects already have is no one, until it's added.
+  test("constructor, __proto__, toString: nobody, until an editor adds one, and then an ordinary name", async () => {
+    for (const name of ["constructor", "__proto__", "toString"]) {
+      expect(await signInAs(name, "anything at all")).toBe("");             // refused, not a 500
+      expect((await send("PUT", { name, password: "long enough" }))).toMatchObject({ status: 404 });
+      expect((await fetch(`${url}?name=${name}`, { method: "DELETE", headers: { Cookie: admin() } })).status).toBe(404);
+    }
+    const listed = async () => (await (await fetch(url, authed())).json()).users.map((u: { name: string }) => u.name);
+    expect(await listed()).not.toContain("constructor");
+    for (const name of ["constructor", "__proto__"]) {
+      expect(await said(await send("POST", { name, password: "long enough" }))).toEqual([200, '{"ok":true}']);
+      expect(Object.hasOwn(users(), name)).toBe(true);                        // written as a name like any other
+      expect(await signedIn(await signInAs(name, "long enough"))).toBe(true);
+      expect(await listed()).toContain(name);
+      expect((await fetch(`${url}?name=${name}`, { method: "DELETE", headers: { Cookie: admin() } })).status).toBe(200);
+      expect(Object.hasOwn(users(), name)).toBe(false);
+    }
+  });
+
   test("lists names, never hashes; adds an editor who can then sign in", async () => {
     const listed = await (await fetch(url, authed())).json();
     expect(listed.me).toBe("admin");

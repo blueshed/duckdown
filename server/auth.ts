@@ -2,7 +2,7 @@ import type { BunRequest } from "bun";
 import { createStorage } from "./storage";
 import { USERS_PATH, DEBUG } from "./config";
 import { scaffoldNotice } from "./scaffold";
-import { readUsers, writeUsers, currentUsers, fingerprint, type Users } from "./users";
+import { readUsers, writeUsers, currentUsers, fingerprint, usersFrom, type Users } from "./users";
 
 const site = createStorage();
 
@@ -89,7 +89,7 @@ export async function ensureAdmin(
   email = process.env.DUCKDOWN_ADMIN_USER || "admin",
 ): Promise<boolean> {
   if (!password) return false;
-  const users: Users = (await site.exists(USERS_PATH)) ? await readUsers(site) : {};
+  const users: Users = (await site.exists(USERS_PATH)) ? await readUsers(site) : usersFrom();
   // Already this password: leave the file alone, so a restart isn't a write
   // (on S3 that's a PUT) and the hash doesn't churn.
   if (users[email] && (await Bun.password.verify(password, users[email]))) return false;
