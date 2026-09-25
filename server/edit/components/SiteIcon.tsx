@@ -1,4 +1,4 @@
-import { createElement, signal, computed, when } from "@blueshed/railroad";
+import { createElement, Fragment, signal, computed, when } from "@blueshed/railroad";
 import { apiJson } from "../api";
 import { speak } from "../notice";
 import { Icon } from "./Icon";
@@ -8,7 +8,11 @@ import { Icon } from "./Icon";
 // middle square and makes the two PNGs the site answers, so a person never
 // needs to know what either file is called or how big it should be.
 
-type Icons = { "apple-touch-icon.png": string | null; "favicon.ico": string | null };
+type Icons = {
+  "apple-touch-icon.png": string | null;
+  "favicon.ico": string | null;
+  elsewhere: { template: string; icons: string[] }[];   // templates naming icons of their own
+};
 
 // A phone fills a transparent home-screen icon with black; white is what the
 // picture was most likely drawn on. A tab shows transparency as it is.
@@ -85,6 +89,28 @@ export function SiteIcon() {
         adds the site there. A square picture is best: any other is cut to its
         middle square.
       </p>
+
+      {/* A template's own <link rel="icon"> wins over these: say so, or the
+          tab shows an icon the pages it wraps never do. Setting the icon
+          doesn't change a template, so what this says is read once. */}
+      {when(() => icons.get()?.elsewhere.length, () => {
+        const named = icons.peek()!.elsewhere;
+        const one = named.length === 1;
+        return (
+          <div class="icon-elsewhere" role="note">
+            <p>
+              {one ? "A template names its own icon, and the pages it wraps show that"
+                : "Some templates name their own icon, and the pages they wrap show that"} instead of this one:
+            </p>
+            <ul>
+              {named.map(({ template, icons }) => (
+                <li><code>templates/{template}</code> — {icons.map((href, i) => <>{i ? ", " : ""}<code>{href}</code></>)}</li>
+              ))}
+            </ul>
+            <p>Take out {one ? "its" : "their"} <code>&lt;link rel="icon"&gt;</code> lines to use the one set here.</p>
+          </div>
+        );
+      })}
 
       {when(icons, () => (
         <div class="icon-shown">

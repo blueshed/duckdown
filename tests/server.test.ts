@@ -8,6 +8,7 @@ import type { Storage } from "../server/storage";
 import { signJwt } from "../server/auth";
 import { usersChanged } from "../server/users";
 import { helpSection, helpSections, HELP_ORDER } from "../server/routes/help";
+import { ours, otherIcons } from "../server/routes/site-icon";
 
 keepSite();
 beforeAll(signIn);
@@ -1161,6 +1162,47 @@ describe("the site's icon, set from the editor", () => {
     const icons = await (await fetch(`${BASE}/edit/site-icon`, authed())).json();
     expect(icons["apple-touch-icon.png"]).toBeNull();
     expect(icons["favicon.ico"]).toMatch(/^\/static\/favicon\.ico\?v=\w+$/);
+    expect(icons.elsewhere).toEqual([]);   // the seed's templates name none
+  });
+
+  test("knows its own two files wherever a link names them from", () => {
+    for (const href of ["/favicon.ico", "favicon.ico", "./favicon.ico", "/static/favicon.ico", "/favicon.ico?v=2",
+      "https://www.example.com/apple-touch-icon.png", "/apple-touch-icon-180x180-precomposed.png", "/static/apple-touch-icon.png"]) {
+      expect(ours(href)).toBe(true);
+    }
+    for (const href of ["/static/favicon.png", "/static/images/mark.svg", "/robots.txt", "/static/images/favicon.ico"]) {
+      expect(ours(href)).toBe(false);
+    }
+  });
+
+  test("finds a template's own icons, in any attribute order and quoting, and nothing else", () => {
+    expect(otherIcons(`
+      <link href="/static/images/mark.svg" rel="icon" type="image/svg+xml">
+      <link rel='shortcut  icon' href='/old.ico'>
+      <link rel=apple-touch-icon href=/static/images/mark-lg.png>
+      <LINK REL="Apple-Touch-Icon-Precomposed" HREF="/p.png">
+      <link rel="icon" href="/favicon.ico" sizes="any">
+      <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+      <link rel="mask-icon" href="/pinned.svg" color="#000">
+      <link rel="stylesheet" href="/static/site.css">
+      <link rel="icon">
+    `)).toEqual(["/static/images/mark.svg", "/old.ico", "/static/images/mark-lg.png", "/p.png"]);
+  });
+
+  test("says which templates name icons of their own", async () => {
+    const at = (name: string) => join(SITE, "templates", name);
+    writeFileSync(at("b-linked.html"), '<link rel="icon" href="/static/mark.svg">{{content}}');
+    writeFileSync(at("a-linked.html"), '<link rel="apple-touch-icon" href="/big.png"><link rel="icon" href="/favicon.ico">');
+    writeFileSync(at("notes.txt"), '<link rel="icon" href="/elsewhere.png">');   // not a template
+    try {
+      const { elsewhere } = await (await fetch(`${BASE}/edit/site-icon`, authed())).json();
+      expect(elsewhere).toEqual([
+        { template: "a-linked.html", icons: ["/big.png"] },
+        { template: "b-linked.html", icons: ["/static/mark.svg"] },
+      ]);
+    } finally {
+      for (const name of ["a-linked.html", "b-linked.html", "notes.txt"]) rmSync(at(name));
+    }
   });
 
   test("writes both, keeps the one it replaced, and the root answers them", async () => {

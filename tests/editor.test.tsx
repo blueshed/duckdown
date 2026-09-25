@@ -1670,6 +1670,7 @@ describe("SiteIcon", () => {
     await waitFor(() => host.querySelector(".icon-shown"));
     // The seed has a tab icon and no home-screen one.
     expect(host.textContent).toContain("No home-screen icon yet.");
+    expect(host.querySelector(".icon-elsewhere")).toBeNull();   // the seed's templates name no icon
     const tabs = [...host.querySelectorAll(".icon-tab img")].map((i) => i.getAttribute("src"));
     expect(tabs).toHaveLength(2);
     expect(tabs[0]).toMatch(/^\/static\/favicon\.ico\?v=/);
@@ -1730,6 +1731,32 @@ describe("SiteIcon", () => {
     expect([...host.querySelectorAll(".icon-shown .drawer-note")].map((p) => p.textContent))
       .toEqual(["No home-screen icon yet.", "No tab icon yet."]);
     dispose();
+  });
+
+  test("a template that names its own icon is said, one or several", async () => {
+    const answer = (elsewhere: { template: string; icons: string[] }[]) =>
+      intercept(() => Response.json({ "apple-touch-icon.png": null, "favicon.ico": null, elsewhere }));
+    let restore = answer([{ template: "site.html", icons: ["/static/images/mark.svg", "/static/favicon.png"] }]);
+    try {
+      const { host, dispose } = render(() => <SiteIcon />);
+      await waitFor(() => host.querySelector(".icon-elsewhere"));
+      const note = host.querySelector(".icon-elsewhere")!;
+      expect(note.getAttribute("role")).toBe("note");
+      expect(note.textContent).toContain("A template names its own icon, and the pages it wraps show that instead of this one:");
+      expect(note.querySelector("li")!.textContent).toBe("templates/site.html — /static/images/mark.svg, /static/favicon.png");
+      expect(note.textContent).toContain("Take out its <link rel=\"icon\"> lines");
+      dispose();
+      restore();
+      restore = answer([{ template: "a.html", icons: ["/a.png"] }, { template: "b.html", icons: ["/b.png"] }]);
+      const again = render(() => <SiteIcon />);
+      await waitFor(() => again.host.querySelector(".icon-elsewhere"));
+      expect(again.host.querySelector(".icon-elsewhere")!.textContent).toContain("Some templates name their own icon, and the pages they wrap");
+      expect(again.host.querySelectorAll(".icon-elsewhere li")).toHaveLength(2);
+      expect(again.host.querySelector(".icon-elsewhere")!.textContent).toContain("Take out their");
+      again.dispose();
+    } finally {
+      restore();
+    }
   });
 
   test("a site whose icons can't be found says so, and shows none", async () => {
