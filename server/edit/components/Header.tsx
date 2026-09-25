@@ -24,6 +24,9 @@ export function Header() {
       <button onclick={() => toggleDrawer("editors")} aria-expanded={drawer.map((d) => String(d === "editors"))}>
         <Icon name="users" /> <span class="label">Editors</span>
       </button>
+      <button onclick={() => toggleDrawer("help")} aria-expanded={drawer.map((d) => String(d === "help"))}>
+        <Icon name="circle-help" /> <span class="label">Help</span>
+      </button>
       <a href={viewHref} target="_blank" class="header-link">
         <Icon name="external-link" /> <span class="label">View</span>
       </a>

@@ -59,6 +59,7 @@ duckdown/
 │   ├── slugs.ts            # An item's slug and address, and how aliases compare (both ends read it)
 │   ├── base.ts             # Where the base files are (server/base/) and the root files
 │   ├── base/               # site.css, search.js: served and exported when a site has none of its own
+│   ├── help/               # The editor's Help, one markdown page per topic, for the person editing
 │   ├── init.ts             # scaffold(root, {vendored}): what both ways in write (see below)
 │   ├── cli.ts              # bin `duckdown`: the server, or `duckdown init`
 │   ├── serve.ts            # The published flavour's server: a dist/ folder, nothing else
@@ -76,6 +77,7 @@ duckdown/
 │   │   ├── browse.ts       # /edit/browse/* — image browser + upload
 │   │   ├── reports.ts      # /edit/reports/* — reports/, read-only: a listing, or a report rendered as a page
 │   │   ├── users.ts        # /edit/users — who can sign in: names, never hashes
+│   │   ├── help.ts         # /edit/help — the Help drawer's pages (server/help/), examples paired with what they give
 │   │   ├── publish.ts      # /edit/publish — status, publish (checked), ?pull
 │   │   ├── collection.ts   # /edit/collection/* — a collection's pictures (upload + thumbnail), and its problems
 │   │   ├── static.ts       # /static/* — site static files
@@ -114,6 +116,7 @@ duckdown/
 │           ├── ConfirmDialog.tsx # Confirm action dialog
 │           ├── Past.tsx      # The past's compartments: its list, the version read-only, it rendered
 │           ├── Users.tsx     # The Editors drawer: add, set a password, remove
+│           ├── Help.tsx      # The Help drawer: what fits what's open first (helpFirst), the rest folded
 │           ├── Publish.tsx   # The header's Publish button and drawer: what's waiting, Publish, Pull
 │           ├── Notice.tsx    # Shows that line (role=alert for a failure, status for news)
 │           └── Icon.tsx      # Lucide icons (lucide-static SVG strings)
@@ -353,7 +356,7 @@ A reader or an editor who uses a keyboard, a screen reader, a larger text size, 
 
 `renderMarkdown(source, path)` in `markdown.ts` is Bun.markdown (GFM, heading ids and self-links, wiki links) plus three passes over its HTML: callouts (`> [!NOTE]` …), `<x-wikilink>` → `<a>`, and the contents list for `toc: true`. `path` is where the page lives, for relative wiki links: the site passes it, and so does the preview (`PUT /edit/mark/?path=`). Keep new syntax opt-in and readable as plain markdown.
 
-When a content feature changes (syntax, front matter, themes, navigation, the editor), update the authoring skill — `.claude/skills/duckdown/` (`SKILL.md`, `reference.md`) — and the seed site's guide pages (`tests/example/pages/guide/`) with it: the skill is what a session writing a site's content reads.
+When a content feature changes (syntax, front matter, themes, navigation, the editor), update the authoring skill — `.claude/skills/duckdown/` (`SKILL.md`, `reference.md`) — the seed site's guide pages (`tests/example/pages/guide/`) and the editor's Help (`server/help/`) with it: the skill is what a session writing a site's content reads, Help what a person editing reads.
 
 Styling is templates and stylesheets, and nothing else. `templates/site.html` links `static/site.css` (duckdown's base, everything drawn from CSS variables) and `static/theme.css` (this site's look, saying only what differs). There is no `theme:` key, no class on `<body>`, and no per-folder cascade: every page is styled because the template links the files, so a page can't opt in and can't forget to. Style new things through the variables so `theme.css` reaches them. For one page, `css:` links a stylesheet after the template's own; for a kind of page, `layout:` picks a template that links what that kind needs.
 
@@ -517,7 +520,19 @@ and the choice stays marked; the pane passes its ⌘Z/⇧⌘Z in (`Drawer`'s
 and its contents dimmed, and the preview busy from the click until its frame
 has loaded the new render — which is asked for at once for a page just
 opened (the 300ms pause is for typing). The tree's first row, in any folder
-but the site's, is `..`, up one. The editor's two right-hand columns each hold whatever is open. The middle one
+but the site's, is `..`, up one.
+
+Help is the header's fourth drawer. Its pages are `server/help/<topic>.md`,
+written for the person editing (plain words, examples first), shipped with
+duckdown so every site has them. `routes/help.ts` renders them, and a fenced
+block marked `example` comes out twice — what you type, then what readers
+get, through `renderMarkdown()` itself, so the two can't disagree; in the
+result a link is only its look and a picture its words, so nothing in the
+drawer takes the editor away. `Help.tsx` orders them by `helpFirst()`: an
+each: page, then a collection, then a template or stylesheet, then a page,
+else the editor itself — the first open, the rest folded, reordered as what's
+open changes. When a content feature changes, change its Help page with the
+skill and the seed's guide. The editor's two right-hand columns each hold whatever is open. The middle one
 holds the page and, beneath it, either a resource or a folder's collection —
 one slot, so opening either closes the other; each closes, two split the
 column, one fills it. Below 768px the three columns stack, the tree capped and

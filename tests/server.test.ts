@@ -7,6 +7,7 @@ import { feedXml, feedsChanged } from "../server/feed";
 import type { Storage } from "../server/storage";
 import { signJwt } from "../server/auth";
 import { usersChanged } from "../server/users";
+import { helpSection, helpSections, HELP_ORDER } from "../server/routes/help";
 
 keepSite();
 beforeAll(signIn);
@@ -1823,5 +1824,40 @@ describe("editors", () => {
       writeFileSync(file, before);
       usersChanged();
     }
+  });
+});
+
+// Help: the editor's pages, shipped with duckdown.
+describe("/edit/help", () => {
+  test("is for editors, and answers every page in its order, examples paired with what they give", async () => {
+    expect((await fetch(`${BASE}/edit/help`)).status).toBe(401);
+    const res = await fetch(`${BASE}/edit/help`, authed());
+    expect(res.status).toBe(200);
+    const { sections } = await res.json() as { sections: { id: string; title: string; html: string }[] };
+    expect(sections.map((x) => x.id)).toEqual(HELP_ORDER);
+    expect(sections.every((x) => x.title && x.html)).toBe(true);
+    const page = sections.find((x) => x.id === "page")!;
+    expect(page.title).toBe("Writing a page");
+    // What you type, escaped, and under it what readers get.
+    expect(page.html).toContain('<div class="help-example"><pre><code>**bold**, *italic*, ~~crossed out~~</code></pre>');
+    expect(page.html).toContain("<strong>bold</strong>");
+    // A heading is a label here, not a link to itself.
+    expect(page.html).toContain("<h2>Headings</h2>");
+    expect(page.html).toContain("<h2>A heading</h2>");
+    // In a result, a link only looks like one, and a picture is its words.
+    expect(page.html).toContain('<span class="help-link">the news page</span>');
+    expect(page.html).toContain('<span class="help-picture">Two birds on a wire, against a grey sky</span>');
+    expect(page.html).not.toMatch(/<a\b|<img\b/);
+  });
+
+  test("a page is read once and kept, and a read that fails is tried again", async () => {
+    const one = helpSection("x", "# A title\n\nWords.\n\n```example\n*hi*\n```\n");
+    expect(one.title).toBe("A title");
+    expect(one.html).toContain("<em>hi</em>");
+    expect(helpSection("y", "No title").title).toBe("y");
+    const first = helpSections(undefined, false);
+    expect(helpSections(undefined, false)).toBe(first);
+    await expect(helpSections("/nowhere/at/all", true)).rejects.toThrow();
+    expect((await helpSections(undefined, false)).length).toBe(HELP_ORDER.length);
   });
 });

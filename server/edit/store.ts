@@ -27,7 +27,7 @@ export function shortName(key: string): string {
 
 // The drawer at the right: Resources, Editors or Publish, one at a time. Each
 // is chosen from the header and leaves the page in view behind it.
-export type DrawerName = "resources" | "editors" | "publish";
+export type DrawerName = "resources" | "editors" | "publish" | "help";
 export const drawer = signal<DrawerName | null>(null);
 export const showImages = computed(() => drawer.get() === "resources");
 

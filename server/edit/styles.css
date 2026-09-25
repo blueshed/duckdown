@@ -35,6 +35,7 @@
   --text-lg: 0.9375rem;
   --text-xl: 1rem;
   --control-font: var(--text-base);
+  --font-mono: ui-monospace, "SF Mono", "Fira Code", "Cascadia Code", monospace;   /* code, file names, the page's text */
   --radius-sm: 4px;
   --radius: 6px;
   --radius-lg: 10px;
@@ -414,7 +415,7 @@ button.header-link:hover {
   background: var(--bg);
   color: var(--text);
   border: none;
-  font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+  font-family: var(--font-mono);
   font-size: var(--text-base);
   line-height: 1.6;
   outline: none;
@@ -627,7 +628,7 @@ button.danger-subtle:hover {
    type in every header, so the bars read as one family. */
 .pane-name,
 .pane-path {
-  font-family: var(--font-mono, ui-monospace, monospace);
+  font-family: var(--font-mono);
   font-size: var(--text-sm);
   color: var(--text-dim);
   overflow: hidden;
@@ -1205,7 +1206,7 @@ button.danger-subtle:hover {
   margin: 0;
   padding: var(--space-3) 0;
   background: color-mix(in srgb, var(--border) 25%, var(--bg));
-  font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+  font-family: var(--font-mono);
   font-size: var(--text-base);
   line-height: 1.6;
   white-space: pre-wrap;
@@ -1531,7 +1532,7 @@ button.danger-subtle:hover {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-family: "SF Mono", "Fira Code", monospace;
+  font-family: var(--font-mono);
   font-size: var(--text-xs);
   color: var(--text-dim);
 }
@@ -1732,4 +1733,150 @@ button.danger-subtle:hover {
   width: 100%;
   height: 100%;
   border: none;
+}
+
+/* Help (Help.tsx): a topic per fold, what fits what is open first and open.
+   Each example is what you type, and under it what readers get. */
+.help {
+  padding: var(--space-2) var(--space-4) var(--space-5);
+  font-size: var(--text-md);
+  line-height: 1.5;
+}
+
+.help-section {
+  border-bottom: 1px solid var(--border);
+}
+
+.help-section > summary {
+  padding: var(--space-3) 0;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.help-section > summary:hover {
+  color: var(--accent-text);
+}
+
+.help-body {
+  padding-bottom: var(--space-4);
+}
+
+.help-body :is(p, ul, ol, table, pre, blockquote) {
+  margin: 0 0 var(--space-3);
+}
+
+.help-body :is(ul, ol) {
+  padding-left: var(--space-5);
+}
+
+/* Help's own labels, between its examples: the body's size, bold. */
+.help-body > h2 {
+  margin: var(--space-4) 0 var(--space-2);
+  font-size: var(--text-md);
+}
+
+.help-body code {
+  font-family: var(--font-mono);
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  font-size: 0.92em;
+}
+
+.help-body pre {
+  overflow-x: auto;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius);
+  background: var(--bg);
+}
+
+.help-body pre code {
+  padding: 0;
+  background: none;
+}
+
+.help-body table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-base);
+}
+
+.help-body :is(th, td) {
+  padding: var(--space-1) var(--space-2) var(--space-1) 0;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+}
+
+/* An example: the typing, then the result in a frame of its own. */
+.help-example {
+  margin: 0 0 var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.help-example > pre {
+  margin: 0;
+  border-radius: 0;
+}
+
+.help-result {
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface);
+}
+
+.help-result > :last-child {
+  margin-bottom: 0;
+}
+
+/* An example's own headings keep their order: ## above ###, both above text. */
+.help-result :is(h2, h3) {
+  margin: var(--space-1) 0;
+  line-height: 1.25;
+}
+
+.help-result h2 {
+  font-size: 1.35em;
+}
+
+.help-result h3 {
+  font-size: 1.15em;
+}
+
+.help-result blockquote {
+  padding-left: var(--space-3);
+  border-left: 3px solid var(--border);
+  color: var(--text-dim);
+}
+
+/* A callout: its colour on the left and its kind named. */
+.help-result blockquote.callout {
+  border-left-color: var(--accent);
+  color: var(--text);
+}
+
+.help-result .callout-title {
+  font-weight: 600;
+  color: var(--accent-text);
+}
+
+.help-result hr {
+  border: 0;
+  border-top: 1px solid var(--border);
+}
+
+/* In a result a link only looks like one, and a picture is its words. */
+.help-link {
+  color: var(--accent-text);
+  text-decoration: underline;
+}
+
+.help-picture {
+  display: inline-block;
+  padding: var(--space-2) var(--space-3);
+  border: 1px dashed var(--field-border);
+  border-radius: var(--radius);
+  color: var(--text-dim);
+  font-style: italic;
 }

@@ -25,6 +25,7 @@ import { CssPreview } from "../server/edit/components/CssPreview";
 import { Header } from "../server/edit/components/Header";
 import { Trail, folderCrumbs } from "../server/edit/components/Trail";
 import { EditorsDrawer } from "../server/edit/components/Users";
+import { HelpDrawer, helpFirst, helpOrder } from "../server/edit/components/Help";
 import { Drawers, LeftDrawer } from "../server/edit/components/Drawers";
 import { PublishButton, publishState, refreshPublish } from "../server/edit/components/Publish";
 import { ImageBrowser } from "../server/edit/components/ImageBrowser";
@@ -1066,6 +1067,50 @@ describe("Header", () => {
     const logout = host.querySelector("form.header-form") as HTMLFormElement;
     expect(logout.getAttribute("method")).toBe("post");
     expect(logout.getAttribute("action")).toBe("/logout");
+    dispose();
+  });
+});
+
+// Help: short pages shipped with duckdown, what fits what's open first.
+describe("Help", () => {
+  const none = { file: null, text: "", resource: null, collection: false };
+
+  test("what fits what is open comes first", () => {
+    expect(helpFirst(none)).toEqual(["editor"]);
+    expect(helpFirst({ ...none, file: "news/index.md", text: "title: News\n\n# News" })).toEqual(["page", "top", "extras"]);
+    // The page every work gets wins over the collection open below it.
+    expect(helpFirst({ ...none, file: "works/item.md", text: "each: true\ntitle: x\n\nbody", collection: true })).toEqual(["each", "collection"]);
+    // "each:" in the page's text, not its top, is only words.
+    expect(helpFirst({ ...none, file: "a.md", text: "title: A\n\neach: day" })).toEqual(["page", "top", "extras"]);
+    expect(helpFirst({ ...none, file: "works/index.md", text: "title: Works", collection: true })).toEqual(["collection", "each"]);
+    expect(helpFirst({ ...none, resource: { section: "templates", path: "site.html" } })).toEqual(["template"]);
+    expect(helpFirst({ ...none, resource: { section: "static", path: "theme.css" } })).toEqual(["look"]);
+    expect(helpFirst({ ...none, file: "theme.css", text: ":root {}" })).toEqual(["look"]);
+    const sections = ["page", "top", "extras", "look"].map((id) => ({ id, title: id, html: "" }));
+    expect(helpOrder(sections, ["look", "top"]).map((x) => x.id)).toEqual(["look", "top", "page", "extras"]);
+  });
+
+  test("the drawer opens from the header, what fits first and open, and follows you", async () => {
+    const { host, dispose } = render(() => <div><Header /><Drawers /></div>);
+    batch(() => {
+      filePath.set("gallery/item.md");
+      editorContent.set("each: true\nlayout: item\n\n{{item-title}}");
+    });
+    const help = button(host, "Help")!;
+    click(help);
+    expect(drawer.get()).toBe("help");
+    expect(help.getAttribute("aria-expanded")).toBe("true");
+    const sections = () => [...host.querySelectorAll(".help-section")] as HTMLDetailsElement[];
+    await waitFor(() => sections().length === 8);
+    expect(sections()[0]!.dataset.help).toBe("each");
+    expect(sections().map((d) => d.open)).toEqual([true, false, false, false, false, false, false, false]);
+    expect(sections()[0]!.querySelector("summary")!.textContent).toBe("The page every work gets");
+    // Open an ordinary page with Help showing: it reorders for that.
+    editorContent.set("title: News\n\n# News");
+    await waitFor(() => sections()[0]!.dataset.help === "page");
+    expect(sections()[0]!.querySelector(".help-example pre")!.textContent).toBe("## A heading\n### A smaller one");
+    click(host.querySelector('[aria-label="Close help"]')!);
+    expect(drawer.get()).toBeNull();
     dispose();
   });
 });

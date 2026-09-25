@@ -2,6 +2,7 @@ import { createElement, Fragment, when } from "@blueshed/railroad";
 import { ImageBrowser } from "./ImageBrowser";
 import { EditorsDrawer } from "./Users";
 import { PublishDrawer } from "./Publish";
+import { HelpDrawer } from "./Help";
 import { drawer, leftDrawer } from "../store";
 
 // The drawer at the left, when a pane has put something in it: a chosen
@@ -17,6 +18,7 @@ export function Drawers() {
       {when(() => drawer.get() === "resources", () => <ImageBrowser />)}
       {when(() => drawer.get() === "editors", () => <EditorsDrawer />)}
       {when(() => drawer.get() === "publish", () => <PublishDrawer />)}
+      {when(() => drawer.get() === "help", () => <HelpDrawer />)}
     </>
   );
 }
