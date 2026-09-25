@@ -1,5 +1,49 @@
 # Changelog
 
+## 0.10.0 — 2026-09-25
+
+Accessible by default: the site readers see, and the editor.
+
+**The site**
+- **A theme overrides the base by saying so.** Every rule in duckdown's
+  `site.css` now sits in `@layer base`; a site's `theme.css` (and a page's
+  `css:`) is in no layer, so its rules win by coming later, however plain the
+  selector. The variables stay outside the layer: they are still the
+  interface.
+- **Less motion for a reader who asks for it.** Under
+  `prefers-reduced-motion: reduce` every animation and transition stops — a
+  theme's too.
+- **A wide table scrolls in a box of its own** instead of pushing the whole
+  page sideways on a phone (a markdown table is wrapped in
+  `<div class="table-scroll">`; one written in HTML is left alone).
+- **A thumbnail beside its title is `alt=""`,** in `{{items}}`: a screen
+  reader said the title twice.
+- **A skip link, when a template has one.** `site.css` styles `.skip`, the
+  first thing a keyboard reaches — `<a class="skip" href="#content">` before
+  the nav, and the page in `<main id="content">`. The seed's templates have
+  it; the bare template is `lang="en"` with a `<main>`.
+- **Colours:** every text pair in `site.css` passes WCAG AA in light and dark
+  (the warning callout's title is darker, `#8a5c00`), the search box has a
+  3:1 edge (`--field-border`), and headings balance their lines.
+
+**The editor** — reachable by keyboard throughout (the trees are buttons,
+uploads reachable by Tab, Resources' tabs are tabs), every control and dialog
+named, focus given back when a dialog closes and shown where it is (and under
+forced colours), its colours passing AA with a test that keeps every pair
+passing, one sizing system with 24px targets or more, type in rem so the
+reader's own text size reaches it, and no sideways scroll at 390px.
+
+**Upgrading**
+- **Look at your pages.** Because of the layer, a rule in `theme.css` that
+  used to lose to a more specific base rule now wins. Usually that is what
+  the theme meant; check the pages anyway, and take out any rule that was
+  only there to out-specify the base.
+- **A theme that animates** should do it inside
+  `@media (prefers-reduced-motion: no-preference) { … }` — though the base
+  now stops it for readers who ask either way.
+- **Optional, recommended:** a skip link and `<main id="content">` in each
+  template with a nav, and `lang` set to the site's language.
+
 ## 0.9.0 — 2026-09-24
 
 - **Editors, from the editor.** **Editors** in the header lists who can sign
