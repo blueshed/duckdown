@@ -167,6 +167,14 @@ describe("auth", () => {
     expect(await res.text()).toContain("--accent");
   });
 
+  test("the editor's icon is served, and both its pages link it", async () => {
+    expect(await (await fetch(`${BASE}/login`)).text()).toContain('rel="icon" type="image/png" href="/edit/icon.png"');
+    expect(await (await fetch(`${BASE}/edit`)).text()).toMatch(/rel="icon" type="image\/png" href="[^"]+\.png"/);   // bundled, hashed
+    const res = await fetch(`${BASE}/edit/icon.png`);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("image/png");
+  });
+
   test("the editor itself is served", async () => {
     const res = await fetch(`${BASE}/edit`);
     expect(res.status).toBe(200);

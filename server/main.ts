@@ -21,9 +21,10 @@ import { handleSitemap } from "./routes/sitemap";
 import { handleSite } from "./routes/site";
 import { handleError } from "./routes/error";
 
-// The editor's stylesheet at a stable URL, for the login page (which is not
-// an HTML import, so Bun never bundles its <link>).
+// The editor's stylesheet and icon at stable URLs, for the login page (which
+// is not an HTML import, so Bun never bundles its <link>s).
 const editorCss = Bun.file(`${import.meta.dir}/edit/styles.css`);
+const editorIcon = Bun.file(`${import.meta.dir}/edit/icon.png`);
 
 // Before listening: a second server stops here, and a dev site is seeded
 // before any request reads it.
@@ -42,6 +43,7 @@ export const server = Bun.serve({
     "/health": new Response("OK"),
     "/edit": homepage,
     "/edit/styles.css": editorCss,
+    "/edit/icon.png": editorIcon,     // the login page's; the editor bundles its own
     "/login": { GET: handleLoginGet, POST: handleLoginPost },
     "/logout": { POST: handleLogout },
     "/edit/pages/*": handlePages,

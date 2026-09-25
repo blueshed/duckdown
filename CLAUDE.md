@@ -15,6 +15,7 @@ Bun.serve({
     "/health":          new Response("OK"),   // a platform's healthcheck
     "/edit":            homepage,
     "/edit/styles.css": editorCss,   // Bun.file — also styles /login
+    "/edit/icon.png":   editorIcon,  // and gives it the editor's icon
     "/login":           { GET: handleLoginGet, POST: handleLoginPost },
     "/logout":          { POST: handleLogout },
     "/edit/pages/*":     handlePages,

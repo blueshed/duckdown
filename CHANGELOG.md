@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- **The editor has an icon** — a browser window, on its tab and on the
+  sign-in page, so it can be told apart from the site in a row of tabs.
+
 ## 0.11.1 — 2026-09-25
 
 - **The home-screen icon answers wherever a phone looks for it.** A site with
