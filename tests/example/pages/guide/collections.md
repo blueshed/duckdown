@@ -228,9 +228,9 @@ watch the overview redraw next to them.
 - **Starting one**: the grid icon at the top of the tree asks for a folder
   name, and writes the data, an `item.md` for the works' pages, and an
   `index.md` showing them — then opens it, ready for pictures.
-- **The fields** are edited where they sit, one box per field the file
-  declares. Anything else on an item — a `slug`, its `aliases` — is left
-  exactly as it was.
+- **The works** are pictures in their groups. Choose one and its fields are
+  beside them, one box per field the file declares. Anything else on an item
+  — a `slug`, its `aliases` — is left exactly as it was.
 - **Renaming a work** changes its address, because the slug comes from the
   title — so the old address goes into its `aliases` and keeps leading there,
   and the message line tells you. A work you added this sitting was never
@@ -238,11 +238,12 @@ watch the overview redraw next to them.
 - **Order**: drag a work by its picture, inside its group or into another one,
   or use the up and down arrows. Groups move with theirs.
 - **Groups**: add one, add a subgroup inside one, rename it, remove it.
-- **A picture**: drop one on a group, or click *Drop a picture here* to choose
-  it. Duckdown puts the original where this collection's `images` says its
+- **A picture**: drop one on a group's last tile — the one with a plus — or
+  click it to choose one. Duckdown puts the original where this collection's `images` says its
   pictures live, writes a 128px thumbnail beside it under the collection's own
   naming rule, and adds the work — then give it a title and a caption.
-- **Replacing a picture**: drop a new one on the work's own picture. It is
+- **Replacing a picture**: drop a new one on the chosen work's picture, beside
+  the grid, or click it. It is
   written under the same file name, so the work keeps its address and
   everything that links to it goes on working.
 

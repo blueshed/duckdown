@@ -1,12 +1,11 @@
-import { createElement, computed, signal, when } from "@blueshed/railroad";
+import { createElement, computed } from "@blueshed/railroad";
 import { Icon } from "./Icon";
-import { EditorsDialog } from "./Users";
 import { PublishButton } from "./Publish";
-import { filePath, showImages, toggleImages } from "../store";
+import { Trail } from "./Trail";
+import { filePath, drawer, toggleDrawer } from "../store";
 import { urlPath } from "../api";
 
 export function Header() {
-  const editors = signal(false);
   const viewHref = computed(() => {
     const fp = filePath.get();
     return fp ? `/${urlPath(fp.replace(/\.md$/, ".html"))}` : "/";
@@ -14,16 +13,17 @@ export function Header() {
 
   return (
     <div class="header">
-      <h1>duckie</h1>
+      <h1 class="visually-hidden">duckie</h1>
+      <Trail />
       <span style="flex: 1;" />
       <PublishButton />
-      <button onclick={toggleImages} aria-expanded={showImages.map(String)}>
+      {/* Each opens its drawer, and the drawer it opens says so. */}
+      <button onclick={() => toggleDrawer("resources")} aria-expanded={drawer.map((d) => String(d === "resources"))}>
         <Icon name="layout-template" /> <span class="label">Resources</span>
       </button>
-      <button onclick={() => editors.set(true)}>
+      <button onclick={() => toggleDrawer("editors")} aria-expanded={drawer.map((d) => String(d === "editors"))}>
         <Icon name="users" /> <span class="label">Editors</span>
       </button>
-      {when(editors, () => <EditorsDialog oncancel={() => editors.set(false)} />)}
       <a href={viewHref} target="_blank" class="header-link">
         <Icon name="external-link" /> <span class="label">View</span>
       </a>

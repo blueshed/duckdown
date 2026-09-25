@@ -2,12 +2,13 @@ import { createElement, signal, computed, list, when } from "@blueshed/railroad"
 import { api, apiJson } from "../api";
 import { tell } from "../notice";
 import { Icon } from "./Icon";
-import { modal } from "../modal";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { Drawer } from "./Drawer";
+import { closeDrawer } from "../store";
 
 // Who can sign in (routes/users.ts): add one, set a password, remove one.
 // Every editor is equal. A refusal the server explains — a name taken, a
-// password too short, yourself — is said here, in the dialog, where the thing
+// password too short, yourself — is said here, in the drawer, where the thing
 // to fix is; what happened is news on the one line.
 
 type Editor = { name: string; env: boolean };
@@ -16,8 +17,7 @@ type Info = { me: string; users: Editor[] };
 const JSON_HEADERS = { "Content-Type": "application/json" };
 const EXPLAINED = [400, 403, 404, 409];
 
-export function EditorsDialog(props: { oncancel: () => void }) {
-  const dialog = modal();
+export function EditorsDrawer() {
   const info = signal<Info | null>(null);
   const users = computed(() => info.get()?.users ?? []);
   const error = signal("");
@@ -68,14 +68,16 @@ export function EditorsDialog(props: { oncancel: () => void }) {
   };
 
   return (
-    <dialog ref={dialog.ref} class="dialog dialog-history" aria-labelledby={dialog.title} onclose={props.oncancel}>
-      <h3 id={dialog.title}>Editors</h3>
+    <Drawer icon="users" title="Editors" close="Close editors" onclose={closeDrawer}>
+      <div class="drawer-body">
       <ul class="history-list editors">
         {list(users, (u) => u.name, (row$) => {
           const { name, env } = row$.peek();
           const me = () => info.get()?.me === name;
           return (
             <li class="editor-row">
+              {/* Circles are for faces: each editor is one. */}
+              <span class="face" aria-hidden="true">{name.slice(0, 1).toUpperCase()}</span>
               <span class="history-label">{name}</span>
               <span class="history-detail">{() => (me() ? "you" : env ? "set by the environment" : "")}</span>
               {env ? null : <button aria-label={`Set ${name}'s password`} onclick={() => { error.set(""); setting.set(name); }}>
@@ -98,14 +100,15 @@ export function EditorsDialog(props: { oncancel: () => void }) {
           );
         })}
       </ul>
-      <form class="editor-add" onsubmit={add}>
-        <input name="name" placeholder="Name or email" aria-label="Name or email" autocomplete="off" />
-        <input name="password" type="password" placeholder="Their password" aria-label="Their password" autocomplete="new-password" />
-        <button type="submit" class="primary"><Icon name="plus" size={12} /> Add</button>
-      </form>
       {when(error, () => <p class="dialog-error" role="alert">{error}</p>)}
-      <div class="dialog-actions">
-        <button type="button" onclick={() => { dialog.close(); props.oncancel(); }}>Close</button>
+      </div>
+      <div class="drawer-foot">
+        <p class="drawer-note">Add an editor</p>
+        <form class="editor-add" onsubmit={add}>
+          <input name="name" placeholder="Name or email" aria-label="Name or email" autocomplete="off" />
+          <input name="password" type="password" placeholder="Their password" aria-label="Their password" autocomplete="new-password" />
+          <button type="submit" class="primary"><Icon name="plus" size={12} /> Add</button>
+        </form>
       </div>
       {when(removing, () => (
         <ConfirmDialog
@@ -116,6 +119,6 @@ export function EditorsDialog(props: { oncancel: () => void }) {
           oncancel={() => removing.set(null)}
         />
       ))}
-    </dialog>
+    </Drawer>
   );
 }

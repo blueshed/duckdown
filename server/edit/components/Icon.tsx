@@ -1,6 +1,6 @@
 import { createElement } from "@blueshed/railroad";
 import {
-  ArchiveRestore, ArrowDown, ArrowUp, CloudDownload, CloudUpload, Copy, CornerLeftUp, Droplet, ExternalLink, FilePlus, FileText,
+  ArchiveRestore, ArrowDown, ArrowUp, ChevronRight, CloudDownload, CloudUpload, Copy, Droplet, ExternalLink, FilePlus, FileText,
   Folder, FolderInput, FolderPlus, History, Image, ImagePlus, Key, LayoutGrid, LayoutTemplate, LogOut, Plus,
   Redo2, RefreshCw, RotateCcw, Save, Trash2, Undo2, Upload, Users, X,
 } from "lucide-static";
@@ -9,10 +9,10 @@ const ICONS: Record<string, string> = {
   "archive-restore": ArchiveRestore,
   "arrow-down": ArrowDown,
   "arrow-up": ArrowUp,
+  "chevron-right": ChevronRight,
   "cloud-download": CloudDownload,
   "cloud-upload": CloudUpload,
   "copy": Copy,
-  "corner-left-up": CornerLeftUp,
   "droplet": Droplet,
   "external-link": ExternalLink,
   "file-plus": FilePlus,

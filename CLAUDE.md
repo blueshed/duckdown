@@ -86,31 +86,35 @@ duckdown/
 │   └── edit/               # Editor client (served at /edit)
 │       ├── index.html      # Entry HTML (Bun auto-bundles .tsx + .css)
 │       ├── app.tsx          # Railroad app root
-│       ├── store.ts         # Signals + actions (shared state)
+│       ├── store.ts         # Signals + actions (shared state): the tree's folder, which drawer is open
+│       ├── past.ts          # Earlier versions and Deleted, as a place: the list, the one looked at, Restore
 │       ├── api.ts           # fetch wrapper: failures speak; a 401 goes to /login
 │       ├── notice.ts        # the one line: a failure (speak), news (tell), hush
 │       ├── modal.ts         # every dialog: shown modally, named by its heading, focus given back
 │       ├── styles.css       # Editor styles (light/dark theme-aware); sizes from :root tokens, pane headers by @container
 │       ├── login.html       # Login page (HTMLRewriter; styled by /edit/styles.css)
 │       └── components/
+│           ├── Trail.tsx     # Where you are, said once: duckie › folder › page (and a drawer's own folders)
 │           ├── Browser.tsx   # File/folder navigator
 │           ├── Editor.tsx    # Textarea editor with save/delete
 │           ├── Preview.tsx   # Live markdown preview
 │           ├── CssPreview.tsx # CSS preview in iframe
-│           ├── Header.tsx    # Top bar (view site, resources, logout)
-│           ├── ImageBrowser.tsx # Resources sidebar: images, css, templates, reports
+│           ├── Header.tsx    # Top bar: the trail, then the drawers' buttons, view site, logout
+│           ├── Drawer.tsx    # The drawer's frame: over the preview, not modal, Escape closes it
+│           ├── Drawers.tsx   # Whichever drawer is open: Resources, Editors or Publish
+│           ├── ImageBrowser.tsx # The Resources drawer: images (a grid), css, templates, reports
 │           ├── ReportList.tsx # Its reports tab: reports/ by folder, each a link to its own tab
 │           ├── ResourceList.tsx # One tab of it: the css or template files
 │           ├── ResourcePane.tsx # A resource open below the page
-│           ├── CollectionPane.tsx # A folder's collection.json, edited as works
+│           ├── CollectionPane.tsx # A folder's collection.json: the works as pictures, the chosen one's fields beside them
 │           ├── PreviewFrame.tsx # The sandboxed iframe, in one place
 │           ├── TemplatePreview.tsx # A sample page through the draft template
 │           ├── PaneHeader.tsx   # The one header both panes wear
 │           ├── NewDialog.tsx    # Name a new page, folder, collection, stylesheet, template
 │           ├── ConfirmDialog.tsx # Confirm action dialog
-│           ├── History.tsx   # Earlier versions of a file, and what was deleted: Restore
-│           ├── Users.tsx     # The Editors dialog: add, set a password, remove
-│           ├── Publish.tsx   # The header's Publish button and dialog: what's waiting, Publish, Pull
+│           ├── Past.tsx      # The past's compartments: its list, the version read-only, it rendered
+│           ├── Users.tsx     # The Editors drawer: add, set a password, remove
+│           ├── Publish.tsx   # The header's Publish button and drawer: what's waiting, Publish, Pull
 │           ├── Notice.tsx    # Shows that line (role=alert for a failure, status for news)
 │           └── Icon.tsx      # Lucide icons (lucide-static SVG strings)
 ├── tests/                  # see Testing below
@@ -305,7 +309,7 @@ COOKIE_NAME=duckie_token     # Cookie name
 
 Users stored in `users.json` in the content directory, passwords hashed with `Bun.password`. A deployment sets `DUCKDOWN_ADMIN_PASSWORD` (and optionally `DUCKDOWN_ADMIN_USER`) instead of committing a hash: `ensureAdmin()` writes it at startup, so a seeded site never carries the example's `admin`/`admin` onto the internet.
 
-`server/users.ts` owns the file, and its shape never changes (`{name: hash}`), so an older duckdown can always read what a newer one wrote. Who is signed in is decided per request by `getUser()`: the cookie is signed, names a user who must still be in the file, and carries `fingerprint()` of their hash, so a new password or a removal ends their sessions without any session list; a cookie with no fingerprint (made by 0.8 or earlier) stands until it expires. The file is read through `currentUsers()`, kept `FRESH` (5s) and dropped by `writeUsers()`, so a change by `duckdown user` (`userCommand()`, via `cli.ts`) or by hand lands within seconds; login reads it afresh. `/edit/users` (`routes/users.ts`) answers names, never hashes, and adds, re-passwords and removes — every editor equal, nobody removing themselves, the environment's admin untouchable there, and your own password needing the current one (the answer re-signs your cookie). The editor's **Editors** dialog is `components/Users.tsx`.
+`server/users.ts` owns the file, and its shape never changes (`{name: hash}`), so an older duckdown can always read what a newer one wrote. Who is signed in is decided per request by `getUser()`: the cookie is signed, names a user who must still be in the file, and carries `fingerprint()` of their hash, so a new password or a removal ends their sessions without any session list; a cookie with no fingerprint (made by 0.8 or earlier) stands until it expires. The file is read through `currentUsers()`, kept `FRESH` (5s) and dropped by `writeUsers()`, so a change by `duckdown user` (`userCommand()`, via `cli.ts`) or by hand lands within seconds; login reads it afresh. `/edit/users` (`routes/users.ts`) answers names, never hashes, and adds, re-passwords and removes — every editor equal, nobody removing themselves, the environment's admin untouchable there, and your own password needing the current one (the answer re-signs your cookie). The editor's **Editors** drawer is `components/Users.tsx`.
 
 Signed out, a page load of a protected route is redirected to `/login?next=…`; a fetch (no `text/html` in `Accept`) gets a 401. The editor sends every request through `edit/api.ts`, which turns a 401 into a trip to the login page and back. `/edit` itself is an HTML import and can't be guarded server-side, so the editor's first request does it. Signing in lands on `/edit` unless `next` says otherwise (and `/login` when already signed in goes straight there). Logout is POST-only and refuses `Sec-Fetch-Site: cross-site`.
 
@@ -315,7 +319,7 @@ A local duckdown with `DUCKDOWN_REMOTE` set edits its own copy of a site that is
 
 The git kind works in the repository the content folder is in, and on that folder only: pathspecs exclude `NEVER` (`users.json`, `.history`, `reports`) whatever `.gitignore` says, and a commit adds the folder whole and then `git reset`s those paths — `git add` refuses a path list naming an ignored file even as an exclusion, and the scaffold ignores two of them (the tests' repositories carry that `.gitignore` for this reason). A commit is `git commit -- <paths>`, so whatever else is staged stays staged; it carries `Edited-by: <user>`. Status doesn't fetch; pull does. A pull commits edits not yet committed ("Edits kept before pulling"), merges the upstream, and settles a conflict inside the site by keeping this copy's side and saving the other into that file's history (`History.save`, bytes, forced) — a conflict outside the site, or git refusing to merge, aborts the merge and says so. The git kind needs no sync record: git is the record.
 
-`publishSite()` checks first (`checkSite()` in export.ts: the whole export into a thrown-away folder, keeping the broken-link and collection lines, or why there was nothing to export), reports problems with what was published, and refuses only under `DUCKDOWN_STRICT`; with no message it writes `defaultMessage()`. `routes/publish.ts` (`/edit/publish`: GET status, POST publish, POST `?pull`) and `remoteCommand()` (`duckdown publish|pull`, via cli.ts) both call it; a pull that changed anything drops the site's caches through the pages route's `changed()`. The editor's `components/Publish.tsx` is the header button (hidden on a 404, a badge counting changes plus unpushed commits, refreshed after writes) and its dialog.
+`publishSite()` checks first (`checkSite()` in export.ts: the whole export into a thrown-away folder, keeping the broken-link and collection lines, or why there was nothing to export), reports problems with what was published, and refuses only under `DUCKDOWN_STRICT`; with no message it writes `defaultMessage()`. `routes/publish.ts` (`/edit/publish`: GET status, POST publish, POST `?pull`) and `remoteCommand()` (`duckdown publish|pull`, via cli.ts) both call it; a pull that changed anything drops the site's caches through the pages route's `changed()`. The editor's `components/Publish.tsx` is the header button (hidden on a 404, a badge counting changes plus unpushed commits, refreshed after writes) and its drawer.
 
 ## The view log
 
@@ -338,7 +342,7 @@ Nothing fails silently. In the editor, every request goes through `api(what, url
 A reader or an editor who uses a keyboard, a screen reader, a larger text size, less motion or High Contrast gets the same site and the same editor. Keep it that way; each of these has a test.
 
 - **Everything is reachable by keyboard.** A tree row is a `<button class="row">`, never an `<li onclick>`; a control that can't be a `<button>` (it holds a file chooser) is `role=button tabindex=0` with Enter and Space (`onpress()` in CollectionPane). Resources' tabs are `role=tab` with the arrows.
-- **Every dialog goes through `modal()`** (`edit/modal.ts`): shown modally, named by its heading, and focus goes back to what opened it when the dialog is dropped, not only when it is closed.
+- **Every dialog goes through `modal()`** (`edit/modal.ts`): shown modally, named by its heading, and focus goes back to what opened it when the dialog is dropped, not only when it is closed. A modal is for new or delete; a drawer (`Drawer.tsx`) is not a modal — the page stays in reach behind it — so it takes focus as it opens, Escape closes it, and focus goes back the same way.
 - **Everything has a name**: `aria-label` on an icon-only button, a text field, a textarea, an iframe (`title`); a state says itself (`aria-current`, `aria-pressed`, `aria-expanded`, `aria-selected`; the unsaved dot is `role=img`). What changes without a click — the notice, Saved — is said from a live region already in the page.
 - **Sizes are tokens** (`:root` in styles.css): space on a 4px grid, controls 30px, never under 28px (WCAG's minimum is 24), type in rem so the reader's own size setting reaches the editor. A pane's header answers to the pane (`@container pane`), not the window.
 - **Colours are tokens, and their pairs are tested** (below, under Testing). A state is never shown by colour or shade alone: forced colours (High Contrast) removes shades and shadows, so a focus ring is an outline, and the open row is bold and outlined there too.
@@ -393,8 +397,11 @@ The preview renders an overview like any page and returns
 `collectionProblems()` beside the html, which is how the editor's Notice hears
 that a slug collides with a page.
 
-`CollectionPane.tsx` edits that file as what it is: groups of items, each an
-input per field the file declares (`fields`, as the server parses them: a line
+`CollectionPane.tsx` edits that file as what it is: groups of works, drawn as
+pictures (a work with no picture field is its title in a box), and the chosen
+one's fields beside them — chosen by position (`Spot`, `firstWork()`), the first
+as the pane opens, a new one as it is added, and the choice follows a work that
+moves. An input per field the file declares (`fields`, as the server parses them: a line
 for text and number — values stay strings, a number may say `skip` — a box for
 long) and the `image` field as the picture; a file with no `fields` gets
 `PLAIN` from the server, and one with no image field adds items as empty rows.
@@ -465,8 +472,15 @@ none is newer than `QUIET` (ten minutes), so a sitting of edits — the
 collection pane writes on every change — leaves one version, the file as it
 was before; a delete or a restore always keeps one; `KEEP` (30) per file. The
 same routes answer `?versions`, `?version=<id>`, `?deleted` and
-`POST ?restore=<id>`, and the editor shows them as Earlier versions (the clock
-in `PaneHeader`) and Deleted (atop the tree and each resource list).
+`POST ?restore=<id>`, and the editor makes them a place (`past.ts`,
+`components/Past.tsx`): Earlier versions (the clock in `PaneHeader`) and Deleted
+(atop the tree and each resource list) put their list where the tree is, grow
+the trail by a crumb, show the one looked at read-only in the middle — a
+version's lines that aren't in the file now marked by `changedLines()`, a
+longest-common-run of lines that gives up past `COMPARE_LIMIT` — and render a
+page as it was in the preview. The present's panes stay mounted behind it,
+hidden by CSS, so nothing unsaved is lost while you look; Restore is one press
+and asks nothing, because what it replaces is kept.
 `POST ?move=<to>` renames, for a section that passes `fileRoutes()` a `Mover`
 (only pages do: templates and stylesheets are named by pages): never onto a
 file that exists or to a change of case alone, the versions follow
@@ -482,7 +496,15 @@ previous one.
 
 Front matter takes only the keys duckdown reads (`KEYS` in `markdown.ts`) or an `x-` extension, unless the block is fenced with `---`, which takes anything: a page opening "Update: closed Monday" keeps its first line. Add a key there and in the skill's reference together.
 
-The editor's two right-hand columns each hold whatever is open. The middle one
+The editor is a bento: one trail at the top says where you are (`Trail.tsx`:
+the site, the tree's folder — `folder` in the store, which `loadFile()` moves
+to the page's own — and the page), so the tree has no `..` and a pane's header
+says a name the trail hasn't (`shortName()`). Under it, the three columns are
+compartments cut into one tray: walls meet square, only the tray's corners
+curve (`--wall`, `--radius-tray`, `--radius-cell`), and the preview sits flush.
+The header's Resources, Editors and Publish each open the one drawer
+(`drawer` in the store, `Drawers.tsx`), over the preview, inside the tray; on a
+phone it is a sheet from the foot. The editor's two right-hand columns each hold whatever is open. The middle one
 holds the page and, beneath it, either a resource or a folder's collection —
 one slot, so opening either closes the other; each closes, two split the
 column, one fills it. Below 768px the three columns stack, the tree capped and

@@ -8,8 +8,8 @@ import { join } from "path";
 import { api, apiJson, urlPath } from "../server/edit/api";
 import { notice, news, speak, tell, hush } from "../server/edit/notice";
 import {
-  filePath, fileContent, editorContent, showImages, browserRevision,
-  loadFile, createFile, saveFile, deleteFile, closeFile, moveFile, reloadBrowser, toggleImages, closeImages,
+  filePath, fileContent, editorContent, showImages, browserRevision, folder, openFolder, drawer, shortName,
+  loadFile, createFile, saveFile, deleteFile, closeFile, moveFile, reloadBrowser, toggleImages, closeImages, toggleDrawer,
   resource, resourceDraft, resourceSaved, resourceDirty, pageLayout, pageIncludes, openResource, closeResource,
   saveResource, deleteResource, createResource,
   collection, openCollection, closeCollection, createCollection,
@@ -23,13 +23,19 @@ import { Editor } from "../server/edit/components/Editor";
 import { Preview } from "../server/edit/components/Preview";
 import { CssPreview } from "../server/edit/components/CssPreview";
 import { Header } from "../server/edit/components/Header";
-import { EditorsDialog } from "../server/edit/components/Users";
+import { Trail, folderCrumbs } from "../server/edit/components/Trail";
+import { EditorsDrawer } from "../server/edit/components/Users";
+import { Drawers } from "../server/edit/components/Drawers";
 import { PublishButton, publishState, refreshPublish } from "../server/edit/components/Publish";
 import { ImageBrowser } from "../server/edit/components/ImageBrowser";
 import { ResourceList } from "../server/edit/components/ResourceList";
 import { ResourcePane } from "../server/edit/components/ResourcePane";
-import { CollectionPane, itemAddresses } from "../server/edit/components/CollectionPane";
+import { CollectionPane, itemAddresses, firstWork, same } from "../server/edit/components/CollectionPane";
 import { parseCollection } from "../server/collection";
+import { PastList, PastPane, PastPreview } from "../server/edit/components/Past";
+import {
+  past, entries, seen, openVersions, openDeleted, look, leavePast, restoreSeen, changedLines, whenKept, COMPARE_LIMIT,
+} from "../server/edit/past";
 
 // --- Harness ---
 
@@ -71,8 +77,10 @@ afterEach(() => {
     filePath.set(null);
     fileContent.set("");
     editorContent.set("");
-    showImages.set(false);
+    drawer.set(null);
+    folder.set("");
   });
+  leavePast();
   hush();
 });
 
@@ -92,6 +100,9 @@ const rowControl = (root: ParentNode, text: string) =>
 const button = (root: ParentNode, text: string) =>
   [...root.querySelectorAll("button")].find((b) => b.textContent!.trim().startsWith(text)) as HTMLButtonElement | undefined;
 const click = (el: Element) => (el as HTMLElement).click();
+// What a trail says, crumb by crumb.
+const trailOf = (root: ParentNode) =>
+  [...root.querySelectorAll(".crumb")].map((c) => c.textContent!.trim()).join(" › ");
 function type(input: HTMLInputElement | HTMLTextAreaElement, value: string) {
   input.value = value;
   input.dispatchEvent(new Event("input"));
@@ -621,10 +632,13 @@ describe("Browser", () => {
     expect(rows(host).some((r) => r.endsWith(".css"))).toBe(false);
     expect(row(host, "index.md").querySelector(".lucide-file-text")).not.toBeNull();
 
+    // A folder is somewhere to be: the store's, so the trail says it too, and
+    // the way back up is the trail's (there is no ".." row).
     click(rowControl(host, "guide"));
     await waitFor(() => rows(host).includes("pages.md"));
-    expect(host.querySelector(".browser-header")!.textContent).toContain("/guide");
-    click(rowControl(host, ".."));
+    expect(folder.get()).toBe("guide");
+    expect(rows(host)).not.toContain("..");
+    openFolder("");
     await waitFor(() => rows(host).includes("guide")); // guide/ has an index.md too: wait for the root
 
     // Every row is a button, so the tree is Tab and Enter; the open page says so.
@@ -712,6 +726,10 @@ describe("Browser", () => {
     expect(page).toContain("Ink on paper.");
     expect(page).toContain(`href="/${FOLDER}/second-wind/"`);
 
+    // Its index opened, so the tree is in the new folder now; back up to ask again.
+    expect(folder.get()).toBe(FOLDER);
+    openFolder("");
+    await waitFor(() => rows(host).includes("guide"));   // the top (a dot folder isn't listed)
     const taken = await create();
     await waitFor(() => taken.textContent!.includes(`${FOLDER}/collection.json already exists`));
     click(button(taken, "Cancel")!);
@@ -1048,6 +1066,58 @@ describe("Header", () => {
   });
 });
 
+// n134: the bento's frame
+describe("Trail", () => {
+  const crumbs = (host: ParentNode) => [...host.querySelectorAll(".crumb")].map((c) => c.textContent!.trim());
+  const here = (host: ParentNode) => host.querySelector("[aria-current=location]")!.textContent;
+
+  test("says where you are once: the site, the folders, the page; every crumb but the last goes there", async () => {
+    const { host, dispose } = render(() => <Trail />);
+    // A list redraws on a microtask, as when() does: wait for what it says.
+    const says = (...want: string[]) => waitFor(() => crumbs(host).join(" › ") === want.join(" › "));
+    await says("duckie");
+    expect(here(host)).toBe("duckie");
+
+    await loadFile("guide/pages.md");                    // the tree goes where the page is
+    expect(folder.get()).toBe("guide");
+    await says("duckie", "guide", "pages.md");
+    expect(here(host)).toBe("pages.md");
+    expect(shortName("guide/pages.md")).toBe("pages.md");  // the pane says the name the trail hasn't
+
+    openFolder("guide/deeper/still");                      // a folder the page isn't in
+    await says("duckie", "guide", "deeper", "still");
+    expect(shortName("guide/pages.md")).toBe("guide/pages.md");
+    click(button(host, "deeper")!);
+    expect(folder.get()).toBe("guide/deeper");
+    await says("duckie", "guide", "deeper");
+    click(button(host, "guide")!);
+    expect(folder.get()).toBe("guide");
+    await says("duckie", "guide", "pages.md");
+    click(button(host, "duckie")!);
+    expect(folder.get()).toBe("");
+    await says("duckie");
+    dispose();
+  });
+
+  test("a drawer's folders say where they are the same way, from their own top", () => {
+    const went: string[] = [];
+    const crumbs = folderCrumbs("images", "a/b/c", (to) => went.push(to));
+    expect(crumbs.map((c) => c.label)).toEqual(["images", "a", "b", "c"]);
+    for (const c of crumbs) c.go!();
+    expect(went).toEqual(["", "a", "a/b", "a/b/c"]);
+  });
+
+  test("one drawer at a time: choosing another takes the first one's place", () => {
+    toggleDrawer("editors");
+    expect(drawer.get()).toBe("editors");
+    toggleImages();
+    expect(drawer.get()).toBe("resources");
+    expect(showImages.get()).toBe(true);
+    toggleDrawer("resources");
+    expect(drawer.get()).toBeNull();
+  });
+});
+
 // n115, n116
 describe("Publish", () => {
   // The server under test has no remote; these stand in for one, and let
@@ -1084,12 +1154,14 @@ describe("Publish", () => {
     });
     try {
       await loadFile("index.md");
-      const { host, dispose } = render(() => <PublishButton />);
+      const { host, dispose } = render(() => <div><PublishButton /><Drawers /></div>);
       await waitFor(() => button(host, "Publish"));
       expect(host.querySelector(".badge")!.textContent).toBe("3");       // two changes, one commit waiting
       click(button(host, "Publish")!);
-      await waitFor(() => host.querySelector("dialog")?.open);
-      const dialog = host.querySelector("dialog")!;
+      // A drawer, not a modal: the page stays in view and in reach behind it.
+      await waitFor(() => host.querySelector(".sidebar"));
+      expect(button(host, "Publish")!.getAttribute("aria-expanded")).toBe("true");
+      const dialog = host.querySelector(".sidebar")!;
       expect(dialog.querySelector("h3")!.textContent).toBe("Publish to git origin/main");
       expect([...dialog.querySelectorAll(".history-list li")].map((li) => li.textContent)).toEqual(["pages/a.mdchanged", "pages/b.mdnew"]);
       expect(dialog.textContent).toContain("1 commit(s) made here, not yet published.");
@@ -1108,15 +1180,15 @@ describe("Publish", () => {
       expect(dialog.textContent).toContain("pages/a.md");
       expect(r.seen).toContain("pull");
 
-      click(button(dialog, "Close")!);
-      expect(host.querySelector("dialog")).toBeNull();
+      click(dialog.querySelector('[aria-label="Close publish"]')!);
+      expect(host.querySelector(".sidebar")).toBeNull();
       dispose();
     } finally {
       r.restore();
     }
   });
 
-  test("a refusal is said in the dialog; nothing waiting is said too, and Publish waits", async () => {
+  test("a refusal is said in the drawer; nothing waiting is said too, and Publish waits", async () => {
     let answer = status({ changes: [], ahead: 0, behind: 0, problem: "This branch has no upstream to publish to: push it once with git push -u" });
     const r = remote({
       status: () => answer(),
@@ -1124,13 +1196,13 @@ describe("Publish", () => {
       pull: () => Response.json({ changed: [], conflicts: [] }),
     });
     try {
-      const { host, dispose } = render(() => <PublishButton />);
+      const { host, dispose } = render(() => <div><PublishButton /><Drawers /></div>);
       await refreshPublish();
       await waitFor(() => button(host, "Publish"));
       expect(host.querySelector(".badge")).toBeNull();
       click(button(host, "Publish")!);
-      await waitFor(() => host.querySelector("dialog")?.textContent!.includes("no upstream"));
-      const dialog = host.querySelector("dialog")!;
+      await waitFor(() => host.querySelector(".sidebar")?.textContent!.includes("no upstream"));
+      const dialog = host.querySelector(".sidebar")!;
       expect(dialog.textContent).toContain("Nothing here that isn't published.");
       expect(button(dialog.querySelector("form")!, "Publish")!.disabled).toBe(true);
       click(button(dialog, "Pull")!);
@@ -1149,15 +1221,16 @@ describe("Publish", () => {
     } finally {
       r.restore();
     }
+    drawer.set(null);                                   // the first button's drawer, still open
     const collided = remote({ status: status(), pull: () => Response.json({ changed: [], conflicts: ["pages/a.md"] }), publish: () => Response.json({ committed: false, pushed: 0, problems: [] }) });
     try {
-      const { host, dispose } = render(() => <PublishButton />);
+      const { host, dispose } = render(() => <div><PublishButton /><Drawers /></div>);
       await waitFor(() => button(host, "Publish"));
       click(button(host, "Publish")!);
-      await waitFor(() => host.querySelector("dialog")?.open);
-      click(button(host.querySelector("dialog")!, "Pull")!);
+      await waitFor(() => host.querySelector(".sidebar"));
+      click(button(host.querySelector(".sidebar")!, "Pull")!);
       await waitFor(() => notice.get() === "Pulled: everything that changed there was changed here too");
-      submit(host.querySelector("dialog form")!);
+      submit(host.querySelector(".sidebar form")!);
       await waitFor(() => notice.get() === "Nothing to publish");
       dispose();
     } finally {
@@ -1168,8 +1241,8 @@ describe("Publish", () => {
 });
 
 // n113
-describe("EditorsDialog", () => {
-  const dialogOf = (host: HTMLElement) => host.querySelector("dialog.dialog-history") as HTMLDialogElement;
+describe("EditorsDrawer", () => {
+  const drawerOf = (host: HTMLElement) => host.querySelector(".sidebar") as HTMLElement | null;
   const names = (host: HTMLElement) => [...host.querySelectorAll(".editor-row .history-label")].map((e) => e.textContent);
   const fill = (form: HTMLFormElement, values: Record<string, string>) => {
     for (const [name, value] of Object.entries(values)) (form.elements.namedItem(name) as HTMLInputElement).value = value;
@@ -1182,11 +1255,16 @@ describe("EditorsDialog", () => {
     intercept((url, init) => (url.startsWith("/edit/users") ? respond() : signedIn(url, init)));
 
   test("opens from the header: adds an editor, sets a password, removes one, and says what the server refused", async () => {
-    const { host, dispose } = render(() => <Header />);
-    click(button(host, "Editors")!);
+    const { host, dispose } = render(() => <div><Header /><Drawers /></div>);
+    const opener = button(host, "Editors")!;
+    opener.focus();
+    click(opener);
     await waitFor(() => names(host).includes("admin"));
-    const dialog = dialogOf(host);
-    expect(dialog.open).toBe(true);
+    const drawer = drawerOf(host)!;
+    expect(drawer.querySelector("h3")!.textContent).toBe("Editors");
+    expect(opener.getAttribute("aria-expanded")).toBe("true");
+    await waitFor(() => document.activeElement === drawer);           // it takes focus
+    expect(drawer.querySelectorAll(".editor-row .face")[0]!.textContent).toBe("A");
     const admin = [...host.querySelectorAll(".editor-row")].find((r) => r.textContent!.includes("admin"))!;
     expect(admin.textContent).toContain("you");
     expect(admin.querySelector('[aria-label="Remove admin"]')).toBeNull();     // not yourself
@@ -1227,12 +1305,12 @@ describe("EditorsDialog", () => {
 
     // Removing asks first.
     click(host.querySelector('[aria-label="Remove eve"]')!);
-    await waitFor(() => host.querySelector("dialog:not(.dialog-history)"));
-    click(button(host.querySelector("dialog:not(.dialog-history)")!, "Cancel")!);
+    await waitFor(() => host.querySelector("dialog"));
+    click(button(host.querySelector("dialog")!, "Cancel")!);
     expect(names(host)).toContain("eve");
     click(host.querySelector('[aria-label="Remove eve"]')!);
-    await waitFor(() => host.querySelector("dialog:not(.dialog-history)"));
-    click(button(host.querySelector("dialog:not(.dialog-history)")!, "Remove")!);
+    await waitFor(() => host.querySelector("dialog"));
+    click(button(host.querySelector("dialog")!, "Remove")!);
     await waitFor(() => !names(host).includes("eve"));
     expect(notice.get()).toBe("eve can't sign in any more");
 
@@ -1245,8 +1323,12 @@ describe("EditorsDialog", () => {
       broken();
     }
 
-    click(button(dialog, "Close")!);
-    expect(dialogOf(host)).toBeNull();
+    // Escape closes it, and focus goes back to the button that opened it.
+    drawer.dispatchEvent(new KeyboardEvent("keydown", { key: "a", bubbles: true }));
+    expect(drawerOf(host)).not.toBeNull();
+    drawer.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    expect(drawerOf(host)).toBeNull();
+    expect(document.activeElement).toBe(opener);
     dispose();
   });
 
@@ -1255,7 +1337,7 @@ describe("EditorsDialog", () => {
     process.env.DUCKDOWN_ADMIN_PASSWORD = "x";
     process.env.DUCKDOWN_ADMIN_USER = "gus";
     try {
-      const { host, dispose } = render(() => <EditorsDialog oncancel={() => {}} />);
+      const { host, dispose } = render(() => <EditorsDrawer />);
       await waitFor(() => names(host).includes("gus"));
       const gus = [...host.querySelectorAll(".editor-row")].find((r) => r.textContent!.includes("gus"))!;
       expect(gus.textContent).toContain("set by the environment");
@@ -1274,7 +1356,9 @@ describe("ImageBrowser", () => {
     Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
     const { host, dispose } = render(() => <ImageBrowser />);
     await waitFor(() => rows(host).includes("logo.svg"));
-    expect(row(host, "logo.svg").querySelector("img")!.getAttribute("src")).toBe("/edit/browse/logo.svg?thumb=32");
+    // Pictures drawn as pictures: a grid of them, big enough to tell apart.
+    expect(row(host, "logo.svg").closest(".file-list.pictures")).not.toBeNull();
+    expect(row(host, "logo.svg").querySelector("img")!.getAttribute("src")).toBe("/edit/browse/logo.svg?thumb=160");
 
     expect(rowControl(host, "logo.svg").getAttribute("aria-pressed")).toBe("false");
     click(rowControl(host, "logo.svg"));
@@ -1300,7 +1384,8 @@ describe("ImageBrowser", () => {
     await newFolder("");
     expect(host.querySelector("dialog")).toBeNull();
     await newFolder("My shots");
-    await waitFor(() => host.querySelector(".browser-header")!.textContent!.includes("/My shots"));
+    // Where you are among the images is a small trail of its own.
+    await waitFor(() => trailOf(host.querySelector(".browser-header")!) === "images › My shots");
 
     // Upload into it: nothing chosen does nothing; a file lands and is listed
     const input = host.querySelector('input[type="file"]') as HTMLInputElement;
@@ -1312,12 +1397,13 @@ describe("ImageBrowser", () => {
     Object.defineProperty(input, "files", { value: [new File(["<svg/>"], "a b.svg", { type: "image/svg+xml" })], configurable: true });
     input.dispatchEvent(new Event("change"));
     await waitFor(() => rows(host).includes("a b.svg"));
-    expect(row(host, "a b.svg").querySelector("img")!.getAttribute("src")).toBe("/edit/browse/My%20shots/a%20b.svg?thumb=32");
+    expect(row(host, "a b.svg").querySelector("img")!.getAttribute("src")).toBe("/edit/browse/My%20shots/a%20b.svg?thumb=160");
     click(rowControl(host, "a b.svg"));
     await waitFor(() => host.querySelector(".image-preview"));
     expect(host.querySelector(".image-preview img")!.getAttribute("src")).toBe("/static/images/My%20shots/a%20b.svg");
 
-    click(rowControl(host, ".."));
+    expect(rows(host)).not.toContain("..");
+    click(button(host.querySelector(".browser-header .trail")!, "images")!);
     await waitFor(() => rows(host).includes("My shots"));
     click(rowControl(host, "My shots"));
     await waitFor(() => rows(host).includes("a b.svg"));
@@ -1380,11 +1466,12 @@ describe("ImageBrowser", () => {
     expect(rows(host)).toEqual(["2026-09", "2026-08"]);
     click(rowControl(host, "2026-09"));
     await waitFor(() => rows(host).includes("2026-09-24.md"));
-    expect(rows(host)).toEqual(["..", "2026-09-24.md", "2026-09-23.md"]);
+    expect(rows(host)).toEqual(["2026-09-24.md", "2026-09-23.md"]);
+    expect(trailOf(host.querySelector(".browser-header")!)).toBe("reports › 2026-09");
     const link = row(host, "2026-09-24.md").querySelector("a")!;
     expect(link.getAttribute("href")).toBe("/edit/reports/2026-09/2026-09-24.md");
     expect(link.getAttribute("target")).toBe("_blank");
-    click(rowControl(host, ".."));                                   // and back up to the months
+    click(button(host.querySelector(".browser-header .trail")!, "reports")!);   // and back up to the months
     await waitFor(() => rows(host).includes("2026-08"));
     expect(rows(host)).toEqual(["2026-09", "2026-08"]);
     rmSync(join(SITE, "reports"), { recursive: true, force: true });
@@ -1418,7 +1505,7 @@ describe("ImageBrowser", () => {
       submit(dialog.querySelector("form")!);
       await waitFor(() => notice.get());
       expect(notice.get()).toBe("Couldn't create images/nope: 403 read-only");
-      expect(host.querySelector(".browser-header span")!.textContent).toBe("/"); // stayed put
+      expect(trailOf(host.querySelector(".browser-header")!)).toBe("images"); // stayed put
     } finally {
       restore();
     }
@@ -1491,10 +1578,17 @@ describe("CollectionPane", () => {
   };
   const values = (host: ParentNode, selector: string) =>
     [...host.querySelectorAll(selector)].map((el) => (el as HTMLInputElement).value);
-  const titles = (host: ParentNode) => values(host, `[data-field="title"]`);
+  // The works as the grid draws them, by the title under each picture.
+  const titles = (host: ParentNode) => [...host.querySelectorAll(".item-tile .item-title")].map((t) => t.textContent);
   const names = (host: ParentNode) => values(host, ".group-name");
   const tool = (row: Element, label: string) => row.querySelector(`[aria-label="${label}"]`)!;
   const items = (host: ParentNode) => [...host.querySelectorAll(".collection-item")];
+  // A work's fields and tools are beside the grid, for the one that is chosen.
+  const panel = (host: ParentNode) => host.querySelector(".collection-chosen")!;
+  const pick = (host: ParentNode, i: number) => {
+    click(items(host)[i]!.querySelector(".item-tile")!);
+    return panel(host);
+  };
 
   // A drag or a drop, as the pane sees one: happy-dom has no DragEvent, and
   // the pane deliberately keeps what is being dragged in a signal rather than
@@ -1528,7 +1622,12 @@ describe("CollectionPane", () => {
     expect(host.querySelector(".pane-header .pane-name")!.textContent).toBe(`${FOLDER}/collection.json`);
     expect(items(host)[0]!.querySelector("img")!.getAttribute("src"))
       .toBe(`/static/images/${FOLDER}/one_tn.svg`);
-    expect(items(host)[0]!.querySelector(".item-src")!.textContent).toBe("one.svg");
+    // The first work is chosen as the pane opens, and its fields are beside the grid.
+    expect(items(host)[0]!.querySelector(".item-tile")!.getAttribute("aria-pressed")).toBe("true");
+    expect(panel(host).querySelector(".item-src")!.textContent).toBe("one.svg");
+    expect(pick(host, 2).querySelector(".item-src")!.textContent).toBe("three.svg");
+    expect(panel(host).getAttribute("aria-label")).toBe("The work: Study");
+    pick(host, 0);
 
     edit(host.querySelector(`[data-field="title"]`)!, "First Light");
     const file = await storedWhen((f) => f.groups[0].items[0].title === "First Light");
@@ -1541,16 +1640,18 @@ describe("CollectionPane", () => {
 
   test("moves a work up and down, and a group with it", async () => {
     const { host, dispose } = await open();
-    click(tool(items(host)[1]!, "Move up"));
+    click(tool(pick(host, 1), "Move up"));
     await storedWhen((f) => f.groups[0].items[0].title === "Second");
     await waitFor(() => titles(host)[0] === "Second");
 
-    click(tool(items(host)[0]!, "Move down"));
+    // The choice went with the work: down again, and it is where it was.
+    expect(items(host)[0]!.querySelector(".item-tile")!.getAttribute("aria-pressed")).toBe("true");
+    click(tool(panel(host), "Move down"));
     await storedWhen((f) => f.groups[0].items[0].title === "First");
 
     // The ends hold: the first can't go up and the last can't go down.
-    click(tool(items(host)[0]!, "Move up"));
-    click(tool(items(host)[3]!, "Move down"));
+    click(tool(pick(host, 0), "Move up"));
+    click(tool(pick(host, 3), "Move down"));
     await settle(60);
     expect(titles(host)).toEqual(["First", "Second", "Study", "Print"]);
 
@@ -1618,7 +1719,7 @@ describe("CollectionPane", () => {
 
   test("removes a work, once asked", async () => {
     const { host, dispose } = await open();
-    click(tool(items(host)[3]!, "Remove item"));
+    click(tool(pick(host, 3), "Remove item"));
     await waitFor(() => host.querySelector("dialog")?.open);
     expect(host.querySelector("dialog h3")!.textContent).toBe("Remove Print?");
     click(button(host.querySelector("dialog")!, "Remove")!);
@@ -1662,7 +1763,8 @@ describe("CollectionPane", () => {
 
   test("swaps a work's picture in place, under the same name, and busts the cache", async () => {
     const { host, dispose } = await open();
-    const thumb = items(host)[0]!.querySelector(".item-thumb")!;
+    // The chosen work's picture, beside the grid, is the control that replaces it.
+    const thumb = panel(host).querySelector(".item-thumb")!;
     const was = items(host)[0]!.querySelector("img")!.getAttribute("src");
 
     click(thumb);   // the picture is the control: clicking it opens the chooser
@@ -1771,16 +1873,12 @@ describe("CollectionPane", () => {
       images: { src: `/static/images/${FOLDER}/` },
       groups: [{ name: "works", items: [{ photo: "one.svg", title: "One", year: 1961, index: "a", notes: "" }] }],
     }), 1);
-    const row = items(host)[0]!;
+    const row = panel(host);
     expect([...row.querySelectorAll("[data-field]")].map((el) => el.getAttribute("data-field")))
       .toEqual(["title", "year", "notes"]);
-    // Each input is named by its label, as placeholder and accessible name: a
-    // bare string is a text field labelled by its name, and a declared label
-    // is used as it is.
-    const label = (name: string) => {
-      expect(field(row, name).getAttribute("aria-label")).toBe(field(row, name).getAttribute("placeholder"));
-      return field(row, name).getAttribute("placeholder");
-    };
+    // Each input is named by its label, a <label> for it: a bare string is a
+    // text field labelled by its name, and a declared label is used as it is.
+    const label = (name: string) => row.querySelector(`label[for="${field(row, name).id}"]`)!.textContent;
     expect(label("title")).toBe("title");
     expect(label("year")).toBe("Year");
     expect(label("notes")).toBe("Notes");
@@ -1789,7 +1887,7 @@ describe("CollectionPane", () => {
     expect(field(row, "year").tagName).toBe("INPUT");
     expect(field(row, "year").type).toBe("text");
     expect(field(row, "year").value).toBe("1961");
-    expect(row.querySelector("img")!.getAttribute("src")).toBe(`/static/images/${FOLDER}/one_tn.svg`);
+    expect(items(host)[0]!.querySelector("img")!.getAttribute("src")).toBe(`/static/images/${FOLDER}/one_tn.svg`);
     expect(row.querySelector(".item-src")!.textContent).toBe("one.svg");
     expect(row.querySelector('[data-field="caption"]')).toBeNull();
 
@@ -1804,7 +1902,7 @@ describe("CollectionPane", () => {
 
     // And a picture is replaced under the name the image field gives it.
     await waitFor(() => items(host).length === 2);
-    choose(items(host)[0]!.querySelector(".item-thumb input")!, picture("ignored.svg"));
+    choose(pick(host, 0).querySelector(".item-thumb input")!, picture("ignored.svg"));
     await waitFor(() => items(host)[0]!.querySelector("img")!.getAttribute("src")!.includes("?v="));
     expect((await stored()).groups[0].items[0].photo).toBe("one.svg");
     dispose();
@@ -1830,7 +1928,7 @@ describe("CollectionPane", () => {
 
   test("renaming a work keeps the address it was published at, says so once, and renaming back takes it off", async () => {
     const { host, dispose } = await open();
-    const title = (i: number) => field(items(host)[i]!, "title");
+    const title = (i: number) => field(pick(host, i), "title");
 
     edit(title(0), "First Light");
     let file = await storedWhen((f) => f.groups[0].items[0].aliases);
@@ -1853,7 +1951,7 @@ describe("CollectionPane", () => {
     expect("aliases" in file.groups[0].items[0]).toBe(false);
 
     // A caption is not an address.
-    edit(field(items(host)[0]!, "caption"), "Ink");
+    edit(field(panel(host), "caption"), "Ink");
     file = await storedWhen((f) => f.groups[0].items[0].caption === "Ink");
     expect("aliases" in file.groups[0].items[0]).toBe(false);
     dispose();
@@ -1872,7 +1970,7 @@ describe("CollectionPane", () => {
     // /study/, and the study moves to /study-1/. The study's old address now
     // answers with the other work — an item wins over an alias — so that is
     // not kept; the second work's old one is, beside what it had.
-    edit(field(items(host)[1]!, "title"), "Study");
+    edit(field(pick(host, 1), "title"), "Study");
     const file = await storedWhen((f) => f.groups[0].items[1].aliases?.length === 3);
     expect(file.groups[0].items[1].aliases).toEqual(["/second-1962", 7, `/${FOLDER}/second/`]);
     expect(file.groups[0].groups[0].items[0].aliases).toBeUndefined();
@@ -1884,7 +1982,9 @@ describe("CollectionPane", () => {
     const { host, dispose } = await open();
     choose(host.querySelector(".item-drop input")!, picture("Fifth.svg"));
     await waitFor(() => items(host).length === 5);
-    edit(field(items(host)[2]!, "title"), "Fifth Work");
+    // A new work is chosen as it is added: it is the one you are about to name.
+    await waitFor(() => panel(host).getAttribute("aria-label") === "The work: Fifth");
+    edit(field(panel(host), "title"), "Fifth Work");
     const file = await storedWhen((f) => f.groups[0].items[2]?.title === "Fifth Work");
     expect(file.groups[0].items[2].aliases).toBeUndefined();
     dispose();
@@ -1894,7 +1994,7 @@ describe("CollectionPane", () => {
     const { host, dispose } = await open();
     const restore = intercept(() => new Response("read-only", { status: 403 }));
     try {
-      edit(field(items(host)[0]!, "title"), "Moved");
+      edit(field(panel(host), "title"), "Moved");
       await waitFor(() => notice.get());
       expect(notice.get()).toBe(`Couldn't save ${FOLDER}/collection.json: 403 read-only`);
     } finally {
@@ -1905,6 +2005,15 @@ describe("CollectionPane", () => {
     expect(notice.get()).toBe(`Moved is now /${FOLDER}/moved/; the old address still leads there.`);
     expect((await stored()).groups[0].items[0].aliases).toEqual([`/${FOLDER}/first/`]);
     dispose();
+  });
+
+  test("the first work is the one the site shows first, through empty groups to a subgroup's", () => {
+    expect(firstWork({ groups: [{ name: "empty" }, { name: "outer", groups: [{ name: "inner", items: [{ title: "Deep" }] }] }] }))
+      .toEqual({ path: [1, 0], i: 0 });
+    expect(firstWork({ groups: [{ name: "none", items: [] }] })).toBeNull();
+    expect(firstWork({})).toBeNull();
+    expect(same(null, { path: [0], i: 0 })).toBe(false);
+    expect(same({ path: [0, 1], i: 0 }, { path: [0], i: 0 })).toBe(false);
   });
 
   test("works out every address exactly as the site does", () => {
@@ -1978,6 +2087,9 @@ describe("CollectionPane", () => {
     closeResource();
 
     // And the file itself is in the tree, opening as a pane rather than as JSON.
+    // (The tree went to the page's folder with it: back to the top first.)
+    expect(folder.get()).toBe(FOLDER);
+    openFolder("");
     const { host, dispose } = render(() => <Browser />);
     await waitFor(() => rows(host).includes("gallery"));
     click(rowControl(host, "gallery"));
@@ -2003,7 +2115,7 @@ describe("CollectionPane", () => {
     await storedWhen((f) => f.groups[0].items[0].title === "Renamed");
     expect(undo.disabled).toBe(false);
     await waitFor(() => notice.get().includes("the old address still leads there"));
-    click(tool(items(host)[1]!, "Move up"));
+    click(tool(pick(host, 1), "Move up"));
     await storedWhen((f) => f.groups[0].items[0].title === "Second");
 
     click(undo);                                                             // the move
@@ -2041,14 +2153,17 @@ describe("CollectionPane", () => {
     edit(host.querySelector(`[data-field="title"]`)!, "Changed");
     await storedWhen((f) => f.groups[0].items[0].title === "Changed");
 
+    // Earlier versions is a place of its own; the version shows where the pane was.
+    const then = render(() => when(seen, () => <PastPane />));
     click(tool(host, `Earlier versions of ${FOLDER}/collection.json`));
-    await waitFor(() => button(host, "Restore"));
-    click(button(host, "Restore")!);
+    await waitFor(() => button(then.host, "Restore"));
+    click(button(then.host, "Restore")!);
     await storedWhen((f) => f.groups[0].items[0].title === "First");
     await waitFor(() => titles(host)[0] === "First");
     expect(news.get()).toBe(true);
     expect(notice.get()).toContain(`${FOLDER}/collection.json is back as it was on`);
     expect((tool(host, "Undo") as HTMLButtonElement).disabled).toBe(true);
+    then.dispose();
     dispose();
   });
 });
@@ -2058,64 +2173,103 @@ describe("CollectionPane", () => {
 describe("earlier versions", () => {
   afterEach(closeResource);
 
-  test("a page's versions, from its header: empty at first, then restorable", async () => {
+  // The past's three compartments beside whatever a test puts in the present.
+  const THEN = () => <div>
+    {when(past, () => <PastList />)}
+    {when(seen, () => <PastPane />)}
+    {when(seen, () => <PastPreview />)}
+  </div>;
+  const pastRows = (host: ParentNode) =>
+    [...host.querySelectorAll(".panel-past .file-list li")].map((li) => li.querySelector(".row-label")!.textContent);
+  const pastRow = (host: ParentNode, label: string) =>
+    [...host.querySelectorAll(".panel-past .file-list button.row")].find((b) => b.querySelector(".row-label")!.textContent === label) as HTMLElement;
+
+  test("a page's versions are a place: where the tree was, shown before they are brought back", async () => {
     await createFile("/versions-test.md", "versions-test.md");
-    const { host, dispose } = render(() => <Editor />);
+    const { host, dispose } = render(() => <div><Editor />{THEN()}</div>);
     const history = host.querySelector('[aria-label="Earlier versions of versions-test.md"]')!;
 
     click(history);
-    await waitFor(() => host.querySelector(".dialog-history .dialog-hint")?.textContent?.startsWith("None yet"));
-    click(button(host.querySelector(".dialog-history")!, "Close")!);
-    expect(host.querySelector(".dialog-history")).toBeNull();
+    expect(entries.get()).toBeNull();                       // being asked for
+    await waitFor(() => host.querySelector(".panel-past .past-hint:not(.past-foot)")?.textContent?.startsWith("None yet"));
+    expect(host.querySelector(".panel-past .pane-title")!.textContent).toBe("Earlier versions");
+    click(host.querySelector('[aria-label="Back to the files"]')!);
+    expect(past.get()).toBeNull();
 
-    type(host.querySelector("textarea")!, "title: versions-test\n\n# Second");
+    type(host.querySelector(".editor-area textarea")!, "title: versions-test\n\n# Second");
     expect(await saveFile()).toBe(true);
     click(history);
-    await waitFor(() => host.querySelectorAll(".history-list li").length === 1);
-    expect(host.querySelector(".history-detail")!.textContent).toBe("22 bytes");
+    // The newest is shown at once, read only, what differs from now marked,
+    // and rendered where the preview was.
+    await waitFor(() => host.querySelector(".past-pane"));
+    expect(pastRows(host)).toEqual(["Now", seen.get()!.entry.label]);
+    expect(host.querySelector(".panel-past .row-detail:not(:first-child)")).not.toBeNull();
+    expect([...host.querySelectorAll(".panel-past .row-detail")].map((d) => d.textContent)).toEqual(["as it is", "22 bytes"]);
+    expect(host.querySelector(".past-pane .pane-name")!.textContent).toBe("versions-test.md");
+    expect(host.querySelector(".past-pane .pane-when")!.textContent).toStartWith("as it was, ");
+    expect(host.querySelector(".past-text")!.textContent).toBe("title: versions-test");
+    expect(host.querySelectorAll(".past-text mark")).toHaveLength(1);   // the blank line "# Second" replaced
+    await waitFor(() => (host.querySelector(".past-preview iframe") as HTMLIFrameElement | null)?.srcdoc.includes("versions-test"));
 
-    // A restore that fails says so and leaves the dialog where it was.
+    // Now is a row of its own: the file as it is, the past still open.
+    click(pastRow(host, "Now"));
+    expect(host.querySelector(".past-pane")).toBeNull();
+    expect(pastRow(host, "Now").getAttribute("aria-current")).toBe("true");
+    click(pastRow(host, seen.peek()?.entry.label ?? pastRows(host)[1]!));
+    await waitFor(() => host.querySelector(".past-pane"));
+    click(host.querySelector('[aria-label="Back to now"]')!);
+    expect(seen.get()).toBeNull();
+    click(pastRow(host, pastRows(host)[1]!));
+    await waitFor(() => host.querySelector(".past-pane"));
+
+    // A restore that fails says so and leaves you where you were.
     const restore = intercept(() => new Response("nope", { status: 500 }));
     try {
-      click(button(host, "Restore")!);
+      click(button(host.querySelector(".past-pane")!, "Restore")!);
       await waitFor(() => notice.get().startsWith("Couldn't restore versions-test.md"));
-      expect(host.querySelector(".dialog-history")).not.toBeNull();
+      expect(host.querySelector(".past-pane")).not.toBeNull();
     } finally {
       restore();
     }
-    await waitFor(() => !button(host, "Restore")!.disabled);
-    click(button(host, "Restore")!);
+    await waitFor(() => !button(host.querySelector(".past-pane")!, "Restore")!.disabled);
+    click(button(host.querySelector(".past-pane")!, "Restore")!);
     await waitFor(() => editorContent.get() === "title: versions-test\n\n");
-    expect(host.querySelector(".dialog-history")).toBeNull();
+    expect(past.get()).toBeNull();
+    expect(news.get()).toBe(true);
     await deleteFile();
     dispose();
   });
 
-  test("a stylesheet's versions, from the resource pane", async () => {
+  test("a stylesheet's versions, from the resource pane: its words, and no page to render", async () => {
     await createResource("static", "versions.css");
-    const { host, dispose } = render(() => <ResourcePane />);
+    const { host, dispose } = render(() => <div><ResourcePane />{THEN()}</div>);
     resourceDraft.set("/* changed */\n");
     expect(await saveResource()).toBe(true);
     click(host.querySelector('[aria-label="Earlier versions of versions.css"]')!);
-    await waitFor(() => button(host, "Restore"));
-    click(button(host, "Restore")!);
+    await waitFor(() => host.querySelector(".past-pane"));
+    expect(host.querySelector(".past-preview .placeholder")!.textContent).toBe("no preview for this kind of file");
+    click(button(host.querySelector(".past-pane")!, "Restore")!);
     await waitFor(() => resourceSaved.get().startsWith("/* Name this"));
     await deleteResource();
     dispose();
   });
 
-  test("a page and a collection deleted come back from Deleted pages, and open", async () => {
+  test("what was deleted is a place too: a page and a collection come back from it, and open", async () => {
     await createFile("/deleted-test.md", "deleted-test.md");
     await deleteFile();
     await fetch("/edit/pages/deleted-coll/collection.json", { method: "PUT", body: '{ "groups": [] }' });
     await fetch("/edit/pages/deleted-coll/collection.json", { method: "DELETE" });
-    const { host, dispose } = render(() => <Browser />);
+    const { host, dispose } = render(() => <div><Browser />{THEN()}</div>);
     const restoreRow = async (key: string) => {
       click(host.querySelector('[aria-label="Deleted pages"]')!);
-      await waitFor(() => [...host.querySelectorAll(".history-label")].some((l) => l.textContent === key));
-      const li = [...host.querySelectorAll(".history-list li")].find((l) => l.querySelector(".history-label")!.textContent === key)!;
-      click(button(li, "Restore")!);
-      await waitFor(() => !host.querySelector(".dialog-history"));
+      await waitFor(() => pastRows(host).includes(key));
+      expect(host.querySelector(".panel-past .pane-title")!.textContent).toBe("Deleted from pages");
+      click(pastRow(host, key));
+      await waitFor(() => host.querySelector(".past-pane .pane-name")?.textContent === key);
+      expect(host.querySelector(".past-pane .pane-when")!.textContent).toStartWith("deleted ");
+      expect(host.querySelectorAll(".past-text mark")).toHaveLength(0);   // no now to differ from
+      click(button(host.querySelector(".past-pane")!, "Restore")!);
+      await waitFor(() => past.get() === null);
     };
 
     await restoreRow("deleted-test.md");
@@ -2129,24 +2283,99 @@ describe("earlier versions", () => {
     const restore = intercept(() => Response.json([]));
     try {
       click(host.querySelector('[aria-label="Deleted pages"]')!);
-      await waitFor(() => host.querySelector(".dialog-history .dialog-hint")?.textContent === "Nothing has been deleted here.");
+      await waitFor(() => host.querySelector(".panel-past .past-hint:not(.past-foot)")?.textContent === "Nothing has been deleted here.");
+      expect(pastRows(host)).toEqual([]);   // and no "Now": a deleted file has none
     } finally {
       restore();
     }
     dispose();
   });
 
-  test("a template deleted comes back from its own list, and opens", async () => {
+  test("a template deleted comes back from its own list, which steps aside for it, and opens", async () => {
     await createResource("templates", "deleted-test");
     await deleteResource();
-    const { host, dispose } = render(() => <ResourceList section="templates" />);
+    drawer.set("resources");
+    const { host, dispose } = render(() => <div><ResourceList section="templates" />{THEN()}</div>);
     click(host.querySelector('[aria-label="Deleted templates"]')!);
-    await waitFor(() => [...host.querySelectorAll(".history-label")].some((l) => l.textContent === "deleted-test.html"));
-    const li = [...host.querySelectorAll(".history-list li")].find((l) => l.textContent!.includes("deleted-test.html"))!;
-    click(button(li, "Restore")!);
+    expect(drawer.get()).toBeNull();
+    await waitFor(() => pastRows(host).includes("deleted-test.html"));
+    click(pastRow(host, "deleted-test.html"));
+    await waitFor(() => host.querySelector(".past-pane .pane-name")?.textContent === "deleted-test.html");
+    click(button(host.querySelector(".past-pane")!, "Restore")!);
     await waitFor(() => resource.get()?.path === "deleted-test.html");
     await deleteResource();
     dispose();
+  });
+
+  test("the trail goes one further in the past, and every crumb before leaves it", async () => {
+    const { host, dispose } = render(() => <Trail />);
+    const says = (...want: string[]) =>
+      waitFor(() => [...host.querySelectorAll(".crumb")].map((c) => c.textContent!.trim()).join(" › ") === want.join(" › "));
+
+    const kept = { id: "2026-09-23T10-15-30-123Z", key: "gallery/index.md", label: "then", detail: "" };
+    past.set({ kind: "versions", url: "/edit/pages/gallery/index.md", name: "gallery/index.md", onrestored: () => {} });
+    await says("duckie", "gallery", "index.md", "Earlier versions");
+    seen.set({ entry: kept, text: "", changed: [] });
+    await says("duckie", "gallery", "index.md", "then");
+    click(button(host, "index.md")!);                       // the file: back to it, as it is
+    expect(past.get()).toBeNull();
+
+    past.set({ kind: "versions", url: "/edit/pages/gallery/index.md", name: "gallery/index.md", onrestored: () => {} });
+    await says("duckie", "gallery", "index.md", "Earlier versions");
+    click(button(host, "gallery")!);                        // a folder: leave, and go there
+    expect(past.get()).toBeNull();
+    expect(folder.get()).toBe("gallery");
+
+    past.set({ kind: "versions", url: "/edit/static/theme.css", name: "theme.css", onrestored: () => {} });
+    await says("duckie", "theme.css", "Earlier versions"); // a stylesheet is in no folder of pages
+    click(button(host, "duckie")!);
+    expect(past.get()).toBeNull();
+    expect(folder.get()).toBe("");
+
+    past.set({ kind: "deleted", section: "pages", onrestored: () => {} });
+    await says("duckie", "Deleted");
+    seen.set({ entry: { ...kept, key: "blog/gone.md" }, text: "", changed: [] });
+    await says("duckie", "Deleted", "blog/gone.md");
+    click(button(host, "Deleted")!);                        // back to the list
+    expect(seen.get()).toBeNull();
+    expect(past.get()?.kind).toBe("deleted");
+    dispose();
+  });
+
+  test("a version that can't be read speaks, and leaving while it is asked for draws nothing", async () => {
+    await createFile("/versions-gone.md", "versions-gone.md");
+    await fetch("/edit/pages/versions-gone.md", { method: "PUT", body: "changed" });
+    const url = "/edit/pages/versions-gone.md";
+    const asked = openVersions(url, "versions-gone.md", () => {});
+    leavePast();                                            // gone before the list came back
+    await asked;
+    expect(entries.get()).toBeNull();
+
+    const listed = openDeleted("pages", () => {});
+    leavePast();
+    await listed;
+    expect(entries.get()).toBeNull();
+
+    await openVersions(url, "versions-gone.md", () => {});
+    const entry = entries.get()![0]!;
+    expect(await look({ ...entry, id: "2000-01-01T00-00-00-000Z" })).toBe(false);
+    expect(notice.get()).toStartWith("Couldn't read versions-gone.md as it was on");
+    const looking = look(entry);
+    leavePast();
+    expect(await looking).toBe(false);
+    expect(await look(entry)).toBe(false);                  // nowhere to look from
+    expect(await restoreSeen()).toBe(false);
+    await fetch(url, { method: "DELETE" });
+  });
+
+  test("marks the lines of then that aren't in now, and gives up on a pair too big to compare", () => {
+    expect(changedLines("a\nb\nc", "a\nb\nc")).toEqual([]);
+    expect(changedLines("a\nold\nc", "a\nnew\nc")).toEqual([1]);
+    expect(changedLines("a\nb\nc", "b")).toEqual([0, 2]);
+    expect(changedLines("x\ny", "a\nx\nb\ny\nc")).toEqual([]);  // only added since: nothing of then is gone
+    const many = Array.from({ length: Math.ceil(Math.sqrt(COMPARE_LIMIT)) + 1 }, (_, i) => `line ${i}`).join("\n");
+    expect(changedLines(many, `${many}\nmore`)).toEqual([]);
+    expect(whenKept("2026-09-23T10-15-30-123Z")).toContain("2026");
   });
 });
 
@@ -2177,7 +2406,7 @@ describe("the app", () => {
     expect(app.querySelector(".panel-editor .placeholder")!.textContent).toBe("select a page or a resource");
     expect(app.querySelector(".panel-preview .placeholder")!.textContent).toBe("preview");
 
-    showImages.set(true);
+    drawer.set("resources");
     expect(app.querySelector(".sidebar")).not.toBeNull();
 
     // A resource opens below the page, in the same column, and closing the
@@ -2214,6 +2443,21 @@ describe("the app", () => {
     await openResource({ section: "templates", path: "post.html" });
     expect(app.querySelector(".panel-collection")).toBeNull();
     closeResource();
+
+    // The past takes the tree's place, and its version stands in front of
+    // the panes and the preview, which wait behind it rather than go.
+    await loadFile("index.md");
+    past.set({ kind: "versions", url: "/edit/pages/index.md", name: "index.md", onrestored: () => {} });
+    seen.set({ entry: { id: "x", key: "index.md", label: "then", detail: "" }, text: "# Then", changed: [0] });
+    await waitFor(() => app.querySelector(".tray > .panel-past") !== null);
+    expect(app.querySelector(".tray > .panel-browser:not(.panel-past)")).toBeNull();
+    expect(app.querySelector(".column-middle > .past-pane")).not.toBeNull();
+    expect(app.querySelector(".column-middle .editor-area")).not.toBeNull();   // still there, behind
+    await waitFor(() => (app.querySelector(".past-preview iframe") as HTMLIFrameElement | null)?.srcdoc.includes("Then"));
+    leavePast();
+    await waitFor(() => app.querySelector(".tray > .panel-past") === null);
+    expect(app.querySelector(".past-pane")).toBeNull();
+    closeFile();
 
     window.dispatchEvent(new ErrorEvent("error", { message: "kaboom" }));
     expect(notice.get()).toBe("Something broke: kaboom");

@@ -3,9 +3,9 @@ import type { FileEntry, Listing } from "../../storage";
 import { Icon } from "./Icon";
 import { byName } from "./Browser";
 import { apiJson } from "../api";
-import { resourceRevision, openResource, createResource, reloadResources, type Resource } from "../store";
+import { resourceRevision, openResource, createResource, reloadResources, closeDrawer, type Resource } from "../store";
 import { NewDialog } from "./NewDialog";
-import { DeletedDialog } from "./History";
+import { openDeleted } from "../past";
 
 // The stylesheets in static/ and the templates in templates/: what a page is
 // composed with, wherever it lives. Flat on purpose — neither folder has a
@@ -16,7 +16,6 @@ import { DeletedDialog } from "./History";
 export function ResourceList({ section }: { section: "templates" | "static" }) {
   const files = signal<FileEntry[]>([]);
   const naming = signal(false);
-  const deleted = signal(false);
   const kind = section === "templates" ? "template" : "stylesheet";
 
   effect(() => {
@@ -29,6 +28,13 @@ export function ResourceList({ section }: { section: "templates" | "static" }) {
     });
   });
 
+  // What was deleted is a place, where the tree is: the drawer steps aside
+  // for it, and a file brought back opens below the page.
+  const showDeleted = () => {
+    closeDrawer();
+    openDeleted(section, (key) => { reloadResources(); return openResource({ section, path: key }); });
+  };
+
   return (
     <>
       <div class="browser-header">
@@ -36,7 +42,7 @@ export function ResourceList({ section }: { section: "templates" | "static" }) {
         <button class="icon-btn" aria-label={`New ${kind}`} title={`New ${kind}`} onclick={() => naming.set(true)}>
           <Icon name="file-plus" />
         </button>
-        <button class="icon-btn" aria-label={`Deleted ${kind}s`} title={`Deleted ${kind}s`} onclick={() => deleted.set(true)}>
+        <button class="icon-btn" aria-label={`Deleted ${kind}s`} title={`Deleted ${kind}s`} onclick={showDeleted}>
           <Icon name="archive-restore" />
         </button>
       </div>
@@ -64,11 +70,6 @@ export function ResourceList({ section }: { section: "templates" | "static" }) {
           }}
           oncancel={() => naming.set(false)}
         />
-      ))}
-      {when(deleted, () => (
-        <DeletedDialog section={section}
-          onrestored={(key) => { reloadResources(); return openResource({ section, path: key }); }}
-          oncancel={() => deleted.set(false)} />
       ))}
     </>
   );

@@ -8,6 +8,8 @@ import { closeImages } from "../store";
 import { modal } from "../modal";
 import { ResourceList } from "./ResourceList";
 import { ReportList } from "./ReportList";
+import { Drawer } from "./Drawer";
+import { Trail, folderCrumbs } from "./Trail";
 
 type Tab = "images" | "styles" | "templates" | "reports";
 const TABS: [Tab, string][] = [["images", "images"], ["styles", "css"], ["templates", "templates"], ["reports", "reports"]];
@@ -95,13 +97,7 @@ export function ImageBrowser() {
   };
 
   return (
-    <div class="sidebar">
-      <div class="sidebar-header">
-        <span class="pane-title">Resources</span>
-        <button class="icon-btn" aria-label="Close resources" title="Close resources" onclick={closeImages}>
-          <Icon name="x" />
-        </button>
-      </div>
+    <Drawer icon="layout-template" title="Resources" close="Close resources" onclose={closeImages}>
 
       <div class="browser-sections" role="tablist" aria-label="Resources" onkeydown={arrows}>
         {TABS.map(([name, label]) => (
@@ -118,7 +114,8 @@ export function ImageBrowser() {
 
       {when(tab.map((t) => t === "images"), () => <>
       <div class="browser-header">
-        <span class="pane-path">/{path}</span>
+        <Trail label="Folder of images" crumbs={() => folderCrumbs("images", path.get(), load)} />
+        <span class="pane-gap" />
         <button class="icon-btn" aria-label="New folder" title="New folder" onclick={() => showFolderInput.set(true)}>
           <Icon name="folder-plus" />
         </button>
@@ -126,16 +123,6 @@ export function ImageBrowser() {
 
       <div class="sidebar-content">
         <ul class="file-list">
-          {when(
-            () => path.get() !== "",
-            () => (
-              <li class="folder">
-                <button class="row" aria-label="Up a folder" title="Up a folder" onclick={() => load(path.peek().split("/").slice(0, -1).join("/"))}>
-                  <Icon name="corner-left-up" size={12} /> ..
-                </button>
-              </li>
-            ),
-          )}
           {/* Keyed rows get a signal per row, not the item: read it with .map/.peek */}
           {list(folders, (f) => f.path, (f$) => (
             <li class="folder">
@@ -144,11 +131,15 @@ export function ImageBrowser() {
               </button>
             </li>
           ))}
+        </ul>
+        {/* Pictures, drawn as pictures; the chosen one rings. */}
+        <ul class="file-list pictures">
           {list(files, (f) => f.path, (f$) => (
             <li>
               <button class="row" onclick={() => selected.set(f$.peek().name)}
                 aria-pressed={computed(() => String(selected.get() === f$.get().name))}>
-                <img class="thumb" src={f$.map((f) => `/edit/browse${urlPath(f.path)}?thumb=32`)} alt="" loading="lazy" /> {f$.map((f) => f.name)}
+                <img class="thumb" src={f$.map((f) => `/edit/browse${urlPath(f.path)}?thumb=160`)} alt="" loading="lazy" />
+                <span class="row-label">{f$.map((f) => f.name)}</span>
               </button>
             </li>
           ))}
@@ -196,6 +187,6 @@ export function ImageBrowser() {
           </dialog>
         );
       })}
-    </div>
+    </Drawer>
   );
 }

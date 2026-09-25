@@ -7,7 +7,37 @@ export const filePath = signal<string | null>(null);
 export const fileContent = signal("");
 export const editorContent = signal("");
 export const browserRevision = signal(0);
-export const showImages = signal(false);
+
+// Where you are: the folder the tree is showing. The trail above says it and
+// walks back up it, and a page opened from anywhere takes the tree to its
+// folder, so the two never disagree about where "here" is.
+export const folder = signal("");
+export const folderOf = (key: string) => (key.includes("/") ? key.slice(0, key.lastIndexOf("/")) : "");
+
+export function openFolder(to: string): void {
+  folder.set(to);
+}
+
+// A file's name as the trail has already said its folder: "index.md" when it
+// is in the folder you are in, and the whole key when it isn't.
+export function shortName(key: string): string {
+  const here = folder.get();
+  return folderOf(key) === here ? key.slice(here ? here.length + 1 : 0) : key;
+}
+
+// The drawer at the right: Resources, Editors or Publish, one at a time. Each
+// is chosen from the header and leaves the page in view behind it.
+export type DrawerName = "resources" | "editors" | "publish";
+export const drawer = signal<DrawerName | null>(null);
+export const showImages = computed(() => drawer.get() === "resources");
+
+export function toggleDrawer(name: DrawerName): void {
+  drawer.update((open) => (open === name ? null : name));
+}
+
+export function closeDrawer(): void {
+  drawer.set(null);
+}
 
 // The tree on the left is the content: pages, and the navigation derived from
 // their front matter. Templates and stylesheets are not content — they are what
@@ -42,14 +72,13 @@ export const collectionRevision = signal(0);
 
 const at = (path: string) => `/edit/pages/${urlPath(path)}`;
 const resourceUrl = (r: Resource) => `/edit/${r.section}/${urlPath(r.path)}`;
-const folderOf = (key: string) => (key.includes("/") ? key.slice(0, key.lastIndexOf("/")) : "");
 export const collectionKey = (folder: string) => `${folder ? `${folder}/` : ""}${COLLECTION_FILE}`;
 
 export function openCollection(folder: string): void {
   batch(() => {
     collection.set({ folder });
     closeResource();      // the slot holds one thing
-    showImages.set(false);
+    closeDrawer();
   });
 }
 
@@ -66,11 +95,11 @@ export function collectionChanged(): void {
 // which you were presumably looking at on purpose. A page in another folder
 // takes the pane away: it belongs to the folder, not to the session.
 async function offerCollection(fp: string): Promise<void> {
-  const folder = folderOf(fp);
-  if (collection.peek() && collection.peek()!.folder !== folder) closeCollection();
+  const own = folderOf(fp);
+  if (collection.peek() && collection.peek()!.folder !== own) closeCollection();
   if (!fp.endsWith("index.md") || resource.peek() || collection.peek()) return;
-  const res = await api(`look for ${collectionKey(folder)}`, at(collectionKey(folder)), undefined, [404]);
-  if (res.ok) openCollection(folder);
+  const res = await api(`look for ${collectionKey(own)}`, at(collectionKey(own)), undefined, [404]);
+  if (res.ok) openCollection(own);
 }
 
 // Transient: a resource is open for as long as you are working on it, and the
@@ -85,7 +114,7 @@ export async function openResource(next: Resource): Promise<boolean> {
     resourceSaved.set(body);
     resourceDraft.set(body);
     collection.set(null);  // the slot below the page holds one thing
-    showImages.set(false); // the sidebar was the chooser; it gets out of the way
+    closeDrawer();         // the drawer was the chooser; it gets out of the way
   });
   return true;
 }
@@ -181,6 +210,7 @@ export async function loadFile(path: string): Promise<boolean> {
     filePath.set(fp);
     fileContent.set(content);
     editorContent.set(content);
+    folder.set(folderOf(fp));
   });
   await offerCollection(fp);
   return true;
@@ -314,9 +344,9 @@ export function reloadBrowser() {
 }
 
 export function toggleImages() {
-  showImages.update((v) => !v);
+  toggleDrawer("resources");
 }
 
 export function closeImages() {
-  showImages.set(false);
+  closeDrawer();
 }
