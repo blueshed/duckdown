@@ -1,11 +1,12 @@
 import { createElement, signal, computed, effect } from "@blueshed/railroad";
 import { PaneHeader } from "./PaneHeader";
 import { urlPath } from "../api";
-import { filePath, editorContent, saveFile, deleteFile, closeFile, loadFile, moveFile } from "../store";
+import { filePath, editorContent, saveFile, deleteFile, closeFile, loadFile, moveFile, shortName } from "../store";
 
 export function Editor() {
   const dirty = signal(false);
   const fp = computed(() => filePath.get() || "");
+  const shown = computed(() => shortName(fp.get()));
 
   const save = async () => {
     if (await saveFile()) dirty.set(false);
@@ -31,7 +32,7 @@ export function Editor() {
 
   return (
     <div class="editor-area">
-      <PaneHeader icon="file-text" name={fp} dirty={dirty} onsave={save} ondelete={deleteFile} onclose={closeFile}
+      <PaneHeader icon="file-text" name={fp} shown={shown} dirty={dirty} onsave={save} ondelete={deleteFile} onclose={closeFile}
         url={() => `/edit/pages/${urlPath(fp.peek())}`} onrestored={() => loadFile(fp.peek())} onmove={moveFile} />
       <textarea aria-label={computed(() => `Contents of ${fp.get()}`)} value={editorContent} onkeydown={onkeydown} oninput={oninput} />
     </div>

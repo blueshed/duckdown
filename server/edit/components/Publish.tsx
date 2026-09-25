@@ -2,15 +2,16 @@ import { createElement, signal, computed, effect, list, when } from "@blueshed/r
 import { api } from "../api";
 import { tell } from "../notice";
 import { Icon } from "./Icon";
-import { modal } from "../modal";
+import { Drawer } from "./Drawer";
 import {
   browserRevision, resourceRevision, collectionRevision, reloadBrowser,
   filePath, fileContent, editorContent, loadFile,
+  drawer, toggleDrawer, closeDrawer,
 } from "../store";
 
 // Publishing from here (routes/publish.ts), when this copy of the site is
 // edited on one machine and published by a push: a button in the header that
-// says how much is waiting, and a dialog that shows it, publishes it, or
+// says how much is waiting, and a drawer that shows it, publishes it, or
 // pulls in what was published from somewhere else. With no DUCKDOWN_REMOTE
 // the server answers 404 and there is no button at all.
 
@@ -36,7 +37,6 @@ export async function refreshPublish(): Promise<void> {
 }
 
 export function PublishButton() {
-  const open = signal(false);
   // Again whenever something is written: a save, a resource, the collection.
   effect(() => {
     browserRevision.get();
@@ -48,20 +48,18 @@ export function PublishButton() {
   return (
     <span class="publish">
       {when(() => publishState.get() !== null, () => (
-        <button onclick={() => open.set(true)}>
+        <button onclick={() => toggleDrawer("publish")} aria-expanded={drawer.map((d) => String(d === "publish"))}>
           <Icon name="cloud-upload" /> <span class="label">Publish</span>
           {when(waiting, () => <span class="badge">{waiting}</span>)}
         </button>
       ))}
-      {when(open, () => <PublishDialog oncancel={() => open.set(false)} />)}
     </span>
   );
 }
 
 const STATE = { added: "new", changed: "changed", deleted: "deleted" } as const;
 
-export function PublishDialog(props: { oncancel: () => void }) {
-  const dialog = modal();
+export function PublishDrawer() {
   const busy = signal(false);
   const error = signal("");
   const found = signal<string[]>([]);       // what the checks said, or what a pull couldn't merge
@@ -116,8 +114,9 @@ export function PublishDialog(props: { oncancel: () => void }) {
   };
 
   return (
-    <dialog ref={dialog.ref} class="dialog dialog-history" aria-labelledby={dialog.title} onclose={props.oncancel}>
-      <h3 id={dialog.title}>Publish {() => (status.get() ? `to ${status.get()?.remote}` : "")}</h3>
+    <Drawer icon="cloud-upload" title={() => (status.get() ? `Publish to ${status.get()?.remote}` : "Publish")}
+      close="Close publish" onclose={closeDrawer}>
+      <div class="drawer-body">
       {when(() => typeof publishState.get() === "string", () => <p class="dialog-error" role="alert">{() => publishState.get() as string}</p>)}
       {when(() => status.get()?.problem, () => <p class="dialog-error" role="alert">{() => status.get()?.problem}</p>)}
       {when(() => status.get() && nothing.get(), () => <p class="dialog-hint">Nothing here that isn't published.</p>)}
@@ -135,12 +134,6 @@ export function PublishDialog(props: { oncancel: () => void }) {
       {when(() => (status.get()?.behind ?? 0) > 0, () => (
         <p class="dialog-hint">{() => `The published site has ${status.get()?.behind} change(s) this copy hasn't: Pull first.`}</p>
       ))}
-      <form class="editor-add" onsubmit={publish}>
-        <input name="message" placeholder="What changed (optional)" aria-label="What changed (optional)" autocomplete="off" />
-        <button type="submit" class="primary" disabled={computed(() => busy.get() || nothing.get())}>
-          <Icon name="cloud-upload" size={12} /> Publish
-        </button>
-      </form>
       {when(error, () => <p class="dialog-error" role="alert">{error}</p>)}
       {when(() => found.get().length > 0, () => (
         <div class="dialog-hint">
@@ -148,10 +141,19 @@ export function PublishDialog(props: { oncancel: () => void }) {
           <ul>{list(found, (f) => f, (f$) => <li>{f$}</li>)}</ul>
         </div>
       ))}
-      <div class="dialog-actions">
-        <button type="button" disabled={busy} onclick={pull}><Icon name="cloud-download" size={12} /> Pull</button>
-        <button type="button" onclick={() => { dialog.close(); props.oncancel(); }}>Close</button>
       </div>
-    </dialog>
+      <div class="drawer-foot">
+        <form class="editor-add" onsubmit={publish}>
+          <input name="message" placeholder="What changed (optional)" aria-label="What changed (optional)" autocomplete="off" />
+          <button type="submit" class="primary" disabled={computed(() => busy.get() || nothing.get())}>
+            <Icon name="cloud-upload" size={12} /> Publish
+          </button>
+        </form>
+        <div class="drawer-line">
+          <button type="button" disabled={busy} onclick={pull}><Icon name="cloud-download" size={12} /> Pull</button>
+          <span class="drawer-note">Bring in what was published elsewhere.</span>
+        </div>
+      </div>
+    </Drawer>
   );
 }

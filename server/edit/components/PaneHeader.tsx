@@ -1,7 +1,7 @@
 import { createElement, Fragment, computed, signal, when } from "@blueshed/railroad";
 import { Icon } from "./Icon";
 import { ConfirmDialog } from "./ConfirmDialog";
-import { VersionsDialog } from "./History";
+import { openVersions } from "../past";
 import { NewDialog } from "./NewDialog";
 
 const NOT_SAVED = "Not saved";
@@ -12,12 +12,13 @@ const NOT_SAVED = "Not saved";
 //
 // Delete still asks first, wherever it is, but it is no longer the end of the
 // file: the server keeps what a delete removes and what a save replaces, and
-// Earlier versions (the clock) puts any of it back. A pane that undoes its own
+// Earlier versions (the clock) goes to them: past.ts. A pane that undoes its own
 // changes (the collection's) passes undo and redo, and they sit here too.
 type Flag = { get(): boolean };
 export function PaneHeader(props: {
   icon: string;
   name: { get(): string };
+  shown?: { get(): string };      // what the header says, when the trail has said the folder
   dirty: { get(): boolean; peek(): boolean };
   onsave: () => unknown;
   ondelete: () => unknown;
@@ -29,7 +30,6 @@ export function PaneHeader(props: {
 }) {
   const flash = signal("");
   const confirming = signal(false);
-  const versions = signal(false);
   const moving = signal(false);
   const label = () => props.name.get();
 
@@ -52,7 +52,7 @@ export function PaneHeader(props: {
   return (
     <div class="pane-header">
       <Icon name={props.icon} size={13} />
-      <span class="pane-name">{label}</span>
+      <span class="pane-name">{() => (props.shown ?? props.name).get()}</span>
       {when(props.dirty as never, () => <span class="dot" role="img" aria-label="Unsaved changes" title="Unsaved changes">●</span>)}
       {/* Saved, or Not saved, said as well as shown: the button's own words
           change, but a screen reader isn't told a button's words changed. */}
@@ -75,7 +75,7 @@ export function PaneHeader(props: {
           </button>
         : null}
       <button class="icon-btn" aria-label={`Earlier versions of ${label()}`} title="Earlier versions"
-        onclick={() => versions.set(true)}>
+        onclick={() => openVersions(props.url(), label(), props.onrestored)}>
         <Icon name="history" />
       </button>
       <button class="icon-btn danger-subtle" aria-label={`Delete ${label()}`} title="Delete" onclick={() => confirming.set(true)}>
@@ -103,10 +103,6 @@ export function PaneHeader(props: {
             return message;
           }}
           oncancel={() => moving.set(false)} />
-      ))}
-      {when(versions, () => (
-        <VersionsDialog url={props.url()} name={label()} onrestored={props.onrestored}
-          oncancel={() => versions.set(false)} />
       ))}
     </div>
   );

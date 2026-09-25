@@ -4,12 +4,14 @@ import { Browser } from "./components/Browser";
 import { Editor } from "./components/Editor";
 import { Preview } from "./components/Preview";
 import { CssPreview } from "./components/CssPreview";
-import { ImageBrowser } from "./components/ImageBrowser";
 import { ResourcePane } from "./components/ResourcePane";
 import { CollectionPane } from "./components/CollectionPane";
 import { TemplatePreview } from "./components/TemplatePreview";
 import { Notice } from "./components/Notice";
-import { filePath, editorContent, showImages, loadFile, resource, resourceDraft, collection } from "./store";
+import { Drawers } from "./components/Drawers";
+import { PastList, PastPane, PastPreview } from "./components/Past";
+import { past, seen } from "./past";
+import { filePath, editorContent, loadFile, resource, resourceDraft, collection } from "./store";
 import { speak } from "./notice";
 
 // App-lifetime root scope: this app is mounted once and never torn down,
@@ -45,21 +47,29 @@ const collectionAlone = computed(() => !hasFile.get() && collection.get() !== nu
 
 const app = document.getElementById("app")!;
 
-// Header and Browser — always present
+// The header, and under it the tray: the three columns are compartments cut
+// into it — where you are, what you are changing, what a reader would see.
 app.appendChild(<Header />);
-app.appendChild(<Browser />);
+const tray = document.createElement("div");
+tray.className = "tray";
+app.appendChild(tray);
+// Where you are: the tree, or — looking at the past — the list of it.
+tray.appendChild(when(past, () => <PastList />, () => <Browser />));
 
 // The middle column: the page, and under it whatever resource is open. Each
 // closes, and the column gives the room to what is left. Built with when() as
 // each is shown, so a pane starts from the state as it is then.
 const middle = document.createElement("div");
 middle.className = "column-middle";
+// An earlier version, or a deleted file, in front of the panes — which stay
+// as they were, hidden, and come back when you look at now again.
+middle.appendChild(when(seen, () => <PastPane />));
 middle.appendChild(when(hasFile, () => <Editor />));
 middle.appendChild(when(collection, () => <CollectionPane />));
 middle.appendChild(when(resource, () => <ResourcePane />));
 middle.appendChild(when(nothingOpen, () =>
   <div class="panel panel-editor"><div class="placeholder">select a page or a resource</div></div>));
-app.appendChild(middle);
+tray.appendChild(middle);
 
 // The preview column. The branches are mutually exclusive, so at most one of
 // them is an element at a time; each is built when it's shown, from the
@@ -67,6 +77,7 @@ app.appendChild(middle);
 // changes can go on showing the old document.
 const right = document.createElement("div");
 right.className = "column-preview";
+right.appendChild(when(seen, () => <PastPreview />));
 right.appendChild(when(pageIsMarkdown, () => <Preview />));
 right.appendChild(when(pageIsCss, () => <CssPreview css={() => editorContent.get()} />));
 right.appendChild(when(cssAlone, () => <CssPreview css={() => resourceDraft.get()} />));
@@ -77,12 +88,10 @@ right.appendChild(when(pageIsNeither, () =>
   <div class="panel panel-preview"><div class="placeholder">no preview for this kind of file</div></div>));
 right.appendChild(when(nothingOpen, () =>
   <div class="panel panel-preview"><div class="placeholder">preview</div></div>));
-app.appendChild(right);
+tray.appendChild(right);
 
-// Resources sidebar
-app.appendChild(
-  when(showImages, () => <ImageBrowser />)
-);
+// The drawer, over the preview: Resources, Editors or Publish.
+tray.appendChild(<Drawers />);
 
 // Failures, when there are any (fixed, over everything)
 app.appendChild(<Notice />);

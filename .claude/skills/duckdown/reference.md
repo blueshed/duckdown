@@ -506,8 +506,11 @@ pane does:
   and writes `collection.json` (picture, title and caption fields, pictures
   under `static/images/<folder>/`), an each: page `item.md`, and an `index.md`
   with `{{items}}` if the folder has none — then opens it with the pane below.
-- **The fields** are edited in place, one input per declared field, its label the placeholder (a
-  `long` one is a text box); with no `fields` in the file, title and caption.
+- **The works** are pictures in their groups (a work with no picture field is
+  its title in a box). Choose one and its fields are beside the grid, one input
+  per declared field, labelled as the file labels it (a `long` one is a text
+  box); with no `fields` in the file, title and caption. The first work is
+  chosen as the pane opens, and a new one as it is added.
   Every other key on an item — `slug`, `aliases`, anything undeclared — is kept
   exactly where it was found, and so is everything around the groups
   (`fields`, `images`, `labels`).
@@ -517,15 +520,16 @@ pane does:
   when you opened it: a work added this sitting was never published. Renaming
   back takes the alias out again.
 - **Order**: drag a work by its picture, within its group or into another, or
-  use the up and down controls. Groups move with theirs.
+  use the up and down controls beside the chosen one. Groups move with theirs.
 - **Groups**: add one, add a subgroup inside one, rename it (the heading edits
   `label` when the group has one, `name` when it hasn't), or remove it.
-- **Pictures**: drop one on a group, or click *Drop a picture here* to choose
-  it. The original is written where `images` says its pictures live (into the
+- **Pictures**: drop one on a group's last tile (the picture with a plus), or
+  click it to choose one. The original is written where `images` says its pictures live (into the
   image field) and a 128px thumbnail beside it, named by the collection's own
   `suffix` and `extension` — the new work then needs its fields filled in. Dropping a
   picture **on a work's picture** replaces it in place, under the same file
-  name, so the work keeps its address and every link to it goes on working.
+  name, so the work keeps its address and every link to it goes on working:
+  that is the chosen work's picture, beside the grid (click it to choose one).
 - A collection whose pictures live off the site (a bucket, a CDN) says so and
   offers no way to add one: the editor can only write the site's own
   `static/images/`. Name the item and put the file there yourself.
@@ -675,7 +679,7 @@ Keep the page's own content in `<main>`, and — when there's a nav before it �
 - Everything in `static/` is served at `/static/…`, typed by its extension, with an ETag so a browser that has a file is told so, and kept for five minutes.
 - `static/site.css` and `static/search.js` are duckdown's base. A site needn't keep copies: with no file of that name they are served and exported from duckdown itself, so upgrading duckdown upgrades them. To change one, make a file of that name — it wins, and is yours from then on; put a site's own look in `theme.css` instead and keep upgrading.
 - Keep images in `static/images/`, in folders if you like; refer to them from pages as `/static/images/…`.
-- The editor's **Resources** sidebar, *images* tab, lists them with thumbnails, makes folders (the folder button) and uploads files (**Upload**, several at once). Clicking one shows it, with **Copy Markdown** for the `![name](/static/images/…)` line, names encoded.
+- The editor's **Resources** drawer, *images* tab, shows them as a grid of pictures, makes folders (the folder button) and uploads files (**Upload**, several at once). Clicking one shows it, with **Copy Markdown** for the `![name](/static/images/…)` line, names encoded.
 
 ## Users
 
@@ -699,21 +703,22 @@ Keep the page's own content in `<main>`, and — when there's a nav before it �
 ## The editor
 
 - At `/edit`. Signing in lands there; `/login` when already signed in goes straight there; the home page's "Login to edit" link does the same.
-- **The tree** (left): the site's folders and pages, and nothing else — everything a page is composed with lives outside `pages/`. Click to open, `..` to go up. A folder's `collection.json` is listed there too, with a grid icon, and opens as the collection pane rather than as JSON. Three buttons in the header make a **new page**, a **new folder** (`folder/index.md`, titled with the folder's name) and a **new collection** (see [Editing one in the editor](#editing-one-in-the-editor)). None ever overwrites — each says when a name is taken.
+- **Where you are** is said once, by the trail at the top left: the site, the folders down to the one the tree is showing, and the page open in it. Every crumb but the last goes there. Opening a page takes the tree to its folder. Below it the editor is one tray of compartments: the tree, what you're changing, and the preview.
+- **The tree** (left): the site's folders and pages, and nothing else — everything a page is composed with lives outside `pages/`. Click a folder to go into it; the trail takes you back up. A folder's `collection.json` is listed there too, with a grid icon, and opens as the collection pane rather than as JSON. Three buttons in the header make a **new page**, a **new folder** (`folder/index.md`, titled with the folder's name) and a **new collection** (see [Editing one in the editor](#editing-one-in-the-editor)). None ever overwrites — each says when a name is taken.
 - **Editing** (middle): Save or ⌘⏎. The button lights up while there are unsaved changes, flashes green for "Saved", and red for "Not saved" (the notice says why). The bin deletes the page, after asking.
-- **Resources** (right sidebar, from the header): what a page is composed with, in three tabs, and a fourth to read.
-  - *images* — browse and upload, and copy a markdown link for one.
+- **Resources** (a drawer over the preview, from the header): what a page is composed with, in three tabs, and a fourth to read.
+  - *images* — the pictures as a grid; browse and upload, and copy a markdown link for one.
   - *css* — the stylesheets in `static/`, the ones a page names with `css:`. Themes aren't here: they belong to a folder, and the tree is where the folders are.
   - *templates* — the files in `templates/`, and a button for a new one.
   - *reports* — the site's `reports/` folder: whatever a task of the site's own (a usage report, say) writes there for its editors, folders newest first. A markdown report opens rendered, in a tab of its own; nothing here is edited, served, exported or seeded, and only a signed-in editor can read it. duckdown writes there only when someone runs `duckdown report` (below).
   - A visitor report for a site whose server logs views (`DUCKDOWN_LOG=1`): feed its log to `duckdown report` — piped (`railway logs | duckdown report`) or as a saved file (`duckdown report site.log`) — and it writes `reports/<month>/<day>.md`: views by readers and by crawlers, the most read pages, addresses that weren't there (worth an `aliases:` line), and the sites that sent readers. It counts exactly the lines it is given, and names no reader.
-- **Editing a resource** (a stylesheet or a template, from the sidebar): it opens in a pane *below* the page, with the same header — name, unsaved dot, delete, Save, and a close button. The page stays where it is, so you can click through pages and watch one stylesheet against each. It's transient: closing the pane leaves nothing behind.
+- **Editing a resource** (a stylesheet or a template, from Resources): it opens in a pane *below* the page, with the same header — name, unsaved dot, delete, Save, and a close button. The page stays where it is, so you can click through pages and watch one stylesheet against each. It's transient: closing the pane leaves nothing behind.
 - **Editing a collection** (from the tree, or offered under a folder's index page): the same pane, holding the folder's works rather than a file's text — see [Editing one in the editor](#editing-one-in-the-editor). It shares the slot with a resource: the column holds the page and one thing beneath it, so opening a stylesheet closes the collection and the other way about.
 - **The middle column holds whatever is open**, and each pane closes, the page included. Two split it; one fills it. With no page open, a stylesheet or template has the column to itself — which is how you write one from scratch.
 - **Preview** (right): what you'd see. With a page open, the page as the site will show it, rendered by the same code — its own template and the stylesheets it links, the navigation, the `{{pages}}` listing, wiki links resolved from the page's folder — sandboxed, so no scripts run. A template open in the pane below is used in place of the saved one when it's the one this page wears, so you watch the page change as you write it; a stylesheet goes straight into the preview's head as you type, after the saved one, so it wins. A link on the page that a reader would follow to nothing — no page, no work, no old address, no file in `static/`, or a draft — is named in the message line (`Links that lead nowhere a reader can go: …`), and the line goes once the link is put right.
 - **With no page open**, whatever you're composing with gets a sample page of its own: for a stylesheet, a bit of everything `site.css` styles; for a template, a sample page put through it, with the site's real navigation. So a template or a stylesheet can be written with nothing else on screen.
-- **Header**: *Resources* (the sidebar), *View* (the page on the site), *Logout*.
-- **Deleting always asks first**, wherever it is — a page, a stylesheet, a template, a work in a collection — and nothing deleted is gone. **Earlier versions** (the clock in every pane's header) lists what a file was before each sitting of saves, newest first, the last 30; **Restore** puts one back, and keeps what it replaces. **Deleted** (at the top of the page tree, and of each resource list) brings back a deleted file. They live in the site's `.history/` folder, beside `pages/` and outside everything the site serves or exports — a site kept in git ignores it (`site/.history/`). The collection pane also has **Undo** and **Redo** for its own changes while it is open.
+- **Header**: the trail, then *Publish* (when the site publishes from here), *Resources* and *Editors* — each a drawer over the preview, one at a time, that leaves the page in view and closes with Escape — *View* (the page on the site), *Logout*.
+- **Deleting always asks first**, wherever it is — a page, a stylesheet, a template, a work in a collection — and nothing deleted is gone. **Earlier versions** (the clock in every pane's header) is a place rather than a dialog: the versions list where the tree was — *Now*, then what the file was before each sitting of saves, newest first, the last 30 — and the trail says which you're looking at. The middle shows that version read-only, with the lines that differ from now marked, and the preview renders a page as it was, so you see a version before you bring it back. **Restore** puts it back and keeps what it replaces; the ✕, *Now* or a crumb takes you back, and nothing unsaved is lost while you look. **Deleted** (at the top of the page tree, and of each resource list) is the same place for deleted files. They live in the site's `.history/` folder, beside `pages/` and outside everything the site serves or exports — a site kept in git ignores it (`site/.history/`). The collection pane also has **Undo** and **Redo** for its own changes while it is open.
 - **Rename or move** (the folder-arrow in the page's header) gives a page a new name or folder: type its new place (`blog/new-name`; `.md` is added). Unsaved changes are saved first, the old address goes into its `aliases`, and its Earlier versions go with it. It won't move onto a page that exists, a folder's `index.md` or an each: page, or change only a name's case.
 - When writing files directly (not through the editor), no version is kept: that is git's job.
 - Anything that fails shows in a red notice at the foot of the screen until dismissed; news that isn't a failure (a renamed work keeping its old address) shows there in the accent colour.

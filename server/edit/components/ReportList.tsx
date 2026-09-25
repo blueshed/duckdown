@@ -1,6 +1,7 @@
 import { createElement, Fragment, signal, list, when } from "@blueshed/railroad";
 import type { FileEntry, FolderEntry, Listing } from "../../storage";
 import { Icon } from "./Icon";
+import { Trail, folderCrumbs } from "./Trail";
 import { apiJson, urlPath } from "../api";
 
 // What the site's own tasks have left in reports/: a folder a month, newest
@@ -24,21 +25,11 @@ export function ReportList() {
   return (
     <>
       <div class="browser-header">
-        <span class="pane-path">/reports/{path}</span>
+        <Trail label="Folder of reports" crumbs={() => folderCrumbs("reports", path.get(), load)} />
       </div>
 
       <div class="sidebar-content">
         <ul class="file-list">
-          {when(
-            () => path.get() !== "",
-            () => (
-              <li class="folder">
-                <button class="row" aria-label="Up a folder" title="Up a folder" onclick={() => load(path.peek().split("/").slice(0, -1).join("/"))}>
-                  <Icon name="corner-left-up" size={12} /> ..
-                </button>
-              </li>
-            ),
-          )}
           {list(folders, (f) => f.path, (f$) => (
             <li class="folder">
               <button class="row" onclick={() => load(f$.peek().path.replace(/^\//, ""))}>

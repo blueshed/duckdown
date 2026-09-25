@@ -36,6 +36,15 @@
   --radius-sm: 4px;
   --radius: 6px;
   --radius-lg: 10px;
+  /* The bento: the columns are compartments cut into one tray. Walls meet
+     square; only the tray's own corners curve, and a compartment in one of
+     them takes the curve less the wall. A drawer is a panel of its own. */
+  --wall: 8px;
+  --radius-tray: 22px;
+  --radius-cell: 14px;
+  --radius-panel: 20px;
+  --radius-thumb: 8px;
+  --tile: 60px;             /* a work in the collection's grid */
   --preview-w: 1fr;
   --editor-w: 1fr;
   /* Colours, each named for what it does, because one colour can't do two
@@ -57,6 +66,8 @@
   --danger-text: #c81e1e;   /* red text on --bg and --surface */
   --ok: #15803d;            /* Saved: a fill, with --on-accent text on it */
   --news: #3634a3;          /* the notice's news: a fill */
+  --paper: #f5f5f7;         /* what the tray sits on, and the trail is written on */
+  --tray: #dcdce4;          /* the walls between compartments: decoration only */
 }
 
 /* A finger, not a pointer: everything a size up. */
@@ -84,6 +95,8 @@
     --accent-text: #a59cfa;
     --focus: #a59cfa;
     --danger-text: #f87171;
+    --paper: #161622;
+    --tray: #2f2f4b;
   }
 }
 
@@ -91,7 +104,7 @@ html, body {
   height: 100%;
   font-family: system-ui, -apple-system, sans-serif;
   color: var(--text);
-  background: var(--bg);
+  background: var(--paper);
 }
 
 /* Not on html: that would set what a rem is, and override the reader. */
@@ -106,25 +119,120 @@ button, input, textarea, select {
 
 #app {
   display: grid;
-  grid-template-columns: var(--sidebar-w) var(--editor-w) var(--preview-w);
-  grid-template-rows: auto 1fr;
+  grid-template-columns: minmax(0, 1fr);   /* the header's content never widens the page */
+  grid-template-rows: auto minmax(0, 1fr);
   height: 100vh;
+}
+
+/* The tray: three compartments, and the drawer over the last. */
+.tray {
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--sidebar-w) var(--editor-w) var(--preview-w);
+  gap: var(--wall);
+  min-height: 0;
+  margin: 0 var(--space-3) var(--space-3);
+  padding: var(--wall);
+  border-radius: var(--radius-tray);
+  background: var(--tray);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18);
+}
+
+.tray > .panel-browser {
+  border-radius: var(--radius-cell) 0 0 var(--radius-cell);
+}
+
+.tray > .column-preview {
+  border-radius: 0 var(--radius-cell) var(--radius-cell) 0;
+  overflow: hidden;
 }
 
 /* --- Header bar --- */
 
 .header {
-  grid-column: 1 / -1;
   display: flex;
   align-items: center;
   gap: var(--space-2);
   min-height: var(--pane-header-h);
-  padding: 0 var(--space-2) 0 var(--space-4);
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
+  padding: 0 var(--space-3) 0 var(--space-5);
 }
 
-.header h1 {
+/* Where you are: the site, the folders, the page. Every crumb but the last
+   goes there; the last is where you stand. */
+/* It gives way on a narrow screen: the folders shorten first, the page's
+   name last, and the site's never. */
+.trail {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.trail ol {
+  display: flex;
+  align-items: center;
+  list-style: none;
+  min-width: 0;
+}
+
+/* A folder's crumb shrinks to a few letters and no further; the page's
+   name, last, can go all the way to an ellipsis. */
+.trail .crumb {
+  display: flex;
+  align-items: center;
+  flex: 0 4 auto;
+  color: var(--text-dim);
+  font-size: var(--text-base);
+}
+
+/* Its floor: the chevron and "gal…". (Left to itself a crumb's least is its
+   whole name, and it wouldn't give way at all.) */
+.trail .crumb:not(.root) {
+  min-width: calc(4ch + 2rem);
+}
+
+.trail .crumb:last-child {
+  flex-shrink: 1;
+  min-width: 0;
+}
+
+.trail .crumb.root {
+  flex: none;
+}
+
+.trail .crumb > .icon {
+  padding: 0 var(--space-1);
+}
+
+.trail .go {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-height: var(--control-h);
+  padding: 0 var(--space-1);
+  border: 0;
+  background: none;
+  color: var(--accent-text);
+  font-size: inherit;
+}
+
+.trail .go:hover {
+  background: none;
+  text-decoration: underline;
+}
+
+.trail .here {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 var(--space-1);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.trail .root :is(.go, .here) {
+  padding-left: 0;
+  color: var(--text);
   font-size: var(--text-xl);
   font-weight: 600;
   letter-spacing: 0.5px;
@@ -173,7 +281,6 @@ button.header-link:hover {
   flex-direction: column;
   padding: 0;
   background: var(--surface);
-  border-right: 1px solid var(--border);
 }
 
 /* No padding, like .panel-browser: the pane header inside has to sit flush,
@@ -186,9 +293,10 @@ button.header-link:hover {
   background: var(--bg);
 }
 
+/* Flush: the page as the site draws it, edge to edge in its compartment. */
 .panel-preview {
+  padding: 0;
   background: var(--surface);
-  border-left: 1px solid var(--border);
 }
 
 /* --- Icons --- */
@@ -583,18 +691,21 @@ button.danger-subtle:hover {
 
 /* --- Sidebar (Image Browser) --- */
 
+/* The drawer: over the preview, inside the tray, a panel of its own. */
 .sidebar {
-  position: fixed;
-  top: 0;
-  right: 0;
-  width: 320px;
-  height: 100vh;
+  position: absolute;
+  top: var(--wall);
+  right: var(--wall);
+  bottom: var(--wall);
+  width: min(340px, calc(100% - 2 * var(--wall)));
   background: var(--surface);
-  border-left: 1px solid var(--border);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
   display: flex;
   flex-direction: column;
+  overflow: hidden;
   z-index: 10;
-  box-shadow: -4px 0 12px rgba(0, 0, 0, 0.1);
+  box-shadow: -12px 0 32px rgba(0, 0, 0, 0.25);
 }
 
 .sidebar-content {
@@ -645,6 +756,133 @@ button.danger-subtle:hover {
 .upload-label:focus-within {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
+}
+
+/* The drawer's own parts: its heading, what it holds, and what stays at its
+   foot however long that is. */
+.sidebar-header h3 {
+  font-size: var(--text-md);
+}
+
+.sidebar:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+
+.drawer-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-2) var(--space-4) var(--space-4);
+}
+
+.drawer-foot {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  border-top: 1px solid var(--border);
+}
+
+.drawer-foot .editor-add {
+  margin-top: 0;
+}
+
+.drawer-note {
+  color: var(--text-dim);
+  font-size: var(--text-sm);
+}
+
+.drawer-line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.sidebar input {
+  height: var(--field-h);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--field-border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text);
+}
+
+.sidebar .editor-add button,
+.sidebar .editor-password button {
+  min-height: var(--field-h);
+}
+
+/* A drawer is narrow: each field a row of its own, the buttons after them. */
+.sidebar :is(.editor-add, .editor-password) {
+  flex-wrap: wrap;
+}
+
+.sidebar :is(.editor-add, .editor-password) input {
+  flex: 1 1 100%;
+}
+
+/* Circles are for faces. */
+.face {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+/* Pictures in the drawer, drawn as pictures. */
+.file-list.pictures {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+  gap: var(--space-3) var(--space-2);
+  padding: var(--space-2) var(--space-1);
+}
+
+.file-list.pictures li,
+.file-list.pictures li:hover {
+  background: none;
+}
+
+.file-list.pictures button.row {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-1);
+  padding: 0;
+  font-size: var(--text-xs);
+  color: var(--text-dim);
+}
+
+.file-list.pictures .thumb {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+  border-radius: var(--radius-thumb);
+}
+
+.file-list.pictures button.row[aria-pressed="true"] {
+  background: none;
+  color: var(--text);
+}
+
+.file-list.pictures button.row[aria-pressed="true"] .thumb {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* A drawer's own folders: the same trail, a size down. */
+.trail-small .root :is(.go, .here) {
+  font-size: var(--text-base);
+  letter-spacing: 0;
+}
+
+.trail-small .crumb {
+  font-size: var(--text-sm);
 }
 
 /* Out of sight, still in the tab order and the accessibility tree. */
@@ -806,42 +1044,39 @@ button.danger-subtle:hover {
    it lines up with them — but tabs, not a heading: each one underlines when
    it is the one you are looking at, over the bar's own divider. */
 .browser-sections {
-  display: flex;
-  flex: 0 0 var(--pane-header-h);
-  gap: 0;
-  padding: 0 var(--space-2);
-  border-bottom: 1px solid var(--border);
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 2px;
+  margin: var(--space-3) var(--space-3) var(--space-1);
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
 }
 
+/* One segmented control: the chosen one raised, the rest quiet. */
 .browser-sections .section {
-  flex: 1;
   justify-content: center;
-  min-height: 0;
+  min-height: 28px;
   padding: 0;
-  margin-bottom: -1px;
   border: 0;
-  border-bottom: 2px solid transparent;
-  border-radius: 0;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text-dim);
-  font: inherit;
   font-size: var(--control-font);
-  cursor: pointer;
-}
-
-.browser-sections .section:focus-visible {
-  outline-offset: -2px;
 }
 
 .browser-sections .section:hover {
   color: var(--text);
   background: transparent;
-  border-bottom-color: var(--border);
 }
 
 .browser-sections .section.on {
   color: var(--text);
-  border-bottom-color: var(--focus);
+  background: var(--surface);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  font-weight: 600;
 }
 
 /* --- The two right-hand columns ---
@@ -855,27 +1090,133 @@ button.danger-subtle:hover {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  min-height: 0;
 }
 
+/* Two panes here are two compartments: the tray's wall between them. */
 .column-middle {
-  border-right: 1px solid var(--border);
+  gap: var(--wall);
 }
 
 .column-middle > *,
 .column-preview > * {
   flex: 1;
   min-height: 0;
-}
-
-/* Adjacent-sibling ignores the comment markers when() leaves behind, so this
-   is the second pane only when there really is one above it. */
-.column-middle > * + * {
-  border-top: 1px solid var(--border);
+  overflow: hidden;
+  background: var(--bg);
 }
 
 .panel-resource {
   display: flex;
   flex-direction: column;
+}
+
+/* --- The past (past.ts): where the tree was, the list of it; where the page
+   was, the one you are looking at; where the preview was, it rendered. The
+   present's panes wait, hidden, behind it: nothing unsaved is lost. */
+
+.column-middle:has(> .past-pane) > :not(.past-pane),
+.column-preview:has(> .past-preview) > :not(.past-preview) {
+  display: none;
+}
+
+.panel-past .browser-header {
+  gap: var(--space-2);
+}
+
+.panel-past .file-list {
+  padding: var(--space-1);
+}
+
+.file-list .row-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-list .row-detail {
+  color: var(--text-dim);
+  font-size: var(--text-xs);
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+.past-hint {
+  padding: var(--space-2) var(--space-3);
+  color: var(--text-dim);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
+.past-foot {
+  margin-top: auto;
+}
+
+.past-pane {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  container: pane / inline-size;
+}
+
+.pane-when {
+  color: var(--text-dim);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Read only, and looks it: the words on a quieter ground. */
+.past-text {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  margin: 0;
+  padding: 12px 0;
+  background: color-mix(in srgb, var(--border) 25%, var(--bg));
+  font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+  font-size: var(--text-base);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  tab-size: 2;
+}
+
+.past-text:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+
+.past-text .line {
+  display: block;
+  min-height: 1.6em;
+  padding: 0 12px;
+  color: var(--text);
+}
+
+/* A line that isn't in the file as it is now: marked with a bar as well as a
+   shade, so it still shows where forced colours takes the shade away. */
+.past-text mark.line {
+  background: color-mix(in srgb, var(--focus) 16%, transparent);
+  box-shadow: inset 3px 0 0 var(--focus);
+}
+
+@media (forced-colors: active) {
+  .past-text mark.line {
+    border-left: 3px solid Highlight;
+  }
+}
+
+.past-preview {
+  display: flex;
+  flex-direction: column;
+}
+
+.past-preview > * {
+  flex: 1;
+  min-height: 0;
 }
 
 /* --- The collection pane ---
@@ -891,24 +1232,32 @@ button.danger-subtle:hover {
   min-width: 0;
 }
 
+/* The works in their groups on the left, the chosen one's fields beside
+   them; each side scrolls in itself. */
 .collection-body {
   flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 220px);
+}
+
+.collection-grid {
   min-height: 0;
   overflow-y: auto;
   padding: var(--space-3) var(--space-3) var(--space-5);
 }
 
 .collection-group {
-  margin-bottom: 16px;
+  margin-bottom: var(--space-4);
 }
 
 .collection-group .collection-group {
-  margin-left: 8px;
-  padding-left: 8px;
+  margin-left: var(--space-2);
+  padding-left: var(--space-2);
   border-left: 2px solid var(--border);
 }
 
-/* The tools repeat on every item, so they are a size quieter than a bar's. */
+/* The tools repeat on every group, so they are a size quieter than a bar's. */
 .group-head,
 .item-tools {
   --icon-btn: 28px;
@@ -922,80 +1271,164 @@ button.danger-subtle:hover {
   margin-bottom: var(--space-2);
 }
 
-.group-name,
-.item-input {
+.group-name {
+  flex: 1;
   min-width: 0;
   min-height: 28px;
   padding: var(--space-1) var(--space-2);
   border: 1px solid transparent;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text);
-  font: inherit;
+  font-weight: 600;
   outline: none;
 }
 
-.group-name {
-  flex: 1;
-  font-weight: 600;
-}
-
-.group-name:hover,
-.item-input:hover {
+.group-name:hover {
   border-color: var(--field-border);
 }
 
-.group-name:focus,
-.item-input:focus {
+.group-name:focus {
   border-color: var(--focus);
   background: var(--surface);
 }
 
+/* A group's works: pictures, in a row that wraps. */
 .collection-items {
   list-style: none;
   display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.collection-item {
-  display: flex;
   flex-wrap: wrap;
-  align-items: flex-start;
-  gap: var(--space-3);
-  padding: var(--space-3);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
+  gap: var(--space-3) var(--space-2);
 }
 
-/* The picture is the control that replaces it: click it, or drop one on it. */
-.item-thumb {
-  position: relative;
-  flex: 0 0 64px;
-  width: 64px;
-  height: 64px;
+.item-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-1);
+  width: var(--tile);
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-dim);
+  font-size: var(--text-xs);
+  white-space: normal;
+}
+
+.item-tile:hover {
+  background: none;
+  color: var(--text);
+}
+
+.item-tile img {
+  width: var(--tile);
+  height: var(--tile);
+  object-fit: cover;
+  border-radius: var(--radius-thumb, 8px);
+  background: var(--bg);
+}
+
+/* With no picture field, a work is its title in a box the picture's size. */
+.item-tile:not(:has(img)) .item-title {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 4px;
+  height: var(--tile);
+  padding: var(--space-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-thumb, 8px);
+  white-space: normal;
+  text-align: center;
+}
+
+.item-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+
+/* The chosen one rings, and its name is bold (forced colours drop the ring). */
+.item-tile[aria-pressed="true"] {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.item-tile[aria-pressed="true"] img,
+.item-tile[aria-pressed="true"]:not(:has(img)) .item-title {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.item-drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  width: var(--tile);
+  height: var(--tile);
+  min-height: 0;
+  padding: 0;
+  border: 1px dashed var(--field-border);
+  border-radius: var(--radius-thumb, 8px);
+  background: transparent;
+  color: var(--text-dim);
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+
+.item-drop:hover {
+  border-color: var(--focus);
+  color: var(--text);
+}
+
+.collection-tools {
+  display: flex;
+  gap: var(--space-2);
+}
+
+/* The chosen work: its picture (the control that replaces it), its fields,
+   and what can be done to it. */
+.collection-chosen {
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-left: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.item-thumb {
+  position: relative;
+  flex: none;
+  width: 120px;
+  height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-thumb, 8px);
   background: var(--bg);
   cursor: pointer;
   overflow: hidden;
 }
 
 .item-thumb img {
-  max-width: 100%;
-  max-height: 100%;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .item-swap {
   position: absolute;
-  right: 2px;
-  bottom: 2px;
+  right: 4px;
+  bottom: 4px;
   display: flex;
-  padding: 2px;
-  border-radius: 3px;
+  padding: 3px;
+  border-radius: var(--radius-sm);
   background: var(--surface);
   color: var(--text-dim);
   opacity: 0;
@@ -1006,62 +1439,74 @@ button.danger-subtle:hover {
   opacity: 1;
 }
 
-.item-fields {
-  flex: 1 1 120px;
-  min-width: 0;
+.item-field {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-1);
+}
+
+.item-field label {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.item-input {
+  width: 100%;
+  min-height: var(--control-h);
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--field-border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text);
+}
+
+.item-input:focus {
+  border-color: var(--focus);
+  outline: none;
 }
 
 .item-long {
   resize: vertical;
-  font-size: var(--text-sm);
   line-height: 1.4;
-}
-
-.item-src {
-  font-family: "SF Mono", "Fira Code", monospace;
-  font-size: var(--text-xs);
-  color: var(--text-dim);
-  overflow-wrap: anywhere;
 }
 
 .item-tools {
   display: flex;
-  gap: var(--icon-gap);
-  margin-left: auto;
-}
-
-.item-drop {
-  display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 6px;
-  margin-top: 8px;
-  padding: 10px;
-  border: 1px dashed var(--border);
-  border-radius: 6px;
+  gap: var(--icon-gap);
+  margin-top: auto;
+}
+
+.item-src {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: "SF Mono", "Fira Code", monospace;
+  font-size: var(--text-xs);
   color: var(--text-dim);
-  font-size: var(--text-sm);
-  text-align: center;
-  cursor: pointer;
 }
 
-.item-drop:hover {
-  border-color: var(--focus);
-  color: var(--text);
-}
+/* A narrow pane puts the chosen work under the grid rather than beside it. */
+@container pane (max-width: 479px) {
+  /* Half each, and each scrolls: the grid never squeezed to nothing. */
+  .collection-body {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(96px, 1fr) minmax(0, 1fr);
+  }
 
-/* The same place, as a button, in a collection with no picture field. */
-button.item-drop {
-  width: 100%;
-  background: transparent;
-}
+  .collection-chosen {
+    border-left: 0;
+    border-top: 1px solid var(--border);
+  }
 
-.collection-tools {
-  display: flex;
-  gap: 8px;
+  .item-thumb {
+    width: var(--tile);
+    height: var(--tile);
+  }
 }
 
 .hidden-file {
@@ -1075,9 +1520,25 @@ button.item-drop {
    you are changing it with, and View opens the site itself. Without this the
    editor at phone width is a 240px tree and two columns of one word each. */
 @media (max-width: 767px) {
-  #app {
+  .tray {
     grid-template-columns: 1fr;
-    grid-template-rows: auto minmax(0, 11rem) minmax(0, 1fr);
+    grid-template-rows: fit-content(11rem) minmax(0, 1fr);
+    margin: 0 var(--space-2) var(--space-2);
+  }
+
+  .tray > .panel-browser {
+    border-radius: var(--radius-cell) var(--radius-cell) 0 0;
+  }
+
+  /* Side by side, so the tree takes a few rows and the page gets the height. */
+  .panel-browser > .file-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px var(--space-1);
+  }
+
+  .column-middle > :last-child {
+    border-radius: 0 0 var(--radius-cell) var(--radius-cell);
   }
 
   /* The bar's things want more than a phone has at the desktop's spacing,
@@ -1101,23 +1562,21 @@ button.item-drop {
     padding: 20px;
   }
 
-  .panel-browser {
-    border-right: 0;
-    border-bottom: 1px solid var(--border);
-  }
-
-  .column-middle {
-    border-right: 0;
-  }
-
   .column-preview {
     display: none;
   }
 
-  /* The resources chooser is a drawer over everything; at this width it is
-     the whole of it. */
+  /* A drawer is a sheet from the foot, over everything. */
   .sidebar {
+    position: fixed;
+    top: auto;
+    left: 0;
+    right: 0;
+    bottom: 0;
     width: 100%;
+    height: min(75vh, 560px);
+    border-radius: var(--radius-panel) var(--radius-panel) 0 0;
+    box-shadow: 0 -12px 32px rgba(0, 0, 0, 0.3);
   }
 }
 

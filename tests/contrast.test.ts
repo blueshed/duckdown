@@ -71,7 +71,7 @@ describe("the editor", () => {
   // A folder's name on the tree's hover shade (color-mix: --border 50% over --surface).
   const hover = (t: Tokens) => over(colour(t, "border"), 0.5, colour(t, "surface"));
   const pairs: Pair[] = [
-    ...["bg", "surface"].flatMap((bg): Pair[] => [
+    ...["bg", "surface", "paper"].flatMap((bg): Pair[] => [
       [`text on ${bg}`, token("text"), token(bg), TEXT],
       [`quieter text on ${bg}`, token("text-dim"), token(bg), TEXT],
       [`accent text (folder names) on ${bg}`, token("accent-text"), token(bg), TEXT],

@@ -7,7 +7,7 @@ import { Icon } from "./Icon";
 import { api, apiJson, urlPath } from "../api";
 import { speak, tell, hush, news } from "../notice";
 import {
-  collection, collectionKey, closeCollection, collectionChanged, reloadBrowser,
+  collection, collectionKey, closeCollection, collectionChanged, reloadBrowser, shortName,
 } from "../store";
 import { type Images, ownImages, imageUrl, thumbName } from "../../images";
 import { slugger, aliasKey, itemHref } from "../../slugs";
@@ -21,7 +21,10 @@ import type { Field } from "../../collection";
 //
 // It opens in the slot a resource uses, below the page, because a collection
 // belongs to the folder whose index page is its overview: you edit the works
-// and watch the overview redraw beside them.
+// and watch the overview redraw beside them. The works are drawn as what they
+// are, pictures in their groups, and the one you choose has its fields beside
+// them: a pane that drew every work as a card of inputs showed two at a time,
+// and this one shows the collection.
 //
 // Every change writes the whole file through /edit/pages/, which is the write
 // path that drops the nav, the search index and the collection cache. Because
@@ -44,6 +47,27 @@ type Upload = { name: string; src: string; thumb: string; v: string };
 // of it. Positions, not names, because two groups may be called the same thing
 // — the gallery this came from has two 1960 sections called London.
 type Path = number[];
+// A work by where it is: its group's path and its place in that group.
+type Spot = { path: Path; i: number };
+
+export const same = (a: Spot | null, b: Spot) =>
+  !!a && a.i === b.i && a.path.length === b.path.length && a.path.every((n, k) => n === b.path[k]);
+
+// The first work in the file, in the order the site shows them: a group's
+// works, then its subgroups'.
+export function firstWork(file: RawFile): Spot | null {
+  const walk = (groups: RawGroup[] | undefined, path: Path): Spot | null => {
+    for (const [g, group] of (groups ?? []).entries()) {
+      if (group.items?.length) return { path: [...path, g], i: 0 };
+      const inner = walk(group.groups, [...path, g]);
+      if (inner) return inner;
+    }
+    return null;
+  };
+  return walk(file.groups, []);
+}
+
+let fieldIds = 0;
 
 const said = (value: unknown) => (typeof value === "string" ? value : "");
 // A value as the site reads it: a year written as 1961 rather than "1961" is
@@ -154,7 +178,7 @@ export function CollectionPane() {
   // A picture swapped in place keeps its address, so the browser has the old
   // bytes: ?v= is what makes it fetch the new ones.
   const busts = signal<Record<string, string>>({});
-  const dragging = signal<{ path: Path; i: number } | null>(null);
+  const dragging = signal<Spot | null>(null);
   const asking = signal<{ title: string; run: () => void } | null>(null);
   // The files this sitting has replaced, and the ones undo has stepped back
   // from. Each is a whole file: the model is never changed in place, only
@@ -163,6 +187,12 @@ export function CollectionPane() {
   const future = signal<RawFile[]>([]);
   const canUndo = computed(() => past.get().length > 0);
   const canRedo = computed(() => future.get().length > 0);
+  // The work whose fields are beside the grid, by position, like a group.
+  const chosen = signal<Spot | null>(null);
+  const chosenItem = computed(() => {
+    const at = chosen.get();
+    return at ? groupAt(model.get(), at.path)?.items?.[at.i] ?? null : null;
+  });
 
   const key = () => collectionKey(folder);
   const fileUrl = () => `/edit/pages/${urlPath(key())}`;
@@ -308,6 +338,15 @@ export function CollectionPane() {
     load();
   });
 
+  // Whatever the file becomes — an undo, a removal, another collection — a
+  // work is chosen while there is one, and the first when the last is gone.
+  effect(() => {
+    const file = model.get();
+    if (!file) return;
+    const at = chosen.peek();
+    if (!at || !groupAt(file, at.path)?.items?.[at.i]) chosen.set(firstWork(file));
+  });
+
   // --- pictures ---------------------------------------------------------
 
   const send = async (file: File, name: string | null): Promise<Upload | null> => {
@@ -337,11 +376,16 @@ export function CollectionPane() {
     return item;
   };
 
-  const pushItem = (path: Path, item: RawItem) =>
-    change((next) => {
+  // A new work is the one you are about to name, so it is chosen.
+  const pushItem = (path: Path, item: RawItem) => {
+    let at: Spot | null = null;
+    const done = change((next) => {
       const group = groupAt(next, path);
-      if (group) (group.items ??= []).push(item);
+      if (group) at = { path, i: (group.items ??= []).push(item) - 1 };
     });
+    if (at) chosen.set(at);
+    return done;
+  };
 
   const addItem = async (path: Path, file: File | undefined) => {
     if (!file) return;
@@ -386,15 +430,21 @@ export function CollectionPane() {
       kept.push(...keepAddresses(before, next, folder, published));
     });
 
-  const moveItem = (from: { path: Path; i: number }, to: { path: Path; i: number }) =>
-    change((next) => {
+  // The choice goes with the work, wherever it lands.
+  const moveItem = (from: Spot, to: Spot) => {
+    let landed: Spot | null = null;
+    const done = change((next) => {
       const source = groupAt(next, from.path)?.items;
       const target = groupAt(next, to.path)?.items;
       if (!source || !target) return;
-      if (source === target) return moveWithin(source, from.i, to.i);
       const [held] = source.splice(from.i, 1);
-      target.splice(to.i, 0, held!);
+      const i = Math.max(0, Math.min(to.i, target.length));
+      target.splice(i, 0, held!);
+      landed = { path: to.path, i };
     });
+    if (landed && same(chosen.peek(), from)) chosen.set(landed);
+    return done;
+  };
 
   const removeItem = (path: Path, i: number) =>
     change((next) => {
@@ -457,34 +507,40 @@ export function CollectionPane() {
 
   type Row = { i: number; item: RawItem };
 
-  // One input per declared field, named as the file labels it: the label is
-  // the placeholder, so an empty field says what it is for and a filled one
-  // is just its value — the row stays a picture and its words — and it is the
-  // input's name to a screen reader either way. A line for text and numbers,
-  // a box for long text. Every value stays a string — a number field may say
-  // "skip", which an <input type=number> would refuse.
-  const fieldInput = (path: Path, row$: ReadonlySignal<Row>, field: Field) => {
-    const value = row$.map((r) => asText(r.item[field.name]) ?? "");
-    const commit = (e: Event) =>
-      setField(path, row$.peek().i, field.name, (e.target as HTMLInputElement).value);
-    return field.kind === "long"
-      ? <textarea class="item-input item-long" data-field={field.name} rows={2}
-          placeholder={field.label} aria-label={field.label} value={value} onchange={commit} />
-      : <input class="item-input" data-field={field.name}
-          placeholder={field.label} aria-label={field.label} value={value} onchange={commit} />;
+  // One input per declared field, named as the file labels it, for the chosen
+  // work: a line for text and numbers, a box for long text. Every value stays
+  // a string — a number field may say "skip", which an <input type=number>
+  // would refuse.
+  const fieldInput = (field: Field) => {
+    const value = chosenItem.map((item) => asText(item?.[field.name]) ?? "");
+    const commit = (e: Event) => {
+      const at = chosen.peek();
+      if (at) setField(at.path, at.i, field.name, (e.target as HTMLInputElement).value);
+    };
+    const id = `field-${++fieldIds}`;
+    return (
+      <div class="item-field">
+        <label for={id}>{field.label}</label>
+        {field.kind === "long"
+          ? <textarea id={id} class="item-input item-long" data-field={field.name} rows={3} value={value} onchange={commit} />
+          : <input id={id} class="item-input" data-field={field.name} value={value} onchange={commit} />}
+      </div>
+    );
   };
 
-  const itemRow = (path: Path, row$: ReadonlySignal<Row>) => {
+  // A work in the grid: its picture (or, with no picture field, its title),
+  // and a button that chooses it. Dragged, it moves.
+  const tile = (path: Path, row$: ReadonlySignal<Row>) => {
     const here = () => ({ path, i: row$.peek().i });
     const image = imageField();
-    const input = chooser((file) => swapItem(path, row$.peek().i, file));
-    const src = () => said(row$.peek().item[image]);
+    const title = row$.map((r) => said(r.item.title) || said(r.item[image]) || "Untitled");
+    const on = computed(() => same(chosen.get(), { path, i: row$.get().i }));
 
     return (
       <li class="collection-item" draggable="true"
         ondragstart={(e: DragEvent) => {
           dragging.set(here());
-          e.dataTransfer?.setData("text/plain", src());
+          e.dataTransfer?.setData("text/plain", said(row$.peek().item[image]));
         }}
         ondragend={() => dragging.set(null)}
         ondragover={(e: DragEvent) => { if (dragging.peek()) e.preventDefault(); }}
@@ -496,42 +552,13 @@ export function CollectionPane() {
           moveItem(from, here());
         }}
       >
-        {image ? (
-          <div class="item-thumb" role="button" tabindex="0"
-            aria-label="Replace this picture (same file name)"
-            title="Replace this picture (same file name)"
-            onclick={() => input.click()}
-            onkeydown={onpress(() => input.click())}
-            ondragover={(e: DragEvent) => e.preventDefault()}
-            ondrop={(e: DragEvent) => {
-              e.preventDefault();
-              swapItem(path, row$.peek().i, e.dataTransfer?.files?.[0]);
-            }}
-          >
-            <img alt="" loading="lazy" src={computed(() => thumbUrl(said(row$.get().item[image])))} />
-            <span class="item-swap"><Icon name="refresh-cw" size={12} /></span>
-            {input}
-          </div>
-        ) : null}
-        <div class="item-fields">
-          {typed().map((field) => fieldInput(path, row$, field))}
-          {image ? <span class="item-src">{row$.map((r) => said(r.item[image]))}</span> : null}
-        </div>
-        <div class="item-tools">
-          <button class="icon-btn" aria-label="Move up" title="Move up"
-            onclick={() => moveItem(here(), { path, i: row$.peek().i - 1 })}>
-            <Icon name="arrow-up" size={12} />
-          </button>
-          <button class="icon-btn" aria-label="Move down" title="Move down"
-            onclick={() => moveItem(here(), { path, i: row$.peek().i + 1 })}>
-            <Icon name="arrow-down" size={12} />
-          </button>
-          <button class="icon-btn danger-subtle" aria-label="Remove item" title="Remove item"
-            onclick={() => ask(`Remove ${said(row$.peek().item.title) || "this item"}?`,
-              () => removeItem(path, row$.peek().i))}>
-            <Icon name="trash-2" size={12} />
-          </button>
-        </div>
+        <button type="button" class="item-tile" aria-pressed={on.map(String)} title={title}
+          onclick={() => chosen.set(here())}>
+          {image
+            ? <img alt="" loading="lazy" src={computed(() => thumbUrl(said(row$.get().item[image])))} />
+            : null}
+          <span class="item-title">{title}</span>
+        </button>
       </li>
     );
   };
@@ -562,31 +589,81 @@ export function CollectionPane() {
         </div>
 
         <ul class="collection-items">
-          {list(items, (x) => x.i, (row$) => itemRow(path, row$))}
+          {list(items, (x) => x.i, (row$) => tile(path, row$))}
+          {/* A work begins as its picture — or, in a collection with no
+              picture field, as a row of empty fields. The last tile adds one. */}
+          <li class="collection-add">
+            {imageField() ? when(uploads, () => (
+              <div class="item-drop" role="button" tabindex="0"
+                aria-label="Add a work: drop a picture here, or choose one"
+                title="Drop a picture here, or choose one"
+                onclick={() => input.click()} onkeydown={onpress(() => input.click())}
+                ondragover={(e: DragEvent) => e.preventDefault()}
+                ondrop={(e: DragEvent) => {
+                  e.preventDefault();
+                  addItem(path, e.dataTransfer?.files?.[0]);
+                }}>
+                <Icon name="image-plus" size={16} />
+                {when(busy, () => <span class="item-title">Adding…</span>)}
+                {input}
+              </div>
+            )) : (
+              <button class="item-drop" aria-label="Add item" title="Add item" onclick={() => pushItem(path, blank(""))}>
+                <Icon name="plus" size={16} /><span class="visually-hidden">Add item</span>
+              </button>
+            )}
+          </li>
         </ul>
-
-        {/* An item begins as its picture — or, in a collection with no
-            picture field, as a row of empty fields. */}
-        {imageField() ? when(uploads, () => (
-          <div class="item-drop" role="button" tabindex="0"
-            onclick={() => input.click()} onkeydown={onpress(() => input.click())}
-            ondragover={(e: DragEvent) => e.preventDefault()}
-            ondrop={(e: DragEvent) => {
-              e.preventDefault();
-              addItem(path, e.dataTransfer?.files?.[0]);
-            }}>
-            <Icon name="image-plus" size={13} />
-            {when(busy, () => <span>Adding…</span>, () => <span>Drop a picture here, or choose one</span>)}
-            {input}
-          </div>
-        )) : (
-          <button class="item-drop" onclick={() => pushItem(path, blank(""))}>
-            <Icon name="plus" size={13} /> Add item
-          </button>
-        )}
 
         {list(subs, (x) => x.i, (sub$) => groupBlock([...path, sub$.peek().i]))}
       </section>
+    );
+  };
+
+  // The chosen work's fields, beside the grid. Its picture is the control
+  // that replaces it, as it always was: click it, or drop one on it.
+  const chosenPanel = () => {
+    const image = imageField();
+    const input = chooser((file) => { const at = chosen.peek(); if (at) swapItem(at.path, at.i, file); });
+    const src = chosenItem.map((item) => said(item?.[image]));
+    const at = () => chosen.peek()!;
+    return (
+      <aside class="collection-chosen" aria-label={chosenItem.map((item) => `The work: ${said(item?.title) || "untitled"}`)}>
+        {image ? (
+          <div class="item-thumb" role="button" tabindex="0"
+            aria-label="Replace this picture (same file name)"
+            title="Replace this picture (same file name)"
+            onclick={() => input.click()}
+            onkeydown={onpress(() => input.click())}
+            ondragover={(e: DragEvent) => e.preventDefault()}
+            ondrop={(e: DragEvent) => {
+              e.preventDefault();
+              swapItem(at().path, at().i, e.dataTransfer?.files?.[0]);
+            }}
+          >
+            <img alt="" src={computed(() => thumbUrl(src.get()))} />
+            <span class="item-swap"><Icon name="refresh-cw" size={12} /></span>
+            {input}
+          </div>
+        ) : null}
+        {typed().map(fieldInput)}
+        <div class="item-tools">
+          {image ? <span class="item-src">{src}</span> : null}
+          <span class="pane-gap" />
+          <button class="icon-btn" aria-label="Move up" title="Move up"
+            onclick={() => moveItem(at(), { path: at().path, i: at().i - 1 })}>
+            <Icon name="arrow-up" size={12} />
+          </button>
+          <button class="icon-btn" aria-label="Move down" title="Move down"
+            onclick={() => moveItem(at(), { path: at().path, i: at().i + 1 })}>
+            <Icon name="arrow-down" size={12} />
+          </button>
+          <button class="icon-btn danger-subtle" aria-label="Remove item" title="Remove item"
+            onclick={() => { const was = at(); ask(`Remove ${said(chosenItem.peek()?.title) || "this item"}?`, () => removeItem(was.path, was.i)); }}>
+            <Icon name="trash-2" size={12} />
+          </button>
+        </div>
+      </aside>
     );
   };
 
@@ -594,23 +671,26 @@ export function CollectionPane() {
 
   return (
     <div class="panel-collection" tabindex="-1" onkeydown={onkeydown}>
-      <PaneHeader icon="layout-grid" name={name} dirty={dirty}
+      <PaneHeader icon="layout-grid" name={name} shown={computed(() => shortName(name.get()))} dirty={dirty}
         onsave={write} ondelete={removeFile} onclose={closeCollection}
         url={fileUrl} onrestored={restored}
         undo={{ onundo: undo, onredo: redo, canUndo, canRedo }} />
       {when(model, () => (
         <div class="collection-body">
-          {when(() => !uploads.get(), () => (
-            <p class="pane-note">
-              This collection keeps its pictures somewhere this editor can't write
-              (<code>{() => images.get().src}</code>), so items are named here and the files
-              are put there another way.
-            </p>
-          ))}
-          {list(groups, (x) => x.i, (g$) => groupBlock([g$.peek().i]))}
-          <div class="collection-tools">
-            <button onclick={() => addGroup(null)}><Icon name="plus" /> Add group</button>
+          <div class="collection-grid">
+            {when(() => !uploads.get(), () => (
+              <p class="pane-note">
+                This collection keeps its pictures somewhere this editor can't write
+                (<code>{() => images.get().src}</code>), so items are named here and the files
+                are put there another way.
+              </p>
+            ))}
+            {list(groups, (x) => x.i, (g$) => groupBlock([g$.peek().i]))}
+            <div class="collection-tools">
+              <button onclick={() => addGroup(null)}><Icon name="plus" /> Add group</button>
+            </div>
           </div>
+          {when(chosenItem, chosenPanel)}
         </div>
       ), () => (
         <div class="placeholder">{() => trouble.get() || "reading the collection…"}</div>
