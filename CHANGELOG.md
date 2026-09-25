@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.13.1 — 2026-09-25
+
+- **`duckdown upgrade` compares what only an origin writes.** A site with
+  no `DUCKDOWN_ORIGIN` where the command runs exported with none, so its
+  sharing tags, `sitemap.xml` and feeds were never written, never compared,
+  and a release that changed them read as "all the same". Both exports now
+  use a stand-in origin (`https://example.invalid`) there, and it says so.
+
 ## 0.13.0 — 2026-09-25
 
 - **`duckdown upgrade`.** In a site that has duckdown as a dependency,

@@ -844,7 +844,10 @@ bunx duckdown upgrade 0.12.3     # or the one named
 It exports the site with the version it has, re-pins, runs `bun install`,
 refreshes `.claude/skills/duckdown/` (this skill), exports again, and compares
 every file: it says how many are the same and names each one added, gone or
-changed, then prints the changelog entries in between. A version that won't
+changed, then prints the changelog entries in between. With no
+`DUCKDOWN_ORIGIN` where it runs, both exports use `https://example.invalid`,
+so what only an origin writes — the sharing tags, `sitemap.xml`, the feeds —
+is compared too, and it says so. A version that won't
 install, or can't export the site, is put back. It commits nothing — look at
 what it reports, then commit `package.json`, `bun.lock` and the skill. A site
 whose content also lives somewhere else (a served site's bucket) should bring

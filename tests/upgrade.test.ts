@@ -6,7 +6,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 
 import { join } from "path";
 import { RUN } from "./helpers";
 import { cli } from "../server/cli";
-import { upgradeCommand, spawnRun, newer, latestTag, changesBetween, compare, type Run } from "../server/upgrade";
+import { upgradeCommand, spawnRun, newer, latestTag, changesBetween, compare, STAND_IN, type Run } from "../server/upgrade";
 
 const CHANGELOG = [
   "# Changelog", "",
@@ -52,7 +52,8 @@ function runner(o: {
   exports?: Record<string, Record<string, string> | "fail">;
 } = {}) {
   const ran: string[] = [];
-  const run: Run = async (cmd, cwd) => {
+  const origins: (string | undefined)[] = [];
+  const run: Run = async (cmd, cwd, env) => {
     ran.push(cmd.slice(0, 2).join(" "));
     if (cmd[0] === "git") return o.tagsFail ? { code: 128, out: "fatal: unable to access\n" } : { code: 0, out: o.tags ?? "" };
     if (cmd[1] === "install") {
@@ -66,13 +67,16 @@ function runner(o: {
     const writes = o.exports?.[version] ?? { "index.html": "home" };
     if (writes === "fail") return { code: 1, out: `v${version}: No pages to export\n` };
     const out = cmd[3]!;
+    origins.push(env?.DUCKDOWN_ORIGIN);
     for (const [path, body] of Object.entries(writes)) {
+      // A body with {origin} in it is only written when there is one, as a sitemap is.
+      if (body.includes("{origin}") && !env?.DUCKDOWN_ORIGIN) continue;
       mkdirSync(join(out, path, ".."), { recursive: true });
-      writeFileSync(join(out, path), body);
+      writeFileSync(join(out, path), body.replace("{origin}", env?.DUCKDOWN_ORIGIN ?? ""));
     }
     return { code: 0, out: "written\n" };
   };
-  return { run, ran };
+  return { run, ran, origins };
 }
 
 const quietly = () => {
@@ -168,6 +172,31 @@ describe("duckdown upgrade", () => {
   });
 });
 
+describe("an origin to export with", () => {
+  const exports = {
+    "0.12.1": { "index.html": "home" },
+    "0.12.3": { "index.html": "home", "sitemap.xml": "{origin}/" },   // new, and only with an origin
+  };
+
+  test("a site with none here is exported with a stand-in, so what only an origin writes is compared", async () => {
+    const { run, origins } = runner({ exports });
+    const { said, say } = quietly();
+    expect(await upgradeCommand(["0.12.3"], { cwd: site("0.12.1"), run, say, env: {} })).toBe(0);
+    expect(origins).toEqual([STAND_IN, STAND_IN]);
+    expect(said[1]).toBe("The export: 1 file(s) the same, 1 not.");
+    expect(said).toContain("  added: sitemap.xml");
+    expect(said[2]).toBe(`  (No DUCKDOWN_ORIGIN here, so both exports used ${STAND_IN}: the sharing tags, sitemap.xml and feeds were compared too.)`);
+  });
+
+  test("a site with its own exports with it, and says nothing of it", async () => {
+    const { run, origins } = runner({ exports });
+    const { said, say } = quietly();
+    expect(await upgradeCommand(["0.12.3"], { cwd: site("0.12.1"), run, say, env: { DUCKDOWN_ORIGIN: "https://www.example.com" } })).toBe(0);
+    expect(origins).toEqual([undefined, undefined]);   // left to the site's own .env and environment
+    expect(said.join("\n")).not.toContain("DUCKDOWN_ORIGIN");
+  });
+});
+
 describe("duckdown upgrade, from the command line", () => {
   test("is a duckdown command, and here — duckdown's own folder — says why it can't", async () => {
     const error = spyOn(console, "error").mockImplementation(() => {});
@@ -206,11 +235,13 @@ describe("its parts", () => {
     expect(compare(a, b)).toEqual({ same: 1, added: ["new"], removed: ["gone"], changed: ["d/y"] });
   });
 
-  test("spawnRun runs a command where it's told and hands back what it said", async () => {
+  test("spawnRun runs a command where it's told, with what it's given, and hands back what it said", async () => {
     const { code, out } = await spawnRun(["bun", "-e", "console.log(process.cwd()); console.error('and this')"], RUN);
     expect(code).toBe(0);
     expect(out).toContain(RUN.split("/").pop()!);
     expect(out).toContain("and this");
     expect(existsSync(RUN)).toBe(true);
+    const given = await spawnRun(["bun", "-e", "console.log(process.env.DUCKDOWN_ORIGIN, !!process.env.PATH)"], RUN, { DUCKDOWN_ORIGIN: STAND_IN });
+    expect(given.out.trim()).toBe(`${STAND_IN} true`);   // added to the environment, not in place of it
   });
 });

@@ -14,10 +14,16 @@ const PIN = /^(github:blueshed\/duckdown)#v(\d+\.\d+\.\d+)$/;
 const REPO = "https://github.com/blueshed/duckdown.git";
 const SKILL = join(".claude", "skills", "duckdown");
 
-export type Run = (cmd: string[], cwd: string) => Promise<{ code: number; out: string }>;
+// An export without DUCKDOWN_ORIGIN writes no absolute address: no sharing
+// tags, no sitemap.xml, no feeds — which a platform's build, with an origin,
+// publishes. So a site with none here is exported with this one, both times,
+// and those are compared too. (.invalid is reserved: it names nothing.)
+export const STAND_IN = "https://example.invalid";
 
-export const spawnRun: Run = async (cmd, cwd) => {
-  const proc = Bun.spawn(cmd, { cwd, stdout: "pipe", stderr: "pipe" });
+export type Run = (cmd: string[], cwd: string, env?: Record<string, string>) => Promise<{ code: number; out: string }>;
+
+export const spawnRun: Run = async (cmd, cwd, env) => {
+  const proc = Bun.spawn(cmd, { cwd, stdout: "pipe", stderr: "pipe", env: env && { ...process.env, ...env } });
   const [out, err] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text()]);
   return { code: await proc.exited, out: out + err };
 };
@@ -79,9 +85,9 @@ async function newest(run: Run, cwd: string): Promise<string> {
 
 export async function upgradeCommand(
   args: string[],
-  o: { cwd?: string; run?: Run; say?: (line: string) => void } = {},
+  o: { cwd?: string; run?: Run; say?: (line: string) => void; env?: Record<string, string | undefined> } = {},
 ): Promise<number> {
-  const { cwd = process.cwd(), run = spawnRun, say = console.log } = o;
+  const { cwd = process.cwd(), run = spawnRun, say = console.log, env = process.env } = o;
   const pkgPath = join(cwd, "package.json");
   if (!existsSync(pkgPath)) throw new Error("run it in a site's folder: there is no package.json here");
   const pkgText = readFileSync(pkgPath, "utf8");
@@ -103,7 +109,8 @@ export async function upgradeCommand(
   }
 
   const scratch = mkdtempSync(join(tmpdir(), "duckdown-upgrade-"));
-  const exportTo = (out: string) => run(["bun", "run", join("node_modules", "duckdown", "server", "export.ts"), out], cwd);
+  const origin = env.DUCKDOWN_ORIGIN ? undefined : { DUCKDOWN_ORIGIN: STAND_IN };
+  const exportTo = (out: string) => run(["bun", "run", join("node_modules", "duckdown", "server", "export.ts"), out], cwd, origin);
   const lockPath = join(cwd, "bun.lock");
   const lockText = existsSync(lockPath) ? readFileSync(lockPath, "utf8") : null;
   try {
@@ -136,6 +143,7 @@ export async function upgradeCommand(
     say(differs
       ? `The export: ${d.same} file(s) the same, ${differs} not.`
       : `The export: all ${d.same} file(s) the same.`);
+    if (origin) say(`  (No DUCKDOWN_ORIGIN here, so both exports used ${STAND_IN}: the sharing tags, sitemap.xml and feeds were compared too.)`);
     for (const [what, list] of [["added", d.added], ["gone", d.removed], ["changed", d.changed]] as const) {
       for (const path of list) say(`  ${what}: ${path}`);
     }
