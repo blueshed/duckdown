@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.12.1 — 2026-09-25
 
 - **The preview on a phone.** Below 768px the preview had no room and was
   gone. Now **Preview**, an eye at the top, lays it over what you're
