@@ -29,13 +29,25 @@
   --radius-lg: 10px;
   --preview-w: 1fr;
   --editor-w: 1fr;
+  /* Colours, each named for what it does, because one colour can't do two
+     of these jobs in both schemes: tests/contrast.test.ts holds every pair
+     to WCAG AA — 4.5:1 for text, 3:1 for a field's edge and a focus ring. */
   --bg: #f5f5f7;
   --surface: #ffffff;
-  --border: #d1d1d6;
+  --border: #d1d1d6;        /* dividers and hover shades: decoration only */
+  --field-border: #86868b;  /* the edge of a text field: 3:1 */
   --text: #1d1d1f;
-  --text-dim: #86868b;
-  --accent: #5856d6;
+  --text-dim: #6e6e73;      /* quieter text: still 4.5:1 */
+  --accent: #5856d6;        /* a fill, with --on-accent text on it */
   --accent-hover: #3634a3;
+  --accent-text: #5856d6;   /* the accent as text on --bg and --surface */
+  --focus: #5856d6;         /* focus rings and "this one" marks: 3:1 */
+  --on-accent: #ffffff;
+  --danger: #dc2626;        /* a fill, with --on-accent text on it */
+  --danger-hover: #b91c1c;
+  --danger-text: #c81e1e;   /* red text on --bg and --surface */
+  --ok: #15803d;            /* Saved: a fill, with --on-accent text on it */
+  --news: #3634a3;          /* the notice's news: a fill */
 }
 
 /* A finger, not a pointer: everything a size up. */
@@ -53,10 +65,16 @@
     --bg: #1e1e2e;
     --surface: #282840;
     --border: #3a3a5c;
+    --field-border: #71719b;
     --text: #e0e0f0;
-    --text-dim: #8888aa;
-    --accent: #7c6ff7;
-    --accent-hover: #9b8fff;
+    --text-dim: #9d9dbf;
+    /* The one place the jobs part: white text needs a darker violet than
+       violet text on this surface does, so the fill and the text differ. */
+    --accent: #6458e8;
+    --accent-hover: #5043d0;
+    --accent-text: #a59cfa;
+    --focus: #a59cfa;
+    --danger-text: #f87171;
   }
 }
 
@@ -215,7 +233,7 @@ button.header-link:hover {
 
 .file-list :is(button.row, a.report):focus-visible,
 .item-drop:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--focus);
   outline-offset: -2px;
 }
 
@@ -234,7 +252,7 @@ button.header-link:hover {
 }
 
 .file-list .folder {
-  color: var(--accent);
+  color: var(--accent-text);
   font-weight: 500;
 }
 
@@ -282,13 +300,13 @@ button.header-link:hover {
    forced colours removes shadows. */
 .editor-area textarea:focus-visible,
 .panel-resource textarea:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--focus);
   outline-offset: -2px;
 }
 
 /* One focus ring for everything else you can reach with Tab. */
 :is(button, a, input, select, textarea, summary, [tabindex]):focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--focus);
   outline-offset: 1px;
 }
 
@@ -325,7 +343,7 @@ button:disabled {
 button.primary {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
 }
 
 button.primary:hover {
@@ -333,9 +351,9 @@ button.primary:hover {
 }
 
 button.saved {
-  background: #34c759;
-  border-color: #34c759;
-  color: #fff;
+  background: var(--ok);
+  border-color: var(--ok);
+  color: var(--on-accent);
   transition: background 0.3s;
 }
 
@@ -347,13 +365,13 @@ button kbd {
 }
 
 button.danger {
-  background: #dc2626;
-  border-color: #dc2626;
-  color: #fff;
+  background: var(--danger);
+  border-color: var(--danger);
+  color: var(--on-accent);
 }
 
 button.danger:hover {
-  background: #b91c1c;
+  background: var(--danger-hover);
 }
 
 /* An action with no room for a word: square, quiet until you reach for it.
@@ -382,13 +400,13 @@ button.icon-btn .icon svg {
 }
 
 button.danger-subtle {
-  color: #dc2626;
+  color: var(--danger-text);
   border-color: transparent;
   background: transparent;
 }
 
 button.danger-subtle:hover {
-  background: rgba(220, 38, 38, 0.1);
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
 }
 
 /* --- Notice: failures speak --- */
@@ -405,8 +423,8 @@ button.danger-subtle:hover {
   max-width: min(640px, calc(100vw - 32px));
   padding: 8px 8px 8px 14px;
   border-radius: 6px;
-  background: #dc2626;
-  color: #fff;
+  background: var(--danger);
+  color: var(--on-accent);
   font-size: 13px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
   animation: notice-in 0.2s ease-out;
@@ -414,7 +432,7 @@ button.danger-subtle:hover {
 
 /* Something done on your behalf, not something gone wrong. */
 .notice.news {
-  background: #3634a3;
+  background: var(--news);
 }
 
 .notice button {
@@ -425,7 +443,7 @@ button.danger-subtle:hover {
   padding: 0;
   border: none;
   background: transparent;
-  color: #fff;
+  color: var(--on-accent);
 }
 
 .notice button:hover {
@@ -516,7 +534,7 @@ button.danger-subtle:hover {
 
 .pane-header .dot {
   margin-left: var(--space-1);
-  color: var(--accent);
+  color: var(--accent-text);
   font-size: 9px;
   line-height: 1;
 }
@@ -612,7 +630,7 @@ button.danger-subtle:hover {
 }
 
 .upload-label:focus-within {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
 
@@ -657,7 +675,7 @@ button.danger-subtle:hover {
   width: 100%;
   height: var(--field-h);
   padding: 0 var(--space-3);
-  border: 1px solid var(--border);
+  border: 1px solid var(--field-border);
   border-radius: var(--radius);
   background: var(--bg);
   color: var(--text);
@@ -681,7 +699,7 @@ button.danger-subtle:hover {
 .dialog-error {
   margin-top: 12px;
   font-size: 12px;
-  color: #dc2626;
+  color: var(--danger-text);
 }
 
 /* Earlier versions and Deleted: a list of times (or names), each with Restore. */
@@ -724,7 +742,7 @@ button.danger-subtle:hover {
   padding: 0 6px;
   border-radius: 8px;
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   font-size: 11px;
   line-height: 16px;
 }
@@ -810,7 +828,7 @@ button.danger-subtle:hover {
 
 .browser-sections .section.on {
   color: var(--text);
-  border-bottom-color: var(--accent);
+  border-bottom-color: var(--focus);
 }
 
 /* --- The two right-hand columns ---
@@ -911,12 +929,12 @@ button.danger-subtle:hover {
 
 .group-name:hover,
 .item-input:hover {
-  border-color: var(--border);
+  border-color: var(--field-border);
 }
 
 .group-name:focus,
 .item-input:focus {
-  border-color: var(--accent);
+  border-color: var(--focus);
   background: var(--surface);
 }
 
@@ -1018,7 +1036,7 @@ button.danger-subtle:hover {
 }
 
 .item-drop:hover {
-  border-color: var(--accent);
+  border-color: var(--focus);
   color: var(--text);
 }
 

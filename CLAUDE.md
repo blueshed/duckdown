@@ -129,6 +129,7 @@ duckdown/
 │   ├── units.test.ts       # pid, config, storage, auth, error handler
 │   ├── s3.test.ts          # S3Storage via Bun's S3 client + fake-s3.ts
 │   ├── markdown.test.ts    # Front-matter, rendering, nav, themes
+│   ├── contrast.test.ts    # WCAG AA for every colour pair, light and dark: the editor, site.css, the seed theme
 │   ├── process.test.ts     # Real subprocesses: pid lock, SIGTERM, seeding
 │   ├── serve.test.ts       # serveDist(): traversal, redirects, 404.html, what is logged
 │   ├── setup-script.test.ts # both scaffold modes on scratch folders, and `bun run export` in each
@@ -524,3 +525,4 @@ Paths: storage keys are real names. The server decodes the URL path (`after()`);
 - **S3** is tested through Bun's real `S3Client` against `tests/fake-s3.ts`; pass credentials explicitly (Bun reads its S3 env only at startup).
 - Keep code testable rather than excluding it: parameters with production defaults (`storageAt(sub, s3)`, `seedLocalSite(seed, target, s3)`, `configLines(c)`), throw instead of `process.exit`, and export what a test must call.
 - A line that no test can reach is dead: delete it, don't ignore it.
+- **Colours are tokens, and their pairs are tested.** The editor's colours each name a job (`--text-dim`, `--accent` a fill with `--on-accent` on it, `--accent-text`, `--focus`, `--field-border`, `--danger-text`, `--ok`), because in dark mode one violet can't be both white text's background and text on the surface. `contrast.test.ts` holds each pair to 4.5:1 (text) or 3:1 (a field's edge, a focus ring) in both schemes, for the editor, `server/base/site.css` and the seed's theme, and fails on a literal colour outside the token blocks. A new colour is a new token and a new pair.
