@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.13.4 — 2026-09-25
 
 - **A month's report.** `duckdown report` now writes each month an
   `index.md` beside its days: each day's line, linked to its report, and
