@@ -13,7 +13,7 @@ export function PreviewFrame({ srcdoc, title, busy, onload }: {
       {busy ? when(busy, () => <div class="loading-line" role="progressbar" aria-label="Rendering the page" />) : null}
       {/* allow-same-origin without allow-scripts: page script can't run, but
           stylesheets, images and the session cookie still load. Never both. */}
-      <iframe title={title} srcdoc={srcdoc} sandbox="allow-same-origin" onload={onload} style="width: 100%; height: 100%; border: none;" />
+      <iframe title={title} srcdoc={srcdoc} sandbox="allow-same-origin" onload={onload} class="preview-frame" />
     </div>
   );
 }

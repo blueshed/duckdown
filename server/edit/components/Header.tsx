@@ -15,7 +15,7 @@ export function Header() {
     <div class="header">
       <h1 class="visually-hidden">duckie</h1>
       <Trail />
-      <span style="flex: 1;" />
+      <span class="pane-gap" />
       <PublishButton />
       {/* Each opens its drawer, and the drawer it opens says so. */}
       <button onclick={() => toggleDrawer("resources")} aria-expanded={drawer.map((d) => String(d === "resources"))}>
