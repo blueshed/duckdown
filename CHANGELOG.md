@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.13.2 — 2026-09-25
 
 - **A logo makes a whole card.** The Sharing card filled itself from any
   picture, cutting what didn't fit, so a square logo lost its top and
