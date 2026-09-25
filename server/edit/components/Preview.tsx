@@ -1,6 +1,6 @@
 import { createElement, signal, computed, effect } from "@blueshed/railroad";
 import { apiJson } from "../api";
-import { editorContent, filePath, pageLayout, pageIncludes, resource, resourceDraft, collectionRevision } from "../store";
+import { editorContent, filePath, pageLayout, pageIncludes, resource, resourceDraft, collectionRevision, opening } from "../store";
 import { speak, hush, notice } from "../notice";
 import { PreviewFrame } from "./PreviewFrame";
 
@@ -15,6 +15,12 @@ type Rendered = { html: string; layout: string; includes: string[]; problems?: s
 export function Preview() {
   const page = signal("");
   let said = "";
+  // Another page is on its way: from the click in the tree (opening) until
+  // the frame has loaded what the server rendered for it. Typing re-renders
+  // the same page, and says nothing: a line on every keystroke is noise.
+  const arriving = signal(false);
+  const busy = computed(() => opening.get() !== null || arriving.get());
+  let shown = "";
 
   const update = async (source: string, draft: { name: string; body: string } | undefined) => {
     const path = encodeURIComponent(filePath.peek() || "");
@@ -23,7 +29,12 @@ export function Preview() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ source, draft }),
     });
-    if (!data) return;
+    if (!data) {
+      arriving.set(false);
+      return;
+    }
+    // The same document again loads nothing, so there is no load to wait for.
+    if (data.html === page.peek()) arriving.set(false);
     page.set(data.html);
     pageLayout.set(data.layout);
     pageIncludes.set(data.includes);
@@ -48,6 +59,15 @@ export function Preview() {
       ? { name: open.path, body: resourceDraft.get() }
       : undefined;
     if (!source) return;
+    // A page just opened is rendered at once; the pause is for typing, so a
+    // render isn't asked for on every keystroke.
+    const path = filePath.peek() || "";
+    if (path !== shown) {
+      shown = path;
+      arriving.set(true);
+      update(source, draft);
+      return;
+    }
     const timer = setTimeout(() => update(source, draft), 300);
     return () => clearTimeout(timer);
   });
@@ -68,5 +88,5 @@ export function Preview() {
     return html.includes("</head>") ? html.replace("</head>", `${css}</head>`) : css + html;
   });
 
-  return <PreviewFrame srcdoc={srcdoc} title="Preview of the page" />;
+  return <PreviewFrame srcdoc={srcdoc} title="Preview of the page" busy={busy} onload={() => arriving.set(false)} />;
 }

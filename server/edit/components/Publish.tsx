@@ -27,7 +27,7 @@ const EXPLAINED = [404, 409];
 export const publishState = signal<Status | string | null>(null);
 const waiting = computed(() => {
   const s = publishState.get();
-  return s && typeof s !== "string" ? s.changes.length + s.ahead : 0;
+  return s && typeof s !== "string" ? (s.changes?.length ?? 0) + (s.ahead ?? 0) : 0;
 });
 
 export async function refreshPublish(): Promise<void> {

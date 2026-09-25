@@ -12,7 +12,7 @@ import {
   loadFile, createFile, saveFile, deleteFile, closeFile, moveFile, reloadBrowser, toggleImages, closeImages, toggleDrawer,
   resource, resourceDraft, resourceSaved, resourceDirty, pageLayout, pageIncludes, openResource, closeResource,
   saveResource, deleteResource, createResource,
-  collection, openCollection, closeCollection, createCollection, leftDrawer,
+  collection, openCollection, closeCollection, createCollection, leftDrawer, opening,
 } from "../server/edit/store";
 import { Icon } from "../server/edit/components/Icon";
 import { Notice } from "../server/edit/components/Notice";
@@ -632,14 +632,18 @@ describe("Browser", () => {
     expect(rows(host).some((r) => r.endsWith(".css"))).toBe(false);
     expect(row(host, "index.md").querySelector(".lucide-file-text")).not.toBeNull();
 
-    // A folder is somewhere to be: the store's, so the trail says it too, and
-    // the way back up is the trail's (there is no ".." row).
+    // A folder is somewhere to be: the store's, so the trail says it too. The
+    // site's own folder has no way up; every other one has "..", first, named
+    // for where it goes — and it goes there.
+    expect(rows(host)).not.toContain("..");
     click(rowControl(host, "guide"));
     await waitFor(() => rows(host).includes("pages.md"));
     expect(folder.get()).toBe("guide");
-    expect(rows(host)).not.toContain("..");
-    openFolder("");
+    expect(rows(host)[0]).toBe("..");
+    expect(rowControl(host, "..").getAttribute("aria-label")).toBe("Up to the site");
+    click(rowControl(host, ".."));
     await waitFor(() => rows(host).includes("guide")); // guide/ has an index.md too: wait for the root
+    expect(folder.get()).toBe("");
 
     // Every row is a button, so the tree is Tab and Enter; the open page says so.
     expect([...host.querySelectorAll(".file-list li")].every((li) => li.querySelector("button.row"))).toBe(true);
@@ -1389,9 +1393,15 @@ describe("ImageBrowser", () => {
 
     // Upload into it: nothing chosen does nothing; a file lands and is listed
     const input = host.querySelector('input[type="file"]') as HTMLInputElement;
-    // Out of sight but not display:none, which would take it out of the tab order.
-    expect(input.className).toBe("visually-hidden");
-    expect(input.closest("label")!.textContent).toContain("Upload");
+    // Upload is a toolbar button in the header, beside New folder, that opens
+    // the hidden picker — in reach however long the folder is.
+    const upload = host.querySelector('.browser-header button[aria-label="Upload pictures"]') as HTMLButtonElement;
+    expect(upload.title).toBe("Upload pictures");
+    expect(input.className).toBe("hidden-file");
+    let opened = 0;
+    input.click = () => { opened++; };
+    click(upload);
+    expect(opened).toBe(1);
     Object.defineProperty(input, "files", { value: [], configurable: true });
     input.dispatchEvent(new Event("change"));
     Object.defineProperty(input, "files", { value: [new File(["<svg/>"], "a b.svg", { type: "image/svg+xml" })], configurable: true });
@@ -2531,6 +2541,30 @@ describe("the app", () => {
   });
 });
 
+describe("Preview, while a page is on its way", () => {
+  test("opening a page says so, and the preview renders it at once and says so until it has loaded", async () => {
+    const { host, dispose } = render(() => <Preview />);
+    const panel = () => host.querySelector(".panel-preview")!;
+    // loadFile marks the page on its way until its text is here.
+    const loading = loadFile("guide/pages.md");
+    expect(opening.get()).toBe("guide/pages.md");
+    expect(panel().getAttribute("aria-busy")).toBe("true");
+    expect(panel().querySelector(".loading-line")).not.toBeNull();
+    await loading;
+    expect(opening.get()).toBeNull();
+    // A page just opened isn't kept waiting for the typing pause (300ms): its
+    // render is asked for at once, and the panel is busy until the frame has
+    // loaded it (happy-dom loads a srcdoc at once).
+    await waitFor(() => (host.querySelector("iframe") as HTMLIFrameElement).srcdoc.includes("Writing Pages"), 250);
+    await waitFor(() => panel().getAttribute("aria-busy") === "false");
+    expect(panel().querySelector(".loading-line")).toBeNull();
+    // A page that can't be opened says so and is no longer on its way.
+    await loadFile("nowhere/at-all.md");
+    expect(opening.get()).toBeNull();
+    dispose();
+  });
+});
+
 describe("Preview, on a folder with a collection", () => {
   const frame = (host: HTMLElement) => host.querySelector("iframe") as HTMLIFrameElement;
 
@@ -2546,10 +2580,12 @@ describe("Preview, on a folder with a collection", () => {
 
     // Failures speak: a problem with collection.json is nothing the page's
     // own text can cause, so the preview carries it and the Notice shows it.
-    const restore = intercept(() => Response.json({
+    // Only the preview's own request: anything else still mounted (a Publish
+    // badge refreshing) gets the real server, not this.
+    const restore = intercept((url, init) => url.includes("/edit/mark/") ? Response.json({
       html: "<p>still here</p>", layout: "site.html", includes: [],
       problems: ['gallery/collection.json: "Notes" wants /gallery/notes/, which is already a page'],
-    }));
+    }) : signedIn(url, init));
     try {
       editorContent.set("title: Gallery\n\n# Gallery again\n\n{{items}}");
       await waitFor(() => notice.get());

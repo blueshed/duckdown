@@ -6,8 +6,8 @@ import { past, seen, leavePast, lookAtNow } from "../past";
 // Where you are, said once, at the top: the site, the folders down to the one
 // the tree is showing, and the page open in it. Every crumb but the last goes
 // there; the last is where you stand, in bold. It is what the tree's "/blog"
-// and its ".." row, and each pane's "blog/" before a name, used to say three
-// times over.
+// and each pane's "blog/" before a name used to say twice over. (The tree's
+// ".." row came back: a way up where the hand already is.)
 export type Crumb = { label: string; go?: () => void };
 
 // In the past, the trail goes one further: the file, then the version you

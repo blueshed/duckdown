@@ -512,7 +512,12 @@ the store holds how to draw it, `LeftDrawer` shows it), over the tree, the
 same size and shape as the right-hand one, so the preview stays in view while
 the work changes. It opens on a click, never by itself; Escape puts it away
 and the choice stays marked; the pane passes its ⌘Z/⇧⌘Z in (`Drawer`'s
-`onkey`), and it goes with the pane. The editor's two right-hand columns each hold whatever is open. The middle one
+`onkey`), and it goes with the pane. A page on its way from the tree says so:
+`opening` in the store, the middle column `aria-busy` with a `.loading-line`
+and its contents dimmed, and the preview busy from the click until its frame
+has loaded the new render — which is asked for at once for a page just
+opened (the 300ms pause is for typing). The tree's first row, in any folder
+but the site's, is `..`, up one. The editor's two right-hand columns each hold whatever is open. The middle one
 holds the page and, beneath it, either a resource or a folder's collection —
 one slot, so opening either closes the other; each closes, two split the
 column, one fills it. Below 768px the three columns stack, the tree capped and

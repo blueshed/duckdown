@@ -1,4 +1,4 @@
-import { createElement, when, computed, pushDisposeScope } from "@blueshed/railroad";
+import { createElement, when, computed, effect, pushDisposeScope } from "@blueshed/railroad";
 import { Header } from "./components/Header";
 import { Browser } from "./components/Browser";
 import { Editor } from "./components/Editor";
@@ -11,7 +11,7 @@ import { Notice } from "./components/Notice";
 import { Drawers, LeftDrawer } from "./components/Drawers";
 import { PastList, PastPane, PastPreview } from "./components/Past";
 import { past, seen } from "./past";
-import { filePath, editorContent, loadFile, resource, resourceDraft, collection } from "./store";
+import { filePath, editorContent, loadFile, resource, resourceDraft, collection, opening } from "./store";
 import { speak } from "./notice";
 
 // App-lifetime root scope: this app is mounted once and never torn down,
@@ -61,6 +61,9 @@ tray.appendChild(when(past, () => <PastList />, () => <Browser />));
 // each is shown, so a pane starts from the state as it is then.
 const middle = document.createElement("div");
 middle.className = "column-middle";
+// A page on its way from the tree: a line across the top, what was there dimmed.
+effect(() => middle.setAttribute("aria-busy", String(opening.get() !== null)));
+middle.appendChild(when(opening, () => <div class="loading-line" role="progressbar" aria-label="Opening the page" />));
 // An earlier version, or a deleted file, in front of the panes — which stay
 // as they were, hidden, and come back when you look at now again.
 middle.appendChild(when(seen, () => <PastPane />));

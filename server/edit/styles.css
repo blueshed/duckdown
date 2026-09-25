@@ -738,37 +738,6 @@ button.danger-subtle:hover {
   margin-bottom: 8px;
 }
 
-.upload-area {
-  margin: 0 var(--space-2);
-  padding: 8px 0;
-  border-top: 1px solid var(--border);
-  margin-top: 8px;
-}
-
-.upload-label {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-height: var(--control-h);
-  padding: 0 var(--space-3);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
-  color: var(--text);
-  font-size: var(--control-font);
-  cursor: pointer;
-}
-
-.upload-label:hover {
-  background: var(--border);
-}
-
-.upload-label:focus-within {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-
 /* The drawer's own parts: its heading, what it holds, and what stays at its
    foot however long that is. */
 .sidebar-header h3 {
@@ -1117,6 +1086,51 @@ button.danger-subtle:hover {
   background: var(--bg);
 }
 
+/* Something on its way — a page opened from the tree, a preview rendering:
+   a line across the top of the column, and what was there dimmed until the
+   new one arrives. The line itself says "working" even with motion reduced;
+   the sweep along it is only for readers who haven't asked for less. */
+.column-middle {
+  position: relative;
+}
+
+.column-middle > .loading-line,
+.panel-preview > .loading-line {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 2;
+  flex: none;
+  height: 3px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+.loading-line::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 35%;
+  background: var(--accent);
+  animation: loading-sweep 1.1s ease-in-out infinite;
+}
+
+@keyframes loading-sweep {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(290%); }
+}
+
+.panel-preview {
+  position: relative;
+}
+
+.column-middle[aria-busy="true"] > :not(.loading-line),
+.panel-preview[aria-busy="true"] > iframe {
+  opacity: 0.55;
+  transition: opacity 0.15s ease-out;
+}
+
 .panel-resource {
   display: flex;
   flex-direction: column;
@@ -1263,6 +1277,7 @@ button.danger-subtle:hover {
 }
 
 .collection-group .collection-group {
+  margin-top: var(--space-4);   /* room after the row of works above it, as below */
   margin-left: var(--space-2);
   padding-left: var(--space-2);
   border-left: 2px solid var(--border);
@@ -1316,7 +1331,7 @@ button.danger-subtle:hover {
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: var(--space-1);
+  gap: var(--space-2);     /* the chosen ring reaches 4px out: its label clears it */
   width: var(--tile);
   min-height: 0;
   padding: 0;

@@ -21,6 +21,7 @@ export function ImageBrowser() {
   const imgPath = signal("/static/images/");
   const selected = signal<string | null>(null);
   const uploading = signal(false);
+  let picker: HTMLInputElement | null = null;   // the hidden file input the Upload button opens
   const showFolderInput = signal(false);
   const folderName = signal("");
 
@@ -116,6 +117,16 @@ export function ImageBrowser() {
       <div class="browser-header">
         <Trail label="Folder of images" crumbs={() => folderCrumbs("images", path.get(), load)} />
         <span class="pane-gap" />
+        {/* Upload stays in reach however long the folder is: a toolbar button
+            in the header, beside New folder, that opens the file picker. */}
+        <input type="file" multiple onchange={upload} class="hidden-file" tabindex="-1"
+          ref={(el: HTMLInputElement) => { picker = el; }} />
+        <button class="icon-btn" aria-label={uploading.map((u) => (u ? "Uploading…" : "Upload pictures"))}
+          title={uploading.map((u) => (u ? "Uploading…" : "Upload pictures"))}
+          aria-busy={uploading.map(String)} disabled={uploading}
+          onclick={() => picker?.click()}>
+          <Icon name="upload" />
+        </button>
         <button class="icon-btn" aria-label="New folder" title="New folder" onclick={() => showFolderInput.set(true)}>
           <Icon name="folder-plus" />
         </button>
@@ -153,14 +164,6 @@ export function ImageBrowser() {
             </button>
           </div>
         ))}
-
-        <div class="upload-area">
-          <label class="upload-label">
-            <Icon name="upload" /> {when(uploading, () => <span>Uploading...</span>, () => <span>Upload</span>)}
-            {/* Hidden from sight, not from the keyboard: Tab reaches it, and the label shows its focus. */}
-            <input type="file" multiple onchange={upload} class="visually-hidden" />
-          </label>
-        </div>
       </div>
       </>)}
       </div>

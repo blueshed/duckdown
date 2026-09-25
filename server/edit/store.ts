@@ -207,11 +207,21 @@ export async function saveResource(): Promise<boolean> {
 }
 
 // Actions. Each says whether it worked; api() has already spoken if not.
+// The page being fetched after a click in the tree, until its text arrives:
+// on a site in a bucket that is a round trip you can feel, and the columns say
+// so (a line across the top, the old page dimmed) rather than sitting still.
+export const opening = signal<string | null>(null);
+
 export async function loadFile(path: string): Promise<boolean> {
   const fp = path.replace(/^\//, "");
+  opening.set(fp);
   const res = await api(`open ${fp}`, at(fp));
-  if (!res.ok) return false;
+  if (!res.ok) {
+    opening.set(null);
+    return false;
+  }
   const content = await res.text();
+  opening.set(null);
   batch(() => {
     filePath.set(fp);
     fileContent.set(content);

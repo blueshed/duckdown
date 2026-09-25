@@ -6,7 +6,7 @@ import { openDeleted } from "../past";
 import { apiJson, urlPath } from "../api";
 import {
   loadFile, createFile, createCollection, browserRevision, openCollection, reloadBrowser, COLLECTION_FILE,
-  filePath, folder, openFolder,
+  filePath, folder, openFolder, folderOf,
 } from "../store";
 
 export const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name);
@@ -83,6 +83,18 @@ export function Browser() {
       </div>
       {/* Every row is a button, so the tree is Tab and Enter as well as a click. */}
       <ul class="file-list">
+        {/* Up one: the way back out of a folder, where the hand already is.
+            The trail says the same, but this is the constant — every folder
+            but the site's own has it, first. */}
+        {when(() => folder.get() !== "", () => (
+          <li class="folder folder-up">
+            <button class="row" onclick={() => openFolder(folderOf(folder.peek()))}
+              aria-label={computed(() => `Up to ${folderOf(folder.get()) || "the site"}`)}
+              title={computed(() => `Up to ${folderOf(folder.get()) || "the site"}`)}>
+              <Icon name="corner-left-up" size={12} /> ..
+            </button>
+          </li>
+        ))}
         {/* Keyed rows get a signal per row, not the item: read it with .map/.peek */}
         {list(folders, (f) => f.path, (f$) => (
           <li class="folder">
