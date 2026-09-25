@@ -11,7 +11,7 @@ import { Notice } from "./components/Notice";
 import { Drawers, LeftDrawer } from "./components/Drawers";
 import { PastList, PastPane, PastPreview } from "./components/Past";
 import { past, seen } from "./past";
-import { filePath, editorContent, loadFile, resource, resourceDraft, collection, opening } from "./store";
+import { filePath, editorContent, loadFile, resource, resourceDraft, collection, opening, previewShown, togglePreview } from "./store";
 import { speak } from "./notice";
 
 // App-lifetime root scope: this app is mounted once and never torn down,
@@ -92,6 +92,14 @@ right.appendChild(when(pageIsNeither, () =>
 right.appendChild(when(nothingOpen, () =>
   <div class="panel panel-preview"><div class="placeholder">preview</div></div>));
 tray.appendChild(right);
+// On a phone, the preview over the rest (styles.css); Escape goes back to the page.
+effect(() => { tray.classList.toggle("previewing", previewShown.get()); });
+effect(() => {
+  if (!previewShown.get()) return;
+  const back = (e: KeyboardEvent) => { if (e.key === "Escape") togglePreview(); };
+  document.addEventListener("keydown", back);
+  return () => document.removeEventListener("keydown", back);
+});
 
 // The drawers: at the right, over the preview, Resources, Editors or Publish;
 // at the left, over the tree, the properties of a work chosen in the middle.

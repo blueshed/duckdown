@@ -33,10 +33,23 @@ export const showImages = computed(() => drawer.get() === "resources");
 
 export function toggleDrawer(name: DrawerName): void {
   drawer.update((open) => (open === name ? null : name));
+  if (drawer.peek()) previewShown.set(false);
 }
 
 export function closeDrawer(): void {
   drawer.set(null);
+}
+
+// On a phone the preview has no column of its own: the header's Preview lays
+// it over the tree and the page, full height, and Edit takes it away again —
+// the page underneath just as it was. It is one of the things over the page,
+// so showing it closes a drawer and opening a drawer puts it away. On a wider
+// screen it has its column and this changes nothing.
+export const previewShown = signal(false);
+
+export function togglePreview(): void {
+  previewShown.update((shown) => !shown);
+  if (previewShown.peek()) drawer.set(null);
 }
 
 // The drawer at the left: properties of the thing chosen in the middle — a

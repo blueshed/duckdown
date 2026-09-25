@@ -12,7 +12,7 @@ import {
   loadFile, createFile, saveFile, deleteFile, closeFile, moveFile, reloadBrowser, toggleImages, closeImages, toggleDrawer,
   resource, resourceDraft, resourceSaved, resourceDirty, pageLayout, pageIncludes, openResource, closeResource,
   saveResource, deleteResource, createResource,
-  collection, openCollection, closeCollection, createCollection, leftDrawer, opening,
+  collection, openCollection, closeCollection, createCollection, leftDrawer, opening, previewShown, togglePreview,
 } from "../server/edit/store";
 import { Icon } from "../server/edit/components/Icon";
 import { Notice } from "../server/edit/components/Notice";
@@ -81,6 +81,7 @@ afterEach(() => {
     editorContent.set("");
     drawer.set(null);
     folder.set("");
+    previewShown.set(false);
   });
   leavePast();
   hush();
@@ -1068,6 +1069,32 @@ describe("Header", () => {
     const logout = host.querySelector("form.header-form") as HTMLFormElement;
     expect(logout.getAttribute("method")).toBe("post");
     expect(logout.getAttribute("action")).toBe("/logout");
+    dispose();
+  });
+
+  test("on a phone, Preview lays the preview over the page and Edit takes it away; a drawer and it take turns", () => {
+    const { host, dispose } = render(() => <Header />);
+    const toggle = host.querySelector(".preview-toggle") as HTMLButtonElement;
+    // It says what it will do: no pressed state to read.
+    expect(toggle.textContent!.trim()).toBe("Preview");
+    expect(toggle.title).toBe("Preview");
+    expect(toggle.hasAttribute("aria-pressed")).toBe(false);
+    click(button(host, "Resources")!);
+    expect(drawer.get()).toBe("resources");
+    click(toggle);
+    expect(previewShown.get()).toBe(true);
+    expect(drawer.get()).toBeNull();                    // showing it closes the drawer
+    expect(toggle.textContent!.trim()).toBe("Edit");
+    expect(toggle.title).toBe("Back to editing");
+    expect(toggle.querySelector("svg")).not.toBeNull();
+    toggleDrawer("help");
+    expect(previewShown.get()).toBe(false);             // and a drawer puts it away
+    toggleDrawer("help");
+    expect(previewShown.get()).toBe(false);             // closing a drawer doesn't bring it back
+    click(toggle);
+    click(toggle);
+    expect(previewShown.get()).toBe(false);
+    expect(toggle.textContent!.trim()).toBe("Preview");
     dispose();
   });
 });
@@ -2766,6 +2793,21 @@ describe("the app", () => {
     await waitFor(() => app.querySelector(".tray > .panel-past") === null);
     expect(app.querySelector(".past-pane")).toBeNull();
     closeFile();
+
+    // On a phone, Preview marks the tray (styles.css lays the preview over the
+    // rest), and Escape goes back to the page; other keys are the page's.
+    const tray = app.querySelector(".tray")!;
+    expect(tray.classList.contains("previewing")).toBe(false);
+    togglePreview();
+    expect(tray.classList.contains("previewing")).toBe(true);
+    const key = (k: string) => document.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true }));
+    key("a");
+    expect(previewShown.get()).toBe(true);
+    key("Escape");
+    expect(previewShown.get()).toBe(false);
+    expect(tray.classList.contains("previewing")).toBe(false);
+    key("Escape");                                      // and once it's gone, Escape is nothing of its
+    expect(previewShown.get()).toBe(false);
 
     window.dispatchEvent(new ErrorEvent("error", { message: "kaboom" }));
     expect(notice.get()).toBe("Something broke: kaboom");

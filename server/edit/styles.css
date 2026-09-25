@@ -165,6 +165,11 @@ button, input, textarea, select {
   padding: 0 var(--space-3) 0 var(--space-5);
 }
 
+/* Phones only: there the preview has no column, and this shows it. */
+.preview-toggle {
+  display: none;
+}
+
 /* Where you are: the site, the folders, the page. Every crumb but the last
    goes there; the last is where you stand. */
 /* It gives way on a narrow screen: the folders shorten first, the page's
@@ -1626,8 +1631,8 @@ button.danger-subtle:hover {
 /* --- Narrow screens ---
    Three columns want about 900px between them; below that they stack. The
    tree goes on top, capped and scrolling, the panes take the rest, and the
-   preview stands down — there is no room to show the page beside the thing
-   you are changing it with, and View opens the site itself. Without this the
+   preview has no column — there is no room to show the page beside the thing
+   you are changing it with. The header's Preview lays it over them instead. Without this the
    editor at phone width is a 240px tree and two columns of one word each. */
 @media (max-width: 767px) {
   .tray {
@@ -1676,6 +1681,31 @@ button.danger-subtle:hover {
     display: none;
   }
 
+  /* Preview, from the header: the column over the tree and the page, in the
+     same compartment of the tray, full height. What it covers keeps its place
+     and its state, and is out of reach until Edit brings it back. */
+  .preview-toggle {
+    display: inline-flex;
+  }
+
+  .tray.previewing > .column-preview {
+    display: flex;
+    grid-row: 1 / -1;
+    grid-column: 1;
+    border-radius: var(--radius-cell);
+  }
+
+  /* Kept in their rows: left to themselves they'd flow into new ones
+     under the preview, and the tray would grow to hold them. */
+  .tray.previewing > .panel-browser,
+  .tray.previewing > .column-middle {
+    grid-column: 1;
+    visibility: hidden;
+  }
+
+  .tray.previewing > .panel-browser { grid-row: 1; }
+  .tray.previewing > .column-middle { grid-row: 2; }
+
   /* A drawer is a sheet from the foot, over everything. */
   .sidebar {
     position: fixed;
@@ -1690,7 +1720,8 @@ button.danger-subtle:hover {
   }
 }
 
-/* Below 420px, Resources and Editors are icons as well. */
+/* Below 420px, Resources and Editors are icons as well — square, like every
+   other icon button, so the trail keeps room for the page's name. */
 @media (max-width: 419px) {
   .header .label {
     position: absolute;
@@ -1699,6 +1730,12 @@ button.danger-subtle:hover {
     overflow: hidden;
     clip-path: inset(50%);
     white-space: nowrap;
+  }
+
+  .header > button {
+    justify-content: center;
+    width: var(--icon-btn);
+    padding: 0;
   }
 }
 

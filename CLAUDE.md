@@ -539,8 +539,14 @@ skill and the seed's guide. The editor's two right-hand columns each hold whatev
 holds the page and, beneath it, either a resource or a folder's collection —
 one slot, so opening either closes the other; each closes, two split the
 column, one fills it. Below 768px the three columns stack, the tree capped and
-scrolling and the preview standing down: there is no room to show a page beside
-the thing you are changing it with. The preview column shows what you'd see: the page as the site
+scrolling, and the preview has no column: there is no room to show a page
+beside the thing you are changing it with. It stays mounted and rendering,
+hidden, and the header's Preview (`previewShown` in the store, phones only by
+CSS) lays it over the tree and the page, full height — the tray marked
+`previewing`, the preview spanning its rows, the rest `visibility: hidden` in
+theirs, so the page keeps its text, caret and scroll — and Edit or Escape takes
+it away. It is one of the things over the page: showing it closes a drawer,
+opening a drawer puts it away. The preview column shows what you'd see: the page as the site
 renders it, or, with no page open, a sample page for whatever you're composing
 with (sample content for a stylesheet, a sample page put through a template).
 Every branch is a `when()` built as it's shown, and they're mutually exclusive,

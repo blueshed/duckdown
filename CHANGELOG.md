@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- **The preview on a phone.** Below 768px the preview had no room and was
+  gone. Now **Preview**, an eye at the top, lays it over what you're
+  writing, full height, with your unsaved words in it; **Edit** (or Escape)
+  goes back to the page just as you left it. The header's icon buttons are
+  square on a phone too, so the page's name in the trail has room.
+
 ## 0.12.0 — 2026-09-25
 
 - **The site's icon, set in the editor.** Resources has an **icon** tab:

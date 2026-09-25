@@ -3,6 +3,10 @@
 On the left, where you are: the site's folders and pages. In the middle, what
 you're changing. On the right, the page as a reader will see it.
 
+On a phone there's no room for all three: **Preview** (the eye, at the top)
+shows the page as a reader will see it, over what you're writing, and **Edit**
+takes you back — with everything as you left it, unsaved words included.
+
 ## Keys
 
 | Keys | Does |

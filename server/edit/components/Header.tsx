@@ -1,8 +1,8 @@
-import { createElement, computed } from "@blueshed/railroad";
+import { createElement, computed, when } from "@blueshed/railroad";
 import { Icon } from "./Icon";
 import { PublishButton } from "./Publish";
 import { Trail } from "./Trail";
-import { filePath, drawer, toggleDrawer } from "../store";
+import { filePath, drawer, toggleDrawer, previewShown, togglePreview } from "../store";
 import { urlPath } from "../api";
 
 export function Header() {
@@ -17,6 +17,13 @@ export function Header() {
       <Trail />
       <span class="pane-gap" />
       <PublishButton />
+      {/* Phones only (CSS): the preview over the page, and back to editing.
+          It says what it will do, so it needs no pressed state. */}
+      <button class="preview-toggle" onclick={togglePreview}
+        title={previewShown.map((s) => (s ? "Back to editing" : "Preview"))}>
+        {when(previewShown, () => <Icon name="pencil" />, () => <Icon name="eye" />)}
+        <span class="label">{() => (previewShown.get() ? "Edit" : "Preview")}</span>
+      </button>
       {/* Each opens its drawer, and the drawer it opens says so. */}
       <button onclick={() => toggleDrawer("resources")} aria-expanded={drawer.map((d) => String(d === "resources"))}>
         <Icon name="layout-template" /> <span class="label">Resources</span>
