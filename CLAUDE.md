@@ -58,7 +58,8 @@ duckdown/
 │   ├── feed.ts             # A folder's Atom feed (feed: true), cached like the nav; {{feed}}
 │   ├── collection.ts       # collection.json (the data) + its each: page (the page every item gets)
 │   ├── history.ts          # Earlier versions: what a save replaced, what a delete removed
-│   ├── images.ts           # Where a collection's pictures are, and what a thumbnail is called (both ends read it)
+│   ├── images.ts           # Where a collection's pictures are, what a thumbnail and a width are called (both ends read it)
+│   ├── widths.ts           # A picture kept at narrower widths: made on upload or by duckdown images; a page's <img> gets a srcset
 │   ├── slugs.ts            # An item's slug and address, and how aliases compare (both ends read it)
 │   ├── base.ts             # Where the base files are (server/base/) and the root files
 │   ├── base/               # site.css, search.js: served and exported when a site has none of its own

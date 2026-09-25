@@ -101,6 +101,14 @@ Reference them with the full path:
 ![Alice](/static/images/team/alice.jpg)
 ```
 
+## Pictures for smaller screens
+
+A photo uploaded here is also kept at narrower widths — 480, 960 and 1600
+pixels — and a page offers them, so a phone downloads the size it needs
+rather than the original. Nothing to write: `![…](…)` works as before.
+Pictures put in `static/images/` by other means get theirs from
+`duckdown images`.
+
 ## Supported formats
 
 Upload any web-compatible image format:

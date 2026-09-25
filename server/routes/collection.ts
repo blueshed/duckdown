@@ -5,6 +5,8 @@ import { IMAGES_PATH } from "../config";
 import { loadCollection, collectionPath, collectionProblems } from "../collection";
 import { imageUrl, thumbName } from "../images";
 import { after } from "../utils";
+import { makeWidths } from "../widths";
+import { siteChanged } from "../kept";
 
 // The one thing the collection pane can't do through the folders the editor
 // already has: put a picture where a collection's `images` settings say its
@@ -115,6 +117,8 @@ export const handleCollectionFiles = {
     }
     await images.write(`${src}${name}`, bytes);
     await images.write(`${thumbAt}${thumb}`, small);
+    await makeWidths(`${src}${name}`, bytes, images);   // and narrower, for a smaller screen (widths.ts)
+    siteChanged();
 
     // The pane shows the new picture at the address it already had, so the
     // browser has the old bytes cached: v is what ?v= is set to.

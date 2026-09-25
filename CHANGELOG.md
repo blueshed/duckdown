@@ -9,6 +9,15 @@
   JavaScript's own objects, not from `users.json`; they are now nobody until
   added, and then ordinary names.
 - The report's totals table has a header.
+- **Pictures for smaller screens.** A JPEG, PNG or WebP uploaded in the
+  editor is also kept at 480, 960 and 1600 pixels wide (never wider than
+  it, and only when smaller in bytes), and a page's picture offers them
+  with a `srcset`, so a phone downloads a width rather than the original.
+  On vashti's 31 widest pictures, what a phone fetches goes from 12 MB to
+  under 5. `duckdown images` makes them for pictures already there.
+- `bun run bench` makes a large site and times it: at 20,000 pages
+  everything grows in step with the site, a save costs a quarter of a
+  second, and an export takes 12.
 
 ## 0.13.4 — 2026-09-25
 

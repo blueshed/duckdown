@@ -6,6 +6,7 @@ import { feedLink } from "./feed";
 import { fillCollections, fillItem, itemMeta, itemBody, type ItemContext } from "./collection";
 import { escapeHtml, outsideCode, canonicalPath, dateHtml } from "./utils";
 import { sitePicture } from "./icons";
+import { withWidths } from "./widths";
 
 const site = createStorage();
 const pages = createPageStorage();
@@ -247,5 +248,7 @@ export async function pageHtml(page: Page, o: PageOptions): Promise<{ html: stri
   // include that came from a real file, so ResourcePane can say a draft
   // template will show — whether the page wears it directly or through one
   // of these.
+  // A picture kept at narrower widths is offered at them (widths.ts).
+  html = await withWidths(html);
   return { html, layout: template.name, includes };
 }

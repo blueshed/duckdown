@@ -34,3 +34,15 @@ export function thumbName(src: string, images: Images): string {
   const dot = cut > src.lastIndexOf("/") ? cut : src.length;
   return src.slice(0, dot) + images.suffix + (images.extension || src.slice(dot));
 }
+
+// The narrower widths a picture is also kept at (widths.ts makes them), for a
+// screen that needs less than the original: never wider than it. Named after
+// it, "photo.jpg" at 960 → "photo-960w.jpg", beside it.
+export const WIDTHS = [480, 960, 1600];
+export const WIDTH_NAME = /-\d+w\.[^./]+$/;   // a width of a picture, not a picture of its own
+
+export function widthName(name: string, width: number): string {
+  const cut = name.lastIndexOf(".");
+  const dot = cut > name.lastIndexOf("/") ? cut : name.length;
+  return `${name.slice(0, dot)}-${width}w${name.slice(dot)}`;
+}

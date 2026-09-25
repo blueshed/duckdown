@@ -3,8 +3,9 @@
 // `duckdown` — the server, or with `init`, the scaffold for a site that has
 // duckdown installed as a dependency (bun add, then bunx duckdown init), or
 // with `user`, who can sign in, with `publish` and `pull`, the remote, with
-// `report`, the view log made into a page for the editors, or with `upgrade`,
-// the site moved to another tag of duckdown and its export compared.
+// `report`, the view log made into a page for the editors, with `upgrade`,
+// the site moved to another tag of duckdown and its export compared, or with
+// `images`, the narrower widths of pictures already in static/images/.
 
 import { scaffold } from "./init";
 
@@ -16,6 +17,7 @@ const commands: Record<string, (args: string[]) => Promise<number>> = {
   pull: async (args) => (await import("./remote")).remoteCommand("pull", args),
   report: async (args) => (await import("./report")).reportCommand(args),
   upgrade: async (args) => (await import("./upgrade")).upgradeCommand(args),
+  images: async () => (await import("./widths")).imagesCommand(),
 };
 
 export async function cli(

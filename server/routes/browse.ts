@@ -3,6 +3,9 @@ import { requireAuth } from "../auth";
 import { createImageStorage } from "../storage";
 import { IMAGES_PATH } from "../config";
 import { after } from "../utils";
+import { makeWidths } from "../widths";
+import { siteChanged } from "../kept";
+import { WIDTH_NAME } from "../images";
 
 const images = createImageStorage();
 
@@ -39,7 +42,9 @@ export const handleBrowse = {
       });
     }
 
-    return Response.json(await images.list(path));
+    // A picture's narrower widths are its own business, not pictures to choose.
+    const listing = await images.list(path);
+    return Response.json({ ...listing, files: listing.files.filter((f) => !WIDTH_NAME.test(f.name)) });
   },
 
   async PUT(req: BunRequest) {
@@ -68,9 +73,11 @@ export const handleBrowse = {
         const dest = path ? `${path}/${file.name}` : file.name;
         const bytes = new Uint8Array(await file.arrayBuffer());
         await images.write(dest, bytes);
+        await makeWidths(dest, bytes, images);   // and narrower, for a smaller screen (widths.ts)
         results.push(`${IMAGES_PATH}${dest}`);
       }
     }
+    siteChanged();   // a page showing it can now offer the widths
     return Response.json({ result: results });
   },
 };
