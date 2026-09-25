@@ -31,6 +31,7 @@ export const PROBES = [
   /%2f/i,                                                       // an encoded slash: a path trying to climb
   /\.php\b|phpinfo|phpmyadmin|opcache/i,                        // PHP
   /\/(wp-|cgi-bin\b|_profiler\b|actuator\b|_environment\b|server-status\b|debug\/)/i,   // other stacks' insides
+  /^\/(api|_[^/]*|@[^/]*)(\/|$)/i,                             // an API, or a framework's own: this site has neither
   /(^|\/)(env|credentials?|secrets?|dockerfile|pipfile|cakefile|id_rsa|appsettings[^/]*|settings\.json|auth\.json|composer\.(json|lock))$/i,
   /(^|\/)env[-_.]/i,                                            // env.js, env-config.js, env.txt
   /\.(bak|backup|old|orig|sql|zip|tar|gz|rar|7z|ini|ya?ml|conf|swp|env|properties|secret)$/i,   // configs, backups, secrets
@@ -39,6 +40,16 @@ export const PROBES = [
   /^(?!\/static\/)(?!\/search\.json$).*\.(js|json|ts|rb|py|toml|tfstate|tfvars|key|pem|csv|log|pwd|lock)$/i,
   /^(?!\/static\/)(?!.*\/(sitemap|feed)\.xml$).*\.xml$/i,
 ];
+// A file a page pulls in — a picture, a stylesheet, the search index, a feed —
+// not a page anyone read: counted apart, and kept out of the views and Most
+// read. (A missing one is still Not found: a 404 favicon is worth knowing.)
+const FILE = /^\/static\/|^\/(favicon\.ico|robots\.txt|apple-touch-icon[^/]*\.png|search\.json|sitemap\.xml)$|\/feed\.xml$/i;
+
+// A machine that isn't a crawler by its name: a certificate authority checking
+// the site is the site (ACME), which on a domain's first day asks hundreds of
+// times. A crawler's view, and not something missing that wants a page.
+const ACME = /^\/\.well-known\/acme-challenge\//;
+
 export const isProbe = (path: string) => {
   const p = path.split("?")[0]!;
   return PROBES.some((probe) => probe.test(p));
@@ -59,13 +70,14 @@ function table(heading: string, rows: [string, number][], empty: string): string
 export function reportMarkdown(views: View[], now: Date): string {
   const probes = views.filter((v) => isProbe(v.path)).length;
   const asked = views.filter((v) => !isProbe(v.path));
-  const readers = asked.filter((v) => !v.crawler);
+  const pages = asked.filter((v) => !FILE.test(v.path.split("?")[0]!));
+  const readers = pages.filter((v) => !v.crawler && !ACME.test(v.path));
   const read: Tally = new Map();
   const missing: Tally = new Map();
   const from: Tally = new Map();
   let errors = 0;
   for (const v of asked) {
-    if (v.status === 404) count(missing, v.path);
+    if (v.status === 404 && !ACME.test(v.path)) count(missing, v.path);   // a certificate check isn't worth a page
     if (v.status >= 500) errors++;
   }
   for (const v of readers) {
@@ -85,9 +97,10 @@ export function reportMarkdown(views: View[], now: Date): string {
     "| | |",
     "|---|---:|",
     `| Views by readers | ${number(readers.length)} |`,
-    `| Views by crawlers | ${number(asked.length - readers.length)} |`,
+    `| Views by crawlers | ${number(pages.length - readers.length)} |`,
     `| Not found (404) | ${number([...missing.values()].reduce((a, b) => a + b, 0))} |`,
     ...(errors ? [`| Server errors (5xx) | ${number(errors)} |`] : []),
+    ...(asked.length > pages.length ? [`| Files a page pulled in | ${number(asked.length - pages.length)} |`] : []),
     ...(probes ? [`| Probes by scanners | ${number(probes)} |`] : []),
     "",
     ...(probes ? [

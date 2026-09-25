@@ -6,7 +6,9 @@
   `/.git/config`, `/wp-login.php` and the like pose as browsers, so they
   were counted as readers and filled Not found: on blueshed.co.uk's first
   report, 925 of 993 views. They're now a line of their own, *Probes by
-  scanners*, and left out of everything else.
+  scanners*, and left out of everything else. The files a page pulls in
+  (pictures, stylesheets, the search index) are counted apart rather than as
+  pages read, and a certificate authority's checks count as a crawler's.
 - **A report for each day.** A log that spans days makes one report per
   day, from each line's own time, rather than one named for the day it was
   run.

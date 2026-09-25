@@ -71,14 +71,30 @@ describe("the report", () => {
     expect(reportMarkdown([parseView("view / 200 1ms")!], NOW)).not.toContain("Probes");
   });
 
+  test("files a page pulls in and certificate checks aren't readers' views; a missing file is still missing", () => {
+    const md = reportMarkdown([
+      "view / 200 3ms", "view /static/site.css 200 1ms", "view /static/images/a.jpg 200 1ms", "view /search.json 200 1ms",
+      "view /favicon.ico 404 1ms", "view /blog/feed.xml 200 1ms",
+      "view /.well-known/acme-challenge/verify 404 0ms", "view /.well-known/acme-challenge/verify 404 0ms",
+    ].map((l) => parseView(l)!), NOW);
+    expect(md).toContain("| Views by readers | 1 |");
+    expect(md).toContain("| Views by crawlers | 2 |");                  // the certificate authority, twice
+    expect(md).toContain("| Files a page pulled in | 5 |");
+    expect(md).toContain("| Page | Views |\n|---|---:|\n| / | 1 |\n");  // no stylesheet among what was read
+    expect(md).toContain("| /favicon.ico | 1 |");
+    expect(md).toContain("| Not found (404) | 1 |");                    // the favicon, not the certificate checks
+    expect(md).not.toContain("acme-challenge |");
+  });
+
   test("what counts as a probe, and what a site of this kind really serves", () => {
     for (const path of ["/.env", "/%2eenv", "/%2f%2eaws%2fcredentials", "/.git/config", "/phpinfo", "/wp-admin/", "/xmlrpc.php?x=1",
       "/cgi-bin/luci", "/actuator/health", "/server-status", "/debug/vars", "/credentials", "/Dockerfile", "/env.js",
       "/config.yml", "/backup.sql", "/terraform.tfstate.backup", "/s3.secret", "/app.js", "/appsettings.QA.json", "/settings.py",
-      "/id_rsa", "/phpcs.xml", "/storage/logs/laravel.log"]) expect([path, isProbe(path)]).toEqual([path, true]);
+      "/id_rsa", "/phpcs.xml", "/storage/logs/laravel.log", "/api", "/api/v1/config", "/@fs/proc/self/environ",
+      "/_ignition/health-check", "/_image"]) expect([path, isProbe(path)]).toEqual([path, true]);
     for (const path of ["/", "/about.html", "/blog/", "/why-i-left-php-behind.html", "/static/site.css", "/static/search.js",
       "/static/data/prices.csv", "/search.json", "/sitemap.xml", "/blog/feed.xml", "/.well-known/security.txt", "/robots.txt",
-      "/favicon.ico", "/feed/", "/llms.txt", "/edit"]) expect([path, isProbe(path)]).toEqual([path, false]);
+      "/favicon.ico", "/feed/", "/llms.txt", "/edit", "/apiary.html", "/blog/api/"]) expect([path, isProbe(path)]).toEqual([path, false]);
   });
 
   test("a line's day is its own, read from whatever the platform wrote", () => {
