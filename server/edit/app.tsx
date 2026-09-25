@@ -8,7 +8,7 @@ import { ResourcePane } from "./components/ResourcePane";
 import { CollectionPane } from "./components/CollectionPane";
 import { TemplatePreview } from "./components/TemplatePreview";
 import { Notice } from "./components/Notice";
-import { Drawers } from "./components/Drawers";
+import { Drawers, LeftDrawer } from "./components/Drawers";
 import { PastList, PastPane, PastPreview } from "./components/Past";
 import { past, seen } from "./past";
 import { filePath, editorContent, loadFile, resource, resourceDraft, collection } from "./store";
@@ -90,8 +90,10 @@ right.appendChild(when(nothingOpen, () =>
   <div class="panel panel-preview"><div class="placeholder">preview</div></div>));
 tray.appendChild(right);
 
-// The drawer, over the preview: Resources, Editors or Publish.
+// The drawers: at the right, over the preview, Resources, Editors or Publish;
+// at the left, over the tree, the properties of a work chosen in the middle.
 tray.appendChild(<Drawers />);
+tray.appendChild(<LeftDrawer />);
 
 // Failures, when there are any (fixed, over everything)
 app.appendChild(<Notice />);

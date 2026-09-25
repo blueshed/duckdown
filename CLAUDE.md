@@ -100,8 +100,8 @@ duckdown/
 │           ├── Preview.tsx   # Live markdown preview
 │           ├── CssPreview.tsx # CSS preview in iframe
 │           ├── Header.tsx    # Top bar: the trail, then the drawers' buttons, view site, logout
-│           ├── Drawer.tsx    # The drawer's frame: over the preview, not modal, Escape closes it
-│           ├── Drawers.tsx   # Whichever drawer is open: Resources, Editors or Publish
+│           ├── Drawer.tsx    # The drawer's frame: over the preview (or, side="left", the tree), not modal, Escape closes it
+│           ├── Drawers.tsx   # Whichever drawer is open: Resources, Editors or Publish; LeftDrawer, a chosen work
 │           ├── ImageBrowser.tsx # The Resources drawer: images (a grid), css, templates, reports
 │           ├── ReportList.tsx # Its reports tab: reports/ by folder, each a link to its own tab
 │           ├── ResourceList.tsx # One tab of it: the css or template files
@@ -502,9 +502,17 @@ to the page's own — and the page), so the tree has no `..` and a pane's header
 says a name the trail hasn't (`shortName()`). Under it, the three columns are
 compartments cut into one tray: walls meet square, only the tray's corners
 curve (`--wall`, `--radius-tray`, `--radius-cell`), and the preview sits flush.
-The header's Resources, Editors and Publish each open the one drawer
+Anything a wall in from the tray's corners — a compartment, a drawer — takes
+the tray's radius less the wall (`--radius-cell` is that calc), or the corners
+bulge. The header's Resources, Editors and Publish each open the one drawer
 (`drawer` in the store, `Drawers.tsx`), over the preview, inside the tray; on a
-phone it is a sheet from the foot. The editor's two right-hand columns each hold whatever is open. The middle one
+phone it is a sheet from the foot. Properties come from the other side: a work
+chosen in the collection pane opens in the drawer at the left (`leftDrawer` in
+the store holds how to draw it, `LeftDrawer` shows it), over the tree, the
+same size and shape as the right-hand one, so the preview stays in view while
+the work changes. It opens on a click, never by itself; Escape puts it away
+and the choice stays marked; the pane passes its ⌘Z/⇧⌘Z in (`Drawer`'s
+`onkey`), and it goes with the pane. The editor's two right-hand columns each hold whatever is open. The middle one
 holds the page and, beneath it, either a resource or a folder's collection —
 one slot, so opening either closes the other; each closes, two split the
 column, one fills it. Below 768px the three columns stack, the tree capped and

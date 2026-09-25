@@ -4,10 +4,11 @@ import {
 import { PaneHeader } from "./PaneHeader";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { Icon } from "./Icon";
+import { Drawer } from "./Drawer";
 import { api, apiJson, urlPath } from "../api";
 import { speak, tell, hush, news } from "../notice";
 import {
-  collection, collectionKey, closeCollection, collectionChanged, reloadBrowser, shortName,
+  collection, collectionKey, closeCollection, collectionChanged, reloadBrowser, shortName, leftDrawer,
 } from "../store";
 import { type Images, ownImages, imageUrl, thumbName } from "../../images";
 import { slugger, aliasKey, itemHref } from "../../slugs";
@@ -187,8 +188,10 @@ export function CollectionPane() {
   const future = signal<RawFile[]>([]);
   const canUndo = computed(() => past.get().length > 0);
   const canRedo = computed(() => future.get().length > 0);
-  // The work whose fields are beside the grid, by position, like a group.
+  // The work whose properties the drawer at the left shows, by position, like
+  // a group. Choosing one opens the drawer; closing it leaves the choice.
   const chosen = signal<Spot | null>(null);
+  const showing = signal(false);
   const chosenItem = computed(() => {
     const at = chosen.get();
     return at ? groupAt(model.get(), at.path)?.items?.[at.i] ?? null : null;
@@ -417,6 +420,14 @@ export function CollectionPane() {
     return v ? `${url}?v=${v}` : url;
   };
 
+  // The picture itself, for the drawer, where a thumbnail would be a blur.
+  const pictureUrl = (src: string) => {
+    if (!src) return "";
+    const url = imageUrl(images.get().src, src);
+    const v = busts.get()[src];
+    return v ? `${url}?v=${v}` : url;
+  };
+
   // --- the shape of the file -------------------------------------------
 
   // A committed edit — the input's change, not each keystroke — so the address
@@ -553,7 +564,7 @@ export function CollectionPane() {
         }}
       >
         <button type="button" class="item-tile" aria-pressed={on.map(String)} title={title}
-          onclick={() => chosen.set(here())}>
+          onclick={() => batch(() => { chosen.set(here()); showing.set(true); })}>
           {image
             ? <img alt="" loading="lazy" src={computed(() => thumbUrl(said(row$.get().item[image])))} />
             : null}
@@ -620,8 +631,8 @@ export function CollectionPane() {
     );
   };
 
-  // The chosen work's fields, beside the grid. Its picture is the control
-  // that replaces it, as it always was: click it, or drop one on it.
+  // The chosen work's properties, in the drawer at the left. Its picture is the
+  // control that replaces it, as it always was: click it, or drop one on it.
   const chosenPanel = () => {
     const image = imageField();
     const input = chooser((file) => { const at = chosen.peek(); if (at) swapItem(at.path, at.i, file); });
@@ -641,7 +652,7 @@ export function CollectionPane() {
               swapItem(at().path, at().i, e.dataTransfer?.files?.[0]);
             }}
           >
-            <img alt="" src={computed(() => thumbUrl(src.get()))} />
+            <img alt="" src={computed(() => pictureUrl(src.get()))} />
             <span class="item-swap"><Icon name="refresh-cw" size={12} /></span>
             {input}
           </div>
@@ -669,6 +680,22 @@ export function CollectionPane() {
 
   const groups = computed(() => (model.get()?.groups ?? []).map((_, i) => ({ i })));
 
+  // The drawer at the left holds the chosen work while it is shown — over the
+  // tree, so the preview keeps showing the page as the work changes. Escape or
+  // its close button puts it away; the choice stays marked in the grid. It
+  // goes with the pane, and with the last work.
+  const workDrawer = () => (
+    <Drawer side="left" icon="image" close="Close the work" onclose={() => showing.set(false)} onkey={onkeydown}
+      title={() => said(chosenItem.get()?.title) || "Untitled"}>
+      {when(chosenItem, chosenPanel)}
+    </Drawer>
+  );
+  effect(() => {
+    const open = showing.get() && chosenItem.get() !== null;
+    leftDrawer.set(open ? workDrawer : null);
+  });
+  effect(() => () => { if (leftDrawer.peek() === workDrawer) leftDrawer.set(null); });
+
   return (
     <div class="panel-collection" tabindex="-1" onkeydown={onkeydown}>
       <PaneHeader icon="layout-grid" name={name} shown={computed(() => shortName(name.get()))} dirty={dirty}
@@ -690,7 +717,6 @@ export function CollectionPane() {
               <button onclick={() => addGroup(null)}><Icon name="plus" /> Add group</button>
             </div>
           </div>
-          {when(chosenItem, chosenPanel)}
         </div>
       ), () => (
         <div class="placeholder">{() => trouble.get() || "reading the collection…"}</div>

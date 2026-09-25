@@ -507,10 +507,12 @@ pane does:
   under `static/images/<folder>/`), an each: page `item.md`, and an `index.md`
   with `{{items}}` if the folder has none — then opens it with the pane below.
 - **The works** are pictures in their groups (a work with no picture field is
-  its title in a box). Choose one and its fields are beside the grid, one input
-  per declared field, labelled as the file labels it (a `long` one is a text
-  box); with no `fields` in the file, title and caption. The first work is
-  chosen as the pane opens, and a new one as it is added.
+  its title in a box). Click one and its properties open in a drawer from the
+  left, over the tree, so the preview stays in view: the picture itself, then
+  one input per declared field, labelled as the file labels it (a `long` one is
+  a text box; with no `fields` in the file, title and caption), and move and
+  remove at the foot. Click another work to show that one; Escape puts the
+  drawer away. A new work is chosen as it is added.
   Every other key on an item — `slug`, `aliases`, anything undeclared — is kept
   exactly where it was found, and so is everything around the groups
   (`fields`, `images`, `labels`).
@@ -529,7 +531,7 @@ pane does:
   `suffix` and `extension` — the new work then needs its fields filled in. Dropping a
   picture **on a work's picture** replaces it in place, under the same file
   name, so the work keeps its address and every link to it goes on working:
-  that is the chosen work's picture, beside the grid (click it to choose one).
+  that is the chosen work's picture, in its drawer (click it to choose one).
 - A collection whose pictures live off the site (a bucket, a CDN) says so and
   offers no way to add one: the editor can only write the site's own
   `static/images/`. Name the item and put the file there yourself.

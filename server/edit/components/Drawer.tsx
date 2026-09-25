@@ -1,8 +1,9 @@
 import { createElement, effect } from "@blueshed/railroad";
 import { Icon } from "./Icon";
 
-// The drawer at the right of the tray (store.ts: drawer): Resources, Editors
-// or Publish, one at a time, over the preview. It is not a modal — the page
+// A drawer in the tray: at the right (store.ts: drawer) Resources, Editors
+// or Publish, one at a time, over the preview; at the left (leftDrawer) a
+// chosen work's properties, over the tree. It is not a modal — the page
 // stays in view and in reach behind it, which is the point of it — so it
 // takes focus when it opens, gives it back when it goes, and Escape closes it.
 let made = 0;
@@ -12,6 +13,8 @@ export function Drawer(props: {
   title: string | (() => string);
   close: string;                 // the close button's name: "Close resources"
   onclose: () => void;
+  side?: "left";                 // over the tree, rather than over the preview
+  onkey?: (e: KeyboardEvent) => void; // what its owner answers to from inside it (⌘Z)
   children?: unknown;
 }) {
   const opener = document.activeElement as HTMLElement | null;
@@ -23,8 +26,9 @@ export function Drawer(props: {
     if (opener?.isConnected) opener.focus();
   });
   return (
-    <aside class="sidebar" tabindex="-1" aria-labelledby={title} ref={(el: HTMLElement) => { aside = el; }}
+    <aside class={props.side === "left" ? "sidebar sidebar-left" : "sidebar"} tabindex="-1" aria-labelledby={title} ref={(el: HTMLElement) => { aside = el; }}
       onkeydown={(e: KeyboardEvent) => {
+        props.onkey?.(e);
         if (e.key !== "Escape") return;
         e.preventDefault();
         props.onclose();

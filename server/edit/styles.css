@@ -38,10 +38,12 @@
   --radius-lg: 10px;
   /* The bento: the columns are compartments cut into one tray. Walls meet
      square; only the tray's own corners curve, and a compartment in one of
-     them takes the curve less the wall. A drawer is a panel of its own. */
+     them takes the curve less the wall — and so does a drawer, which sits a
+     wall in from the tray's corners too: concentric, or the corners bulge.
+     A sheet from the foot of a phone stands alone, and has its own. */
   --wall: 8px;
   --radius-tray: 22px;
-  --radius-cell: 14px;
+  --radius-cell: calc(var(--radius-tray) - var(--wall));
   --radius-panel: 20px;
   --radius-thumb: 8px;
   --tile: 60px;             /* a work in the collection's grid */
@@ -700,12 +702,21 @@ button.danger-subtle:hover {
   width: min(340px, calc(100% - 2 * var(--wall)));
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius-panel);
+  border-radius: var(--radius-cell);   /* a wall in from the tray's corner */
   display: flex;
   flex-direction: column;
   overflow: hidden;
   z-index: 10;
   box-shadow: -12px 0 32px rgba(0, 0, 0, 0.25);
+}
+
+/* The same drawer from the left, over the tree: a chosen work's properties,
+   so the preview stays in view while they change. (On a phone it is the same
+   sheet from the foot as the right-hand one.) */
+.sidebar-left {
+  left: var(--wall);
+  right: auto;
+  box-shadow: 12px 0 32px rgba(0, 0, 0, 0.25);
 }
 
 .sidebar-content {
@@ -1232,13 +1243,13 @@ button.danger-subtle:hover {
   min-width: 0;
 }
 
-/* The works in their groups on the left, the chosen one's fields beside
-   them; each side scrolls in itself. */
+/* The works in their groups, the whole width: a chosen one's properties open
+   in the drawer at the left. */
 .collection-body {
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(180px, 220px);
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .collection-grid {
@@ -1389,17 +1400,28 @@ button.danger-subtle:hover {
   gap: var(--space-2);
 }
 
-/* The chosen work: its picture (the control that replaces it), its fields,
-   and what can be done to it. */
+/* The chosen work, in the drawer at the left: its picture (the control that
+   replaces it), its fields, and what can be done to it. */
 .collection-chosen {
+  flex: 1;
   min-height: 0;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  padding: var(--space-3);
-  border-left: 1px solid var(--border);
-  background: var(--surface);
+  padding: var(--space-3) var(--space-4) var(--space-4);
+}
+
+/* The picture as large as the drawer is wide. */
+.collection-chosen .item-thumb {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+}
+
+/* The whole picture, not a square cut from it. */
+.collection-chosen .item-thumb img {
+  object-fit: contain;
 }
 
 .item-thumb {
@@ -1490,24 +1512,6 @@ button.danger-subtle:hover {
   color: var(--text-dim);
 }
 
-/* A narrow pane puts the chosen work under the grid rather than beside it. */
-@container pane (max-width: 479px) {
-  /* Half each, and each scrolls: the grid never squeezed to nothing. */
-  .collection-body {
-    grid-template-columns: 1fr;
-    grid-template-rows: minmax(96px, 1fr) minmax(0, 1fr);
-  }
-
-  .collection-chosen {
-    border-left: 0;
-    border-top: 1px solid var(--border);
-  }
-
-  .item-thumb {
-    width: var(--tile);
-    height: var(--tile);
-  }
-}
 
 .hidden-file {
   display: none;

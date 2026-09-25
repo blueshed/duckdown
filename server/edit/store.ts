@@ -39,6 +39,12 @@ export function closeDrawer(): void {
   drawer.set(null);
 }
 
+// The drawer at the left: properties of the thing chosen in the middle — a
+// collection's work — over the tree, so the preview on the right stays in
+// view while it changes. Whoever fills it hands over how to draw it; one at a
+// time, and null when nothing is chosen for it.
+export const leftDrawer = signal<(() => Node) | null>(null);
+
 // The tree on the left is the content: pages, and the navigation derived from
 // their front matter. Templates and stylesheets are not content — they are what
 // a page is composed with — so they are reached from the resource sidebar and

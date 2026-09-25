@@ -242,8 +242,8 @@ watch the overview redraw next to them.
   click it to choose one. Duckdown puts the original where this collection's `images` says its
   pictures live, writes a 128px thumbnail beside it under the collection's own
   naming rule, and adds the work — then give it a title and a caption.
-- **Replacing a picture**: drop a new one on the chosen work's picture, beside
-  the grid, or click it. It is
+- **Replacing a picture**: drop a new one on the chosen work's picture, in the
+  drawer that opens from the left when you click a work, or click it. It is
   written under the same file name, so the work keeps its address and
   everything that links to it goes on working.
 

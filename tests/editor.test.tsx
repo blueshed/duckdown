@@ -12,7 +12,7 @@ import {
   loadFile, createFile, saveFile, deleteFile, closeFile, moveFile, reloadBrowser, toggleImages, closeImages, toggleDrawer,
   resource, resourceDraft, resourceSaved, resourceDirty, pageLayout, pageIncludes, openResource, closeResource,
   saveResource, deleteResource, createResource,
-  collection, openCollection, closeCollection, createCollection,
+  collection, openCollection, closeCollection, createCollection, leftDrawer,
 } from "../server/edit/store";
 import { Icon } from "../server/edit/components/Icon";
 import { Notice } from "../server/edit/components/Notice";
@@ -25,7 +25,7 @@ import { CssPreview } from "../server/edit/components/CssPreview";
 import { Header } from "../server/edit/components/Header";
 import { Trail, folderCrumbs } from "../server/edit/components/Trail";
 import { EditorsDrawer } from "../server/edit/components/Users";
-import { Drawers } from "../server/edit/components/Drawers";
+import { Drawers, LeftDrawer } from "../server/edit/components/Drawers";
 import { PublishButton, publishState, refreshPublish } from "../server/edit/components/Publish";
 import { ImageBrowser } from "../server/edit/components/ImageBrowser";
 import { ResourceList } from "../server/edit/components/ResourceList";
@@ -1583,7 +1583,7 @@ describe("CollectionPane", () => {
   const names = (host: ParentNode) => values(host, ".group-name");
   const tool = (row: Element, label: string) => row.querySelector(`[aria-label="${label}"]`)!;
   const items = (host: ParentNode) => [...host.querySelectorAll(".collection-item")];
-  // A work's fields and tools are beside the grid, for the one that is chosen.
+  // A work's fields and tools are in the drawer at the left, for the one chosen.
   const panel = (host: ParentNode) => host.querySelector(".collection-chosen")!;
   const pick = (host: ParentNode, i: number) => {
     click(items(host)[i]!.querySelector(".item-tile")!);
@@ -1604,12 +1604,21 @@ describe("CollectionPane", () => {
   };
   const picture = (name: string) => new File(["<svg/>"], name, { type: "image/svg+xml" });
 
+  // The pane, with the drawer at the left beside it (where a chosen work's
+  // properties open), and the first work opened there as a click would.
+  const mountPane = () => render(() => <div><CollectionPane /><LeftDrawer /></div>);
+  const opened = async (host: ParentNode) => {
+    click(host.querySelector(".item-tile")!);
+    await waitFor(() => host.querySelector(".collection-chosen") !== null);
+  };
+
   async function open() {
     fresh();
     await write(seed());
     openCollection(FOLDER);
-    const { host, dispose } = render(() => <CollectionPane />);
+    const { host, dispose } = mountPane();
     await waitFor(() => host.querySelectorAll(".collection-item").length === 4);
+    await opened(host);
     return { host, dispose: () => { dispose(); closeCollection(); } };
   }
 
@@ -1622,7 +1631,8 @@ describe("CollectionPane", () => {
     expect(host.querySelector(".pane-header .pane-name")!.textContent).toBe(`${FOLDER}/collection.json`);
     expect(items(host)[0]!.querySelector("img")!.getAttribute("src"))
       .toBe(`/static/images/${FOLDER}/one_tn.svg`);
-    // The first work is chosen as the pane opens, and its fields are beside the grid.
+    // The first work is chosen as the pane opens; a click opens its properties
+    // in the drawer at the left (open() made it).
     expect(items(host)[0]!.querySelector(".item-tile")!.getAttribute("aria-pressed")).toBe("true");
     expect(panel(host).querySelector(".item-src")!.textContent).toBe("one.svg");
     expect(pick(host, 2).querySelector(".item-src")!.textContent).toBe("three.svg");
@@ -1787,8 +1797,9 @@ describe("CollectionPane", () => {
   test("an item with no picture says so rather than writing one under no name", async () => {
     await write({ images: { src: `/static/images/${fresh()}/` }, groups: [{ name: "odd", items: [{ title: "No picture" }] }] });
     openCollection(FOLDER);
-    const { host, dispose } = render(() => <CollectionPane />);
+    const { host, dispose } = mountPane();
     await waitFor(() => host.querySelector(".collection-item"));
+    await opened(host);
     expect(host.querySelector(".item-thumb img")!.getAttribute("src")).toBe("");
 
     choose(host.querySelector(".item-thumb input")!, picture("nowhere.svg"));
@@ -1802,11 +1813,14 @@ describe("CollectionPane", () => {
     fresh();
     await write({ images: "https://pictures.example.com/", groups: [{ name: "away", items: [{ src: "a.jpg", title: "Away" }] }] });
     openCollection(FOLDER);
-    const { host, dispose } = render(() => <CollectionPane />);
+    const { host, dispose } = mountPane();
     await waitFor(() => host.querySelector(".pane-note"));
     expect(host.querySelector(".pane-note")!.textContent).toContain("can't write");
     expect(host.querySelector(".item-drop")).toBeNull();
-    expect(host.querySelector(".item-thumb img")!.getAttribute("src")).toBe("https://pictures.example.com/a_tn.jpg");
+    // The grid shows the thumbnail; the drawer, the picture itself.
+    expect(host.querySelector(".item-tile img")!.getAttribute("src")).toBe("https://pictures.example.com/a_tn.jpg");
+    await opened(host);
+    expect(host.querySelector(".item-thumb img")!.getAttribute("src")).toBe("https://pictures.example.com/a.jpg");
     dispose();
     closeCollection();
   });
@@ -1856,8 +1870,9 @@ describe("CollectionPane", () => {
     fresh();
     await write(body());
     openCollection(FOLDER);
-    const { host, dispose } = render(() => <CollectionPane />);
+    const { host, dispose } = mountPane();
     await waitFor(() => host.querySelectorAll(".collection-item").length === rows);
+    if (rows) await opened(host);
     return { host, dispose: () => { dispose(); closeCollection(); } };
   }
   const field = (row: Element, name: string) => row.querySelector(`[data-field="${name}"]`) as HTMLInputElement;
@@ -1963,8 +1978,9 @@ describe("CollectionPane", () => {
     (body.groups[0]!.items[1] as Record<string, unknown>).aliases = ["/second-1962", 7];
     await write(body);
     openCollection(FOLDER);
-    const { host, dispose } = render(() => <CollectionPane />);
+    const { host, dispose } = mountPane();
     await waitFor(() => items(host).length === 4);
+    await opened(host);
 
     // "Second" becomes "Study": it comes first in the file, so it takes
     // /study/, and the study moves to /study-1/. The study's old address now
@@ -2099,6 +2115,50 @@ describe("CollectionPane", () => {
     expect(filePath.get()).toBe(`${FOLDER}/index.md`);   // the page in the middle stayed put
     closeCollection();
     dispose();
+  });
+
+  test("a chosen work opens in the drawer at the left: on a click, never by itself; Escape puts it away", async () => {
+    fresh();
+    await write(seed());
+    openCollection(FOLDER);
+    const { host, dispose } = mountPane();
+    await waitFor(() => items(host).length === 4);
+    // The first work is chosen as the pane opens, but nothing covers the tree
+    // until a work is clicked.
+    expect(items(host)[0]!.querySelector(".item-tile")!.getAttribute("aria-pressed")).toBe("true");
+    await settle(20);
+    expect(host.querySelector(".sidebar-left")).toBeNull();
+    expect(leftDrawer.get()).toBeNull();
+
+    // A click opens it, over the tree: the work's picture — the picture
+    // itself, not its thumbnail — its fields, and its name at the top.
+    const second = items(host)[1]!.querySelector(".item-tile")! as HTMLElement;
+    click(second);
+    await waitFor(() => host.querySelector(".sidebar-left .collection-chosen") !== null);
+    const drawerEl = host.querySelector(".sidebar-left")!;
+    expect(drawerEl.querySelector("h3")!.textContent).toBe("Second");
+    expect(drawerEl.querySelector(".item-thumb img")!.getAttribute("src")).toBe(`/static/images/${FOLDER}/two.svg`);
+    // Another work, with it open, is the drawer showing that one instead.
+    click(items(host)[2]!.querySelector(".item-tile")!);
+    expect(drawerEl.querySelector("h3")!.textContent).toBe("Study");
+
+    // Undo and redo answer from inside it, as they do in the pane.
+    edit(host.querySelector(`[data-field="caption"]`)!, "Crayon");
+    await storedWhen((f) => f.groups[0].groups[0].items[0].caption === "Crayon");
+    drawerEl.dispatchEvent(new KeyboardEvent("keydown", { key: "z", metaKey: true, bubbles: true }));
+    await storedWhen((f) => f.groups[0].groups[0].items[0].caption === undefined);
+
+    // Escape puts it away; the choice stays marked in the grid.
+    drawerEl.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    await waitFor(() => host.querySelector(".sidebar-left") === null);
+    expect(items(host)[2]!.querySelector(".item-tile")!.getAttribute("aria-pressed")).toBe("true");
+
+    // Open again, then the pane goes: the drawer goes with it.
+    click(items(host)[0]!.querySelector(".item-tile")!);
+    await waitFor(() => leftDrawer.get() !== null);
+    dispose();
+    closeCollection();
+    expect(leftDrawer.get()).toBeNull();
   });
 
   test("undoes and redoes, from the header or the keyboard, and each step is written", async () => {
