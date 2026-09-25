@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.11.0 — 2026-09-25
+
+- **Help.** A **Help** button beside Resources and Editors opens a cheat
+  sheet: writing a page (headings, emphasis, links, pictures, lists, tables),
+  the top of a page, notes and links between pages, collections, the page
+  every work gets, templates, the look, and the editor's own keys and places.
+  The part that fits what is open comes first, and open; the rest follow,
+  folded, and it reorders as you move. Each example shows what you type over
+  what readers get, rendered by the site's own renderer. The pages ship with
+  duckdown (`server/help/`), written for the person editing.
+- **A page on its way says so.** After a click in the tree, the middle column
+  and the preview show a line across the top and dim what was there until
+  the new page arrives — on a site in a bucket that is a round trip you can
+  feel. The preview renders a page just opened at once; its short pause is
+  for typing.
+- **`..` is back** at the top of the tree in every folder but the site's own.
+- **Upload** is a toolbar button in the images header, beside New folder, in
+  reach however long the folder is.
+- **Consistency:** every corner and spacing in the editor is a token (two
+  new steps, 2px and 6px, and a pill radius), one monospace face, the work
+  drawer's buttons a toolbar's size, the group name a field's shape, room
+  round the chosen work's ring and above an indented group.
+
+Nothing a reader sees changes.
+
 ## 0.10.1 — 2026-09-25
 
 - **A work's properties open in a drawer from the left.** In the collection
