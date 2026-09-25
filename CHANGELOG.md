@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.14.0 — 2026-09-25
 
 - **A shared picture says what it is** (`og:image:alt`): the site's card
   or icon is named by the front page's title, a page's own picture by the
