@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.11.1 — 2026-09-25
+
+- **The home-screen icon answers wherever a phone looks for it.** A site with
+  `static/apple-touch-icon.png` now answers it at the root too, under every
+  name an iPhone (or an app drawing a link's preview) asks for it by —
+  `apple-touch-icon.png`, `-precomposed`, and sized ones like
+  `-120x120-precomposed` — served or published; the export writes the plain
+  two at the root of `dist/`. They were 404s, which is how a visitor report
+  showed them.
+
 ## 0.11.0 — 2026-09-25
 
 - **Help.** A **Help** button beside Resources and Editors opens a cheat
