@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.10.1 — 2026-09-25
+
+- **A work's properties open in a drawer from the left.** In the collection
+  pane, clicking a work opens it in a drawer over the tree — the picture
+  itself, every field full width, move and remove at the foot — so the
+  preview stays in view while it changes, and the grid has the pane's whole
+  width. Click another work to show that one; Escape puts it away, the choice
+  staying marked; undo and redo answer from inside it. Nothing opens by
+  itself. On a phone it is the same sheet from the foot as the other drawers.
+- **The drawers' corners are concentric with the tray's.** A drawer sits a
+  wall in from the tray's corner, so its radius is the tray's less the wall
+  (`--radius-cell`, now written as that calc), not a radius of its own.
+
+Nothing a reader sees changes.
+
 ## 0.10.0 — 2026-09-25
 
 Accessible by default: the site readers see, and the editor.
