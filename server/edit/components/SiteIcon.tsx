@@ -4,53 +4,96 @@ import { speak } from "../notice";
 import { Icon } from "./Icon";
 
 // Resources' icon tab: the picture on a browser tab and on a phone's home
-// screen (routes/site-icon.ts). Any picture will do — the browser cuts its
-// middle square and makes the two PNGs the site answers, so a person never
-// needs to know what either file is called or how big it should be.
+// screen, and the card a link to the site shows when it's shared
+// (routes/site-icon.ts). Any picture will do — the browser cuts what each
+// needs from it and makes the files the site answers, so a person never needs
+// to know what any of them is called or how big it should be.
 
 type Icons = {
   "apple-touch-icon.png": string | null;
   "favicon.ico": string | null;
   elsewhere: { template: string; icons: string[] }[];   // templates naming icons of their own
+  card: string | null;
+  home: { title: string; description: string };          // what a shared link says under the card
 };
 
-// A phone fills a transparent home-screen icon with black; white is what the
-// picture was most likely drawn on. A tab shows transparency as it is.
-const HOME_FILL = "#ffffff";
+// A phone fills a transparent home-screen icon with black, and a card is a
+// JPEG, which has no transparency: white is what a picture was most likely
+// drawn on. A tab shows transparency as it is.
+const WHITE = "#ffffff";
 
-// The middle square of a picture, at `size` pixels, as a PNG. Through an <img>
-// rather than createImageBitmap, which won't read an SVG in every browser. The
-// whole picture is drawn first, at least as big as the icon, and the square
-// cut from that: an SVG sized in percent says 150×150 and is drawn at whatever
-// it's asked for, so a square cut from the <img> itself came out a corner.
-export async function squarePng(file: Blob, size: number, fill?: string): Promise<Blob> {
+// The card's size, as the server checks it (icons.ts).
+const CARD = { width: 1200, height: 630 };
+
+// The whole picture on a canvas, at least `min` on its short side. Through an
+// <img> rather than createImageBitmap, which won't read an SVG in every
+// browser; and whole first, because an SVG sized in percent says 150×150 and
+// is drawn at whatever it's asked for, so a piece cut from the <img> itself
+// came out a corner.
+async function whole(file: Blob, min: number): Promise<HTMLCanvasElement> {
   const url = URL.createObjectURL(file);
   try {
     const img = new Image();
     img.src = url;
     await img.decode();
-    const w = img.naturalWidth || size;
-    const h = img.naturalHeight || size;
-    const k = Math.max(1, size / Math.min(w, h));
-    const whole = document.createElement("canvas");
-    whole.width = Math.round(w * k);
-    whole.height = Math.round(h * k);
-    whole.getContext("2d")!.drawImage(img, 0, 0, whole.width, whole.height);
-    const side = Math.min(whole.width, whole.height);
+    const w = img.naturalWidth || min;
+    const h = img.naturalHeight || min;
+    const k = Math.max(1, min / Math.min(w, h));
     const canvas = document.createElement("canvas");
-    canvas.width = canvas.height = size;
-    const ctx = canvas.getContext("2d")!;
-    if (fill) {
-      ctx.fillStyle = fill;
-      ctx.fillRect(0, 0, size, size);
-    }
-    ctx.imageSmoothingQuality = "high";
-    ctx.drawImage(whole, (whole.width - side) / 2, (whole.height - side) / 2, side, side, 0, 0, size, size);
-    return await new Promise<Blob>((resolve, reject) =>
-      canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("the browser made no PNG"))), "image/png"));
+    canvas.width = Math.round(w * k);
+    canvas.height = Math.round(h * k);
+    canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
+    return canvas;
   } finally {
     URL.revokeObjectURL(url);
   }
+}
+
+// A canvas of `width`×`height`, filled when asked, to draw on.
+function sheet(width: number, height: number, fill?: string) {
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d")!;
+  if (fill) {
+    ctx.fillStyle = fill;
+    ctx.fillRect(0, 0, width, height);
+  }
+  ctx.imageSmoothingQuality = "high";
+  return { canvas, ctx };
+}
+
+const encoded = (canvas: HTMLCanvasElement, type: string) =>
+  new Promise<Blob>((resolve, reject) =>
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("the browser made no picture"))), type, 0.86));
+
+// The middle square of a picture, at `size` pixels, as a PNG.
+export async function squarePng(file: Blob, size: number, fill?: string): Promise<Blob> {
+  const from = await whole(file, size);
+  const side = Math.min(from.width, from.height);
+  const { canvas, ctx } = sheet(size, size, fill);
+  ctx.drawImage(from, (from.width - side) / 2, (from.height - side) / 2, side, side, 0, 0, size, size);
+  return encoded(canvas, "image/png");
+}
+
+// The site's card from a picture: its middle, cut to the card's shape.
+export async function cardJpeg(file: Blob): Promise<Blob> {
+  const from = await whole(file, CARD.width);
+  const w = Math.min(from.width, from.height * CARD.width / CARD.height);
+  const h = w * CARD.height / CARD.width;
+  const { canvas, ctx } = sheet(CARD.width, CARD.height, WHITE);
+  ctx.drawImage(from, (from.width - w) / 2, (from.height - h) / 2, w, h, 0, 0, CARD.width, CARD.height);
+  return encoded(canvas, "image/jpeg");
+}
+
+// The site's card from its icon: the icon in the middle, on white.
+export async function iconCard(file: Blob): Promise<Blob> {
+  const side = Math.round(CARD.height * 0.6);
+  const from = await whole(file, side);
+  const s = Math.min(from.width, from.height);
+  const { canvas, ctx } = sheet(CARD.width, CARD.height, WHITE);
+  ctx.drawImage(from, (from.width - s) / 2, (from.height - s) / 2, s, s, (CARD.width - side) / 2, (CARD.height - side) / 2, side, side);
+  return encoded(canvas, "image/jpeg");
 }
 
 export function SiteIcon() {
@@ -68,7 +111,7 @@ export function SiteIcon() {
     busy.set(true);
     try {
       const form = new FormData();
-      form.append("apple-touch-icon.png", await squarePng(file, 180, HOME_FILL), "apple-touch-icon.png");
+      form.append("apple-touch-icon.png", await squarePng(file, 180, WHITE), "apple-touch-icon.png");
       form.append("favicon.ico", await squarePng(file, 48), "favicon.ico");
       const data = await apiJson<Icons>("set the site's icon", "/edit/site-icon", { method: "POST", body: form });
       if (data) icons.set(data);
@@ -79,8 +122,40 @@ export function SiteIcon() {
     }
   };
 
+  // The card: made from a picture chosen, or from the icon; or taken away.
+  const carding = signal(false);
+  let cardPicker: HTMLInputElement | null = null;
+  const sendCard = async (what: string, make: () => Promise<Blob>) => {
+    carding.set(true);
+    try {
+      const form = new FormData();
+      form.append("card.jpg", await make(), "card.jpg");
+      const data = await apiJson<Icons>("set the site's sharing card", "/edit/site-icon?card", { method: "POST", body: form });
+      if (data) icons.set(data);
+    } catch (err) {
+      speak(`Couldn't read ${what} as a picture: ${(err as Error).message}`);
+    } finally {
+      carding.set(false);
+    }
+  };
+  const chooseCard = (e: Event) => {
+    const input = e.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = "";
+    if (file) sendCard(file.name, () => cardJpeg(file));
+  };
+  const fromIcon = () => sendCard("the icon", async () => iconCard(await (await fetch(home.peek()!)).blob()));
+  const dropCard = async () => {
+    const data = await apiJson<Icons>("take the sharing card away", "/edit/site-icon?card", { method: "DELETE" });
+    if (data) icons.set(data);
+  };
+
   const home = computed(() => icons.get()?.["apple-touch-icon.png"] ?? null);
   const tab = computed(() => icons.get()?.["favicon.ico"] ?? null);
+  const card = computed(() => icons.get()?.card ?? null);
+  // What a shared link to the front page says under its picture.
+  const said = () => icons.get()?.home?.title || location.host;
+  const described = () => icons.get()?.home?.description ?? "";
 
   return (
     <div class="sidebar-content site-icon">
@@ -137,9 +212,51 @@ export function SiteIcon() {
       <input type="file" accept="image/*" onchange={choose} class="hidden-file" tabindex="-1"
         ref={(el: HTMLInputElement) => { picker = el; }} />
       <button class="icon-choose" aria-busy={busy.map(String)} disabled={busy}
+        aria-label={busy.map((b) => (b ? "Setting the icon…" : "Choose a picture for the icon"))}
         onclick={() => picker?.click()}>
         <Icon name="upload" size={12} /> {busy.map((b) => (b ? "Setting the icon…" : "Choose a picture…"))}
       </button>
+
+      <h4 class="site-icon-heading">Sharing</h4>
+      <p class="drawer-note">
+        The picture a link to the site shows when it's shared — in a message, on
+        social media — for any page that doesn't name one with <code>image:</code>.
+      </p>
+      {/* As a shared link would look: the card, and the front page's words
+          under it; with no card, the icon, small. */}
+      {when(icons, () => (
+        <figure class="share">
+          <div class={card.map((c) => (c ? "share-card" : "share-card small"))}>
+            {when(card, () => <img src={card} alt="The site's sharing card" />,
+              () => when(home, () => <img src={home} alt="The site's icon, which a shared link shows with no card" />))}
+            <div class="share-words">
+              <span class="share-host">{() => location.host}</span>
+              <strong>{said}</strong>
+              {when(described, () => <span>{described}</span>)}
+            </div>
+          </div>
+          <figcaption>a shared link</figcaption>
+        </figure>
+      ))}
+      {when(() => icons.get() && !card.get(), () => (
+        <p class="drawer-note">{() => (home.get()
+          ? "No card yet: a shared link shows the icon, small."
+          : "No card yet, and no icon: a shared link shows no picture.")}</p>
+      ))}
+      <input type="file" accept="image/*" onchange={chooseCard} class="hidden-file" tabindex="-1"
+        ref={(el: HTMLInputElement) => { cardPicker = el; }} />
+      <div class="share-actions">
+        <button aria-busy={carding.map(String)} disabled={carding} onclick={() => cardPicker?.click()}
+          aria-label={carding.map((b) => (b ? "Making the card…" : "Choose a picture for the card"))}>
+          <Icon name="upload" size={12} /> {carding.map((b) => (b ? "Making the card…" : "Choose a picture…"))}
+        </button>
+        {when(home, () => (
+          <button disabled={carding} onclick={fromIcon}>Make one from the icon</button>
+        ))}
+        {when(card, () => (
+          <button class="danger-subtle" disabled={carding} onclick={dropCard} aria-label="Remove the card">Remove</button>
+        ))}
+      </div>
     </div>
   );
 }

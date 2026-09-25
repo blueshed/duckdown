@@ -3,7 +3,7 @@
 import { describe, test, expect, beforeAll, afterAll, afterEach, beforeEach, spyOn, mock } from "bun:test";
 import { createElement, mount, batch, signal, when } from "@blueshed/railroad";
 import { BASE, SITE, signIn, waitFor, keepSite } from "./helpers";
-import { mkdirSync, writeFileSync, readFileSync, rmSync } from "fs";
+import { mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from "fs";
 import { join } from "path";
 import { api, apiJson, urlPath } from "../server/edit/api";
 import { notice, news, speak, tell, hush } from "../server/edit/notice";
@@ -29,8 +29,9 @@ import { HelpDrawer, helpFirst, helpOrder } from "../server/edit/components/Help
 import { Drawers, LeftDrawer } from "../server/edit/components/Drawers";
 import { PublishButton, publishState, refreshPublish } from "../server/edit/components/Publish";
 import { ImageBrowser } from "../server/edit/components/ImageBrowser";
-import { SiteIcon, squarePng } from "../server/edit/components/SiteIcon";
+import { SiteIcon, squarePng, cardJpeg, iconCard } from "../server/edit/components/SiteIcon";
 import { PreviewFrame, withoutScripts } from "../server/edit/components/PreviewFrame";
+import { siteChanged } from "../server/kept";
 import { ResourceList } from "../server/edit/components/ResourceList";
 import { ResourcePane } from "../server/edit/components/ResourcePane";
 import { CollectionPane, itemAddresses, firstWork, same } from "../server/edit/components/CollectionPane";
@@ -1668,9 +1669,12 @@ describe("SiteIcon", () => {
           fillRect: (...a: unknown[]) => drawn.push(["fillRect", ...a]),
           drawImage: (img: unknown, ...a: unknown[]) => drawn.push(["drawImage", img === canvas ? "self" : (img as any)?.getContext ? "canvas" : "img", ...a]),
         }),
-        toBlob: (done: (b: Blob | null) => void) => {
+        toBlob: (done: (b: Blob | null) => void, type: string) => {
           if (noPng) return done(null);
-          png(canvas.width).then((bytes) => done(new Blob([bytes], { type: "image/png" })));
+          const made = type === "image/jpeg"
+            ? new Bun.Image(source).resize(canvas.width, canvas.height, { fit: "fill" }).jpeg().bytes()
+            : png(canvas.width);
+          made.then((bytes) => done(new Blob([new Uint8Array(bytes)], { type })));
         },
       };
       return canvas;
@@ -1682,8 +1686,10 @@ describe("SiteIcon", () => {
     canvases.mockRestore();
     const statics = join(SITE, "static");
     rmSync(join(statics, "apple-touch-icon.png"), { force: true });
+    rmSync(join(statics, "card.jpg"), { force: true });
     writeFileSync(join(statics, "favicon.ico"), source);
     rmSync(join(SITE, ".history", "static"), { recursive: true, force: true });
+    siteChanged();
   });
 
   test("squarePng cuts the middle square, fills behind it when asked, and says when it made nothing", async () => {
@@ -1708,7 +1714,80 @@ describe("SiteIcon", () => {
     expect(drawn[0]).toEqual(["drawImage", "img", 0, 0, 96, 48]);
 
     noPng = true;
-    await expect(squarePng(new Blob(["x"]), 48)).rejects.toThrow("the browser made no PNG");
+    await expect(squarePng(new Blob(["x"]), 48)).rejects.toThrow("the browser made no picture");
+  });
+
+  test("a card is the middle of a picture at 1200×630 on white, or the icon in the middle of white", async () => {
+    await cardJpeg(new Blob(["wide"]));
+    expect(drawn).toEqual([
+      ["drawImage", "img", 0, 0, 1800, 1200],                            // drawn up to the card's width
+      ["fillStyle", "#ffffff"],
+      ["fillRect", 0, 0, 1200, 630],
+      ["drawImage", "canvas", 0, 127.5, 1800, 945, 0, 0, 1200, 630],     // its middle, the card's shape
+    ]);
+    drawn = [];
+    natural = { w: 180, h: 180 };
+    await iconCard(new Blob(["icon"]));
+    expect(drawn).toEqual([
+      ["drawImage", "img", 0, 0, 378, 378],
+      ["fillStyle", "#ffffff"],
+      ["fillRect", 0, 0, 1200, 630],
+      ["drawImage", "canvas", 0, 0, 378, 378, 411, 126, 378, 378],      // 60% of the height, centred
+    ]);
+  });
+
+  test("the sharing card: shown as a shared link shows it, chosen, made from the icon, taken away", async () => {
+    const { host, dispose } = render(() => <SiteIcon />);
+    await waitFor(() => host.querySelector(".share-card"));
+    // No card and no icon: a shared link has no picture, and there is no icon to make one from.
+    expect(host.querySelector(".share-card")!.className).toBe("share-card small");
+    expect(host.querySelector(".share-card img")).toBeNull();
+    expect(host.querySelector(".share-words strong")!.textContent).toBe("duckdown");   // the front page's title
+    expect(host.textContent).toContain("No card yet, and no icon: a shared link shows no picture.");
+    expect(button(host, "Make one from the icon")).toBeUndefined();
+    expect(button(host, "Remove")).toBeUndefined();
+    // Two choosers, each named for what it's for.
+    expect([...host.querySelectorAll("button[aria-label^='Choose']")].map((b) => b.getAttribute("aria-label")))
+      .toEqual(["Choose a picture for the icon", "Choose a picture for the card"]);
+
+    const [iconInput, cardInput] = [...host.querySelectorAll('input[type="file"]')] as HTMLInputElement[];
+    let opened = 0;
+    cardInput!.click = () => { opened++; };
+    click([...host.querySelectorAll(".share-actions button")][0]!);
+    expect(opened).toBe(1);
+    Object.defineProperty(cardInput, "files", { value: [], configurable: true });
+    cardInput!.dispatchEvent(new Event("change"));                    // nothing chosen: nothing happens
+    Object.defineProperty(cardInput, "files", { value: [new File(["wide"], "harbour.jpg")], configurable: true });
+    cardInput!.dispatchEvent(new Event("change"));
+    await waitFor(() => host.querySelector(".share-card img"));
+    expect(host.querySelector(".share-card")!.className).toBe("share-card");
+    expect(host.querySelector(".share-card img")!.getAttribute("src")).toMatch(/^\/static\/card\.jpg\?v=/);
+    const meta = await new Bun.Image(readFileSync(join(SITE, "static", "card.jpg"))).metadata();
+    expect([meta.format, meta.width, meta.height]).toEqual(["jpeg", 1200, 630]);
+
+    click(button(host, "Remove")!);
+    await waitFor(() => !host.querySelector(".share-card img"));
+    expect(existsSync(join(SITE, "static", "card.jpg"))).toBe(false);
+
+    // With an icon, a shared link shows it, small, and a card can be made from it.
+    Object.defineProperty(iconInput, "files", { value: [new File(["square"], "logo.png")], configurable: true });
+    iconInput!.dispatchEvent(new Event("change"));
+    await waitFor(() => button(host, "Make one from the icon"));
+    expect(host.querySelector(".share-card.small img")!.getAttribute("src")).toMatch(/^\/static\/apple-touch-icon\.png\?v=/);
+    expect(host.textContent).toContain("No card yet: a shared link shows the icon, small.");
+    drawn = [];
+    natural = { w: 180, h: 180 };
+    click(button(host, "Make one from the icon")!);
+    await waitFor(() => host.querySelector(".share-card:not(.small) img"));
+    expect(drawn.at(-1)).toEqual(["drawImage", "canvas", 0, 0, 378, 378, 411, 126, 378, 378]);
+
+    // A picture that won't read speaks.
+    undecodable = true;
+    Object.defineProperty(cardInput, "files", { value: [new File(["words"], "notes.txt")], configurable: true });
+    cardInput!.dispatchEvent(new Event("change"));
+    await waitFor(() => notice.get());
+    expect(notice.get()).toBe("Couldn't read notes.txt as a picture: The source image cannot be decoded.");
+    dispose();
   });
 
   test("shows the icons the site has, and sets both from one picture", async () => {
@@ -1781,7 +1860,9 @@ describe("SiteIcon", () => {
 
   test("a template that names its own icon is said, one or several", async () => {
     const answer = (elsewhere: { template: string; icons: string[] }[]) =>
-      intercept(() => Response.json({ "apple-touch-icon.png": null, "favicon.ico": null, elsewhere }));
+      intercept(() => Response.json({
+        "apple-touch-icon.png": null, "favicon.ico": null, elsewhere, card: null, home: { title: "", description: "Songs and news" },
+      }));
     let restore = answer([{ template: "site.html", icons: ["/static/images/mark.svg", "/static/favicon.png"] }]);
     try {
       const { host, dispose } = render(() => <SiteIcon />);
@@ -1791,6 +1872,9 @@ describe("SiteIcon", () => {
       expect(note.textContent).toContain("A template names its own icon, and the pages it wraps show that instead of this one:");
       expect(note.querySelector("li")!.textContent).toBe("templates/site.html — /static/images/mark.svg, /static/favicon.png");
       expect(note.textContent).toContain("Take out its <link rel=\"icon\"> lines");
+      // A front page with no title: a shared link says the site's address; its description under that.
+      expect([...host.querySelectorAll(".share-words > *")].map((e) => e.textContent))
+        .toEqual([location.host, location.host, "Songs and news"]);
       dispose();
       restore();
       restore = answer([{ template: "a.html", icons: ["/a.png"] }, { template: "b.html", icons: ["/b.png"] }]);

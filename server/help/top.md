@@ -21,7 +21,7 @@ date: 2005-10-24
 | `order:` | On a folder's `index.md`: a number, for where it comes in the menu |
 | `feed: true` | On a folder's `index.md`: its pages can be followed in a feed reader |
 | `toc: true` | A list of the page's sections under its title |
-| `image:` | The picture shown when the page is shared (`images/cover.jpg`) |
+| `image:` | The picture shown when the page is shared (`images/cover.jpg`); without one, the site's card (**Resources → icon**) |
 | `aliases:` | An old address that should still lead here (`/old-page`) |
 | `layout:` | Another template for this page (`post`) |
 | `css:` | An extra stylesheet for this page (`poster`) |

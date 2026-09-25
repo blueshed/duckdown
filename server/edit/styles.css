@@ -1607,6 +1607,80 @@ button.danger-subtle:hover {
   align-self: flex-start;
 }
 
+.site-icon-heading {
+  margin-top: var(--space-2);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border);
+  font-size: var(--text-md);
+}
+
+/* The card as a message or a feed shows a shared link: the picture over the
+   host, the title and the description — or, with no card, the icon beside
+   them, small. */
+.share {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.share figcaption {
+  font-size: var(--text-sm);
+  color: var(--text-dim);
+}
+
+.share-card {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.share-card img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1200 / 630;
+  object-fit: cover;
+}
+
+.share-card.small {
+  flex-direction: row;
+  align-items: center;
+}
+
+.share-card.small img {
+  flex: none;
+  width: 72px;
+  aspect-ratio: 1;
+}
+
+.share-words {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-0-5);
+  min-width: 0;
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.share-words > * {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.share-host {
+  color: var(--text-dim);
+}
+
+.share-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
 /* A template that names its own icon: said beside the one set here. */
 .icon-elsewhere {
   display: flex;

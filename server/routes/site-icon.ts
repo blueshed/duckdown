@@ -1,8 +1,11 @@
 import type { BunRequest } from "bun";
 import { requireAuth } from "../auth";
-import { createStaticStorage, createTemplateStorage, storageAt } from "../storage";
+import { createStaticStorage, createTemplateStorage, createPageStorage, storageAt } from "../storage";
 import { History, HISTORY_PATH } from "../history";
 import { rootFile } from "../base";
+import { ICONS, CARD } from "../icons";
+import { siteChanged } from "../kept";
+import { parseFrontMatter } from "../markdown";
 
 // /edit/site-icon — the site's icon, set from the editor. The site answers
 // two files at its root (base.ts): favicon.ico on a browser tab and
@@ -20,25 +23,37 @@ import { rootFile } from "../base";
 // a page names no icon. A template that names one of its own wins, though, so
 // the tab would show an icon its readers never see — GET says which templates
 // do, and what they name.
+//
+// ?card is the site's sharing card (icons.ts): the picture a link to the site
+// shows when it's shared, for any page that names none of its own. A JPEG,
+// 1200×630, made the same way; DELETE takes it away, and the pages go back to
+// sharing the home-screen icon. A write here changes what every page shares,
+// so it drops what the site knows about itself, as a page's save does.
 
-export const ICONS = { "apple-touch-icon.png": 180, "favicon.ico": 48 } as const;
 type IconName = keyof typeof ICONS;
 const NAMES = Object.keys(ICONS) as IconName[];
 
 const statics = createStaticStorage();
+const pages = createPageStorage();
 const templates = createTemplateStorage();
 const history = new History(storageAt(`${HISTORY_PATH}static/`));
 
-// Where each one is now, with ?v= so a new one isn't hidden by the browser's
-// copy of the old; null for one the site doesn't have.
+// Where one is now, with ?v= so a new one isn't hidden by the browser's copy
+// of the old; null when the site doesn't have it.
+const where = async (name: string) =>
+  await statics.exists(name) ? `/static/${name}?v=${Bun.hash(await statics.readBytes(name)).toString(36)}` : null;
+
 async function icons(): Promise<Record<IconName, string | null>> {
   const out = {} as Record<IconName, string | null>;
-  for (const name of NAMES) {
-    out[name] = await statics.exists(name)
-      ? `/static/${name}?v=${Bun.hash(await statics.readBytes(name)).toString(36)}`
-      : null;
-  }
+  for (const name of NAMES) out[name] = await where(name);
   return out;
+}
+
+// What a shared link to the front page says under its picture, for the tab
+// to draw the card as it will look.
+async function home(): Promise<{ title: string; description: string }> {
+  const meta = await pages.exists("index.md") ? parseFrontMatter(await pages.read("index.md")).meta : {};
+  return { title: meta.title?.[0] ?? "", description: meta.description?.[0] ?? "" };
 }
 
 // <link rel="icon">, and the home-screen kind; not Safari's mask-icon, which
@@ -78,18 +93,25 @@ async function elsewhere(): Promise<{ template: string; icons: string[] }[]> {
   return out;
 }
 
-// What the tab shows: the two icons, and any template naming its own.
-const answer = async () => ({ ...(await icons()), elsewhere: await elsewhere() });
+// What the tab shows: the two icons, any template naming its own, the card.
+const answer = async () => ({
+  ...(await icons()), elsewhere: await elsewhere(), card: await where(CARD.name), home: await home(),
+});
 
-// Why these bytes aren't the icon they're sent as, or null when they are.
-async function wrong(name: IconName, bytes: Uint8Array): Promise<string | null> {
-  const size = ICONS[name];
+// Why these bytes aren't the picture they're sent as, or null when they are.
+async function wrong(name: string, bytes: Uint8Array, format: "png" | "jpeg", width: number, height: number): Promise<string | null> {
   const meta = await new Bun.Image(bytes).metadata().catch(() => null);
-  if (meta?.format !== "png") return `${name} wasn't sent as a PNG`;
-  if (meta.width !== size || meta.height !== size) {
-    return `${name} should be ${size}×${size}, and was ${meta.width}×${meta.height}`;
+  if (meta?.format !== format) return `${name} wasn't sent as a ${format === "png" ? "PNG" : "JPEG"}`;
+  if (meta.width !== width || meta.height !== height) {
+    return `${name} should be ${width}×${height}, and was ${meta.width}×${meta.height}`;
   }
   return null;
+}
+
+// Keep what was there, as any save does, then write.
+async function put(name: string, bytes: Uint8Array): Promise<void> {
+  if (await statics.exists(name)) await history.save(name, await statics.readBytes(name), true);
+  await statics.write(name, bytes);
 }
 
 export const handleSiteIcon = {
@@ -99,25 +121,40 @@ export const handleSiteIcon = {
     return Response.json(await answer());
   },
 
-  // Both or neither: a tab and a home screen showing two different icons is
-  // worse than either one old.
+  // The icons: both or neither — a tab and a home screen showing two
+  // different icons is worse than either one old. With ?card, the card.
   async POST(req: BunRequest) {
     const denied = await requireAuth(req);
     if (denied) return denied;
     const form = await req.formData();
-    const sent = new Map<IconName, Uint8Array>();
-    for (const name of NAMES) {
+    const card = new URL(req.url).searchParams.has("card");
+    const wanted: [string, "png" | "jpeg", number, number][] = card
+      ? [[CARD.name, "jpeg", CARD.width, CARD.height]]
+      : NAMES.map((name) => [name, "png", ICONS[name], ICONS[name]]);
+    const sent = new Map<string, Uint8Array>();
+    for (const [name, format, width, height] of wanted) {
       const file = form.get(name);
       if (!(file instanceof File)) return new Response(`No ${name} was sent`, { status: 400 });
       const bytes = new Uint8Array(await file.arrayBuffer());
-      const why = await wrong(name, bytes);
+      const why = await wrong(name, bytes, format, width, height);
       if (why) return new Response(why, { status: 422 });
       sent.set(name, bytes);
     }
-    for (const [name, bytes] of sent) {
-      if (await statics.exists(name)) await history.save(name, await statics.readBytes(name), true);
-      await statics.write(name, bytes);
+    for (const [name, bytes] of sent) await put(name, bytes);
+    siteChanged();
+    return Response.json(await answer());
+  },
+
+  // ?card only: the icons are never taken away, only replaced.
+  async DELETE(req: BunRequest) {
+    const denied = await requireAuth(req);
+    if (denied) return denied;
+    if (!new URL(req.url).searchParams.has("card")) return new Response("Only the card can be taken away", { status: 400 });
+    if (await statics.exists(CARD.name)) {
+      await history.save(CARD.name, await statics.readBytes(CARD.name), true);
+      await statics.remove(CARD.name);
     }
+    siteChanged();
     return Response.json(await answer());
   },
 };

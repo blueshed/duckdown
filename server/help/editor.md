@@ -24,6 +24,8 @@ takes you back — with everything as you left it, unsaved words included.
 - **Resources → icon** sets the site's icon: the picture on a browser tab and
   on a phone's home screen. Choose any picture; a square one is best. If a
   template names an icon of its own, the tab says which: that one wins.
+  Under it, **Sharing** is the picture a link to the site shows when it's
+  shared: choose one, or make it from the icon.
 - **Editors** is who can sign in: add someone, change a password.
 
 ## When something goes wrong

@@ -8,6 +8,12 @@
   skill's copy, exports again and compares every file, then prints the
   changelog in between. A version that won't install or can't export the site
   is put back. It commits nothing.
+- **A picture for every shared link.** The icon tab has a **Sharing** card:
+  the picture a link to the site shows in a message or on social media,
+  1200×630, cut from any picture or made from the icon, shown as a shared
+  link would look. Any page that doesn't name its own `image:` shares it —
+  or, with no card, the home-screen icon, small — so a site with only an
+  icon now has a picture when its links are shared.
 
 ## 0.12.2 — 2026-09-25
 

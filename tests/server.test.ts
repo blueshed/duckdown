@@ -899,6 +899,49 @@ describe("folders, the edit link, layouts, drafts and listings", () => {
     expect(work).toContain(`<meta property="og:image" content="${BASE}/static/images/gallery/one.svg">`);
   });
 
+  test("a page with no picture of its own shares the site's card, else its icon, small", async () => {
+    const statics = join(SITE, "static");
+    const tags = async () => (await (await fetch(`${BASE}/`)).text()).match(/<meta (?:property="og:image[^"]*"|name="twitter:card") content="[^"]*">/g);
+    const card = new Uint8Array(await new Bun.Image(readFileSync("tests/example/static/favicon.ico")).resize(1200, 630, { fit: "fill" }).jpeg().bytes());
+    const icon = new Uint8Array(await new Bun.Image(readFileSync("tests/example/static/favicon.ico")).resize(180, 180).png().bytes());
+    const send = (name: string, body: Uint8Array<ArrayBuffer>) => {
+      const form = new FormData();
+      form.append(name, new Blob([body]), name);
+      return fetch(`${BASE}/edit/site-icon?card`, { ...authed(), method: "POST", body: form });
+    };
+    try {
+      expect(await tags()).toBeNull();                                    // neither: no picture
+      writeFileSync(join(statics, "apple-touch-icon.png"), icon);
+      siteChanged();                                                      // written by hand: say so, as the tab does
+      expect(await tags()).toEqual([
+        `<meta property="og:image" content="${BASE}/static/apple-touch-icon.png">`,
+        '<meta property="og:image:width" content="180">',
+        '<meta property="og:image:height" content="180">',
+        '<meta name="twitter:card" content="summary">',
+      ]);
+      expect((await send("card.jpg", card)).status).toBe(200);           // the tab drops what pages knew
+      expect(await tags()).toEqual([
+        `<meta property="og:image" content="${BASE}/static/card.jpg">`,
+        '<meta property="og:image:width" content="1200">',
+        '<meta property="og:image:height" content="630">',
+        '<meta name="twitter:card" content="summary_large_image">',
+      ]);
+      // A page's own picture is still its own, and says no size it doesn't know.
+      await put("pictured.md", "title: Pictured\nimage: images/green.svg\n\n# P");
+      const own = await (await fetch(`${BASE}/pictured.html`)).text();
+      expect(own).toContain(`<meta property="og:image" content="${BASE}/static/images/green.svg">`);
+      expect(own).not.toContain("og:image:width");
+      const gone = await fetch(`${BASE}/edit/site-icon?card`, { ...authed(), method: "DELETE" });
+      expect((await gone.json()).card).toBeNull();
+      expect((await tags())!.at(-1)).toBe('<meta name="twitter:card" content="summary">');   // back to the icon
+      expect(existsSync(join(SITE, ".history", "static", "card.jpg"))).toBe(true);      // kept, like any delete
+    } finally {
+      for (const name of ["apple-touch-icon.png", "card.jpg"]) rmSync(join(statics, name), { force: true });
+      rmSync(join(SITE, ".history", "static"), { recursive: true, force: true });
+      siteChanged();
+    }
+  });
+
   test("image: is a full URL as it is, a site path after the origin, and never a climb", async () => {
     const card = async (image: string) => {
       await put("pictured.md", `title: Pictured\nimage: ${image}\n\n# P`);
@@ -1226,6 +1269,29 @@ describe("the site's icon, set from the editor", () => {
       rmSync(join(statics, "apple-touch-icon.png"), { force: true });
       rmSync(join(SITE, ".history", "static"), { recursive: true, force: true });
     }
+  });
+
+  test("the card: a JPEG of 1200×630, or nothing; only it can be taken away", async () => {
+    const card = (w: number, h: number) => new Bun.Image(readFileSync("tests/example/static/favicon.ico")).resize(w, h, { fit: "fill" });
+    const sendCard = async (body?: Uint8Array<ArrayBuffer>) => {
+      const form = new FormData();
+      if (body) form.append("card.jpg", new Blob([body]), "card.jpg");
+      const res = await fetch(`${BASE}/edit/site-icon?card`, { ...authed(), method: "POST", body: form });
+      return `${res.status} ${await res.text()}`;
+    };
+    expect(await sendCard()).toBe("400 No card.jpg was sent");
+    expect(await sendCard(new Uint8Array(await card(1200, 630).png().bytes()))).toBe("422 card.jpg wasn't sent as a JPEG");
+    expect(await sendCard(new Uint8Array(await card(1000, 630).jpeg().bytes()))).toBe("422 card.jpg should be 1200×630, and was 1000×630");
+    expect(existsSync(join(SITE, "static", "card.jpg"))).toBe(false);
+    const plain = await fetch(`${BASE}/edit/site-icon`, { ...authed(), method: "DELETE" });
+    expect(`${plain.status} ${await plain.text()}`).toBe("400 Only the card can be taken away");
+    expect((await fetch(`${BASE}/edit/site-icon?card`, { method: "DELETE" })).status).toBe(401);
+    // Taking away a card there isn't is nothing to do, and says so by answering as it is.
+    const none = await fetch(`${BASE}/edit/site-icon?card`, { ...authed(), method: "DELETE" });
+    expect((await none.json()).card).toBeNull();
+    // What a shared link says under the card: the front page's own words.
+    const { home } = await (await fetch(`${BASE}/edit/site-icon`, authed())).json();
+    expect(home).toEqual({ title: "duckdown", description: expect.any(String) });
   });
 
   test("refuses what isn't the icon it's sent as, and writes neither", async () => {

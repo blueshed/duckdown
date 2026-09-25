@@ -5,6 +5,7 @@ import { siteNav, markCurrent, folderListing, siteMap } from "./nav";
 import { feedLink } from "./feed";
 import { fillCollections, fillItem, itemMeta, itemBody, type ItemContext } from "./collection";
 import { escapeHtml, outsideCode, canonicalPath, dateHtml } from "./utils";
+import { sitePicture } from "./icons";
 
 const site = createStorage();
 const pages = createPageStorage();
@@ -194,6 +195,9 @@ export async function pageHtml(page: Page, o: PageOptions): Promise<{ html: stri
   // No origin (an export without DUCKDOWN_ORIGIN) means no feed is written,
   // so there is none to link to.
   const feed = o.origin && html.includes("{{feed}}") ? await feedLink(pages, folderOf(file)) : "";
+  // A page that names no picture of its own shares the site's: its card, else
+  // its home-screen icon (icons.ts).
+  const shared = !meta.image?.[0] && o.origin && html.includes("{{description}}") ? await sitePicture() : null;
   for (const [name, value] of [
     ["title", () => escapeHtml(title)],
     ["url", () => escapeHtml(o.origin + canonicalPath(page.key))],
@@ -201,16 +205,21 @@ export async function pageHtml(page: Page, o: PageOptions): Promise<{ html: stri
     // The page's description, and the card a link to it shows when shared:
     // Open Graph, which most places that unfurl a link read. Addresses in it
     // are absolute, so without an origin (an export with no DUCKDOWN_ORIGIN)
-    // the URL and the picture are left out rather than written relative.
+    // the URL and the picture are left out rather than written relative. The
+    // site's own picture says its size, so a card can be drawn before it loads;
+    // an icon is a small card, not a large one.
     ["description", () => {
-      const picture = pictureUrl(meta.image?.[0] ?? "", o.origin);
+      const picture = pictureUrl(meta.image?.[0] || shared?.file || "", o.origin);
+      const large = !shared || shared.large;
       const tag = (attr: string, name: string, value: string) => `<meta ${attr}="${name}" content="${escapeHtml(value)}">`;
       return [
         ...(description ? [tag("name", "description", description), tag("property", "og:description", description)] : []),
         tag("property", "og:title", title),
         tag("property", "og:type", meta.date ? "article" : "website"),
         ...(o.origin ? [tag("property", "og:url", o.origin + encodeURI(canonicalPath(page.key)))] : []),
-        ...(picture ? [tag("property", "og:image", picture), tag("name", "twitter:card", "summary_large_image")] : []),
+        ...(picture ? [tag("property", "og:image", picture)] : []),
+        ...(picture && shared ? [tag("property", "og:image:width", String(shared.width)), tag("property", "og:image:height", String(shared.height))] : []),
+        ...(picture ? [tag("name", "twitter:card", large ? "summary_large_image" : "summary")] : []),
       ].join("\n  ");
     }],
     ["nav", () => nav ? `<nav><ul class="nav">${nav}</ul></nav>` : ""],
