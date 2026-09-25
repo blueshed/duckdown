@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.14.1 — 2026-09-25
+
+- The authoring skill says what vashti's run showed: after `duckdown images`
+  writes a served site's widths into its bucket from outside, restart the
+  site, which keeps what it has read of each folder until a change made
+  through it. Nothing else changes.
+
 ## 0.14.0 — 2026-09-25
 
 - **A shared picture says what it is** (`og:image:alt`): the site's card
