@@ -9,8 +9,21 @@ import { join } from "path";
 const BASE_DIR = join(import.meta.dir, "base");
 
 // Files a crawler or a browser asks for at the root, answered from static/.
-// A list of two, on purpose: nothing else is worth a mechanism.
-export const ROOT_FILES = ["robots.txt", "favicon.ico"];
+// A short list, on purpose: nothing else is worth a mechanism.
+export const ROOT_FILES = ["robots.txt", "favicon.ico", "apple-touch-icon.png"];
+
+// An iPhone putting a site on its home screen, or an app drawing a link's
+// preview, asks the root for the icon under several names — plain,
+// -precomposed, and sized (-120x120, -180x180-precomposed) — whatever the page
+// says in its <link rel="apple-touch-icon">. One picture answers them all:
+// static/apple-touch-icon.png, which iOS scales.
+const TOUCH_ICON = /^apple-touch-icon(-\d+x\d+)?(-precomposed)?\.png$/;
+
+// The file in static/ a root address is answered from, or null.
+export function rootFile(path: string): string | null {
+  if (ROOT_FILES.includes(path)) return path;
+  return TOUCH_ICON.test(path) ? "apple-touch-icon.png" : null;
+}
 
 export const BASE_FILES = ["site.css", "search.js"];
 

@@ -6,7 +6,7 @@ import { logView } from "../log";
 import { decodePath, conditional } from "../utils";
 import { NOT_FOUND, aliasTarget } from "../search";
 import { itemAt, collectionPath } from "../collection";
-import { ROOT_FILES } from "../base";
+import { rootFile } from "../base";
 import { APP_PATH, IS_S3, ORIGIN } from "../config";
 import { hostAnswer, hostOf, looking } from "../hosts";
 import { existsSync } from "fs";
@@ -118,8 +118,9 @@ const renderPage = async (req: Request) => {
   const decoded = decodePath(url.pathname);
   if (decoded === null) return new Response("Bad Request", { status: 400 });
   const path = decoded.replace(/^\//, "") || "index.html";
-  if (ROOT_FILES.includes(path)) {
-    const file = await staticFile(req, path);
+  const root = rootFile(path);
+  if (root) {
+    const file = await staticFile(req, root);
     if (file) return file;
   }
   // A folder's feed, when its index asks for one (feed.ts); otherwise the

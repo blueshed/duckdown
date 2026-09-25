@@ -210,6 +210,12 @@ export async function exportSite(o: {
     write(name, await files.readBytes(name));
     count.files++;
   }
+  // The icon's other plain name, as a file of its own: a static host has no
+  // rule to answer it with. (serve.ts answers the sized names too.)
+  if (await files.exists("apple-touch-icon.png")) {
+    write("apple-touch-icon-precomposed.png", await files.readBytes("apple-touch-icon.png"));
+    count.files++;
+  }
 
   // The same index the served site answers at /search.json, as a file. A
   // published site has no server to ask, so the browser fetches this and does

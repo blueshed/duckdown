@@ -23,7 +23,8 @@ It's the folder `DUCKDOWN_PATH` names in `.env`:
 pages/        the site: every .md is a page, every folder can have an index.md
               a folder may also hold collection.json — a gallery or catalogue's
               data — and an each: page that every item gets (Collections in reference.md)
-static/       served as-is at /static/ — site.css, theme.css, images/, favicon.ico
+static/       served as-is at /static/ — site.css, theme.css, images/, favicon.ico,
+              apple-touch-icon.png (the home-screen picture)
 templates/    site.html wraps every page and links the stylesheets;
               layout: picks another
 users.json    who can sign in (password hashes)

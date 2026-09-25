@@ -159,6 +159,19 @@ describe("an export of nothing", () => {
 });
 
 describe("what a published site needs beside its pages", () => {
+  test("the home-screen icon at the root, under its two plain names", async () => {
+    const icon = join(SITE, "static", "apple-touch-icon.png");
+    writeFileSync(icon, "PNG-BYTES");
+    try {
+      const dir = out("icon");
+      await exportSite({ out: dir, origin: "https://example.com", say: quiet });
+      expect(read(dir, "apple-touch-icon.png")).toBe("PNG-BYTES");
+      expect(read(dir, "apple-touch-icon-precomposed.png")).toBe("PNG-BYTES");
+    } finally {
+      rmSync(icon);
+    }
+  });
+
   test("robots.txt and favicon.ico at the root, the base it has no copy of, and a sitemap", async () => {
     const dir = out("crawlers");
     await exportSite({ out: dir, origin: "https://example.com", say: quiet, files: new LocalStorage(join(RUN, "no-statics")) });
@@ -171,6 +184,7 @@ describe("what a published site needs beside its pages", () => {
     await exportSite({ out: full, origin: "https://example.com", say: quiet });
     expect(read(full, "robots.txt")).toContain("Allow: /");
     expect(existsSync(join(full, "favicon.ico"))).toBe(true);
+    expect(existsSync(join(full, "apple-touch-icon.png"))).toBe(false);   // the seed has no icon: nothing written
     expect(existsSync(join(full, "static/robots.txt"))).toBe(true);   // and still where the editor has it
     const xml = read(full, "sitemap.xml");
     expect(xml).toContain("<loc>https://example.com/</loc>");

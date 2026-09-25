@@ -13,6 +13,7 @@ import { join, normalize, resolve } from "path";
 import { logView } from "./log";
 import { decodePath } from "./utils";
 import { hostAnswer, hostOf, looking } from "./hosts";
+import { rootFile } from "./base";
 
 export { looking };
 
@@ -44,7 +45,10 @@ async function route(req: Request, dir: string, origin: string): Promise<{ res: 
   const path = decodePath(url.pathname);
   if (path === null) return { res: new Response("Bad Request", { status: 400 }), html: false };
 
-  const found = await file(dir, path.endsWith("/") ? `${path}index.html` : path);
+  // An icon asked for under one of its other names (base.ts) is the one the
+  // export wrote at the root.
+  const found = await file(dir, path.endsWith("/") ? `${path}index.html` : path)
+    ?? (rootFile(path.slice(1)) === "apple-touch-icon.png" ? await file(dir, "/apple-touch-icon.png") : null);
   if (found) {
     // Short, and the same for everything: nothing here is content-hashed,
     // so a stylesheet edited this morning has to be able to show up.

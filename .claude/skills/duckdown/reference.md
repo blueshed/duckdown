@@ -54,7 +54,7 @@
 - Names may contain spaces (`About us.md` is `/About%20us.html`), but lowercase-with-dashes names make tidier URLs.
 - A folder whose name starts with `-` (say `-drafts/`) is left out of the navigation; its pages are still served to anyone with the URL. Names starting with `.` aren't listed in the editor.
 - A page that doesn't exist is a plain 404 — unless the site has `pages/404.md`, which is then the answer (with a 404 status). `bun run export` writes it as `404.html`, the file a static host serves for a miss. It stays out of the navigation, `{{pages}}` listings, search and the sitemap. The seed has one to copy.
-- `robots.txt` and `favicon.ico` in `static/` are also answered at the site's root (`/robots.txt`), where crawlers look, and exported there too, as well as at `/static/…`.
+- `robots.txt`, `favicon.ico` and `apple-touch-icon.png` in `static/` are also answered at the site's root (`/robots.txt`), where crawlers and phones look, and exported there too, as well as at `/static/…`. `apple-touch-icon.png` is the picture a phone puts on its home screen: a square PNG, 180×180 is plenty. An iPhone asks for it under several names (`-precomposed`, `-120x120`…) and every one of them answers with it, so one file is all a site needs; `<link rel="apple-touch-icon" href="/static/apple-touch-icon.png">` in a template says so too.
 
 ## Front matter
 
@@ -777,7 +777,7 @@ DUCKDOWN_ORIGIN=https://example.com bun run export     # into ./dist
 
 - Every page at its one canonical address: `/` and `/blog/` as `index.html`,
   `about.md` as `about.html`. Nothing written twice.
-- `static/` copied alongside, bytes and all, with the base files (`site.css`, `search.js`) the site has no copy of; `robots.txt` and `favicon.ico` also at the root.
+- `static/` copied alongside, bytes and all, with the base files (`site.css`, `search.js`) the site has no copy of; `robots.txt`, `favicon.ico` and `apple-touch-icon.png` (and its `-precomposed` copy) also at the root.
 - `sitemap.xml` at the root, from the same list of pages as search (no drafts, no 404 page), with `<lastmod>` from a page's `date:`. It needs `DUCKDOWN_ORIGIN`, being absolute addresses; the export says so when it is missing. The served site answers `/sitemap.xml` too. To point crawlers at it, add `Sitemap: https://example.com/sitemap.xml` to `robots.txt`.
 - Links are checked: every relative `href` and `src` that points at nothing in the site is reported as `page -> link`. It reports and carries on; `bun run export --strict` (or `DUCKDOWN_STRICT=1`) makes it a failure, for a deploy that should stop. Other sites, `#fragments` and the editor's own addresses are left alone.
 - An export that finds no pages at all — `DUCKDOWN_PATH` unset or wrong, an empty bucket — fails, and leaves `dist/` as it was, rather than publish an empty site and go green.

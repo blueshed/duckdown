@@ -1150,6 +1150,25 @@ describe("files a crawler asks for at the root", () => {
     expect((await fetch(`${BASE}/favicon.ico`)).status).toBe(200);
   });
 
+  test("the home-screen icon answers under every name an iPhone asks for it by", async () => {
+    const file = join(SITE, "static", "apple-touch-icon.png");
+    expect((await fetch(`${BASE}/apple-touch-icon.png`, named)).status).toBe(404);   // none yet: a miss
+    writeFileSync(file, "PNG-BYTES");
+    try {
+      for (const name of ["apple-touch-icon.png", "apple-touch-icon-precomposed.png",
+        "apple-touch-icon-120x120.png", "apple-touch-icon-180x180-precomposed.png"]) {
+        const res = await fetch(`${BASE}/${name}`, named);
+        expect(res.status).toBe(200);
+        expect(res.headers.get("content-type")).toContain("image/png");
+        expect(await res.text()).toBe("PNG-BYTES");
+      }
+      // Not one of its names: a miss, like any other.
+      expect((await fetch(`${BASE}/apple-touch-icon-big.png`, named)).status).toBe(404);
+    } finally {
+      rmSync(file);
+    }
+  });
+
   test("a site with none gets the 404 page, not an error", async () => {
     const file = join(SITE, "static", "robots.txt");
     const saved = readFileSync(file);

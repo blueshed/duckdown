@@ -1,6 +1,6 @@
 // The published flavour: a folder of files and nothing else.
 import { describe, test, expect } from "bun:test";
-import { mkdirSync, writeFileSync } from "fs";
+import { mkdirSync, rmSync, writeFileSync } from "fs";
 import { join } from "path";
 import { RUN } from "./helpers";
 import { serveDist, listen, looking } from "../server/serve";
@@ -26,6 +26,20 @@ async function ask(path: string, dir = dist) {
 }
 
 describe("serveDist", () => {
+  test("the home-screen icon answers under its sized names too", async () => {
+    expect((await ask("/apple-touch-icon-120x120-precomposed.png")).res.status).toBe(404);   // none written
+    writeFileSync(join(dist, "apple-touch-icon.png"), "PNG-BYTES");
+    try {
+      for (const name of ["/apple-touch-icon.png", "/apple-touch-icon-180x180.png", "/apple-touch-icon-120x120-precomposed.png"]) {
+        const { res } = await ask(name);
+        expect(res.status).toBe(200);
+        expect(await res.text()).toBe("PNG-BYTES");
+      }
+    } finally {
+      rmSync(join(dist, "apple-touch-icon.png"));
+    }
+  });
+
   test("a folder is its index, and a file is itself, cached briefly", async () => {
     const { res } = await ask("/blog/");
     expect(await res.text()).toBe("<h1>blog</h1>");
