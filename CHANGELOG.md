@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.13.3 — 2026-09-25
 
 - **Reports tell readers from scanners.** Bots probing for `/.env`,
   `/.git/config`, `/wp-login.php` and the like pose as browsers, so they
