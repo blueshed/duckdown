@@ -1,12 +1,12 @@
 import type { Storage } from "./storage";
 import { DEBUG } from "./config";
-import { renderMarkdown, yes } from "./markdown";
+import { renderMarkdown } from "./markdown";
 import { COLLECTION_FILE, aliasKey, loadCollection, itemBody, itemMeta } from "./collection";
 import { canonicalPath } from "./utils";
 import { kept } from "./kept";
+import { unlisted, pageKey, readable } from "./listed";
 
 // The site's own page for a miss: a page, but not one to search for, list or map.
-export const NOT_FOUND = "404.md";
 
 // What a reader can search: one entry per page and one per section of it, so a
 // result can take the reader to the place and not just the page. Small enough
@@ -72,10 +72,10 @@ export async function buildSite(pages: Storage, prefix = "", debug = DEBUG): Pro
 
   for (const f of files) {
     const key = f.path;
-    if (!key.endsWith(".md") || key === NOT_FOUND) continue;
+    if (!pageKey(key) || unlisted(f.name)) continue;
     const { content, meta } = renderMarkdown(await pages.read(key), key.replace(/\.md$/, ""));
     // An each: page is found by its collection, below, and is its items.
-    if (yes(meta.draft) || meta.each) continue;
+    if (!readable(meta)) continue;
     const url = canonicalPath(key);
     const title = meta.title?.[0] ?? key.replace(/\.md$/, "");
     const date = meta.date?.[0] ?? "";
@@ -112,7 +112,7 @@ export async function buildSite(pages: Storage, prefix = "", debug = DEBUG): Pro
   }
 
   for (const folder of folders.sort((a, b) => a.name.localeCompare(b.name))) {
-    if (folder.name.startsWith(".")) continue;
+    if (unlisted(folder.name)) continue;
     const inside = await buildSite(pages, folder.path, debug);
     out.entries.push(...inside.entries);
     out.pages.push(...inside.pages);

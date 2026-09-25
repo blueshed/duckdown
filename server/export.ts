@@ -23,6 +23,7 @@ import { buildSite } from "./search";
 import { COLLECTION_FILE, collectionProblems, loadCollection } from "./collection";
 import { canonicalPath, escapeHtml } from "./utils";
 import { brokenLinks } from "./links";
+import { hidden } from "./listed";
 import { yes } from "./markdown";
 import { BASE_FILES, ROOT_FILES, baseFile } from "./base";
 import { sitemapXml } from "./sitemap";
@@ -41,12 +42,13 @@ export function redirectHtml(to: string): string {
     + `</head><body><p>This page is now at <a href="${href}">${href}</a>.</p></body></html>\n`;
 }
 
-// Every key under a storage, depth first. Folders the site serves but keeps
-// out of the navigation (a leading `-`) are pages all the same, so they go.
+// Every key under a storage, depth first, but hidden ones (listed.ts). Names
+// the site serves but lists nowhere (a leading `-`) are pages all the same, so
+// they go.
 async function walk(store: Storage, prefix = ""): Promise<string[]> {
   const { files, folders } = await store.list(prefix);
-  const keys = files.map((f) => f.path);
-  for (const folder of folders) {
+  const keys = files.filter((f) => !hidden(f.name)).map((f) => f.path);
+  for (const folder of folders.filter((f) => !hidden(f.name))) {
     keys.push(...await walk(store, folder.path));
   }
   return keys;

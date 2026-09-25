@@ -59,6 +59,11 @@ describe("buildNav", () => {
     expect(await buildNav(memory({}))).toBe("");
   });
 
+  test("leaves out an index that is an each: page: its address is a miss", async () => {
+    const nav = await buildNav(memory({ "index.md": "title: Home\n\n", "works/index.md": "title: Works\neach: true\n\n" }));
+    expect(nav).toBe('<li><a href="/">Home</a></li>');
+  });
+
   test("escapes a folder's title, as every other walk does", async () => {
     const nav = await buildNav(memory({ "x/index.md": 'title: A <b>bold</b> & "co"\n\n' }));
     expect(nav).toBe('<li><a href="/x/">A &lt;b&gt;bold&lt;/b&gt; &amp; &quot;co&quot;</a></li>');

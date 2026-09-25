@@ -33,6 +33,20 @@ function memory(files: Record<string, string>, broken = ""): Storage {
   };
 }
 
+describe("what counts as a page", () => {
+  test("a - name is served but listed nowhere: not in search, not in the sitemap", async () => {
+    const built = await buildSite(memory({
+      "index.md": "title: Home\n\nhi",
+      "-notes.md": "title: Notes\n\nfor whoever has the address",
+      "-drafts/idea.md": "title: Idea\n\nlater",
+      "blog/-aside.md": "title: Aside\n\nquiet",
+      "blog/post.md": "title: Post\n\nloud",
+    }), "", true);
+    expect(built.pages.map((p) => p.url)).toEqual(["/", "/blog/post.html"]);
+    expect(built.entries.map((e) => e.title)).toEqual(["Home", "Post"]);
+  });
+});
+
 describe("buildIndex", () => {
   const site = () => memory({
     "index.md": "title: Home\ndescription: The front door\n\n# Home\n\nWelcome in.",

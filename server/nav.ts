@@ -2,7 +2,7 @@ import type { Storage } from "./storage";
 import { DEBUG } from "./config";
 import { buildNav, parseFrontMatter, yes, sortFolders } from "./markdown";
 import { escapeHtml, canonicalPath, dateHtml } from "./utils";
-import { NOT_FOUND } from "./search";
+import { unlisted, pageKey, readable } from "./listed";
 import { kept } from "./kept";
 
 // What the site knows about itself: its nav, and each folder's list of pages,
@@ -18,17 +18,17 @@ export const folderListing = (pages: Storage, folder: string, debug = DEBUG): Pr
 
 export type Listed = { key: string; href: string; title: string; date: string; description: string };
 
-// A folder's pages, newest first by date:, then by title. Its own index,
-// drafts, the 404 page, and anything starting with - are left out. The feed
-// (feed.ts) is made from these too, so it and {{pages}} agree.
+// A folder's pages, newest first by date:, then by title: what listed.ts says
+// is a page, less the folder's own index. The feed (feed.ts) is made from
+// these too, so it and {{pages}} agree.
 export async function folderEntries(pages: Storage, folder: string): Promise<Listed[]> {
   const { files } = await pages.list(folder);
   const entries: Listed[] = [];
 
   for (const file of files) {
-    if (!file.name.endsWith(".md") || file.name === "index.md" || file.name.startsWith("-") || file.path === NOT_FOUND) continue;
+    if (!pageKey(file.path) || file.name === "index.md" || unlisted(file.name)) continue;
     const { meta } = parseFrontMatter(await pages.read(file.path));
-    if (yes(meta.draft) || meta.each) continue;   // an each: page is its items, not a page
+    if (!readable(meta)) continue;
     entries.push({
       key: file.path,
       href: encodeURI(`/${file.path.replace(/\.md$/, ".html")}`),
@@ -69,8 +69,7 @@ async function buildSiteMap(pages: Storage, folder = ""): Promise<string> {
   }
   // Follows the nav's own order, so the two agree on which folder comes first.
   const { folders } = await pages.list(folder);
-  const eligible = folders.filter((f) => !f.name.startsWith(".") && !f.name.startsWith("-"));
-  for (const sub of await sortFolders(pages, eligible)) {
+  for (const sub of await sortFolders(pages, folders.filter((f) => !unlisted(f.name)))) {
     const path = sub.path;
     const inside = await buildSiteMap(pages, path);
     if (!inside) continue;

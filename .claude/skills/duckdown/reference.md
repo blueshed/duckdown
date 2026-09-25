@@ -52,7 +52,7 @@
 - Every `pages/**/*.md` is a page at the same path with `.html`, or without an extension: `pages/blog/first-post.md` is `/blog/first-post.html` and `/blog/first-post`.
 - `pages/index.md` is `/`, and a folder is served by its index: `/blog`, `/blog/` and `/blog/index.html` all reach `pages/blog/index.md`. The shortest is the page's canonical address — what the nav links to and what the page declares — so write links that way. A page of the same name wins over a folder (`blog.md` before `blog/index.md`).
 - Names may contain spaces (`About us.md` is `/About%20us.html`), but lowercase-with-dashes names make tidier URLs.
-- A folder whose name starts with `-` (say `-drafts/`) is left out of the navigation; its pages are still served to anyone with the URL. Names starting with `.` aren't listed in the editor.
+- A folder or page whose name starts with `-` (say `-drafts/`) is listed nowhere — not in the navigation, `{{pages}}`, `{{sitemap}}`, a feed, search or `sitemap.xml` — and still served (and exported) for anyone with the URL. Names starting with `.` aren't listed in the editor.
 - A page that doesn't exist is a plain 404 — unless the site has `pages/404.md`, which is then the answer (with a 404 status). `bun run export` writes it as `404.html`, the file a static host serves for a miss. It stays out of the navigation, `{{pages}}` listings, search and the sitemap. The seed has one to copy.
 - `robots.txt`, `favicon.ico` and `apple-touch-icon.png` in `static/` are also answered at the site's root (`/robots.txt`), where crawlers and phones look, and exported there too, as well as at `/static/…`. `apple-touch-icon.png` is the picture a phone puts on its home screen: a square PNG, 180×180 is plenty. An iPhone asks for it under several names (`-precomposed`, `-120x120`…) and every one of them answers with it, so one file is all a site needs; `<link rel="apple-touch-icon" href="/static/apple-touch-icon.png">` in a template says so too. A person in the editor sets both from one picture in **Resources → icon**; a session can write the two files itself.
 
@@ -735,8 +735,9 @@ of that section, cut at each heading — and
 hands the lot over at `/search.json`; `bun run export` writes the same thing to
 `dist/search.json`, so search works on a published site with no server.
 
-- **Every non-draft page is in it**, found the same way the navigation walks
-  the folders. There is nothing to register and no index to rebuild by hand.
+- **Every page a reader can open is in it**: not drafts, not `404.md`, and not
+  anything named with a leading `-`, which is listed nowhere. There is
+  nothing to register and no index to rebuild by hand.
 - **A result takes the reader to the place.** A section's `url` ends `#its-id`,
   the id the page's own heading has (read out of the rendered page, so they
   can't disagree), and the seed's `search.js` shows "Page – Section", shows at

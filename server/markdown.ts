@@ -1,6 +1,7 @@
 import type { Storage } from "./storage";
 import { DEBUG } from "./config";
 import { canonicalPath, escapeHtml } from "./utils";
+import { unlisted, readable } from "./listed";
 
 // Front-matter parser + Bun.markdown wrapper
 
@@ -199,7 +200,7 @@ export async function buildNav(pages: Storage, prefix = ""): Promise<string> {
       const raw = await pages.read(f.path);
       const { meta } = parseFrontMatter(raw);
       const title = meta.nav?.[0] || meta.title?.[0];
-      if (title && !yes(meta.draft)) { // a draft stays out of the nav
+      if (title && readable(meta)) { // a draft stays out of the nav, and so does an each: page
         const href = encodeURI(canonicalPath(f.path));
         items.push(`<li><a href="${href}">${escapeHtml(title)}</a></li>`);
       }
@@ -207,8 +208,7 @@ export async function buildNav(pages: Storage, prefix = ""): Promise<string> {
   }
 
   // Recurse into subfolders, ordered
-  const eligible = folders.filter((f) => !f.name.startsWith(".") && !f.name.startsWith("-"));
-  for (const folder of await sortFolders(pages, eligible)) {
+  for (const folder of await sortFolders(pages, folders.filter((f) => !unlisted(f.name)))) {
     const sub = await buildNav(pages, folder.path);
     if (sub) items.push(sub);
   }

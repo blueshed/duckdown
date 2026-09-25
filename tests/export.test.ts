@@ -134,6 +134,35 @@ describe("an export of nothing", () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
+  test("publishes a - name but never a . one, though a bucket lists them", async () => {
+    const root = join(RUN, "dot-names");
+    mkdirSync(join(root, ".x"), { recursive: true });
+    mkdirSync(join(root, "-unlisted"), { recursive: true });
+    writeFileSync(join(root, "index.md"), "title: Home\n\nhi");
+    writeFileSync(join(root, ".notes.md"), "title: Notes\n\nmine");
+    writeFileSync(join(root, ".x", "secret.md"), "title: Secret\n\nmine");
+    writeFileSync(join(root, "-unlisted", "page.md"), "title: Unlisted\n\nfor whoever has the address");
+    // Disk never lists a . name; a bucket does, as any other.
+    const disk = new LocalStorage(root);
+    const bucket = Object.assign(Object.create(disk), {
+      async list(prefix: string) {
+        const listing = await disk.list(prefix);
+        if (prefix) return listing;
+        return {
+          files: [...listing.files, { name: ".notes.md", path: ".notes.md", file: true as const, size: 0, type: "text/markdown" }],
+          folders: [...listing.folders, { name: ".x", path: ".x", file: false as const }],
+        };
+      },
+    });
+    const dir = out("dot-names");
+    await exportSite({ out: dir, pages: bucket, say: quiet });
+    expect(existsSync(join(dir, "-unlisted", "page.html"))).toBe(true);
+    expect(existsSync(join(dir, ".notes.html"))).toBe(false);
+    expect(existsSync(join(dir, ".x"))).toBe(false);
+    rmSync(root, { recursive: true, force: true });
+    rmSync(dir, { recursive: true, force: true });
+  });
+
   test("says when the pages it found were all drafts", async () => {
     mkdirSync(join(empty, "pages"), { recursive: true });
     writeFileSync(join(empty, "pages", "wip.md"), "title: Wip\ndraft: true\n\nsoon");
