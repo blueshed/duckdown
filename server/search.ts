@@ -3,6 +3,7 @@ import { DEBUG } from "./config";
 import { renderMarkdown, yes } from "./markdown";
 import { COLLECTION_FILE, aliasKey, loadCollection, itemBody, itemMeta } from "./collection";
 import { canonicalPath } from "./utils";
+import { kept } from "./kept";
 
 // The site's own page for a miss: a page, but not one to search for, list or map.
 export const NOT_FOUND = "404.md";
@@ -121,17 +122,9 @@ export async function buildSite(pages: Storage, prefix = "", debug = DEBUG): Pro
   return out;
 }
 
-// Kept until a page changes, like the nav and the folder listings, and rebuilt
-// per request in development where pages are often written straight to disk.
-let built: Promise<Built> | null = null;
-
-function site(pages: Storage, debug: boolean): Promise<Built> {
-  if (debug) return buildSite(pages, "", debug);
-  return (built ??= buildSite(pages, "", debug).catch((e) => {
-    built = null;
-    throw e;
-  }));
-}
+// Kept until a page changes, like the nav and the folder listings (kept.ts).
+const built = kept((pages, _, debug) => buildSite(pages, "", debug));
+const site = (pages: Storage, debug: boolean): Promise<Built> => built(pages, "", debug);
 
 export const searchIndex = async (pages: Storage, debug = DEBUG): Promise<Entry[]> => (await site(pages, debug)).entries;
 export const pageList = async (pages: Storage, debug = DEBUG): Promise<PageRef[]> => (await site(pages, debug)).pages;
@@ -147,6 +140,3 @@ export async function aliasTarget(pages: Storage, path: string, debug = DEBUG): 
   return (await site(pages, debug)).aliases.find((a) => a.from === key)?.to ?? null;
 }
 
-export function searchChanged(): void {
-  built = null;
-}

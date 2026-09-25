@@ -4,9 +4,7 @@ import { afterAll, beforeAll } from "bun:test";
 import { cpSync, mkdtempSync, rmSync } from "fs";
 import { join } from "path";
 import { server } from "../server/main";
-import { pagesChanged } from "../server/nav";
-import { searchChanged } from "../server/search";
-import { collectionsChanged } from "../server/collection";
+import { siteChanged } from "../server/kept";
 
 export const BASE = server.url.href.replace(/\/$/, "");
 export const SITE = process.env.DUCKDOWN_PATH!;
@@ -24,9 +22,7 @@ export function keepSite(): void {
     rmSync(SITE, { recursive: true, force: true });
     cpSync(kept, SITE, { recursive: true });
     rmSync(kept, { recursive: true, force: true });
-    pagesChanged();
-    searchChanged();
-    collectionsChanged();
+    siteChanged();
   });
 }
 

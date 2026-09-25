@@ -1,25 +1,15 @@
 import { createPageStorage } from "../storage";
-import { pagesChanged } from "../nav";
-import { searchChanged } from "../search";
-import { collectionsChanged } from "../collection";
-import { feedsChanged } from "../feed";
+import { siteChanged } from "../kept";
 import { addMeta, dropMeta, parseFrontMatter, yes } from "../markdown";
 import { aliasKey } from "../slugs";
 import { canonicalPath } from "../utils";
 import { fileRoutes, type Mover } from "./files";
 
-// The site's pages. A write here changes what the nav, the folder listings,
-// the search index and a folder's collection.json would say, so all of them
-// are dropped and rebuilt on the next request — collection.json lives under
-// pages/ and is written through this same route. A new thing the site knows
-// about itself is dropped here too — and by a pull (routes/publish.ts), which
-// changes pages on disk behind the server's back.
-export const changed = () => {
-  pagesChanged();
-  searchChanged();
-  collectionsChanged();
-  feedsChanged();
-};
+// The site's pages. A write here changes what the site knows about itself —
+// the nav, the listings, the search index, a folder's collection.json (which
+// lives under pages/ and is written through this same route) — so the lot is
+// dropped (siteChanged(), kept.ts) and rebuilt on the next request. So does a
+// pull (routes/publish.ts), which changes pages on disk behind the server's back.
 
 const refuse = (why: string) => new Response(why, { status: 400 });
 const nameOf = (key: string) => key.slice(key.lastIndexOf("/") + 1);
@@ -44,4 +34,4 @@ export const movePage: Mover = (from, to, source) => {
   return { body, kept: old };
 };
 
-export const handlePages = fileRoutes("/edit/pages/", createPageStorage(), changed, undefined, movePage);
+export const handlePages = fileRoutes("/edit/pages/", createPageStorage(), siteChanged, undefined, movePage);

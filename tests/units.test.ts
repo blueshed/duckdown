@@ -10,6 +10,8 @@ import { handleError } from "../server/routes/error";
 import { fromSite, viewLine, logView } from "../server/log";
 import { scaffoldNotice } from "../server/scaffold";
 import { dateHtml, canonicalPath, outsideCode } from "../server/utils";
+import { kept, siteChanged } from "../server/kept";
+import type { Storage } from "../server/storage";
 
 const scratch = (name: string) => join(RUN, `units-${name}`);
 
@@ -87,6 +89,44 @@ describe("pid", () => {
     } finally {
       exit.mockRestore();
     }
+  });
+});
+
+describe("kept", () => {
+  const pages = {} as Storage;   // what's built from it isn't read here
+
+  test("builds once per key, again after siteChanged, and every time in development", async () => {
+    let builds = 0;
+    let drops = 0;
+    const count = kept(async (_, key) => `${key}:${++builds}`, () => drops++);
+    expect(await count(pages, "a", false)).toBe("a:1");
+    expect(await count(pages, "a", false)).toBe("a:1");
+    expect(await count(pages, "b", false)).toBe("b:2");
+    siteChanged();
+    expect(drops).toBe(1);
+    expect(await count(pages, "a", false)).toBe("a:3");
+    expect(await count(pages, "a", true)).toBe("a:4");
+    expect(await count(pages, "a", true)).toBe("a:5");
+    expect(await count(pages, "a", false)).toBe("a:3");   // development didn't touch what's kept
+  });
+
+  test("doesn't keep a failure, nor let a late one drop a newer build", async () => {
+    let fail: (e: Error) => void = () => {};
+    let builds = 0;
+    const flaky = kept(async () => {
+      if (++builds === 1) return new Promise<string>((_, reject) => { fail = reject; });
+      return `ok ${builds}`;
+    });
+    const first = flaky(pages, "", false);
+    siteChanged();                                        // the pages changed while it was building
+    expect(await flaky(pages, "", false)).toBe("ok 2");
+    fail(new Error("disk"));
+    await expect(first).rejects.toThrow("disk");
+    expect(await flaky(pages, "", false)).toBe("ok 2");   // still the newer one
+    let tries = 0;
+    const broken = kept(async () => { throw new Error(`down ${++tries}`); });
+    await expect(broken(pages, "", false)).rejects.toThrow("down 1");
+    await expect(broken(pages, "", false)).rejects.toThrow("down 2");   // built again, not kept
   });
 });
 

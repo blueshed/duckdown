@@ -5,10 +5,11 @@ import type { Storage, Listing } from "../server/storage";
 import {
   SLUG, slugify, fragmentId, aliasKey, parseCollection, parseArgs,
   itemsHtml, groupsHtml, neighbour, itemValue, fillCollections, sortValues,
-  loadCollection, collectionsChanged, collectionPath, collisions, collectionProblems, itemAt,
+  loadCollection, collectionPath, collisions, collectionProblems, itemAt,
   fillItem, itemMeta, itemBody, PLAIN,
 } from "../server/collection";
 import { thumbName } from "../server/images";
+import { siteChanged } from "../server/kept";
 
 // An in-memory Storage over { "gallery/collection.json": "…" }.
 function memory(files: Record<string, string>): Storage {
@@ -432,7 +433,7 @@ describe("loadCollection", () => {
     files["works/collection.json"] = json({ groups: [group("all", [{ title: "A" }, { title: "B" }])] });
     expect((await loadCollection(store, "works", false))!.items).toHaveLength(1);   // still the kept one
     expect(reads).toHaveBeenCalledTimes(1);
-    collectionsChanged();
+    siteChanged();
     expect((await loadCollection(store, "works", false))!.items).toHaveLength(2);
   });
 
@@ -441,13 +442,13 @@ describe("loadCollection", () => {
   });
 
   test("a build that fails isn't kept: the next request tries again", async () => {
-    collectionsChanged();
+    siteChanged();
     const store = memory({ "works/collection.json": "{}" });
     const read = spyOn(store, "read").mockImplementation(async () => { throw new Error("storage is down"); });
     await expect(loadCollection(store, "works", false)).rejects.toThrow("storage is down");
     read.mockRestore();
     expect(await loadCollection(store, "works", false)).not.toBeNull();
-    collectionsChanged();
+    siteChanged();
   });
 
   test("what is wrong with the file is logged as well as carried", async () => {
@@ -565,7 +566,7 @@ describe("fields", () => {
   test("asking for a field that isn't declared is a typo, said once in the log", () => {
     const warn = spyOn(console, "warn").mockImplementation(() => {});
     try {
-      collectionsChanged();
+      siteChanged();
       const collection = paged(parseCollection("works", json({ fields: ["title", "year"], groups: [group("all", [{ title: "A" }])] })));
       const context = { collection, item: collection.items[0]! };
       expect(itemValue("item-yaer", context)).toBe("");
@@ -580,7 +581,7 @@ describe("fields", () => {
       ]);
     } finally {
       warn.mockRestore();
-      collectionsChanged();
+      siteChanged();
     }
   });
 });

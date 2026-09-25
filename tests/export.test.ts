@@ -6,8 +6,7 @@ import { RUN, SITE } from "./helpers";
 import { exportSite, outPath, aliasFile, main, lands } from "../server/export";
 import { brokenLinks } from "../server/links";
 import { LocalStorage } from "../server/storage";
-import { searchChanged } from "../server/search";
-import { collectionsChanged } from "../server/collection";
+import { siteChanged } from "../server/kept";
 
 const out = (name: string) => join(RUN, `export-${name}`);
 const read = (dir: string, path: string) => readFileSync(join(dir, path), "utf8");
@@ -356,8 +355,7 @@ describe("collections", () => {
     changed.groups[0].items[0].aliases.push(`/l"etoile-1976`, "/don’t-write-everything-down");
     try {
       writeFileSync(file, JSON.stringify(changed));
-      collectionsChanged();
-      searchChanged();
+      siteChanged();
       await exportSite({ out: dir, origin: "https://example.com", say: quiet });
       // The name on disk is the decoded one, which is what serve.ts looks for
       // after decodePath — so the round trip works without re-encoding twice.
@@ -365,8 +363,7 @@ describe("collections", () => {
       expect(read(dir, "don’t-write-everything-down/index.html")).toContain("/gallery/first-light/");
     } finally {
       writeFileSync(file, before);
-      collectionsChanged();
-      searchChanged();
+      siteChanged();
     }
   });
 
@@ -455,14 +452,14 @@ describe("collections", () => {
     changed.groups[0].items[0].aliases.push("/gallery");   // the folder's own index
     try {
       writeFileSync(file, JSON.stringify(changed));
-      collectionsChanged();
+      siteChanged();
       const count = await exportSite({ out: dir, origin: "https://example.com", say: (l) => said.push(l) });
       expect(read(dir, "gallery/index.html")).toContain('class="collection"');   // still the overview
       expect(said.join("\n")).toContain("alias /gallery is already a page");
       expect(count.problems).toBe(1);
     } finally {
       writeFileSync(file, before);
-      collectionsChanged();
+      siteChanged();
     }
   });
 
@@ -476,7 +473,7 @@ describe("collections", () => {
     try {
       writeFileSync(join(SITE, "pages", "gallery", "notes.md"), "title: Notes\n\n# Notes");
       writeFileSync(file, JSON.stringify(changed));
-      collectionsChanged();
+      siteChanged();
       const count = await exportSite({ out: out("clash"), origin: "", say: (l) => said.push(l) });
       expect(count.problems).toBe(1);
       expect(said.join("\n")).toContain("already a page");
@@ -485,7 +482,7 @@ describe("collections", () => {
     } finally {
       rmSync(join(SITE, "pages", "gallery", "notes.md"));
       writeFileSync(file, before);
-      collectionsChanged();
+      siteChanged();
       log.mockRestore();
     }
   });

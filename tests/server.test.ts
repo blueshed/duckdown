@@ -3,12 +3,13 @@ import { mkdirSync, writeFileSync, readFileSync, renameSync, existsSync, rmSync 
 import { join } from "path";
 import { BASE, SITE, signIn, authed, keepSite } from "./helpers";
 import { siteHandler } from "../server/routes/site";
-import { feedXml, feedsChanged } from "../server/feed";
+import { feedXml } from "../server/feed";
 import type { Storage } from "../server/storage";
 import { signJwt } from "../server/auth";
 import { usersChanged } from "../server/users";
 import { helpSection, helpSections, HELP_ORDER } from "../server/routes/help";
 import { ours, otherIcons } from "../server/routes/site-icon";
+import { siteChanged } from "../server/kept";
 
 keepSite();
 beforeAll(signIn);
@@ -1833,13 +1834,13 @@ describe("a folder's feed", () => {
   test("a feed that can't be built isn't kept: the next request tries again", async () => {
     let tries = 0;
     const failing = { exists: async () => { tries++; throw new Error("the bucket is away"); } } as unknown as Storage;
-    feedsChanged();
+    siteChanged();
     try {
       await expect(feedXml(failing, "away", "https://example.com", false)).rejects.toThrow("the bucket is away");
       await expect(feedXml(failing, "away", "https://example.com", false)).rejects.toThrow("the bucket is away");
       expect(tries).toBe(2);
     } finally {
-      feedsChanged();
+      siteChanged();
     }
   });
 });

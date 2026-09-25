@@ -3,6 +3,7 @@ import { DEBUG } from "./config";
 import { parseFrontMatter, renderMarkdown, yes } from "./markdown";
 import { folderEntries } from "./nav";
 import { canonicalPath, escapeHtml } from "./utils";
+import { kept } from "./kept";
 
 // A folder that says `feed: true` in its index.md can be followed in a feed
 // reader: /<folder>/feed.xml, an Atom feed of the pages {{pages}} lists there,
@@ -12,8 +13,7 @@ import { canonicalPath, escapeHtml } from "./utils";
 //
 // Atom's ids and links are absolute, so the XML is written for an origin:
 // the request's when served, DUCKDOWN_ORIGIN when exported. What it is made
-// from is kept without one, like the nav, and dropped by feedsChanged()
-// whenever the pages route writes.
+// from is kept without one, like the nav (kept.ts).
 
 type Entry = { url: string; title: string; updated: string; summary: string; content: string };
 type Feed = { url: string; title: string; entries: Entry[] };
@@ -41,23 +41,7 @@ async function buildFeed(pages: Storage, folder: string): Promise<Feed | null> {
   return { url: canonicalPath(index), title: meta.title?.[0] ?? (folder || "Home"), entries };
 }
 
-const kept = new Map<string, Promise<Feed | null>>();
-
-function feedOf(pages: Storage, folder: string, debug: boolean): Promise<Feed | null> {
-  if (debug) return buildFeed(pages, folder);
-  const had = kept.get(folder);
-  if (had) return had;
-  const building = buildFeed(pages, folder).catch((e) => {
-    kept.delete(folder);
-    throw e;
-  });
-  kept.set(folder, building);
-  return building;
-}
-
-export function feedsChanged(): void {
-  kept.clear();
-}
+const feedOf = kept((pages, folder) => buildFeed(pages, folder));
 
 // The folder's feed as Atom, or null when it doesn't have one. The author is
 // the site's host: Atom asks for one, and a site is who writes it.

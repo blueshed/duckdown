@@ -4,6 +4,7 @@ import { escapeHtml, outsideCode } from "./utils";
 import { parseFrontMatter, renderMarkdown } from "./markdown";
 import { type Images, DEFAULT_IMAGES, ownImages, imageUrl, thumbName } from "./images";
 import { SLUG, slugify, unique, slugger, itemHref } from "./slugs";
+import { kept } from "./kept";
 
 export { SLUG, slugify, aliasKey } from "./slugs";
 
@@ -276,15 +277,10 @@ export function parseCollection(folder: string, source: string): Collection {
 
 // --- The cache ---------------------------------------------------------
 
-// Kept like the nav and the search index: built once, and dropped when a page
-// changes (the pages route writes collection.json through the same folder). In
-// development it is read per request, where files are written straight to disk.
-const loaded = new Map<string, Promise<Collection | null>>();
-
-export function collectionsChanged(): void {
-  loaded.clear();
-  warned.clear();
-}
+// Kept like the nav and the search index (kept.ts): collection.json is
+// written through the pages route like any page. What was said about the
+// files starts again with them.
+const loaded = kept((pages, folder) => read(pages, folder), () => warned.clear());
 
 // Said once, not per request: a warning repeated on every page view is noise.
 const warned = new Set<string>();
@@ -336,17 +332,8 @@ async function read(pages: Storage, folder: string): Promise<Collection | null> 
   return collection;
 }
 
-export function loadCollection(pages: Storage, folder: string, debug = DEBUG): Promise<Collection | null> {
-  if (debug) return read(pages, folder);
-  const kept = loaded.get(folder);
-  if (kept) return kept;
-  const building = read(pages, folder).catch((e) => {
-    loaded.delete(folder);
-    throw e;
-  });
-  loaded.set(folder, building);
-  return building;
-}
+export const loadCollection = (pages: Storage, folder: string, debug = DEBUG): Promise<Collection | null> =>
+  loaded(pages, folder, debug);
 
 // The item a request names, with the collection it belongs to, or null.
 // `name` is the path with its extension and trailing slash already off

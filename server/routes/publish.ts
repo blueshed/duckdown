@@ -1,7 +1,7 @@
 import type { BunRequest } from "bun";
 import { requireAuth, getUser } from "../auth";
 import { remoteFrom, publishSite, RemoteRefused, type Remote } from "../remote";
-import { changed } from "./pages";
+import { siteChanged } from "../kept";
 
 // /edit/publish — this copy of the site and where it is published (remote.ts).
 // GET is what would be published; POST publishes it, checked first; POST
@@ -42,7 +42,7 @@ export function publishRoutes(
         return answer(async () => {
           const pulled = await remote.pull(by);
           // The pages changed on disk: what the site knows about itself goes.
-          if (pulled.changed.length) changed();
+          if (pulled.changed.length) siteChanged();
           return pulled;
         });
       }

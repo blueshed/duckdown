@@ -3,43 +3,18 @@ import { DEBUG } from "./config";
 import { buildNav, parseFrontMatter, yes, sortFolders } from "./markdown";
 import { escapeHtml, canonicalPath, dateHtml } from "./utils";
 import { NOT_FOUND } from "./search";
+import { kept } from "./kept";
 
-// What the site knows about itself: its nav, and each folder's list of pages.
-// Both are built once and kept until a page changes — in production every
-// write comes through this server (the pages route calls pagesChanged), so
-// nothing else has to expire them. In development they are built per request
-// instead: pages are often written straight to disk there, by hand or by an
-// agent, and a cache would keep them out until the next save in the editor.
-// A build that fails isn't kept either: the next request tries again.
-let nav: Promise<string> | null = null;
-const listings = new Map<string, Promise<string>>();
+// What the site knows about itself: its nav, and each folder's list of pages,
+// kept until a page changes (kept.ts).
+const nav = kept((pages) => buildNav(pages));
+const listings = kept((pages, folder) => buildListing(pages, folder));
 
-export function siteNav(pages: Storage, debug = DEBUG): Promise<string> {
-  if (debug) return buildNav(pages);
-  return (nav ??= buildNav(pages).catch((e) => {
-    nav = null;
-    throw e;
-  }));
-}
+export const siteNav = (pages: Storage, debug = DEBUG): Promise<string> => nav(pages, "", debug);
 
 // A folder's pages, for {{pages}} in its index.
-export function folderListing(pages: Storage, folder: string, debug = DEBUG): Promise<string> {
-  if (debug) return buildListing(pages, folder);
-  const kept = listings.get(folder);
-  if (kept) return kept;
-  const building = buildListing(pages, folder).catch((e) => {
-    listings.delete(folder);
-    throw e;
-  });
-  listings.set(folder, building);
-  return building;
-}
-
-export function pagesChanged(): void {
-  nav = null;
-  map = null;
-  listings.clear();
-}
+export const folderListing = (pages: Storage, folder: string, debug = DEBUG): Promise<string> =>
+  listings(pages, folder, debug);
 
 export type Listed = { key: string; href: string; title: string; date: string; description: string };
 
@@ -107,16 +82,10 @@ async function buildSiteMap(pages: Storage, folder = ""): Promise<string> {
   return items.length ? `<ul class="sitemap">\n${items.join("\n")}\n</ul>` : "";
 }
 
-let map: Promise<string> | null = null;
+const map = kept((pages) => buildSiteMap(pages));
 
 // Every page, nested by folder, for {{sitemap}}. Kept like the nav.
-export function siteMap(pages: Storage, debug = DEBUG): Promise<string> {
-  if (debug) return buildSiteMap(pages);
-  return (map ??= buildSiteMap(pages).catch((e) => {
-    map = null;
-    throw e;
-  }));
-}
+export const siteMap = (pages: Storage, debug = DEBUG): Promise<string> => map(pages, "", debug);
 
 // The nav is one string for every page, so mark it per page: the page's own
 // link gets aria-current="page"; failing that, the nearest folder it sits in

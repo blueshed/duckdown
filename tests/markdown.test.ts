@@ -1,7 +1,8 @@
 import { describe, test, expect, spyOn } from "bun:test";
 import { parseFrontMatter, renderMarkdown, buildNav, addMeta, dropMeta } from "../server/markdown";
 import type { Storage, Listing } from "../server/storage";
-import { siteNav, pagesChanged, markCurrent, folderListing } from "../server/nav";
+import { siteNav, markCurrent, folderListing } from "../server/nav";
+import { siteChanged } from "../server/kept";
 
 // An in-memory Storage over { "guide/index.md": "…" }; exists() throws for `broken`.
 function memory(files: Record<string, string>, broken = ""): Storage {
@@ -113,8 +114,8 @@ describe("buildNav: order:", () => {
 
 describe("siteNav", () => {
   // The cache is shared with the in-process server: start and end it empty.
-  test("builds once, rebuilds after pagesChanged, and never keeps a failure", async () => {
-    pagesChanged();
+  test("builds once, rebuilds after siteChanged, and never keeps a failure", async () => {
+    siteChanged();
     let lists = 0;
     const pages = memory({ "index.md": "nav: Home\n\n" });
     const counting = { ...pages, list: (prefix: string) => (lists++, pages.list(prefix)) };
@@ -123,21 +124,21 @@ describe("siteNav", () => {
       const once = lists;
       expect(await siteNav(counting)).toContain(">Home<");
       expect(lists).toBe(once); // kept
-      pagesChanged();
+      siteChanged();
       await siteNav(counting);
       expect(lists).toBe(once * 2); // rebuilt
 
-      pagesChanged();
+      siteChanged();
       const failing = { ...pages, list: async () => { throw new Error("storage is down"); } };
       await expect(siteNav(failing)).rejects.toThrow("storage is down");
       expect(await siteNav(counting)).toContain(">Home<"); // tried again, not the failure
     } finally {
-      pagesChanged();
+      siteChanged();
     }
   });
 
   test("in development it is built per request, so files written straight to disk show up", async () => {
-    pagesChanged();
+    siteChanged();
     let lists = 0;
     const pages = memory({ "index.md": "nav: Home\n\n" });
     const counting = { ...pages, list: (prefix: string) => (lists++, pages.list(prefix)) };
@@ -150,7 +151,7 @@ describe("siteNav", () => {
       await siteNav(counting, false);
       expect(lists).toBe(once * 3); // kept
     } finally {
-      pagesChanged();
+      siteChanged();
     }
   });
 });
@@ -187,7 +188,7 @@ describe("folderListing", () => {
   });
 
   test("is kept until a page changes, and a failure isn't kept", async () => {
-    pagesChanged();
+    siteChanged();
     let reads = 0;
     const counting = { ...pages, read: (key: string) => (reads++, pages.read(key)) };
     try {
@@ -195,16 +196,16 @@ describe("folderListing", () => {
       const once = reads;
       await folderListing(counting, "blog");
       expect(reads).toBe(once); // kept
-      pagesChanged();
+      siteChanged();
       await folderListing(counting, "blog");
       expect(reads).toBe(once * 2); // rebuilt
 
-      pagesChanged();
+      siteChanged();
       const failing = { ...pages, list: async () => { throw new Error("storage is down"); } };
       await expect(folderListing(failing, "blog")).rejects.toThrow("storage is down");
       expect(await folderListing(counting, "blog")).toContain(">One<"); // tried again
     } finally {
-      pagesChanged();
+      siteChanged();
     }
   });
 });

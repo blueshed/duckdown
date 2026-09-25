@@ -1,8 +1,9 @@
 // The index a reader searches: built here, matched in the browser.
 import { describe, test, expect } from "bun:test";
 import type { Storage, Listing } from "../server/storage";
-import { buildSite, searchIndex, pageList, searchChanged, aliasTarget } from "../server/search";
-import { siteMap, pagesChanged } from "../server/nav";
+import { buildSite, searchIndex, pageList, aliasTarget } from "../server/search";
+import { siteMap } from "../server/nav";
+import { siteChanged } from "../server/kept";
 
 const buildIndex = async (pages: Storage) => (await buildSite(pages)).entries;
 
@@ -121,9 +122,9 @@ describe("sections", () => {
     const pages = memory({ "song.md": "title: S\ndate: 2026-09-21\n\n## A\n\nx\n\n## B\n\ny", "guide/index.md": "title: G\n\n## C\n\nz" });
     expect((await buildSite(pages)).pages).toEqual([{ url: "/song.html", date: "2026-09-21" }, { url: "/guide/", date: "" }]);
     expect(await pageList(pages, true)).toHaveLength(2);
-    searchChanged();
+    siteChanged();
     expect(await pageList(pages, false)).toHaveLength(2);
-    searchChanged();
+    siteChanged();
   });
 });
 
@@ -134,9 +135,9 @@ describe("searchIndex", () => {
     await pages.write("index.md", "title: Two\n\nsecond");
 
     expect((await searchIndex(pages, false))[0]!.title).toBe("One");   // the kept one
-    searchChanged();
+    siteChanged();
     expect((await searchIndex(pages, false))[0]!.title).toBe("Two");
-    searchChanged();
+    siteChanged();
   });
 
   test("built per request in development, where pages are written straight to disk", async () => {
@@ -153,7 +154,7 @@ describe("searchIndex", () => {
     // The same storage, no longer broken — it would answer from the failure if
     // the failure had been cached.
     expect((await searchIndex(memory({ "index.md": "title: Two\n\nsecond" }), false))[0]!.title).toBe("Two");
-    searchChanged();
+    siteChanged();
   });
 });
 
@@ -226,20 +227,20 @@ describe("siteMap", () => {
 
   test("built once and kept, until a page changes", async () => {
     const store = memory({ "index.md": "title: One\n\nx" });
-    pagesChanged();
+    siteChanged();
     expect(await siteMap(store, false)).toContain(">One<");
     await store.write("index.md", "title: Two\n\nx");
     expect(await siteMap(store, false)).toContain(">One<");
-    pagesChanged();
+    siteChanged();
     expect(await siteMap(store, false)).toContain(">Two<");
-    pagesChanged();
+    siteChanged();
   });
 
   test("a build that fails isn't kept", async () => {
-    pagesChanged();
+    siteChanged();
     await expect(siteMap(memory({ "index.md": "title: One" }, "index.md"), false)).rejects.toThrow("storage is down");
     expect(await siteMap(memory({ "index.md": "title: Two" }), false)).toContain(">Two<");
-    pagesChanged();
+    siteChanged();
   });
 });
 
@@ -279,10 +280,10 @@ describe("collections in the index", () => {
 
   test("an old address is looked up decoded, and anything else is simply a miss", async () => {
     const pages = site();
-    searchChanged();
+    siteChanged();
     expect(await aliasTarget(pages, "/battersea", false)).toBe("/works/battersea/");
     expect(await aliasTarget(pages, "/battersea/", false)).toBe("/works/battersea/");
     expect(await aliasTarget(pages, "/battersey", false)).toBeNull();
-    searchChanged();
+    siteChanged();
   });
 });
