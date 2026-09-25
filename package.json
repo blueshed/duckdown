@@ -52,7 +52,7 @@
     "postinstall": "bun run create/setup.ts"
   },
   "dependencies": {
-    "@blueshed/railroad": "^0.11.0",
+    "@blueshed/railroad": "^0.14.0",
     "lucide-static": "^1.47.0"
   },
   "devDependencies": {

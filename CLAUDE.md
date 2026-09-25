@@ -223,7 +223,7 @@ function after(req: BunRequest, prefix: string): string {
 
 ## Railroad
 
-Package: `@blueshed/railroad`, from npm (`^0.11.0`). Signals + JSX + routes — real DOM, no virtual DOM.
+Package: `@blueshed/railroad`, from npm (`^0.14.0`). Signals + JSX + routes — real DOM, no virtual DOM.
 
 Railroad ships two Claude Code skills, installed in `.claude/skills/`: **`railroad`** (the checklist of failure modes that actually bite — use it whenever writing railroad JSX) and **`bun-route`** (scaffolding HTML routes, and `Bun.WebView` tests). They're copies, pinned to the installed version: after upgrading railroad, refresh them with `cp -r node_modules/@blueshed/railroad/.claude/skills/* .claude/skills/`. The notes below are the duckdown-specific ones.
 
@@ -261,14 +261,15 @@ function Counter() {
 - **`signal(value)`** — reactive state, auto-updates DOM when changed
 - **`computed(fn)`** — derived signal from other signals
 - **`effect(fn)`** — side-effect that re-runs when dependencies change, returns dispose
-- **`when(sig, truthy, falsy?)`** — conditional rendering, swaps on truthiness transitions only
+- **`when(sig, truthy, falsy?)`** — conditional rendering, swaps on truthiness transitions only. Since 0.14 the truthy branch is handed `v$`, a signal of the current value, for a branch that must follow the value while it stays truthy; a branch passed by reference (`when(x, chosenPanel)`) receives it too, so it must take no argument it means otherwise.
 - **`list(sig, keyFn, render)`** — keyed list rendering with DOM diffing. **`render` gets a signal per row, not the item** (railroad 0.11): `row$.map(r => r.name)` for text, `row$.peek()` in handlers. Reading it as the item left the file list empty in 0.0.2's upgrade.
-- **Function children** — `{() => expr}` is a reactive text node (0.11 removed `text()`)
+- **Function children and props** — `{() => expr}` is a reactive text node (0.11 removed `text()`), and since 0.12 a function prop is reactive too (`class={() => …}`), as a signal prop always was. A boolean child renders nothing (0.13): `{flag.map(String)}` to show one.
 - **`batch(fn)`** — group updates into a single flush
-- **`effect(fn)` may return a cleanup**, run before its next run and when it's disposed: the place to clear a timer (Preview's debounce).
+- **`effect(fn)` may return a cleanup**, run before its next run and when it's disposed: the place to clear a timer (Preview's debounce). Only a returned function counts (0.13), and an effect is synchronous.
+- **An effect's run owns what its body creates** (0.12): a `computed`/`.map()`, a `when()`, a component made inside the body is disposed before the next run. Make anything long-lived in the component, outside the effect. Component bodies don't subscribe to what they read (0.13): bind a signal or a function to the DOM rather than reading `.get()` in a body and expecting it to re-run. An effect's writes reach other listeners after its body returns.
 - **Build conditional panels with `when()`**, not by swapping prebuilt nodes: a component made when it's shown starts from the current state (an iframe attached as its `srcdoc` changes can keep the old document).
 
-**`when()` renders on a microtask, not in the `mount()` call.** Straight after mounting, a branch whose condition is already true is not in the DOM yet — a synchronous `querySelector` for it comes back null. Await a tick (the tests' `waitFor`) before looking. Transitions after that are synchronous. This looks exactly like "`when()` ignores an initially-true condition", which it doesn't, and chasing that wastes an hour.
+**`when()` and `list()` render in the `mount()` call** (since 0.12; before, on a microtask). What changes after that — a fetch landing, a signal set in a handler — still arrives later, so the tests' `waitFor` stays the way to wait for it.
 
 Don't wrap signal updates in a bare `catch {}`: a render error inside `.set()` throws back to the caller, and an empty catch hides it.
 

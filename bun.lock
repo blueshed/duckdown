@@ -5,7 +5,7 @@
     "": {
       "name": "duckdown",
       "dependencies": {
-        "@blueshed/railroad": "^0.11.0",
+        "@blueshed/railroad": "^0.14.0",
         "lucide-static": "^1.47.0",
       },
       "devDependencies": {
@@ -16,7 +16,7 @@
     },
   },
   "packages": {
-    "@blueshed/railroad": ["@blueshed/railroad@0.11.0", "", {}, "sha512-Rw0cCB6rWZEGD5t0e40TRrBjEq0GYa1vmA1VHrxItF28TZc9Vx5hbOqZ77ZJM6ph/+PJZZQfrJgYrAblG3WsdA=="],
+    "@blueshed/railroad": ["@blueshed/railroad@0.14.0", "", {}, "sha512-477ZI0z7W47l+1U5Khvtd9CxqHKlzNLlhpe90JrdSrwFXibPYMMkoeZ+uLWU8hu92NE3z+K8c6rQoeMwS2W+5A=="],
 
     "@happy-dom/global-registrator": ["@happy-dom/global-registrator@20.14.5", "", { "dependencies": { "@types/node": ">=20.0.0", "happy-dom": "^20.14.5" } }, "sha512-B05ID9DhSwLs6mlm1fzlkAtTIvB3duCvjJjfr19LBrlTK7VZtRjDqoTRIVv13GuYuNdhByu8LSZgThwV3Rkj7g=="],
 
