@@ -20,8 +20,8 @@ function memory(files: Record<string, string>): Storage {
       for (const key of Object.keys(files).filter((k) => k.startsWith(dir))) {
         const rest = key.slice(dir.length);
         const name = rest.split("/")[0]!;
-        if (rest === name) out.files.push({ name, path: `/${key}`, file: true, size: 0, type: "application/json" });
-        else if (!out.folders.some((f) => f.name === name)) out.folders.push({ name, path: `/${dir}${name}`, file: false });
+        if (rest === name) out.files.push({ name, path: key, file: true, size: 0, type: "application/json" });
+        else if (!out.folders.some((f) => f.name === name)) out.folders.push({ name, path: `${dir}${name}`, file: false });
       }
       return out;
     },

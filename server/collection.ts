@@ -299,7 +299,7 @@ async function eachPageIn(pages: Storage, collection: Collection): Promise<EachP
   const found: { key: string; meta: Record<string, string[]>; source: string }[] = [];
   for (const file of (await pages.list(folder)).files.sort((a, b) => a.name.localeCompare(b.name))) {
     if (!file.name.endsWith(".md") || file.name === "index.md") continue;
-    const key = file.path.replace(/^\//, "");
+    const key = file.path;
     const source = await pages.read(key);
     const { meta } = parseFrontMatter(source);
     if (!meta.each) continue;

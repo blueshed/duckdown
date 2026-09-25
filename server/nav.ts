@@ -26,12 +26,12 @@ export async function folderEntries(pages: Storage, folder: string): Promise<Lis
   const entries: Listed[] = [];
 
   for (const file of files) {
-    if (!file.name.endsWith(".md") || file.name === "index.md" || file.name.startsWith("-") || file.path.replace(/^\//, "") === NOT_FOUND) continue;
-    const { meta } = parseFrontMatter(await pages.read(file.path.replace(/^\//, "")));
+    if (!file.name.endsWith(".md") || file.name === "index.md" || file.name.startsWith("-") || file.path === NOT_FOUND) continue;
+    const { meta } = parseFrontMatter(await pages.read(file.path));
     if (yes(meta.draft) || meta.each) continue;   // an each: page is its items, not a page
     entries.push({
-      key: file.path.replace(/^\//, ""),
-      href: encodeURI(`/${file.path.replace(/\.md$/, ".html").replace(/^\//, "")}`),
+      key: file.path,
+      href: encodeURI(`/${file.path.replace(/\.md$/, ".html")}`),
       title: meta.title?.[0] ?? file.name.replace(/\.md$/, ""),
       date: meta.date?.[0] ?? "",
       description: meta.description?.[0] ?? "",
@@ -71,7 +71,7 @@ async function buildSiteMap(pages: Storage, folder = ""): Promise<string> {
   const { folders } = await pages.list(folder);
   const eligible = folders.filter((f) => !f.name.startsWith(".") && !f.name.startsWith("-"));
   for (const sub of await sortFolders(pages, eligible)) {
-    const path = sub.path.replace(/^\//, "");
+    const path = sub.path;
     const inside = await buildSiteMap(pages, path);
     if (!inside) continue;
     const meta = await pages.exists(`${path}/index.md`) ? parseFrontMatter(await pages.read(`${path}/index.md`)).meta : null;

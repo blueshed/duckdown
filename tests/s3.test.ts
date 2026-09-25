@@ -32,11 +32,11 @@ describe("S3Storage", () => {
     const root = await store.list("");
     expect(root.files.map((f) => f.name).sort()).toEqual(["about.md", "index.md"]);
     expect(root.files.find((f) => f.name === "index.md")).toEqual({
-      name: "index.md", path: "/index.md", file: true, size: 13, type: "text/markdown",
+      name: "index.md", path: "index.md", file: true, size: 13, type: "text/markdown",
     });
-    expect(root.folders).toEqual([{ name: "guide", path: "/guide", file: false }]);
+    expect(root.folders).toEqual([{ name: "guide", path: "guide", file: false }]);
     const guide = await store.list("guide");
-    expect(guide.files.map((f) => f.path)).toEqual(["/guide/index.md"]);
+    expect(guide.files.map((f) => f.path)).toEqual(["guide/index.md"]);
     expect(guide.folders).toEqual([]);
   });
 

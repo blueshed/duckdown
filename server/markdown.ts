@@ -182,7 +182,7 @@ export async function sortFolders<T extends { name: string; path: string }>(
   pages: Storage, folders: T[],
 ): Promise<T[]> {
   const withOrder = await Promise.all(
-    folders.map(async (f) => ({ f, order: await folderOrder(pages, f.path.replace(/^\//, "")) })),
+    folders.map(async (f) => ({ f, order: await folderOrder(pages, f.path) })),
   );
   withOrder.sort((a, b) => a.order - b.order || a.f.name.localeCompare(b.f.name));
   return withOrder.map((x) => x.f);
@@ -196,11 +196,11 @@ export async function buildNav(pages: Storage, prefix = ""): Promise<string> {
   // Check current folder's index.md for a nav entry
   for (const f of files) {
     if (f.name === "index.md") {
-      const raw = await pages.read(f.path.replace(/^\//, ""));
+      const raw = await pages.read(f.path);
       const { meta } = parseFrontMatter(raw);
       const title = meta.nav?.[0] || meta.title?.[0];
       if (title && !yes(meta.draft)) { // a draft stays out of the nav
-        const href = encodeURI(canonicalPath(f.path.replace(/^\//, "")));
+        const href = encodeURI(canonicalPath(f.path));
         items.push(`<li><a href="${href}">${escapeHtml(title)}</a></li>`);
       }
     }
@@ -209,7 +209,7 @@ export async function buildNav(pages: Storage, prefix = ""): Promise<string> {
   // Recurse into subfolders, ordered
   const eligible = folders.filter((f) => !f.name.startsWith(".") && !f.name.startsWith("-"));
   for (const folder of await sortFolders(pages, eligible)) {
-    const sub = await buildNav(pages, folder.path.replace(/^\//, ""));
+    const sub = await buildNav(pages, folder.path);
     if (sub) items.push(sub);
   }
 

@@ -255,8 +255,8 @@ describe("storage", () => {
     await store.write("a/c/d.md", "deeper");
     const listing = await store.list("a");
     expect(listing.files.map((f) => f.name)).toEqual(["b.md"]);
-    expect(listing.files[0]).toMatchObject({ path: "/a/b.md", file: true, size: 5, type: "text/markdown" });
-    expect(listing.folders).toEqual([{ name: "c", path: "/a/c", file: false }]);
+    expect(listing.files[0]).toMatchObject({ path: "a/b.md", file: true, size: 5, type: "text/markdown" });
+    expect(listing.folders).toEqual([{ name: "c", path: "a/c", file: false }]);
     expect(await store.read("a/b.md")).toBe("hello");
     expect(new TextDecoder().decode(await store.readBytes("a/b.md"))).toBe("hello");
     expect(await store.exists("a/b.md")).toBe(true);

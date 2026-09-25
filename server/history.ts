@@ -81,7 +81,7 @@ export class History {
     const kept = files.filter((f) => STAMP.test(f.name)).map((f) => f.name).sort();
     if (prefix && kept.length && !(await exists(prefix))) out.push({ key: prefix, id: kept.at(-1)! });
     for (const folder of folders.sort((a, b) => a.name.localeCompare(b.name))) {
-      out.push(...await this.deleted(exists, folder.path.replace(/^\//, "")));
+      out.push(...await this.deleted(exists, folder.path));
     }
     return out;
   }

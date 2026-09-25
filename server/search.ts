@@ -71,7 +71,7 @@ export async function buildSite(pages: Storage, prefix = "", debug = DEBUG): Pro
   const out: Built = { entries: [], pages: [], aliases: [] };
 
   for (const f of files) {
-    const key = f.path.replace(/^\//, "");
+    const key = f.path;
     if (!key.endsWith(".md") || key === NOT_FOUND) continue;
     const { content, meta } = renderMarkdown(await pages.read(key), key.replace(/\.md$/, ""));
     // An each: page is found by its collection, below, and is its items.
@@ -113,7 +113,7 @@ export async function buildSite(pages: Storage, prefix = "", debug = DEBUG): Pro
 
   for (const folder of folders.sort((a, b) => a.name.localeCompare(b.name))) {
     if (folder.name.startsWith(".")) continue;
-    const inside = await buildSite(pages, folder.path.replace(/^\//, ""), debug);
+    const inside = await buildSite(pages, folder.path, debug);
     out.entries.push(...inside.entries);
     out.pages.push(...inside.pages);
     out.aliases.push(...inside.aliases);

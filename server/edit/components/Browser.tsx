@@ -98,7 +98,7 @@ export function Browser() {
         {/* Keyed rows get a signal per row, not the item: read it with .map/.peek */}
         {list(folders, (f) => f.path, (f$) => (
           <li class="folder">
-            <button class="row" onclick={() => openFolder(f$.peek().path.replace(/^\//, ""))}>
+            <button class="row" onclick={() => openFolder(f$.peek().path)}>
               <Icon name="folder" size={12} /> {f$.map((f) => f.name)}
             </button>
           </li>
@@ -106,7 +106,7 @@ export function Browser() {
         {list(files, (f) => f.path, (f$) => (
           <li>
             <button class="row" onclick={() => open(f$.peek())}
-              aria-current={computed(() => filePath.get() === f$.get().path.replace(/^\//, "") ? "page" : null)}>
+              aria-current={computed(() => filePath.get() === f$.get().path ? "page" : null)}>
               <Icon name={f$.peek().name === COLLECTION_FILE ? "layout-grid" : "file-text"} size={12} />
               {" "}{f$.map((f) => f.name)}
             </button>

@@ -45,9 +45,9 @@ export function redirectHtml(to: string): string {
 // out of the navigation (a leading `-`) are pages all the same, so they go.
 async function walk(store: Storage, prefix = ""): Promise<string[]> {
   const { files, folders } = await store.list(prefix);
-  const keys = files.map((f) => f.path.replace(/^\//, ""));
+  const keys = files.map((f) => f.path);
   for (const folder of folders) {
-    keys.push(...await walk(store, folder.path.replace(/^\//, "")));
+    keys.push(...await walk(store, folder.path));
   }
   return keys;
 }

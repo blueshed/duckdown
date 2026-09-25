@@ -9,6 +9,8 @@ import {
 
 // --- Types ---
 
+// `path` is the entry's key in its storage ("guide/pages.md"), ready to read,
+// list or put in a URL after a slash.
 export interface FileEntry {
   name: string;
   path: string;
@@ -82,7 +84,7 @@ export class LocalStorage implements Storage {
     for (const entry of entries) {
       if (entry.name.startsWith(".")) continue;
       const fullPath = join(dirPath, entry.name);
-      const relPath = fullPath.substring(rootLen);
+      const relPath = fullPath.substring(rootLen + 1);   // past the root and its slash
 
       if (entry.isFile()) {
         const s = await stat(fullPath);
@@ -172,7 +174,7 @@ export class S3Storage implements Storage {
         const name = obj.key.slice(fullPrefix.length);
         return {
           name,
-          path: `/${obj.key.slice(this.prefix.length)}`,
+          path: obj.key.slice(this.prefix.length),
           file: true as const,
           size: obj.size || 0,
           type: guessMime(name),
@@ -183,7 +185,7 @@ export class S3Storage implements Storage {
       const name = p.prefix.slice(fullPrefix.length).replace(/\/$/, "");
       return {
         name,
-        path: `/${p.prefix.slice(this.prefix.length).replace(/\/$/, "")}`,
+        path: p.prefix.slice(this.prefix.length).replace(/\/$/, ""),
         file: false as const,
       };
     });

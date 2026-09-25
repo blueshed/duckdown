@@ -32,14 +32,14 @@ export function ReportList() {
         <ul class="file-list">
           {list(folders, (f) => f.path, (f$) => (
             <li class="folder">
-              <button class="row" onclick={() => load(f$.peek().path.replace(/^\//, ""))}>
+              <button class="row" onclick={() => load(f$.peek().path)}>
                 <Icon name="folder" size={12} /> {f$.map((f) => f.name)}
               </button>
             </li>
           ))}
           {list(files, (f) => f.path, (f$) => (
             <li>
-              <a class="report" href={f$.map((f) => `/edit/reports${urlPath(f.path)}`)} target="_blank" rel="noopener">
+              <a class="report" href={f$.map((f) => `/edit/reports/${urlPath(f.path)}`)} target="_blank" rel="noopener">
                 <Icon name="file-text" size={12} /> {f$.map((f) => f.name)}
               </a>
             </li>

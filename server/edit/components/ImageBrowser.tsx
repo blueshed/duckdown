@@ -140,7 +140,7 @@ export function ImageBrowser() {
           {/* Keyed rows get a signal per row, not the item: read it with .map/.peek */}
           {list(folders, (f) => f.path, (f$) => (
             <li class="folder">
-              <button class="row" onclick={() => load(f$.peek().path.replace(/^\//, ""))}>
+              <button class="row" onclick={() => load(f$.peek().path)}>
                 <Icon name="folder" size={12} /> {f$.map((f) => f.name)}
               </button>
             </li>
@@ -152,7 +152,7 @@ export function ImageBrowser() {
             <li>
               <button class="row" onclick={() => selected.set(f$.peek().name)}
                 aria-pressed={computed(() => String(selected.get() === f$.get().name))}>
-                <img class="thumb" src={f$.map((f) => `/edit/browse${urlPath(f.path)}?thumb=160`)} alt="" loading="lazy" />
+                <img class="thumb" src={f$.map((f) => `/edit/browse/${urlPath(f.path)}?thumb=160`)} alt="" loading="lazy" />
                 <span class="row-label">{f$.map((f) => f.name)}</span>
               </button>
             </li>
