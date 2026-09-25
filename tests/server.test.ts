@@ -917,6 +917,7 @@ describe("folders, the edit link, layouts, drafts and listings", () => {
         `<meta property="og:image" content="${BASE}/static/apple-touch-icon.png">`,
         '<meta property="og:image:width" content="180">',
         '<meta property="og:image:height" content="180">',
+        '<meta property="og:image:alt" content="duckdown">',                // the site, by its front page's title
         '<meta name="twitter:card" content="summary">',
       ]);
       expect((await send("card.jpg", card)).status).toBe(200);           // the tab drops what pages knew
@@ -924,6 +925,7 @@ describe("folders, the edit link, layouts, drafts and listings", () => {
         `<meta property="og:image" content="${BASE}/static/card.jpg">`,
         '<meta property="og:image:width" content="1200">',
         '<meta property="og:image:height" content="630">',
+        '<meta property="og:image:alt" content="duckdown">',
         '<meta name="twitter:card" content="summary_large_image">',
       ]);
       // A page's own picture is still its own, and says no size it doesn't know.
@@ -931,6 +933,7 @@ describe("folders, the edit link, layouts, drafts and listings", () => {
       const own = await (await fetch(`${BASE}/pictured.html`)).text();
       expect(own).toContain(`<meta property="og:image" content="${BASE}/static/images/green.svg">`);
       expect(own).not.toContain("og:image:width");
+      expect(own).toContain('<meta property="og:image:alt" content="Pictured">');   // a page's own picture is of the page
       const gone = await fetch(`${BASE}/edit/site-icon?card`, { ...authed(), method: "DELETE" });
       expect((await gone.json()).card).toBeNull();
       expect((await tags())!.at(-1)).toBe('<meta name="twitter:card" content="summary">');   // back to the icon

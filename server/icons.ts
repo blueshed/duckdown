@@ -1,4 +1,5 @@
-import { createStaticStorage } from "./storage";
+import { createStaticStorage, createPageStorage } from "./storage";
+import { parseFrontMatter } from "./markdown";
 import { DEBUG } from "./config";
 import { kept } from "./kept";
 
@@ -13,17 +14,25 @@ export const HOME_ICON = "apple-touch-icon.png";
 // ask for. A JPEG: a card is a picture, often a photograph.
 export const CARD = { name: "card.jpg", width: 1200, height: 630 } as const;
 
-export type SitePicture = { file: string; width: number; height: number; large: boolean };
+export type SitePicture = { file: string; width: number; height: number; large: boolean; alt: string };
 
 const statics = createStaticStorage();
+const pages = createPageStorage();
+
+// What the site's picture is of, for a reader who can't see it: the site,
+// by its front page's title.
+async function siteName(): Promise<string> {
+  if (!await pages.exists("index.md")) return "";
+  return parseFrontMatter(await pages.read("index.md")).meta.title?.[0] ?? "";
+}
 
 // What a shared link shows when its page names no image: of its own — the
 // site's card, else its home-screen icon (a small card, but a picture), else
 // nothing. Kept like everything else the site knows about itself (kept.ts);
 // the icon tab calls siteChanged() when it writes either.
 const found = kept(async (store): Promise<SitePicture | null> => {
-  if (await store.exists(CARD.name)) return { file: CARD.name, width: CARD.width, height: CARD.height, large: true };
-  if (await store.exists(HOME_ICON)) return { file: HOME_ICON, width: ICONS[HOME_ICON], height: ICONS[HOME_ICON], large: false };
+  if (await store.exists(CARD.name)) return { file: CARD.name, width: CARD.width, height: CARD.height, large: true, alt: await siteName() };
+  if (await store.exists(HOME_ICON)) return { file: HOME_ICON, width: ICONS[HOME_ICON], height: ICONS[HOME_ICON], large: false, alt: await siteName() };
   return null;
 });
 

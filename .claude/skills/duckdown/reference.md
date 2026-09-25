@@ -638,7 +638,7 @@ In the editor, a stylesheet opens from **Resources → css** in a pane below wha
 | Placeholder | Becomes |
 |-------------|---------|
 | `{{title}}` | The page's `title`, else `duckie` |
-| `{{description}}` | The page's `description` as `<meta name="description">` and `og:description`, and the card a shared link shows: `og:title`, `og:type` (`article` for a page with a `date:`, else `website`), `og:url`, and with an `image:` (or an item's picture, or else the site's card or icon) `og:image` and `twitter:card` — the site's own with its size. The URL and the picture are absolute, so an export without `DUCKDOWN_ORIGIN` leaves them out. A template that writes its own `og:` tags will have them twice: take its own out |
+| `{{description}}` | The page's `description` as `<meta name="description">` and `og:description`, and the card a shared link shows: `og:title`, `og:type` (`article` for a page with a `date:`, else `website`), `og:url`, and with an `image:` (or an item's picture, or else the site's card or icon) `og:image` and `twitter:card` — the site's own with its size, and every picture with `og:image:alt` (the site's by the front page's title, a page's own by its title). The URL and the picture are absolute, so an export without `DUCKDOWN_ORIGIN` leaves them out. A template that writes its own `og:` tags will have them twice: take its own out |
 | `{{url}}` | The page's one canonical address — use it as `<link rel="canonical" href="{{url}}">` |
 | `{{date}}` | The page's `date` as a `<time>`, written out (`21 September 2026`), or nothing |
 | `{{nav}}` | The navigation (above), or nothing |

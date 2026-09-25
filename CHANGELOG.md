@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- **A shared picture says what it is** (`og:image:alt`): the site's card
+  or icon is named by the front page's title, a page's own picture by the
+  page's.
+- **Editor names like `constructor` or `__proto__`** were read from
+  JavaScript's own objects, not from `users.json`; they are now nobody until
+  added, and then ordinary names.
+- The report's totals table has a header.
+
 ## 0.13.4 — 2026-09-25
 
 - **A month's report.** `duckdown report` now writes each month an

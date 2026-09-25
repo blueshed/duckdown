@@ -102,7 +102,7 @@ export function countViews(views: View[]): Counts {
 function body(c: Counts): string[] {
   const tally = (o: Record<string, number>): Tally => new Map(Object.entries(o));
   return [
-    "| | |",
+    "| In the log | Count |",
     "|---|---:|",
     `| Views by readers | ${number(c.readers)} |`,
     `| Views by crawlers | ${number(c.crawlers)} |`,

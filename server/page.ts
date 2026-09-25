@@ -219,6 +219,9 @@ export async function pageHtml(page: Page, o: PageOptions): Promise<{ html: stri
         ...(o.origin ? [tag("property", "og:url", o.origin + encodeURI(canonicalPath(page.key)))] : []),
         ...(picture ? [tag("property", "og:image", picture)] : []),
         ...(picture && shared ? [tag("property", "og:image:width", String(shared.width)), tag("property", "og:image:height", String(shared.height))] : []),
+        // What the picture is, for a reader who can't see it: the site's own is
+        // of the site; a page's own, of the page.
+        ...(picture && (shared ? shared.alt : title) ? [tag("property", "og:image:alt", shared ? shared.alt : title)] : []),
         ...(picture ? [tag("name", "twitter:card", large ? "summary_large_image" : "summary")] : []),
       ].join("\n  ");
     }],
