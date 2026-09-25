@@ -8,11 +8,12 @@ import { closeImages } from "../store";
 import { modal } from "../modal";
 import { ResourceList } from "./ResourceList";
 import { ReportList } from "./ReportList";
+import { SiteIcon } from "./SiteIcon";
 import { Drawer } from "./Drawer";
 import { Trail, folderCrumbs } from "./Trail";
 
-type Tab = "images" | "styles" | "templates" | "reports";
-const TABS: [Tab, string][] = [["images", "images"], ["styles", "css"], ["templates", "templates"], ["reports", "reports"]];
+type Tab = "images" | "styles" | "templates" | "icon" | "reports";
+const TABS: [Tab, string][] = [["images", "images"], ["styles", "css"], ["templates", "templates"], ["icon", "icon"], ["reports", "reports"]];
 
 export function ImageBrowser() {
   const files = signal<FileEntry[]>([]);
@@ -80,7 +81,8 @@ export function ImageBrowser() {
 
   // Three kinds of resource, one chooser. Images are inserted into the page at
   // the cursor; a stylesheet or a template opens below the page to be edited.
-  // And what the site's own tasks reported, to read.
+  // The site's icon, set from any picture. And what the site's own tasks
+  // reported, to read.
   const tab = signal<Tab>("images");
   const on = (name: string) => tab.map((t) => (t === name ? "section on" : "section"));
 
@@ -111,6 +113,7 @@ export function ImageBrowser() {
       <div class="tab-panel" role="tabpanel" aria-labelledby={tab.map((t) => `tab-${t}`)}>
       {when(tab.map((t) => t === "styles"), () => <ResourceList section="static" />)}
       {when(tab.map((t) => t === "templates"), () => <ResourceList section="templates" />)}
+      {when(tab.map((t) => t === "icon"), () => <SiteIcon />)}
       {when(tab.map((t) => t === "reports"), () => <ReportList />)}
 
       {when(tab.map((t) => t === "images"), () => <>

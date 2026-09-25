@@ -1145,6 +1145,66 @@ describe("the site's own 404 page", () => {
   });
 });
 
+describe("the site's icon, set from the editor", () => {
+  const statics = join(SITE, "static");
+  const png = async (size: number) =>
+    new Uint8Array(await new Bun.Image(readFileSync("tests/example/static/favicon.ico")).resize(size, size).png().bytes());
+  const send = async (parts: Record<string, Uint8Array<ArrayBuffer> | string>) => {
+    const form = new FormData();
+    for (const [name, body] of Object.entries(parts)) form.append(name, new Blob([body]), name);
+    return fetch(`${BASE}/edit/site-icon`, { ...authed(), method: "POST", body: form });
+  };
+
+  test("says where each one is, and none it doesn't have", async () => {
+    expect((await fetch(`${BASE}/edit/site-icon`)).status).toBe(401);
+    expect((await fetch(`${BASE}/edit/site-icon`, { method: "POST" })).status).toBe(401);
+    const icons = await (await fetch(`${BASE}/edit/site-icon`, authed())).json();
+    expect(icons["apple-touch-icon.png"]).toBeNull();
+    expect(icons["favicon.ico"]).toMatch(/^\/static\/favicon\.ico\?v=\w+$/);
+  });
+
+  test("writes both, keeps the one it replaced, and the root answers them", async () => {
+    const was = readFileSync(join(statics, "favicon.ico"));
+    const home = await png(180);
+    const tab = await png(48);
+    try {
+      const res = await send({ "apple-touch-icon.png": home, "favicon.ico": tab });
+      expect(res.status).toBe(200);
+      const icons = await res.json();
+      expect(icons["apple-touch-icon.png"]).toStartWith("/static/apple-touch-icon.png?v=");
+      expect(new Uint8Array(await (await fetch(`${BASE}/apple-touch-icon-precomposed.png`)).arrayBuffer())).toEqual(home);
+      expect(new Uint8Array(await (await fetch(`${BASE}/favicon.ico`)).arrayBuffer())).toEqual(tab);
+      // What it replaced is kept, as any save's is; there was no home icon to keep.
+      const versions = await (await fetch(`${BASE}/edit/static/favicon.ico?versions`, authed())).json();
+      expect(versions).toHaveLength(1);
+      expect(existsSync(join(SITE, ".history", "static", "apple-touch-icon.png"))).toBe(false);
+    } finally {
+      writeFileSync(join(statics, "favicon.ico"), was);
+      rmSync(join(statics, "apple-touch-icon.png"), { force: true });
+      rmSync(join(SITE, ".history", "static"), { recursive: true, force: true });
+    }
+  });
+
+  test("refuses what isn't the icon it's sent as, and writes neither", async () => {
+    const was = readFileSync(join(statics, "favicon.ico"));
+    const tab = await png(48);
+    const refused = async (parts: Record<string, Uint8Array<ArrayBuffer> | string>) => {
+      const res = await send(parts);
+      return `${res.status} ${await res.text()}`;
+    };
+    expect(await refused({ "favicon.ico": tab })).toBe("400 No apple-touch-icon.png was sent");
+    expect(await refused({ "apple-touch-icon.png": "not a picture", "favicon.ico": tab }))
+      .toBe("422 apple-touch-icon.png wasn't sent as a PNG");
+    const jpeg = new Uint8Array(await new Bun.Image(await png(180)).jpeg().bytes());
+    expect(await refused({ "apple-touch-icon.png": jpeg, "favicon.ico": tab }))
+      .toBe("422 apple-touch-icon.png wasn't sent as a PNG");
+    expect(await refused({ "apple-touch-icon.png": await png(180), "favicon.ico": await png(32) }))
+      .toBe("422 favicon.ico should be 48×48, and was 32×32");
+    expect(existsSync(join(statics, "apple-touch-icon.png"))).toBe(false);
+    expect(readFileSync(join(statics, "favicon.ico"))).toEqual(was);
+  });
+});
+
 describe("files a crawler asks for at the root", () => {
   // Asked under the site's own name: on localhost (a place to look) robots.txt
   // is closed whatever the site says — see "one site, one address" below.

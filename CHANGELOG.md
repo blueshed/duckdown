@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- **The site's icon, set in the editor.** Resources has an **icon** tab:
+  choose any picture — a photo, a logo, an SVG — and duckdown makes the
+  site's two icons from its middle square, the one on a browser tab and the
+  one on a phone's home screen (on white, since a phone turns transparency
+  black). It shows them as a phone and a light and a dark tab bar would, and
+  keeps what they replaced. Before, they could only be put in `static/` by
+  hand, which on a site in a bucket meant not at all.
 - **The editor has an icon** — a browser window, on its tab and on the
   sign-in page, so it can be told apart from the site in a row of tabs.
 

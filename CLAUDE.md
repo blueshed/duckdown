@@ -79,6 +79,7 @@ duckdown/
 │   │   ├── reports.ts      # /edit/reports/* — reports/, read-only: a listing, or a report rendered as a page
 │   │   ├── users.ts        # /edit/users — who can sign in: names, never hashes
 │   │   ├── help.ts         # /edit/help — the Help drawer's pages (server/help/), examples paired with what they give
+│   │   ├── site-icon.ts    # /edit/site-icon — the tab and home-screen icon: where they are, and both written from the editor's PNGs
 │   │   ├── publish.ts      # /edit/publish — status, publish (checked), ?pull
 │   │   ├── collection.ts   # /edit/collection/* — a collection's pictures (upload + thumbnail), and its problems
 │   │   ├── static.ts       # /static/* — site static files
@@ -105,9 +106,10 @@ duckdown/
 │           ├── Header.tsx    # Top bar: the trail, then the drawers' buttons, view site, logout
 │           ├── Drawer.tsx    # The drawer's frame: over the preview (or, side="left", the tree), not modal, Escape closes it
 │           ├── Drawers.tsx   # Whichever drawer is open: Resources, Editors or Publish; LeftDrawer, a chosen work
-│           ├── ImageBrowser.tsx # The Resources drawer: images (a grid), css, templates, reports
+│           ├── ImageBrowser.tsx # The Resources drawer: images (a grid), css, templates, icon, reports
 │           ├── ReportList.tsx # Its reports tab: reports/ by folder, each a link to its own tab
 │           ├── ResourceList.tsx # One tab of it: the css or template files
+│           ├── SiteIcon.tsx  # Its icon tab: any picture, squared on a canvas (squarePng), sent as the site's two icons
 │           ├── ResourcePane.tsx # A resource open below the page
 │           ├── CollectionPane.tsx # A folder's collection.json: the works as pictures, the chosen one's fields beside them
 │           ├── PreviewFrame.tsx # The sandboxed iframe, in one place
@@ -569,7 +571,7 @@ Paths: storage keys are real names. The server decodes the URL path (`after()`);
 
 - **The base.** `site.css` and `search.js` are duckdown's, not the site's: `staticFile()` (routes/static.ts) and the exporter fall back to `base.ts`'s copy when the site has no file of that name, so a site that never forked one is upgraded by upgrading duckdown. They live in `server/base/`, which exists whether duckdown is installed or vendored by `bun create`, so one fallback serves both; the seed carries no copy, and the editor lists only files a site owns. `create/setup.ts` doesn't copy them.
 - **A 404 page.** `pages/404.md` answers a miss with a 404 status (`notFound()` in routes/site.ts) and exports as `404.html`. `NOT_FOUND` in search.ts keeps it out of search, `{{pages}}` and the sitemap. A content folder that vanishes while the server runs is said once in the log, at the first miss.
-- **Root files.** `ROOT_FILES` (robots.txt, favicon.ico, apple-touch-icon.png) in `base.ts`: answered at the root from `static/` and written to the root of `dist/`. An iPhone (or an app drawing a link preview) also asks for the icon as `-precomposed` and sized (`-120x120`, `-180x180-precomposed`): `rootFile()` maps all of them to `apple-touch-icon.png`, the site route and `serve.ts` answer them with it, and the export writes the `-precomposed` copy too. Not a mechanism.
+- **Root files.** `ROOT_FILES` (robots.txt, favicon.ico, apple-touch-icon.png) in `base.ts`: answered at the root from `static/` and written to the root of `dist/`. An iPhone (or an app drawing a link preview) also asks for the icon as `-precomposed` and sized (`-120x120`, `-180x180-precomposed`): `rootFile()` maps all of them to `apple-touch-icon.png`, the site route and `serve.ts` answer them with it, and the export writes the `-precomposed` copy too. Not a mechanism. A person sets both in the editor's **Resources → icon** (`SiteIcon.tsx`, `routes/site-icon.ts`): the browser squares the picture on a canvas — Bun.Image can't crop or fill, and can't read an SVG — and the route checks each is a PNG of its size (180, on white; 48) before writing both or neither, keeping what they replaced in static's history.
 - **One address.** `hosts.ts` is what both servers ask of a request's name (`hostOf()`: x-forwarded-host first): `hostAnswer()` 301s another name to `DUCKDOWN_ORIGIN` and closes `robots.txt` on a place to look (`looking()`: localhost, 127.0.0.1, `*.up.railway.app`, never the origin's own host), and the caller adds `X-Robots-Tag: noindex` there to every answer. `serve.ts` asks it in `route()`, the served site in `siteHandler(origin)` (routes/site.ts) — pages only: the other routes answer under any name. Unset, nothing moves.
 - **Sitemap.** `sitemapXml()` over `searchIndex()`, served at `/sitemap.xml` and written by the exporter when `DUCKDOWN_ORIGIN` is set (it needs absolute addresses).
 - **Feeds.** `feed: true` on a folder's `index.md` gives it `/<folder>/feed.xml` (`feed.ts`): Atom over `folderEntries()` — what `{{pages}}` lists, so they agree on drafts and order — taking only the pages whose `date:` parses. What it is made from is cached per folder without an origin, dropped by `feedsChanged()` from the pages route, and `feedXml()` writes it for an origin. The site route answers `…/feed.xml` before a page (a folder with no feed falls through to a miss); the export writes it only with `DUCKDOWN_ORIGIN`, and `{{feed}}` is empty when `pageHtml` has no origin, so no page links to a feed that wasn't written. `deadLinks()` counts a feed as somewhere.

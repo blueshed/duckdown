@@ -112,3 +112,11 @@ Upload any web-compatible image format:
 | `.jpg` | Photos |
 | `.gif` | Simple animations |
 | `.webp` | Modern format, smaller files |
+
+## The site's icon
+
+The picture on a browser tab, and on a phone's home screen when someone adds
+the site there, is set in **Resources → icon**. Choose any picture — a logo, a
+photo, an SVG — and both icons are made from its middle square: the phone's
+on white, the tab's as it is. The tab shows it on a light and a dark tab bar,
+so a drawing that disappears on one is easy to spot.

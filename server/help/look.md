@@ -21,5 +21,8 @@ sizes, and the whole site follows.
 | `--font-body` | The typeface |
 | `--measure` | How wide the text runs |
 
+The site's icon — on a browser tab, and on a phone's home screen — is in
+**Resources → icon**: choose any picture and both are made from it.
+
 While a stylesheet is open, the preview changes as you type — nothing is
 saved until you press Save.

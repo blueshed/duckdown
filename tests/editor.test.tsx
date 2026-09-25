@@ -1,9 +1,9 @@
 // The editor's own code, in happy-dom, talking to the real server in this
 // process (signed in). Failures are staged with intercept().
-import { describe, test, expect, beforeAll, afterAll, afterEach, spyOn, mock } from "bun:test";
+import { describe, test, expect, beforeAll, afterAll, afterEach, beforeEach, spyOn, mock } from "bun:test";
 import { createElement, mount, batch, signal, when } from "@blueshed/railroad";
 import { BASE, SITE, signIn, waitFor, keepSite } from "./helpers";
-import { mkdirSync, writeFileSync, rmSync } from "fs";
+import { mkdirSync, writeFileSync, readFileSync, rmSync } from "fs";
 import { join } from "path";
 import { api, apiJson, urlPath } from "../server/edit/api";
 import { notice, news, speak, tell, hush } from "../server/edit/notice";
@@ -29,6 +29,7 @@ import { HelpDrawer, helpFirst, helpOrder } from "../server/edit/components/Help
 import { Drawers, LeftDrawer } from "../server/edit/components/Drawers";
 import { PublishButton, publishState, refreshPublish } from "../server/edit/components/Publish";
 import { ImageBrowser } from "../server/edit/components/ImageBrowser";
+import { SiteIcon, squarePng } from "../server/edit/components/SiteIcon";
 import { ResourceList } from "../server/edit/components/ResourceList";
 import { ResourcePane } from "../server/edit/components/ResourcePane";
 import { CollectionPane, itemAddresses, firstWork, same } from "../server/edit/components/CollectionPane";
@@ -1468,7 +1469,7 @@ describe("ImageBrowser", () => {
     dispose();
   });
 
-  test("four tabs over one sidebar: images, css, templates, reports", async () => {
+  test("five tabs over one sidebar: images, css, templates, icon, reports", async () => {
     const { host, dispose } = render(() => <ImageBrowser />);
     await waitFor(() => rows(host).includes("logo.svg"));
     const tab = (name: string) => button(host.querySelector(".browser-sections")!, name)!;
@@ -1531,6 +1532,9 @@ describe("ImageBrowser", () => {
     expect(rows(host)).toEqual(["2026-09", "2026-08"]);
     rmSync(join(SITE, "reports"), { recursive: true, force: true });
 
+    click(tab("icon"));
+    await waitFor(() => host.querySelector(".site-icon .icon-shown"));
+
     click(tab("images"));
     await waitFor(() => rows(host).includes("logo.svg"));
     dispose();
@@ -1573,6 +1577,168 @@ describe("ImageBrowser", () => {
       const { host, dispose } = render(() => <ImageBrowser />);
       await waitFor(() => notice.get());
       expect(rows(host)).toEqual([]);
+      dispose();
+    } finally {
+      restore();
+    }
+  });
+});
+
+// --- The site's icon ---
+//
+// happy-dom draws nothing, so a picture and a canvas are stood in for: the
+// picture says how big it is, the canvas records what was drawn and hands back
+// a real PNG of its own size, which the server then checks as it would any.
+
+describe("SiteIcon", () => {
+  const source = readFileSync("tests/example/static/favicon.ico");
+  const png = async (size: number) => new Uint8Array(await new Bun.Image(source).resize(size, size).png().bytes());
+  let drawn: unknown[][] = [];
+  let noPng = false;
+  let natural = { w: 300, h: 200 };
+  let undecodable = false;
+  const RealImage = globalThis.Image;
+  const make = document.createElement.bind(document);
+  let canvases: ReturnType<typeof spyOn>;
+
+  beforeEach(() => {
+    drawn = [];
+    noPng = false;
+    natural = { w: 300, h: 200 };
+    undecodable = false;
+    (globalThis as any).Image = class {
+      src = "";
+      get naturalWidth() { return natural.w; }
+      get naturalHeight() { return natural.h; }
+      decode() { return undecodable ? Promise.reject(new Error("The source image cannot be decoded.")) : Promise.resolve(); }
+    };
+    canvases = spyOn(document, "createElement").mockImplementation(((tag: string) => {
+      if (tag !== "canvas") return make(tag);
+      const canvas: any = {
+        width: 0,
+        height: 0,
+        getContext: () => ({
+          set fillStyle(v: string) { drawn.push(["fillStyle", v]); },
+          fillRect: (...a: unknown[]) => drawn.push(["fillRect", ...a]),
+          drawImage: (img: unknown, ...a: unknown[]) => drawn.push(["drawImage", img === canvas ? "self" : (img as any)?.getContext ? "canvas" : "img", ...a]),
+        }),
+        toBlob: (done: (b: Blob | null) => void) => {
+          if (noPng) return done(null);
+          png(canvas.width).then((bytes) => done(new Blob([bytes], { type: "image/png" })));
+        },
+      };
+      return canvas;
+    }) as typeof document.createElement);
+  });
+
+  afterEach(() => {
+    (globalThis as any).Image = RealImage;
+    canvases.mockRestore();
+    const statics = join(SITE, "static");
+    rmSync(join(statics, "apple-touch-icon.png"), { force: true });
+    writeFileSync(join(statics, "favicon.ico"), source);
+    rmSync(join(SITE, ".history", "static"), { recursive: true, force: true });
+  });
+
+  test("squarePng cuts the middle square, fills behind it when asked, and says when it made nothing", async () => {
+    const blob = await squarePng(new Blob(["wide"]), 180, "#ffffff");
+    expect(new Uint8Array(await blob.arrayBuffer())).toEqual(await png(180));
+    expect(drawn).toEqual([
+      ["drawImage", "img", 0, 0, 300, 200],                        // the whole picture, big enough already
+      ["fillStyle", "#ffffff"],
+      ["fillRect", 0, 0, 180, 180],
+      ["drawImage", "canvas", 50, 0, 200, 200, 0, 0, 180, 180],    // its middle square, from that
+    ]);
+
+    // An SVG with no size of its own is drawn at the size asked for; a small
+    // picture is drawn up to it first; a tab icon has nothing behind it.
+    drawn = [];
+    natural = { w: 0, h: 0 };
+    await squarePng(new Blob(["<svg/>"]), 48);
+    expect(drawn).toEqual([["drawImage", "img", 0, 0, 48, 48], ["drawImage", "canvas", 0, 0, 48, 48, 0, 0, 48, 48]]);
+    drawn = [];
+    natural = { w: 24, h: 12 };
+    await squarePng(new Blob(["tiny"]), 48);
+    expect(drawn[0]).toEqual(["drawImage", "img", 0, 0, 96, 48]);
+
+    noPng = true;
+    await expect(squarePng(new Blob(["x"]), 48)).rejects.toThrow("the browser made no PNG");
+  });
+
+  test("shows the icons the site has, and sets both from one picture", async () => {
+    const { host, dispose } = render(() => <SiteIcon />);
+    await waitFor(() => host.querySelector(".icon-shown"));
+    // The seed has a tab icon and no home-screen one.
+    expect(host.textContent).toContain("No home-screen icon yet.");
+    const tabs = [...host.querySelectorAll(".icon-tab img")].map((i) => i.getAttribute("src"));
+    expect(tabs).toHaveLength(2);
+    expect(tabs[0]).toMatch(/^\/static\/favicon\.ico\?v=/);
+    expect(host.querySelectorAll(".icon-tab img")[1]!.getAttribute("alt")).toBe("The site's icon on a dark tab bar");
+
+    const input = host.querySelector('input[type="file"]') as HTMLInputElement;
+    expect(input.accept).toBe("image/*");
+    let opened = 0;
+    input.click = () => { opened++; };
+    const choose = button(host, "Choose a picture")!;
+    click(choose);
+    expect(opened).toBe(1);
+
+    Object.defineProperty(input, "files", { value: [], configurable: true });
+    input.dispatchEvent(new Event("change"));                       // nothing chosen: nothing happens
+    Object.defineProperty(input, "files", { value: [new File(["wide"], "logo.png", { type: "image/png" })], configurable: true });
+    input.dispatchEvent(new Event("change"));
+    expect(choose.getAttribute("aria-busy")).toBe("true");
+    expect(choose.textContent).toContain("Setting the icon…");
+    await waitFor(() => host.querySelector("img.icon-home"));
+    expect(host.querySelector("img.icon-home")!.getAttribute("src")).toMatch(/^\/static\/apple-touch-icon\.png\?v=/);
+    expect(host.querySelector(".icon-tab img")!.getAttribute("src")).not.toBe(tabs[0]);   // a new one, not the cached
+    expect(choose.getAttribute("aria-busy")).toBe("false");
+    // The home-screen copy has white behind it; the tab's has nothing.
+    expect(drawn.filter((d) => d[0] === "fillRect")).toEqual([["fillRect", 0, 0, 180, 180]]);
+    expect(readFileSync(join(SITE, "static", "favicon.ico"))).toEqual(Buffer.from(await png(48)));
+    dispose();
+  });
+
+  test("a file that isn't a picture speaks, and so does a refusal", async () => {
+    const { host, dispose } = render(() => <SiteIcon />);
+    await waitFor(() => host.querySelector(".icon-shown"));
+    const input = host.querySelector('input[type="file"]') as HTMLInputElement;
+    undecodable = true;
+    Object.defineProperty(input, "files", { value: [new File(["words"], "notes.txt")], configurable: true });
+    input.dispatchEvent(new Event("change"));
+    await waitFor(() => notice.get());
+    expect(notice.get()).toBe("Couldn't read notes.txt as a picture: The source image cannot be decoded.");
+    hush();
+
+    undecodable = false;
+    const restore = intercept(() => new Response("favicon.ico should be 48×48, and was 32×32", { status: 422 }));
+    try {
+      input.dispatchEvent(new Event("change"));
+      await waitFor(() => notice.get());
+      expect(notice.get()).toBe("Couldn't set the site's icon: 422 favicon.ico should be 48×48, and was 32×32");
+    } finally {
+      restore();
+    }
+    expect(host.querySelector("img.icon-home")).toBeNull();
+    dispose();
+  });
+
+  test("a site with neither says so", async () => {
+    rmSync(join(SITE, "static", "favicon.ico"));
+    const { host, dispose } = render(() => <SiteIcon />);
+    await waitFor(() => host.querySelector(".icon-shown"));
+    expect([...host.querySelectorAll(".icon-shown .drawer-note")].map((p) => p.textContent))
+      .toEqual(["No home-screen icon yet.", "No tab icon yet."]);
+    dispose();
+  });
+
+  test("a site whose icons can't be found says so, and shows none", async () => {
+    const restore = intercept(() => new Response("boom", { status: 500 }));
+    try {
+      const { host, dispose } = render(() => <SiteIcon />);
+      await waitFor(() => notice.get());
+      expect(notice.get()).toBe("Couldn't find the site's icon: 500 boom");
+      expect(host.querySelector(".icon-shown")).toBeNull();
       dispose();
     } finally {
       restore();

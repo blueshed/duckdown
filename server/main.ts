@@ -13,6 +13,7 @@ import { handleBrowse } from "./routes/browse";
 import { handleReports } from "./routes/reports";
 import { handleUsers } from "./routes/users";
 import { handleHelp } from "./routes/help";
+import { handleSiteIcon } from "./routes/site-icon";
 import { handlePublish } from "./routes/publish";
 import { handleCollectionFiles } from "./routes/collection";
 import { handleStatic } from "./routes/static";
@@ -53,6 +54,7 @@ export const server = Bun.serve({
     "/edit/browse/*": handleBrowse,
     "/edit/reports/*": handleReports,          // what the site's own tasks left for its editors
     "/edit/users": handleUsers,                // who can sign in: names, never hashes
+    "/edit/site-icon": handleSiteIcon,         // the tab and home-screen icon, made in the editor
     "/edit/help": handleHelp,                  // the Help drawer's pages, shipped with duckdown
     "/edit/publish": handlePublish,            // this copy and where it is published: status, publish, pull
     "/edit/collection/*": handleCollectionFiles,   // a collection's pictures, and what's wrong with it
