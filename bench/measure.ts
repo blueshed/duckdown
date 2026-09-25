@@ -1,14 +1,15 @@
-// Times what the site knows about itself, cold and kept, against DUCKDOWN_PATH.
+// Times what the site knows about itself, cold and kept, against DUCKDOWN_PATH
+// (set by run.ts before this process starts, so the modules read it as they load).
+import { createPageStorage } from "../server/storage";
+import { siteNav, folderListing, siteMap } from "../server/nav";
+import { searchIndex } from "../server/search";
+import { siteChanged } from "../server/kept";
+import { parsePage, pageHtml } from "../server/page";
+import { exportSite } from "../server/export";
 const t = async (what: string, fn: () => Promise<unknown>) => {
   const s = performance.now(); await fn(); const ms = performance.now() - s;
   console.log(`${what.padEnd(46)} ${ms.toFixed(0).padStart(7)} ms`); return ms;
 };
-const { createPageStorage } = await import("../server/storage.ts");
-const { siteNav, folderListing, siteMap } = await import("../server/nav.ts");
-const { searchIndex } = await import("../server/search.ts");
-const { siteChanged } = await import("../server/kept.ts");
-const { parsePage, pageHtml } = await import("../server/page.ts");
-const { exportSite } = await import("../server/export.ts");
 const pages = createPageStorage();
 const render = async (key: string) => pageHtml(parsePage(key, await pages.read(key)), { origin: "https://example.com" } as any);
 await t("nav, cold", () => siteNav(pages));
