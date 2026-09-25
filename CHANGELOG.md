@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+- **Reports tell readers from scanners.** Bots probing for `/.env`,
+  `/.git/config`, `/wp-login.php` and the like pose as browsers, so they
+  were counted as readers and filled Not found: on blueshed.co.uk's first
+  report, 925 of 993 views. They're now a line of their own, *Probes by
+  scanners*, and left out of everything else.
+- **A report for each day.** A log that spans days makes one report per
+  day, from each line's own time, rather than one named for the day it was
+  run.
+
 ## 0.13.2 — 2026-09-25
 
 - **A logo makes a whole card.** The Sharing card filled itself from any

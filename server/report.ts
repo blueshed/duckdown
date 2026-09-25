@@ -13,9 +13,36 @@ import { parseView, type View } from "./log";
 //
 // A report is of exactly the lines it was given: it keeps no count between
 // runs, so running it twice over overlapping logs never counts a view twice.
-// Nothing in it says who: the lines carry no address, browser or cookie.
+// Each line lands in the report for its own day (UTC), so a week of log is
+// seven reports, and a later run replaces the days it covers — give it whole
+// days. Nothing in it says who: the lines carry no address, browser or cookie.
 
 const TOP = 20;
+
+// A request no page of a site like this answers, made by a scanner looking
+// for a weakness: a dot-file or folder (/.env, /.git/config — not
+// /.well-known/, a standard address worth knowing is missing), PHP,
+// WordPress, a config, a backup. Scanners pose as browsers, so the log can't
+// mark them as crawlers; on blueshed.co.uk's first report they were 939 of
+// 993 views. The report counts them apart, and leaves them out of the readers
+// and of Not found, which then says what a reader asked for and missed.
+export const PROBES = [
+  /(^|\/)(\.|%2e)(?!well-known\/)/i,                          // a dot-file or folder, spelled or encoded
+  /%2f/i,                                                       // an encoded slash: a path trying to climb
+  /\.php\b|phpinfo|phpmyadmin|opcache/i,                        // PHP
+  /\/(wp-|cgi-bin\b|_profiler\b|actuator\b|_environment\b|server-status\b|debug\/)/i,   // other stacks' insides
+  /(^|\/)(env|credentials?|secrets?|dockerfile|pipfile|cakefile|id_rsa|appsettings[^/]*|settings\.json|auth\.json|composer\.(json|lock))$/i,
+  /(^|\/)env[-_.]/i,                                            // env.js, env-config.js, env.txt
+  /\.(bak|backup|old|orig|sql|zip|tar|gz|rar|7z|ini|ya?ml|conf|swp|env|properties|secret)$/i,   // configs, backups, secrets
+  // Scripts, data, source and keys: a site's own are in static/, and it
+  // serves no source at all. search.json, sitemap.xml and feeds are its own.
+  /^(?!\/static\/)(?!\/search\.json$).*\.(js|json|ts|rb|py|toml|tfstate|tfvars|key|pem|csv|log|pwd|lock)$/i,
+  /^(?!\/static\/)(?!.*\/(sitemap|feed)\.xml$).*\.xml$/i,
+];
+export const isProbe = (path: string) => {
+  const p = path.split("?")[0]!;
+  return PROBES.some((probe) => probe.test(p));
+};
 
 type Tally = Map<string, number>;
 const count = (tally: Tally, key: string) => tally.set(key, (tally.get(key) ?? 0) + 1);
@@ -30,12 +57,14 @@ function table(heading: string, rows: [string, number][], empty: string): string
 }
 
 export function reportMarkdown(views: View[], now: Date): string {
-  const readers = views.filter((v) => !v.crawler);
+  const probes = views.filter((v) => isProbe(v.path)).length;
+  const asked = views.filter((v) => !isProbe(v.path));
+  const readers = asked.filter((v) => !v.crawler);
   const read: Tally = new Map();
   const missing: Tally = new Map();
   const from: Tally = new Map();
   let errors = 0;
-  for (const v of views) {
+  for (const v of asked) {
     if (v.status === 404) count(missing, v.path);
     if (v.status >= 500) errors++;
   }
@@ -56,10 +85,16 @@ export function reportMarkdown(views: View[], now: Date): string {
     "| | |",
     "|---|---:|",
     `| Views by readers | ${number(readers.length)} |`,
-    `| Views by crawlers | ${number(views.length - readers.length)} |`,
+    `| Views by crawlers | ${number(asked.length - readers.length)} |`,
     `| Not found (404) | ${number([...missing.values()].reduce((a, b) => a + b, 0))} |`,
     ...(errors ? [`| Server errors (5xx) | ${number(errors)} |`] : []),
+    ...(probes ? [`| Probes by scanners | ${number(probes)} |`] : []),
     "",
+    ...(probes ? [
+      `${number(probes)} request(s) were probes: a scanner asking for files no site like this has (\`.env\`, \`.git\`, \`.php\`…).`,
+      "They're counted here and left out of everything else.",
+      "",
+    ] : []),
     "## Most read",
     "",
     table("Page", top(read), "No page was read by a reader."),
@@ -74,9 +109,18 @@ export function reportMarkdown(views: View[], now: Date): string {
   ].join("\n");
 }
 
+// The UTC day a line was printed on, from its timestamp: a platform's may say
+// nanoseconds, which a Date can't read, or put a space for the T. Null when
+// there is none to read.
+export function dayOf(at: string): string | null {
+  const when = new Date(at.replace(" ", "T").replace(/(\.\d{3})\d+/, "$1"));
+  return at && !Number.isNaN(when.getTime()) ? when.toISOString().slice(0, 10) : null;
+}
+
 // Reads the lines — from a file named on the command line, else what is piped
-// in — writes reports/<yyyy-mm>/<yyyy-mm-dd>.md (today's is replaced by a
-// second run today), and says where.
+// in — writes reports/<yyyy-mm>/<yyyy-mm-dd>.md for each day they cover
+// (a line with no time counts as today's; a day already reported is
+// replaced), and says where.
 export async function reportCommand(
   args: string[],
   read = (file?: string) => (file ? Bun.file(file).text() : Bun.stdin.text()),
@@ -88,10 +132,17 @@ export async function reportCommand(
   if (!views.length) {
     throw new Error("No view lines in what was read: pipe in the site's log, and check DUCKDOWN_LOG=1 is set where it runs");
   }
-  const date = now.toISOString().slice(0, 10);
-  const key = `${date.slice(0, 7)}/${date}.md`;
-  const replacing = await store.exists(key);
-  await store.write(key, reportMarkdown(views, now));
-  say(`${replacing ? "replaced" : "wrote"} reports/${key}, from ${number(views.length)} view line(s)`);
+  const today = now.toISOString().slice(0, 10);
+  const days = new Map<string, View[]>();
+  for (const v of views) {
+    const date = dayOf(v.at) ?? today;
+    days.set(date, [...(days.get(date) ?? []), v]);
+  }
+  for (const [date, lines] of [...days].sort(([a], [b]) => a.localeCompare(b))) {
+    const key = `${date.slice(0, 7)}/${date}.md`;
+    const replacing = await store.exists(key);
+    await store.write(key, reportMarkdown(lines, new Date(`${date}T12:00:00Z`)));
+    say(`${replacing ? "replaced" : "wrote"} reports/${key}, from ${number(lines.length)} view line(s)`);
+  }
   return 0;
 }

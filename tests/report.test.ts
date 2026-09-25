@@ -4,7 +4,7 @@ import { mkdtempSync, writeFileSync, readFileSync, existsSync, rmSync } from "fs
 import { join } from "path";
 import { RUN, SITE } from "./helpers";
 import { viewLine, parseView } from "../server/log";
-import { reportMarkdown, reportCommand } from "../server/report";
+import { reportMarkdown, reportCommand, isProbe, dayOf } from "../server/report";
 import { LocalStorage } from "../server/storage";
 import { cli } from "../server/cli";
 
@@ -57,6 +57,38 @@ describe("the report", () => {
     expect(md).not.toMatch(/Mozilla|Googlebot|\d+\.\d+\.\d+\.\d+/);    // nothing about who
   });
 
+  test("a scanner's probes are counted apart, and kept out of readers and of Not found", () => {
+    const md = reportMarkdown([
+      "view / 200 3ms", "view /.env 404 1ms", "view /wp-login.php 404 1ms", "view /.git/config 404 1ms",
+      "view /appsettings.Production.json 404 1ms", "view /old-page 404 1ms",
+    ].map((l) => parseView(l)!), NOW);
+    expect(md).toContain("| Views by readers | 2 |");                // / and /old-page
+    expect(md).toContain("| Not found (404) | 1 |");
+    expect(md).toContain("| Probes by scanners | 4 |");
+    expect(md).toContain("4 request(s) were probes: a scanner asking for files no site like this has");
+    expect(md).toContain("| Address | Views |\n|---|---:|\n| /old-page | 1 |\n");
+    expect(md).not.toContain("/.env |");
+    expect(reportMarkdown([parseView("view / 200 1ms")!], NOW)).not.toContain("Probes");
+  });
+
+  test("what counts as a probe, and what a site of this kind really serves", () => {
+    for (const path of ["/.env", "/%2eenv", "/%2f%2eaws%2fcredentials", "/.git/config", "/phpinfo", "/wp-admin/", "/xmlrpc.php?x=1",
+      "/cgi-bin/luci", "/actuator/health", "/server-status", "/debug/vars", "/credentials", "/Dockerfile", "/env.js",
+      "/config.yml", "/backup.sql", "/terraform.tfstate.backup", "/s3.secret", "/app.js", "/appsettings.QA.json", "/settings.py",
+      "/id_rsa", "/phpcs.xml", "/storage/logs/laravel.log"]) expect([path, isProbe(path)]).toEqual([path, true]);
+    for (const path of ["/", "/about.html", "/blog/", "/why-i-left-php-behind.html", "/static/site.css", "/static/search.js",
+      "/static/data/prices.csv", "/search.json", "/sitemap.xml", "/blog/feed.xml", "/.well-known/security.txt", "/robots.txt",
+      "/favicon.ico", "/feed/", "/llms.txt", "/edit"]) expect([path, isProbe(path)]).toEqual([path, false]);
+  });
+
+  test("a line's day is its own, read from whatever the platform wrote", () => {
+    expect(dayOf("2026-09-25T14:25:39.745618764Z")).toBe("2026-09-25");     // Railway: nanoseconds
+    expect(dayOf("2026-09-24 23:30:00+00:00")).toBe("2026-09-24");
+    expect(dayOf("2026-09-25T00:30:00+01:00")).toBe("2026-09-24");          // a day is UTC's
+    expect(dayOf("")).toBeNull();
+    expect(dayOf("yesterday")).toBeNull();
+  });
+
   test("says so when there's nothing to put in a table, and no span without timestamps", () => {
     const md = reportMarkdown([parseView("view /gone 404 1ms crawler")!], NOW);
     expect(md).toContain("No page was read by a reader.");
@@ -77,6 +109,28 @@ describe("the report", () => {
     expect(said).toEqual(["wrote reports/2026-09/2026-09-24.md, from 2 view line(s)", "replaced reports/2026-09/2026-09-24.md, from 1 view line(s)"]);
     await expect(reportCommand([], async () => "listening\n", store, NOW)).rejects.toThrow(
       "No view lines in what was read: pipe in the site's log, and check DUCKDOWN_LOG=1 is set where it runs");
+  });
+
+  test("a log that spans days is a report for each, and a line with no time is today's", async () => {
+    const root = mkdtempSync(join(RUN, "reports-days-"));
+    const store = new LocalStorage(root);
+    const said: string[] = [];
+    const log = [
+      JSON.stringify({ message: "view / 200 3ms", timestamp: "2026-09-23T23:59:59.999999999Z" }),
+      JSON.stringify({ message: "view /blog/ 200 3ms", timestamp: "2026-09-22T08:00:00Z" }),
+      JSON.stringify({ message: "view /a.html 200 3ms", timestamp: "2026-09-23T00:00:00Z" }),
+      "view /untimed.html 200 3ms",
+    ].join("\n");
+    expect(await reportCommand([], async () => log, store, NOW, (l) => said.push(l))).toBe(0);
+    expect(said).toEqual([
+      "wrote reports/2026-09/2026-09-22.md, from 1 view line(s)",
+      "wrote reports/2026-09/2026-09-23.md, from 2 view line(s)",
+      "wrote reports/2026-09/2026-09-24.md, from 1 view line(s)",
+    ]);
+    const day = readFileSync(join(root, "2026-09/2026-09-23.md"), "utf8");
+    expect(day).toStartWith("title: Visitors, 23 September 2026\n");
+    expect(day).toContain("| Views by readers | 2 |");
+    expect(readFileSync(join(root, "2026-09/2026-09-24.md"), "utf8")).toContain("/untimed.html");
   });
 
   test("is a duckdown command, reading a saved log into this site's reports/", async () => {
