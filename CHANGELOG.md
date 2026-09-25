@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.12.0 — 2026-09-25
 
 - **The site's icon, set in the editor.** Resources has an **icon** tab:
   choose any picture — a photo, a logo, an SVG — and duckdown makes the
@@ -8,7 +8,9 @@
   one on a phone's home screen (on white, since a phone turns transparency
   black). It shows them as a phone and a light and a dark tab bar would, and
   keeps what they replaced. Before, they could only be put in `static/` by
-  hand, which on a site in a bucket meant not at all.
+  hand, which on a site in a bucket meant not at all. A template that links
+  an icon of its own wins over these, so the tab says which templates do and
+  what they link.
 - **The editor has an icon** — a browser window, on its tab and on the
   sign-in page, so it can be told apart from the site in a row of tabs.
 
