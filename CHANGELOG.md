@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.13.0 — 2026-09-25
 
 - **`duckdown upgrade`.** In a site that has duckdown as a dependency,
   `bunx duckdown upgrade` moves it to the newest tag (or `upgrade 0.12.3`, the
@@ -14,6 +14,8 @@
   link would look. Any page that doesn't name its own `image:` shares it —
   or, with no card, the home-screen icon, small — so a site with only an
   icon now has a picture when its links are shared.
+- **railroad 0.14** underneath the editor (from 0.11). Nothing you use
+  changes.
 
 ## 0.12.2 — 2026-09-25
 
