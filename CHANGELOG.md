@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- **A logo makes a whole card.** The Sharing card filled itself from any
+  picture, cutting what didn't fit, so a square logo lost its top and
+  bottom. A picture far from the card's shape — square, upright, very wide —
+  is now shown whole on white, and a button beside the preview makes the
+  card the other way (**Show it whole** / **Fill the card**).
+
 ## 0.13.1 — 2026-09-25
 
 - **`duckdown upgrade` compares what only an origin writes.** A site with

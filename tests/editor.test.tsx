@@ -29,7 +29,7 @@ import { HelpDrawer, helpFirst, helpOrder } from "../server/edit/components/Help
 import { Drawers, LeftDrawer } from "../server/edit/components/Drawers";
 import { PublishButton, publishState, refreshPublish } from "../server/edit/components/Publish";
 import { ImageBrowser } from "../server/edit/components/ImageBrowser";
-import { SiteIcon, squarePng, cardJpeg, iconCard } from "../server/edit/components/SiteIcon";
+import { SiteIcon, squarePng, cardJpeg, iconCard, cardFit } from "../server/edit/components/SiteIcon";
 import { PreviewFrame, withoutScripts } from "../server/edit/components/PreviewFrame";
 import { siteChanged } from "../server/kept";
 import { ResourceList } from "../server/edit/components/ResourceList";
@@ -1718,7 +1718,7 @@ describe("SiteIcon", () => {
   });
 
   test("a card is the middle of a picture at 1200×630 on white, or the icon in the middle of white", async () => {
-    await cardJpeg(new Blob(["wide"]));
+    expect((await cardJpeg(new Blob(["wide"]))).fit).toBe("fill");      // 300×200: near the card's shape
     expect(drawn).toEqual([
       ["drawImage", "img", 0, 0, 1800, 1200],                            // drawn up to the card's width
       ["fillStyle", "#ffffff"],
@@ -1734,6 +1734,17 @@ describe("SiteIcon", () => {
       ["fillRect", 0, 0, 1200, 630],
       ["drawImage", "canvas", 0, 0, 378, 378, 411, 126, 378, 378],      // 60% of the height, centred
     ]);
+  });
+
+  test("a picture far from the card's shape is shown whole, unless told to fill", async () => {
+    expect([cardFit(1200, 630), cardFit(300, 200), cardFit(250, 100), cardFit(200, 200), cardFit(300, 400), cardFit(300, 100)])
+      .toEqual(["fill", "fill", "fill", "whole", "whole", "whole"]);
+    natural = { w: 200, h: 200 };                                        // a square logo
+    expect((await cardJpeg(new Blob(["logo"]))).fit).toBe("whole");
+    expect(drawn.at(-1)).toEqual(["drawImage", "canvas", 0, 0, 1200, 1200, 348, 63, 504, 504]);   // 80% of the height, centred
+    drawn = [];
+    expect((await cardJpeg(new Blob(["logo"]), "fill")).fit).toBe("fill");
+    expect(drawn.at(-1)).toEqual(["drawImage", "canvas", 0, 285, 1200, 630, 0, 0, 1200, 630]);    // its middle strip
   });
 
   test("the sharing card: shown as a shared link shows it, chosen, made from the icon, taken away", async () => {
@@ -1764,9 +1775,20 @@ describe("SiteIcon", () => {
     expect(host.querySelector(".share-card img")!.getAttribute("src")).toMatch(/^\/static\/card\.jpg\?v=/);
     const meta = await new Bun.Image(readFileSync(join(SITE, "static", "card.jpg"))).metadata();
     expect([meta.format, meta.width, meta.height]).toEqual(["jpeg", 1200, 630]);
+    // It filled the card (300×200 is near its shape); the same picture can be shown whole instead, and back.
+    const refit = () => [...host.querySelectorAll(".share-actions button")].find((b) => /whole|Fill/.test(b.textContent!))!;
+    expect(refit().textContent!.trim()).toBe("Show it whole");
+    drawn = [];
+    click(refit());
+    await waitFor(() => refit().textContent!.trim() === "Fill the card");
+    expect(drawn.at(-1)![0]).toBe("drawImage");
+    expect(drawn.at(-1)!.slice(2, 6)).toEqual([0, 0, 1800, 1200]);     // the whole picture, not a cut of it
+    click(refit());
+    await waitFor(() => refit().textContent!.trim() === "Show it whole");
 
     click(button(host, "Remove")!);
     await waitFor(() => !host.querySelector(".share-card img"));
+    expect(button(host, "Show it whole")).toBeUndefined();              // nothing chosen to make again
     expect(existsSync(join(SITE, "static", "card.jpg"))).toBe(false);
 
     // With an icon, a shared link shows it, small, and a card can be made from it.

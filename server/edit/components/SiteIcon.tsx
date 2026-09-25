@@ -76,14 +76,34 @@ export async function squarePng(file: Blob, size: number, fill?: string): Promis
   return encoded(canvas, "image/png");
 }
 
-// The site's card from a picture: its middle, cut to the card's shape.
-export async function cardJpeg(file: Blob): Promise<Blob> {
+export type Fit = "fill" | "whole";
+
+// Whether a picture fills the card, cut to its shape, or is shown whole on
+// white: a landscape photograph near the card's own shape loses little to the
+// cut; a square logo, or anything upright, would lose its top and bottom —
+// which is how blueshed.co.uk's first card came out.
+export const cardFit = (width: number, height: number): Fit => {
+  const ratio = width / height;
+  return ratio >= 1.5 && ratio <= 2.5 ? "fill" : "whole";
+};
+
+// The site's card from a picture: its middle cut to the card's shape, or all
+// of it on white, inside 90% of the card's width and 80% of its height. Says
+// which, so the tab can offer the other.
+export async function cardJpeg(file: Blob, fit?: Fit): Promise<{ blob: Blob; fit: Fit }> {
   const from = await whole(file, CARD.width);
-  const w = Math.min(from.width, from.height * CARD.width / CARD.height);
-  const h = w * CARD.height / CARD.width;
+  const how = fit ?? cardFit(from.width, from.height);
   const { canvas, ctx } = sheet(CARD.width, CARD.height, WHITE);
-  ctx.drawImage(from, (from.width - w) / 2, (from.height - h) / 2, w, h, 0, 0, CARD.width, CARD.height);
-  return encoded(canvas, "image/jpeg");
+  if (how === "fill") {
+    const w = Math.min(from.width, from.height * CARD.width / CARD.height);
+    const h = w * CARD.height / CARD.width;
+    ctx.drawImage(from, (from.width - w) / 2, (from.height - h) / 2, w, h, 0, 0, CARD.width, CARD.height);
+  } else {
+    const k = Math.min(CARD.width * 0.9 / from.width, CARD.height * 0.8 / from.height);
+    const [w, h] = [from.width * k, from.height * k];
+    ctx.drawImage(from, 0, 0, from.width, from.height, (CARD.width - w) / 2, (CARD.height - h) / 2, w, h);
+  }
+  return { blob: await encoded(canvas, "image/jpeg"), fit: how };
 }
 
 // The site's card from its icon: the icon in the middle, on white.
@@ -125,13 +145,19 @@ export function SiteIcon() {
   // The card: made from a picture chosen, or from the icon; or taken away.
   const carding = signal(false);
   let cardPicker: HTMLInputElement | null = null;
-  const sendCard = async (what: string, make: () => Promise<Blob>) => {
+  // The picture the card was last made from, and how, while you're here: so
+  // it can be made again the other way without choosing it again.
+  const picked = signal<{ file: File; fit: Fit } | null>(null);
+  const sendCard = async (what: string, make: () => Promise<Blob>, made: () => void = () => picked.set(null)) => {
     carding.set(true);
     try {
       const form = new FormData();
       form.append("card.jpg", await make(), "card.jpg");
       const data = await apiJson<Icons>("set the site's sharing card", "/edit/site-icon?card", { method: "POST", body: form });
-      if (data) icons.set(data);
+      if (data) {
+        icons.set(data);
+        made();
+      }
     } catch (err) {
       speak(`Couldn't read ${what} as a picture: ${(err as Error).message}`);
     } finally {
@@ -142,12 +168,23 @@ export function SiteIcon() {
     const input = e.target as HTMLInputElement;
     const file = input.files?.[0];
     input.value = "";
-    if (file) sendCard(file.name, () => cardJpeg(file));
+    if (file) fromPicture(file);
+  };
+  const fromPicture = (file: File, fit?: Fit) => {
+    let how: Fit = "fill";
+    return sendCard(file.name, async () => {
+      const card = await cardJpeg(file, fit);
+      how = card.fit;
+      return card.blob;
+    }, () => picked.set({ file, fit: how }));
   };
   const fromIcon = () => sendCard("the icon", async () => iconCard(await (await fetch(home.peek()!)).blob()));
   const dropCard = async () => {
     const data = await apiJson<Icons>("take the sharing card away", "/edit/site-icon?card", { method: "DELETE" });
-    if (data) icons.set(data);
+    if (data) {
+      icons.set(data);
+      picked.set(null);
+    }
   };
 
   const home = computed(() => icons.get()?.["apple-touch-icon.png"] ?? null);
@@ -250,6 +287,12 @@ export function SiteIcon() {
           aria-label={carding.map((b) => (b ? "Making the card…" : "Choose a picture for the card"))}>
           <Icon name="upload" size={12} /> {carding.map((b) => (b ? "Making the card…" : "Choose a picture…"))}
         </button>
+        {/* The picture just chosen, made again the other way. */}
+        {when(picked, (p$) => (
+          <button disabled={carding} onclick={() => fromPicture(p$.peek().file, p$.peek().fit === "fill" ? "whole" : "fill")}>
+            {p$.map((p) => (p.fit === "fill" ? "Show it whole" : "Fill the card"))}
+          </button>
+        ))}
         {when(home, () => (
           <button disabled={carding} onclick={fromIcon}>Make one from the icon</button>
         ))}
