@@ -58,7 +58,9 @@ function guessMime(path: string): string {
 // --- Local filesystem ---
 
 function safePath(base: string, userPath: string): string {
-  const resolved = resolve(base, userPath);
+  // A key's leading slash is no part of it — as a bucket takes it (n169) —
+  // not a way to name the machine's root.
+  const resolved = resolve(base, userPath.replace(/^\/+/, ""));
   // Inside the root, not merely sharing its prefix: "…/pages-old" must not
   // pass for "…/pages".
   const root = resolve(base);
@@ -170,10 +172,12 @@ export class S3Storage implements Storage {
     const fullPrefix = this.key(folder ? `${folder}/` : "");
     const result = await this.client.list({ prefix: fullPrefix, delimiter: "/" });
 
-    // With a delimiter, deeper keys come back as commonPrefixes; the only key
-    // to skip is a folder marker (an object named exactly the prefix).
+    // With a delimiter, deeper keys come back as commonPrefixes; what to skip
+    // is a folder marker (an object named exactly the prefix) and a . name.
     const files: FileEntry[] = (result.contents || [])
       .filter((obj) => obj.key !== fullPrefix)
+      // A . name is listed nowhere, as on disk (n169): .widths.json, .history.
+      .filter((obj) => !obj.key.slice(fullPrefix.length).startsWith("."))
       .map((obj) => {
         const name = obj.key.slice(fullPrefix.length);
         return {
@@ -185,7 +189,7 @@ export class S3Storage implements Storage {
         };
       });
 
-    const folders: FolderEntry[] = (result.commonPrefixes || []).map((p) => {
+    const folders: FolderEntry[] = (result.commonPrefixes || []).filter((p) => !p.prefix.slice(fullPrefix.length).startsWith(".")).map((p) => {
       const name = p.prefix.slice(fullPrefix.length).replace(/\/$/, "");
       return {
         name,

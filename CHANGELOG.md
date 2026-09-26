@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.14.3 — 2026-09-26
+
+- **A bucket and a folder on disk now answer alike, and a test holds them
+  to it.** The same questions are asked of both: a folder with or without
+  its slash, a leading slash, names with spaces, what exists. It found two
+  more differences, fixed: a bucket listed `.` names — so `.widths.json`
+  showed among a site's pictures in the editor — and disk refused a key
+  with a leading slash.
+
 ## 0.14.2 — 2026-09-26
 
 - **Fixed: a site in a bucket showed every folder empty in the editor's
