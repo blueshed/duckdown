@@ -37,6 +37,7 @@ describe("S3Storage", () => {
     expect(root.folders).toEqual([{ name: "guide", path: "guide", file: false }]);
     const guide = await store.list("guide");
     expect(guide.files.map((f) => f.path)).toEqual(["guide/index.md"]);
+    expect(await store.list("guide/")).toEqual(guide);   // asked with its slash, as the editor's tree asks
     expect(guide.folders).toEqual([]);
   });
 

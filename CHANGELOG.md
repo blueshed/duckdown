@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.14.2 — 2026-09-26
+
+- **Fixed: a site in a bucket showed every folder empty in the editor's
+  tree.** Since 0.12.1 the tree asks for a folder with its trailing slash;
+  on disk that was harmless, but the bucket was asked for `news//`, which
+  holds nothing. vashti's News, the one folder she edits, looked empty.
+
 ## 0.14.1 — 2026-09-25
 
 - The authoring skill says what vashti's run showed: after `duckdown images`

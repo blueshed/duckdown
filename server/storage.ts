@@ -163,7 +163,11 @@ export class S3Storage implements Storage {
   }
 
   async list(prefix: string): Promise<Listing> {
-    const fullPrefix = this.key(prefix ? `${prefix}/` : "");
+    // "news" or "news/": the editor asks for a folder with its slash (so
+    // "v1.2" isn't taken for a file), and "news//" is a prefix nothing has —
+    // which emptied every folder of vashti's bucket in the tree.
+    const folder = prefix.replace(/\/+$/, "");
+    const fullPrefix = this.key(folder ? `${folder}/` : "");
     const result = await this.client.list({ prefix: fullPrefix, delimiter: "/" });
 
     // With a delimiter, deeper keys come back as commonPrefixes; the only key
