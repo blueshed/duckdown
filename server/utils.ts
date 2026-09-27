@@ -1,4 +1,11 @@
 import type { BunRequest } from "bun";
+import { version } from "../package.json";
+
+// What /health answers, on the served site and the published one alike: which
+// duckdown this is, so a site's own address says what release it runs. It is
+// never in a page, so an upgrade's before-and-after export stays a comparison
+// of what the site writes.
+export const HEALTH = `OK duckdown ${version}`;
 
 // A request that can't be answered because of what it says, not because of
 // anything we did: handleError turns it into a 400 and doesn't log a stack.

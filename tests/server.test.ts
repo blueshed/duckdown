@@ -10,6 +10,7 @@ import { usersChanged } from "../server/users";
 import { helpSection, helpSections, HELP_ORDER } from "../server/routes/help";
 import { ours, otherIcons } from "../server/routes/site-icon";
 import { siteChanged } from "../server/kept";
+import pkg from "../package.json";
 
 keepSite();
 beforeAll(signIn);
@@ -721,10 +722,10 @@ describe("a collection's pictures", () => {
 // --- Public routes (no auth needed) ---
 
 describe("health", () => {
-  test("answers without reading storage, for a platform's healthcheck", async () => {
+  test("answers without reading storage, for a platform's healthcheck, and says which duckdown it is", async () => {
     const res = await fetch(`${BASE}/health`);
     expect(res.status).toBe(200);
-    expect(await res.text()).toBe("OK");
+    expect(await res.text()).toBe(`OK duckdown ${pkg.version}`);
   });
 });
 

@@ -132,6 +132,25 @@ describe("duckdown upgrade", () => {
     expect(JSON.parse(readFileSync(join(root, "package.json"), "utf8")).devDependencies.duckdown).toBe("github:blueshed/duckdown#v0.12.2");
   });
 
+  test("a site added with no tag starts from what is installed, and is pinned", async () => {
+    const root = site("0.12.1", { dependency: "github:blueshed/duckdown" });
+    writeFileSync(join(root, "node_modules", "duckdown", "package.json"), JSON.stringify({ version: "0.12.1" }));
+    const { run } = runner();
+    const { said, say } = quietly();
+    expect(await upgradeCommand(["0.12.3"], { cwd: root, run, say })).toBe(0);
+    expect(JSON.parse(readFileSync(join(root, "package.json"), "utf8")).dependencies.duckdown).toBe("github:blueshed/duckdown#v0.12.3");
+    expect(said[0]).toBe("duckdown v0.12.1 → v0.12.3, pinned (it named no tag).");
+    // On the version it has already, it still pins it, and compares to show nothing moved.
+    const same = site("0.12.1", { dependency: "github:blueshed/duckdown" });
+    writeFileSync(join(same, "node_modules", "duckdown", "package.json"), JSON.stringify({ version: "0.12.1" }));
+    expect(await upgradeCommand(["0.12.1"], { cwd: same, run, say })).toBe(0);
+    expect(JSON.parse(readFileSync(join(same, "package.json"), "utf8")).dependencies.duckdown).toBe("github:blueshed/duckdown#v0.12.1");
+    // Not installed, there is nothing to say which it is.
+    const bare = site("0.12.1", { dependency: "github:blueshed/duckdown" });
+    Bun.spawnSync(["rm", "-r", join(bare, "node_modules")]);
+    await expect(upgradeCommand(["0.12.3"], { cwd: bare, run, say })).rejects.toThrow("naming no tag, and isn't installed");
+  });
+
   test("a version that can't install, or can't export the site, is put back", async () => {
     const root = site("0.12.1");
     const before = readFileSync(join(root, "package.json"), "utf8");

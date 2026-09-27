@@ -11,7 +11,7 @@
 
 import { join, normalize, resolve } from "path";
 import { logView } from "./log";
-import { decodePath } from "./utils";
+import { decodePath, HEALTH } from "./utils";
 import { hostAnswer, hostOf, looking } from "./hosts";
 import { rootFile } from "./base";
 
@@ -34,7 +34,7 @@ async function file(dir: string, path: string): Promise<Bun.BunFile | null> {
 // which is what the served site counts too.
 async function route(req: Request, dir: string, origin: string): Promise<{ res: Response; html: boolean }> {
   const url = new URL(req.url);
-  if (url.pathname === "/health") return { res: new Response("OK"), html: false };
+  if (url.pathname === "/health") return { res: new Response(HEALTH), html: false };
 
   // A place to look is not a place to be (hosts.ts): on localhost or the
   // platform's own address the site is served whatever the origin says, but

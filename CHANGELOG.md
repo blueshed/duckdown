@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.14.4 — 2026-09-27
+
+- **`/health` says which duckdown it is**: `OK duckdown 0.14.4`, on the
+  served site and the published one alike, so a site's own address says
+  what release it runs. It is never in a page, so an upgrade's
+  before-and-after export compares only what the site writes.
+- **`duckdown upgrade` takes a site added with no tag.** One added as
+  `github:blueshed/duckdown` was refused; it now starts from the version
+  installed and is pinned from then on, as daisy was.
+- In duckdown's own repository, `bun run sites` lists every site under
+  `~/Workshop` that depends on duckdown and where each stands against the
+  newest tag, its address's `/health` included. It isn't shipped.
+
 ## 0.14.3 — 2026-09-26
 
 - **A bucket and a folder on disk now answer alike, and a test holds them

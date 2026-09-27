@@ -21,6 +21,7 @@ import { handleSearch } from "./routes/search";
 import { handleSitemap } from "./routes/sitemap";
 import { handleSite } from "./routes/site";
 import { handleError } from "./routes/error";
+import { HEALTH } from "./utils";
 
 // The editor's stylesheet and icon at stable URLs, for the login page (which
 // is not an HTML import, so Bun never bundles its <link>s).
@@ -41,7 +42,8 @@ export const server = Bun.serve({
   routes: {
     // A platform's healthcheck: proves the process is listening without
     // reading storage, so a content mistake never reads as a dead service.
-    "/health": new Response("OK"),
+    // It names the version, which is how `bun run sites` reads a live site.
+    "/health": new Response(HEALTH),
     "/edit": homepage,
     "/edit/styles.css": editorCss,
     "/edit/icon.png": editorIcon,     // the login page's; the editor bundles its own

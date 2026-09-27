@@ -1,6 +1,6 @@
 {
   "name": "duckdown",
-  "version": "0.14.3",
+  "version": "0.14.4",
   "description": "A markdown CMS built with Bun and Railroad",
   "author": "Peter Bunyan <peter@blueshed.co.uk> (https://blueshed.co.uk)",
   "license": "MIT",
@@ -44,6 +44,7 @@
     "stop": "bun run server/stop.ts",
     "check": "bunx tsc --noEmit",
     "bench": "bun bench/run.ts",
+    "sites": "bun scripts/sites.ts",
     "test": "bun test --coverage",
     "setup": "bun run create/setup.ts",
     "export": "bun run server/export.ts",

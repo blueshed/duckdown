@@ -835,7 +835,8 @@ Don't invent a deployment step that isn't written down.
 ## Upgrading duckdown
 
 A site that has duckdown as a dependency (`github:blueshed/duckdown#vX.Y.Z` in
-`package.json`) moves to another version with one command, in the site's folder:
+`package.json`, or with no tag, which the upgrade pins) moves to another
+version with one command, in the site's folder:
 
 ```sh
 bunx duckdown upgrade            # the newest tag
@@ -854,6 +855,9 @@ what it reports, then commit `package.json`, `bun.lock` and the skill. A site
 whose content also lives somewhere else (a served site's bucket) should bring
 that here first, so the comparison is of the content that is live. A site made
 by `bun create` owns its code and has no upgrade.
+
+After a deploy, the site's `/health` says which duckdown it runs
+(`OK duckdown 0.14.4`), at its own address: `curl https://<site>/health`.
 
 ## Troubleshooting
 

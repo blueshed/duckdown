@@ -8,9 +8,11 @@ import { tmpdir } from "os";
 // of the authoring skill, export again, and compare every file — then say
 // what changed and what the changelog says came in between. A version that
 // can't export the site is put back. It commits nothing: that, and pulling a
-// site's content from wherever else it lives first, stay the site's.
+// site's content from wherever else it lives first, stay the site's. A site
+// added with no tag (`bun add github:blueshed/duckdown`) starts from the
+// version installed, and is pinned from then on.
 
-const PIN = /^(github:blueshed\/duckdown)#v(\d+\.\d+\.\d+)$/;
+const PIN = /^(github:blueshed\/duckdown)(?:#v(\d+\.\d+\.\d+))?$/;
 const REPO = "https://github.com/blueshed/duckdown.git";
 const SKILL = join(".claude", "skills", "duckdown");
 
@@ -75,6 +77,12 @@ export function compare(before: string, after: string): { same: number; added: s
   return out;
 }
 
+// The version of duckdown in a site's node_modules, or null with none there.
+function installed(cwd: string): string | null {
+  const path = join(cwd, "node_modules", "duckdown", "package.json");
+  return existsSync(path) ? JSON.parse(readFileSync(path, "utf8")).version : null;
+}
+
 // The newest tag duckdown has published, asked of GitHub.
 async function newest(run: Run, cwd: string): Promise<string> {
   const listed = await run(["git", "ls-remote", "--tags", "--refs", REPO], cwd);
@@ -99,11 +107,13 @@ export async function upgradeCommand(
       ? `duckdown is "${spec}" here, not a github:blueshed/duckdown#vX.Y.Z tag to move`
       : "duckdown isn't a dependency here — a site made by bun create owns its code, and has no upgrade (see the README)");
   }
-  const from = pin[2]!;
+  const pinned = pin[2] !== undefined;
+  const from = pin[2] ?? installed(cwd);
+  if (!from) throw new Error(`duckdown is "${spec}" here, naming no tag, and isn't installed to say which it is: bun install first`);
 
   const to = args[0]?.replace(/^v/, "") || await newest(run, cwd);
   if (!/^\d+\.\d+\.\d+$/.test(to)) throw new Error(`"${args[0]}" isn't a version: say it as 0.12.3 or v0.12.3`);
-  if (to === from) {
+  if (to === from && pinned) {
     say(`Already on v${from}.`);
     return 0;
   }
@@ -117,19 +127,16 @@ export async function upgradeCommand(
     const before = await exportTo(join(scratch, "before"));
     if (before.code !== 0) throw new Error(`the site doesn't export as it is, on v${from}, so there is nothing to compare with:\n${before.out.trim()}`);
 
-    writeFileSync(pkgPath, pkgText.replace(`${pin[1]}#v${from}`, `${pin[1]}#v${to}`));
+    writeFileSync(pkgPath, pkgText.replace(`"${spec}"`, `"${pin[1]}#v${to}"`));
     const put = async (why: string) => {
       writeFileSync(pkgPath, pkgText);
       if (lockText !== null) writeFileSync(lockPath, lockText);
       await run(["bun", "install"], cwd);
       return new Error(`${why} — put back to v${from}`);
     };
-    const installed = await run(["bun", "install"], cwd);
-    const version = existsSync(join(cwd, "node_modules", "duckdown", "package.json"))
-      ? JSON.parse(readFileSync(join(cwd, "node_modules", "duckdown", "package.json"), "utf8")).version
-      : null;
-    if (installed.code !== 0 || version !== to) {
-      throw await put(`v${to} didn't install:\n${installed.out.trim()}`);
+    const install = await run(["bun", "install"], cwd);
+    if (install.code !== 0 || installed(cwd) !== to) {
+      throw await put(`v${to} didn't install:\n${install.out.trim()}`);
     }
     const after = await exportTo(join(scratch, "after"));
     if (after.code !== 0) throw await put(`v${to} can't export this site:\n${after.out.trim()}`);
@@ -138,7 +145,7 @@ export async function upgradeCommand(
     if (skill) cpSync(join(cwd, "node_modules", "duckdown", SKILL), join(cwd, SKILL), { recursive: true });
 
     const d = compare(join(scratch, "before"), join(scratch, "after"));
-    say(`duckdown v${from} → v${to}${skill ? ", and the skill's copy refreshed" : ""}.`);
+    say(`duckdown v${from} → v${to}${pinned ? "" : ", pinned (it named no tag)"}${skill ? ", and the skill's copy refreshed" : ""}.`);
     const differs = d.added.length + d.removed.length + d.changed.length;
     say(differs
       ? `The export: ${d.same} file(s) the same, ${differs} not.`

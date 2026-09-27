@@ -4,6 +4,7 @@ import { mkdirSync, rmSync, writeFileSync } from "fs";
 import { join } from "path";
 import { RUN } from "./helpers";
 import { serveDist, listen, looking } from "../server/serve";
+import pkg from "../package.json";
 
 const dist = join(RUN, "dist-served");
 const files: Record<string, string> = {
@@ -83,7 +84,7 @@ describe("serveDist", () => {
     expect((await ask("/search.json")).logged).toEqual([]);
     expect((await ask("/blog")).logged).toEqual([]);
     const health = await ask("/health");
-    expect(await health.res.text()).toBe("OK");
+    expect(await health.res.text()).toBe(`OK duckdown ${pkg.version}`);
     expect(health.logged).toEqual([]);
   });
 
@@ -106,7 +107,7 @@ describe("serveDist", () => {
     expect((await at("www.blueshed.co.uk")).status).toBe(200);
     expect((await at("localhost:8080")).status).toBe(200);
     // Health never moves: the platform asks on whatever host it likes.
-    expect(await (await at("blueshed.co.uk", "/health")).text()).toBe("OK");
+    expect(await (await at("blueshed.co.uk", "/health")).text()).toBe(`OK duckdown ${pkg.version}`);
     // Without an origin, any host is served; a Request with no Host header uses its URL's.
     expect((await ask("/")).res.status).toBe(200);
     expect((await serveDist(new Request("http://blueshed.co.uk/"), dist, () => {}, origin)).status).toBe(301);

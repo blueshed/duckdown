@@ -12,7 +12,7 @@ import homepage from "./edit/index.html";
 
 Bun.serve({
   routes: {
-    "/health":          new Response("OK"),   // a platform's healthcheck
+    "/health":          new Response(HEALTH),   // a platform's healthcheck: "OK duckdown 0.14.4"
     "/edit":            homepage,
     "/edit/styles.css": editorCss,   // Bun.file — also styles /login
     "/edit/icon.png":   editorIcon,  // and gives it the editor's icon
@@ -152,6 +152,7 @@ duckdown/
 │   ├── setup-script.test.ts # both scaffold modes on scratch folders, and `bun run export` in each
 │   └── compose.yml         # MinIO for manual S3 runs (bun run dev:s3)
 ├── bench/                  # bun run bench: a large site made and timed (n163); measures, doesn't check
+├── scripts/sites.ts        # bun run sites: every site under ~/Workshop on duckdown, and where each stands (not shipped)
 ├── bunfig.toml             # Test preload + the 100% coverage threshold
 ├── create/                 # `bun create blueshed/duckdown`: calls the scaffold, keeps code and tests
 ├── package.json
@@ -579,7 +580,35 @@ Paths: storage keys are real names. The server decodes the URL path (`after()`);
 
 ## Two ways in, one scaffold
 
-`server/init.ts` exports `scaffold(root, { vendored })`, which writes everything a site needs around the code: `site/` (index, theme.css, the seed's template, users.json), `.env`, `.gitignore` lines, `.railway/railway.ts` (Railway's infrastructure-as-code, plus a `railway` devDependency to resolve its `railway/iac` import), the authoring skill, `launch.json`, a CLAUDE.md, and package.json's scripts. **Install** (`bun add` then `bunx duckdown init`, via `cli.ts`) runs it with `vendored: false`; **create** (`create/setup.ts`) with `vendored: true`. The only difference in what it writes is the scripts' paths (`scripts()`): `node_modules/duckdown/server/…` or `server/…`. It never overwrites and returns what it wrote and what it left alone. Create mode keeps `server/`, `tests/` and `bunfig.toml`: an owner starts with the suite. There is no upgrade path from create; the README says to fork on GitHub for that. An installed site upgrades with `duckdown upgrade [tag]` (`upgrade.ts`): it exports with the version it has, re-pins (in `dependencies` or `devDependencies`, as init takes either), installs, refreshes the skill's copy, exports again and compares every file (with `STAND_IN` as the origin when the site has none, since without one an export writes no sharing tags, sitemap or feeds), and prints the changelog in between; a version that won't install or export the site is put back, and nothing is committed. Its `git`, `bun install` and export go through a `Run` the tests stand in for.
+`server/init.ts` exports `scaffold(root, { vendored })`, which writes everything a site needs around the code: `site/` (index, theme.css, the seed's template, users.json), `.env`, `.gitignore` lines, `.railway/railway.ts` (Railway's infrastructure-as-code, plus a `railway` devDependency to resolve its `railway/iac` import), the authoring skill, `launch.json`, a CLAUDE.md, and package.json's scripts. **Install** (`bun add` then `bunx duckdown init`, via `cli.ts`) runs it with `vendored: false`; **create** (`create/setup.ts`) with `vendored: true`. The only difference in what it writes is the scripts' paths (`scripts()`): `node_modules/duckdown/server/…` or `server/…`. It never overwrites and returns what it wrote and what it left alone. Create mode keeps `server/`, `tests/` and `bunfig.toml`: an owner starts with the suite. There is no upgrade path from create; the README says to fork on GitHub for that. An installed site upgrades with `duckdown upgrade [tag]` (`upgrade.ts`): it exports with the version it has (the pin's, or what is installed when the dependency names no tag), re-pins (in `dependencies` or `devDependencies`, as init takes either), installs, refreshes the skill's copy, exports again and compares every file (with `STAND_IN` as the origin when the site has none, since without one an export writes no sharing tags, sitemap or feeds), and prints the changelog in between; a version that won't install or export the site is put back, and nothing is committed. Its `git`, `bun install` and export go through a `Run` the tests stand in for.
+
+## A release, and the sites that run it
+
+A release is a commit named `X.Y.Z: what it does`, with `version` in
+package.json and a `## X.Y.Z` entry at the top of CHANGELOG.md, then the tag
+`vX.Y.Z`, both pushed: `git push && git push origin vX.Y.Z`. A site upgrades
+to a tag, never to master. The changelog entry is what each site reads when
+`duckdown upgrade` prints it, so anything a site has to do itself (run
+`duckdown images`, restart, change a template in its bucket) is said there.
+
+A release isn't out until the sites run it. `bun run sites` finds every folder
+under `~/Workshop` that depends on duckdown and shows where each stands: its
+pin, what is installed, its copy of the skill, whether git has the upgrade,
+and what its address's `/health` says it runs (`OK duckdown X.Y.Z`; before
+0.14.4 only `OK`). The address is the `DUCKDOWN_ORIGIN` in its
+`.railway/railway.ts`, or, while that domain isn't on Railway yet, the
+service's own `<service>-production.up.railway.app`; the domains themselves
+are DNS in blueshed/domains. A site another session is still making shows up
+too: leave it to that session, and tell it the release is out.
+For each site that's behind, in its folder and by its own CLAUDE.md — the
+steps differ, and that file is where they're kept:
+
+1. bring its content home if it lives elsewhere (vashti pulls its bucket first);
+2. `bunx duckdown upgrade X.Y.Z`, and read what it compares and prints;
+3. do what the changelog asks of a site;
+4. commit `package.json`, `bun.lock` and the skill, with a line in its ledger;
+5. deploy it its own way (a push, or `railway up`), and run `bun run sites`
+   again until its row is on the tag, live included.
 
 ## What a site gets without asking
 
