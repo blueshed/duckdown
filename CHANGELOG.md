@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.15.0 — 2026-09-27
+
+- **Extensions: routes a site adds.** An extension is a module whose default
+  export takes the site and returns Bun routes: a form, an RSVP, anything that
+  needs a server. A site declares it in its package.json, as
+  `"duckdown": { "extensions": [...] }`, never in `site/`, so what runs on
+  the server changes only by a commit. The served site and the published one
+  (`serve.ts`) both serve extensions on the site's own address, so an
+  extension's pages wear the site's template, stylesheets and links. An
+  extension is given the site's storage (disk or a bucket) and `render()`,
+  which makes a whole page from markdown. A route that clashes with
+  duckdown's, or an extension that won't load, stops the server and says
+  which.
+- A page rendered from somewhere other than `pages/` can give its own
+  address: `pageHtml`'s `path` sets its canonical link and `og:url` (n173).
+- `listen()` in `serve.ts` is now async, because it loads the site's
+  extensions. A script that calls it and uses the server it returns should
+  await it.
+- **A new site's `.claude/launch.json` is its own**: one entry, its dev
+  server on 8080. It was a copy of duckdown's, which now lists other sites
+  previewed beside duckdown. It is no longer in the package; a site that
+  already has one keeps it.
+
+A site that declares no extensions has nothing to do: it runs as before.
+
 ## 0.14.4 — 2026-09-27
 
 - **`/health` says which duckdown it is**: `OK duckdown 0.14.4`, on the

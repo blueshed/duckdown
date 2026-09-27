@@ -22,8 +22,8 @@ export async function setup(root: string) {
   console.log(`Setting up ${name}...`);
 
   // What is about developing duckdown as a project, not the code or its tests:
-  // its ledger, and this script.
-  for (const path of ["todo.jsonl", "create"]) {
+  // its ledger, this script, and its previews (the scaffold writes the site's).
+  for (const path of ["todo.jsonl", "create", join(".claude", "launch.json")]) {
     rmSync(join(root, path), { recursive: true, force: true });
   }
 

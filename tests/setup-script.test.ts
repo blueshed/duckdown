@@ -71,6 +71,8 @@ describe("create: bun create blueshed/duckdown, and the code is yours", () => {
     expect(existsSync(join(root, "create"))).toBe(false);
     expect(read(root, "todo.jsonl")).toBe("");                        // a fresh ledger, not duckdown's
     expect(read(root, "CLAUDE.md")).toBe("duckdown's own notes");     // theirs to keep: it describes the code they now have
+    // duckdown's previews are dropped; the site's own dev server is written in their place
+    expect(json(root, ".claude/launch.json").configurations).toEqual([{ name: "created", runtimeExecutable: "bun", runtimeArgs: ["run", "dev"], port: 8080 }]);
 
     const pkg = json(root, "package.json");
     expect(pkg).toMatchObject({ name: "created", version: "0.0.1", private: true });
@@ -154,7 +156,8 @@ describe("install: bun add, then bunx duckdown init", () => {
     expect(read(root, "CLAUDE.md")).toContain("pinned dependency");
     expect(read(root, "CLAUDE.md")).toContain(".railway/railway.ts");
     expect(readdirSync(join(root, ".claude", "skills", "duckdown"))).toContain("SKILL.md");
-    expect(existsSync(join(root, ".claude", "launch.json"))).toBe(true);
+    // Its own dev server, and none of the sites duckdown's own config previews
+    expect(json(root, ".claude/launch.json").configurations).toEqual([{ name: "installed", runtimeExecutable: "bun", runtimeArgs: ["run", "dev"], port: 8080 }]);
     const users = json(root, "site/users.json");
     expect(await Bun.password.verify("admin", users.admin)).toBe(true);
     exportIn(root);

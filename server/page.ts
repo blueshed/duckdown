@@ -150,6 +150,9 @@ export type PageOptions = {
   // each look the item up and hand it over here, so all three render it the
   // same way they render a page written by hand.
   item?: ItemContext;
+  // The page's own address, when it isn't the one its key makes: a page an
+  // extension serves (extensions.ts) from a key outside pages/ (n173).
+  path?: string;
 };
 
 // The whole document: the page's markdown inside the template it asks for,
@@ -157,6 +160,7 @@ export type PageOptions = {
 // through here too, which is what makes it a preview rather than a likeness.
 export async function pageHtml(page: Page, o: PageOptions): Promise<{ html: string; layout: string; includes: string[] }> {
   const { file, meta } = page;
+  const address = o.path ?? canonicalPath(page.key);
   const nav = markCurrent(await siteNav(pages), file);
   const title = meta.title?.[0] || "duckie";
   const description = meta.description?.[0] ?? "";
@@ -201,7 +205,7 @@ export async function pageHtml(page: Page, o: PageOptions): Promise<{ html: stri
   const shared = !meta.image?.[0] && o.origin && html.includes("{{description}}") ? await sitePicture() : null;
   for (const [name, value] of [
     ["title", () => escapeHtml(title)],
-    ["url", () => escapeHtml(o.origin + canonicalPath(page.key))],
+    ["url", () => escapeHtml(o.origin + address)],
     ["date", () => dateHtml(meta.date?.[0] ?? "")],
     // The page's description, and the card a link to it shows when shared:
     // Open Graph, which most places that unfurl a link read. Addresses in it
@@ -217,7 +221,7 @@ export async function pageHtml(page: Page, o: PageOptions): Promise<{ html: stri
         ...(description ? [tag("name", "description", description), tag("property", "og:description", description)] : []),
         tag("property", "og:title", title),
         tag("property", "og:type", meta.date ? "article" : "website"),
-        ...(o.origin ? [tag("property", "og:url", o.origin + encodeURI(canonicalPath(page.key)))] : []),
+        ...(o.origin ? [tag("property", "og:url", o.origin + encodeURI(address))] : []),
         ...(picture ? [tag("property", "og:image", picture)] : []),
         ...(picture && shared ? [tag("property", "og:image:width", String(shared.width)), tag("property", "og:image:height", String(shared.height))] : []),
         // What the picture is, for a reader who can't see it: the site's own is

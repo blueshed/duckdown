@@ -1,6 +1,6 @@
 {
   "name": "duckdown",
-  "version": "0.14.4",
+  "version": "0.15.0",
   "description": "A markdown CMS built with Bun and Railroad",
   "author": "Peter Bunyan <peter@blueshed.co.uk> (https://blueshed.co.uk)",
   "license": "MIT",
@@ -25,7 +25,6 @@
   "files": [
     "server",
     ".claude/skills/duckdown",
-    ".claude/launch.json",
     "create",
     "tests/example",
     "CHANGELOG.md",

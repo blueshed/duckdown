@@ -100,6 +100,8 @@ same code, so you can change your mind.
 - `duckdown report`: that log (from Railway, say: `railway logs | duckdown
   report`) made into a report in the editor's Reports tab — most read, not
   found, where readers came from
+- **Extensions**: routes a site adds (a form, an RSVP), declared in its
+  `package.json` and served by both servers, in the site's own template
 - Local filesystem or S3 storage
 - Zero build step — Bun serves everything
 
@@ -133,7 +135,8 @@ below your page.
 │   ├── log.ts           # The view log (counts, never identifies)
 │   ├── init.ts          # The scaffold both ways in share
 │   ├── cli.ts           # `duckdown` (the server) and `duckdown init`
-│   ├── serve.ts         # Hands out an exported site
+│   ├── serve.ts         # Hands out an exported site, and its extensions
+│   ├── extensions.ts    # Routes a site adds, declared in its package.json
 │   ├── base/            # site.css and search.js, for a site with no copy
 │   ├── routes/          # Route handlers
 │   └── edit/            # Editor UI (Railroad + JSX)

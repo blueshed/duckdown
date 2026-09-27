@@ -34,6 +34,8 @@ Bun.serve({
 
 Adding a new route: one import, one line. The route file is self-contained.
 
+A site's own routes come in as extensions (see [Extensions](#extensions)): `main.ts` passes its routes through `withExtensions()`, which adds a site's and refuses a clash.
+
 ## Project Structure
 
 ```
@@ -67,7 +69,8 @@ duckdown/
 │   ├── init.ts             # scaffold(root, {vendored}): what both ways in write (see below)
 │   ├── cli.ts              # bin `duckdown`: the server, or `duckdown init|user|publish|pull|report|upgrade`
 │   ├── upgrade.ts          # duckdown upgrade [tag]: export, re-pin, install, refresh the skill, export, compare
-│   ├── serve.ts            # The published flavour's server: a dist/ folder, nothing else
+│   ├── serve.ts            # The published flavour's server: a dist/ folder, and the site's extensions
+│   ├── extensions.ts       # Routes a site adds: declared in its package.json, given its storage and look
 │   ├── hosts.ts            # One site, one address: which names move to DUCKDOWN_ORIGIN, which are noindex
 │   ├── scaffold.ts         # Says so when `bun create` left a half-scaffold
 │   ├── page.ts             # A page, rendered: markdown in its template
@@ -580,7 +583,7 @@ Paths: storage keys are real names. The server decodes the URL path (`after()`);
 
 ## Two ways in, one scaffold
 
-`server/init.ts` exports `scaffold(root, { vendored })`, which writes everything a site needs around the code: `site/` (index, theme.css, the seed's template, users.json), `.env`, `.gitignore` lines, `.railway/railway.ts` (Railway's infrastructure-as-code, plus a `railway` devDependency to resolve its `railway/iac` import), the authoring skill, `launch.json`, a CLAUDE.md, and package.json's scripts. **Install** (`bun add` then `bunx duckdown init`, via `cli.ts`) runs it with `vendored: false`; **create** (`create/setup.ts`) with `vendored: true`. The only difference in what it writes is the scripts' paths (`scripts()`): `node_modules/duckdown/server/…` or `server/…`. It never overwrites and returns what it wrote and what it left alone. Create mode keeps `server/`, `tests/` and `bunfig.toml`: an owner starts with the suite. There is no upgrade path from create; the README says to fork on GitHub for that. An installed site upgrades with `duckdown upgrade [tag]` (`upgrade.ts`): it exports with the version it has (the pin's, or what is installed when the dependency names no tag), re-pins (in `dependencies` or `devDependencies`, as init takes either), installs, refreshes the skill's copy, exports again and compares every file (with `STAND_IN` as the origin when the site has none, since without one an export writes no sharing tags, sitemap or feeds), and prints the changelog in between; a version that won't install or export the site is put back, and nothing is committed. Its `git`, `bun install` and export go through a `Run` the tests stand in for.
+`server/init.ts` exports `scaffold(root, { vendored })`, which writes everything a site needs around the code: `site/` (index, theme.css, the seed's template, users.json), `.env`, `.gitignore` lines, `.railway/railway.ts` (Railway's infrastructure-as-code, plus a `railway` devDependency to resolve its `railway/iac` import), the authoring skill, `launch.json` (the site's own dev server, written rather than copied: duckdown's own lists the sites previewed beside it, and isn't shipped), a CLAUDE.md, and package.json's scripts. **Install** (`bun add` then `bunx duckdown init`, via `cli.ts`) runs it with `vendored: false`; **create** (`create/setup.ts`) with `vendored: true`. The only difference in what it writes is the scripts' paths (`scripts()`): `node_modules/duckdown/server/…` or `server/…`. It never overwrites and returns what it wrote and what it left alone. Create mode keeps `server/`, `tests/` and `bunfig.toml`: an owner starts with the suite. There is no upgrade path from create; the README says to fork on GitHub for that. An installed site upgrades with `duckdown upgrade [tag]` (`upgrade.ts`): it exports with the version it has (the pin's, or what is installed when the dependency names no tag), re-pins (in `dependencies` or `devDependencies`, as init takes either), installs, refreshes the skill's copy, exports again and compares every file (with `STAND_IN` as the origin when the site has none, since without one an export writes no sharing tags, sitemap or feeds), and prints the changelog in between; a version that won't install or export the site is put back, and nothing is committed. Its `git`, `bun install` and export go through a `Run` the tests stand in for.
 
 ## A release, and the sites that run it
 
@@ -624,6 +627,23 @@ steps differ, and that file is where they're kept:
 - **Pictures for smaller screens.** `widths.ts`: a JPEG, PNG or WebP under `static/images/` is also kept at `WIDTHS` (480, 960, 1600; never wider, and only when the copy is smaller in bytes), noted with the original's width in the folder's hidden `.widths.json`; `withWidths()` gives each `<img>` of it a `srcset` and `sizes` (the base's 46rem measure), from a per-folder cache (`kept()`). Made on upload (the images route, the collection route, each calling `siteChanged()`) or by `duckdown images` — which, run against a live bucket from outside, a served site sees only after a restart. The images grid hides the widths (`WIDTH_NAME`).
 - **Bad URLs.** `decodePath()` answers null for a malformed escape; `after()` throws `BadRequest`, which `handleError` answers 400 without a stack. The site route and `serve.ts` answer 400 themselves.
 - **The export's checks.** It renders everything before it deletes `dist/`, and fails when there is nothing to write (naming where it looked). `brokenLinks()` reports each relative link that leads nowhere; `--strict` or `DUCKDOWN_STRICT=1` fails on them. The preview asks the same of the page being edited as it is written: `links.ts` holds `linksIn()` (what counts as a link, for both) and `deadLinks()`, which checks against the cached index (`pageList()`, `aliasTargets()`), and against `static/` only for the files the page names, and `routes/mark.ts` returns what it finds among `problems`. `Preview.tsx` takes its own line down once the problems are gone. `main()` returns the exit code so the `import.meta.main` line stays one line (coverage counts a multi-line block that a test can't run).
+
+## Extensions
+
+A site adds routes of its own (a form, an RSVP) as **extensions** (`extensions.ts`). An extension is a module whose default export takes the `Site` and returns Bun routes, or a promise of them:
+
+```ts
+export default (site: Site) => ({
+  "/forms/:name": { GET: …, POST: … },
+});
+```
+
+- **Declared in the site's `package.json`**, as `"duckdown": { "extensions": ["duckdown-forms", "./extensions/rsvp.ts"] }`, resolved from the folder the server runs in. Never from `site/`: that can be a bucket its editors write to, and what runs on the server changes only by a commit.
+- **Both servers take them.** `main.ts` merges them into its routes; `serve.ts`'s `listen()` serves them beside `dist/`. So a form on a published site is on the site's own host, with its stylesheets, pictures and links. The export writes nothing for them: they need a server.
+- **`Site` is `{ storage, render }`.** `storage` is the site root through the same `Storage` as everything else (disk or a bucket, held to the storage contract). `render(markdown, { key, path })` makes a whole page in the site's template. `key` is where the markdown is kept, and relative wiki links resolve from its folder, so an extension's page links with `[[/page]]`. `path` is the address the page is served at, for its canonical link and `og:url` (`PageOptions.path`, n173).
+- **A clash stops the server.** `withExtensions()` refuses a route that duckdown or another extension already has. A declared extension that won't load, or has no default export, stops the server too, and says which: a site missing its forms would otherwise fail quietly.
+- **What an extension collects goes under `reports/`**, which only signed-in editors read and which is never served, exported or seeded. Keep one object per record, since a bucket can't append. On a published site `site/` is the deployed code, so anything written there is lost at the next deploy: it needs a bucket, a volume, or somewhere else.
+- The first is duckdown-forms (`~/Workshop/blueshed/duckdown-forms`): forms reached by a link whose token authorises itself, signed with Ed25519, so a server can check a token but never make one.
 
 ## Testing
 

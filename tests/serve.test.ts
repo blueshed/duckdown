@@ -142,7 +142,7 @@ describe("serveDist", () => {
   });
 
   test("listens on the port it is given", async () => {
-    const server = listen(dist, 0);
+    const server = await listen(dist, 0);
     try {
       expect(await (await fetch(`http://localhost:${server.port}/`)).text()).toBe("<h1>home</h1>");
     } finally {

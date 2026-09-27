@@ -14,6 +14,7 @@ import { logView } from "./log";
 import { decodePath, HEALTH } from "./utils";
 import { hostAnswer, hostOf, looking } from "./hosts";
 import { rootFile } from "./base";
+import { loadExtensions, siteFor, withExtensions, type Extension } from "./extensions";
 
 export { looking };
 
@@ -89,15 +90,22 @@ export async function serveDist(
   return res;
 }
 
-export function listen(
+// The site's extensions (extensions.ts) are served beside dist/, on the same
+// host, so a form on a published site wears the site's stylesheets and links.
+export async function listen(
   dir = process.env.SITE_DIR || "./dist",
   port = parseInt(process.env.PORT || "8080"),
   origin = process.env.DUCKDOWN_ORIGIN || "",
+  extensions?: Extension[],
 ) {
-  const server = Bun.serve({ port, fetch: (req) => serveDist(req, dir, logView, origin) });
+  const server = Bun.serve({
+    port,
+    routes: await withExtensions({ "/health": new Response(HEALTH) }, siteFor(), extensions ?? (await loadExtensions())),
+    fetch: (req) => serveDist(req, dir, logView, origin),
+  });
   console.log(`serving ${resolve(dir)} on http://localhost:${server.port}/`);
   return server;
 }
 
 // Only when run, never on import: the tests call serveDist() directly.
-if (import.meta.main) listen();
+if (import.meta.main) await listen();

@@ -179,12 +179,16 @@ export default defineRailway(() => {
 });
 `);
 
-  // The authoring skill and the desktop app's preview config. From this
-  // package, so a site's copy is as new as the duckdown it was made with; to
-  // refresh it later: cp -r node_modules/duckdown/.claude/skills/duckdown .claude/skills/
+  // The authoring skill. From this package, so a site's copy is as new as the
+  // duckdown it was made with; duckdown upgrade refreshes it.
   put(join(".claude", "skills", "duckdown"), () =>
     cpSync(join(PACKAGE, ".claude", "skills", "duckdown"), join(root, ".claude", "skills", "duckdown"), { recursive: true }));
-  put(join(".claude", "launch.json"), () => copyFileSync(join(PACKAGE, ".claude", "launch.json"), join(root, ".claude", "launch.json")));
+  // The desktop app's preview config: this site's own dev server, and nothing
+  // else. Written, not copied: duckdown's own lists the sites previewed beside it.
+  text(join(".claude", "launch.json"), `${JSON.stringify({
+    version: "0.0.1",
+    configurations: [{ name, runtimeExecutable: "bun", runtimeArgs: ["run", "dev"], port: 8080 }],
+  }, null, 2)}\n`);
 
   text("CLAUDE.md", `# ${name}
 

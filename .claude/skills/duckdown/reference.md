@@ -832,6 +832,26 @@ Where the output goes is otherwise the site's own business, not duckdown's:
 its README.md or CLAUDE.md says how it's deployed — read whichever it has.
 Don't invent a deployment step that isn't written down.
 
+## Extensions
+
+A site can add routes of its own (a form, an RSVP) with an extension: a module
+duckdown gives the site to, which returns Bun routes. Declare it in the site's
+`package.json`, never in the content folder:
+
+```json
+"duckdown": { "extensions": ["duckdown-forms"] }
+```
+
+A name is a package the site depends on, or a path from the site's folder
+(`./extensions/rsvp.ts`). The served site and the published one both serve
+it, at the site's own address. If it won't load, the server won't start, and
+it says which one.
+
+An extension's pages are rendered in the site's template. Where it keeps its
+markdown isn't `pages/`, so a link in one should start from the root
+(`[[/about]]`): a relative link resolves from the extension's folder. What it
+collects goes under `reports/`, which only signed-in editors read.
+
 ## Upgrading duckdown
 
 A site that has duckdown as a dependency (`github:blueshed/duckdown#vX.Y.Z` in
