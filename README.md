@@ -221,6 +221,12 @@ S3_ACCESS_KEY_ID=minio
 S3_SECRET_ACCESS_KEY=minio123
 ```
 
+A served site's bucket comes home with `duckdown bucket pull [folder]`, and
+goes back with `duckdown bucket push [folder]` (which refuses a bucket that
+has a site unless given `--force`, and keeps what it replaces in the site's
+history). Run either with the site's environment: `railway run --service
+<name> bunx duckdown bucket pull`. `duckdown --help` lists every command.
+
 ## License
 
 MIT

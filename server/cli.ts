@@ -4,10 +4,26 @@
 // duckdown installed as a dependency (bun add, then bunx duckdown init), or
 // with `user`, who can sign in, with `publish` and `pull`, the remote, with
 // `report`, the view log made into a page for the editors, with `upgrade`,
-// the site moved to another tag of duckdown and its export compared, or with
-// `images`, the narrower widths of pictures already in static/images/.
+// the site moved to another tag of duckdown and its export compared, with
+// `images`, the narrower widths of pictures already in static/images/, or with
+// `bucket pull|push`, a served site's content between its bucket and a folder.
 
 import { scaffold } from "./init";
+
+export const USAGE = `duckdown                      the server (the editor at /edit)
+duckdown init                 the scaffold around duckdown in a new site
+duckdown user <name>          who can sign in: add one, or set a password
+duckdown publish | pull       this copy of the site, to and from its git remote (DUCKDOWN_REMOTE)
+duckdown bucket pull [folder] a served site's bucket into a folder (DUCKDOWN_SEED by default)
+duckdown bucket push [folder] a folder into the bucket: --force over a site, keeping what it replaces
+duckdown report [file]        the view log made into reports/ for the editors
+duckdown upgrade [tag]        this site onto another tag of duckdown, its export compared
+duckdown images               the narrower widths of pictures already in static/images/`;
+
+const help = async () => {
+  console.log(USAGE);
+  return 0;
+};
 
 // Loaded when asked for, not at the top: the server's modules read the
 // environment as they load, and `init` runs where there is no site yet.
@@ -18,6 +34,8 @@ const commands: Record<string, (args: string[]) => Promise<number>> = {
   report: async (args) => (await import("./report")).reportCommand(args),
   upgrade: async (args) => (await import("./upgrade")).upgradeCommand(args),
   images: async () => (await import("./widths")).imagesCommand(),
+  bucket: async (args) => (await import("./bucket")).bucketCommand(args),
+  help, "--help": help, "-h": help,
 };
 
 export async function cli(

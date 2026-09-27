@@ -140,6 +140,12 @@ export class LocalStorage implements Storage {
   mime(key: string): string {
     return guessMime(key);
   }
+
+  // Every file, flat and sorted, . names too: what a copy of the whole site
+  // is made of (duckdown bucket), where list() is what a person is shown.
+  async keys(): Promise<string[]> {
+    return existsSync(this.root) ? (await filesUnder(this.root)).sort() : [];
+  }
 }
 
 // --- S3 ---
@@ -223,6 +229,19 @@ export class S3Storage implements Storage {
 
   mime(key: string): string {
     return guessMime(key);
+  }
+
+  // Every object under the prefix, flat and sorted, . names too, a page of
+  // the listing at a time; a folder marker (a key ending "/") is no file.
+  async keys(): Promise<string[]> {
+    const found: string[] = [];
+    let continuationToken: string | undefined;
+    do {
+      const page = await this.client.list({ prefix: this.prefix, continuationToken });
+      for (const obj of page.contents ?? []) if (!obj.key.endsWith("/")) found.push(obj.key.slice(this.prefix.length));
+      continuationToken = page.isTruncated ? page.nextContinuationToken : undefined;
+    } while (continuationToken);
+    return found.sort();
   }
 }
 

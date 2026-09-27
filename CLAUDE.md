@@ -67,8 +67,9 @@ duckdown/
 │   ├── base/               # site.css, search.js: served and exported when a site has none of its own
 │   ├── help/               # The editor's Help, one markdown page per topic, for the person editing
 │   ├── init.ts             # scaffold(root, {vendored}): what both ways in write (see below)
-│   ├── cli.ts              # bin `duckdown`: the server, or `duckdown init|user|publish|pull|report|upgrade`
+│   ├── cli.ts              # bin `duckdown`: the server, or `duckdown init|user|publish|pull|report|upgrade|images|bucket`; --help
 │   ├── upgrade.ts          # duckdown upgrade [tag]: export, re-pin, install, refresh the skill, export, compare
+│   ├── bucket.ts           # duckdown bucket pull|push [folder]: a served site's bucket to and from a folder
 │   ├── serve.ts            # The published flavour's server: a dist/ folder, and the site's extensions
 │   ├── extensions.ts       # Routes a site adds: declared in its package.json, given its storage and look
 │   ├── hosts.ts            # One site, one address: which names move to DUCKDOWN_ORIGIN, which are noindex
@@ -144,6 +145,7 @@ duckdown/
 │   ├── remote.test.ts      # The git kind against real repositories; the publish route; duckdown publish|pull
 │   ├── report.test.ts      # parseView, the report, duckdown report
 │   ├── upgrade.test.ts     # duckdown upgrade against scratch sites, git/install/export stood in
+│   ├── bucket.test.ts      # duckdown bucket pull|push between fake-s3 and scratch folders
 │   ├── editor.test.tsx     # The editor's code in happy-dom, against that server
 │   ├── units.test.ts       # pid, config, storage, auth, error handler
 │   ├── s3.test.ts          # S3Storage via Bun's S3 client + fake-s3.ts
@@ -607,7 +609,9 @@ too: leave it to that session, and tell it the release is out.
 For each site that's behind, in its folder and by its own CLAUDE.md — the
 steps differ, and that file is where they're kept:
 
-1. bring its content home if it lives elsewhere (vashti pulls its bucket first);
+1. bring its content home if it lives elsewhere: a served site's bucket with
+   `railway run --service <name> bunx duckdown bucket pull` (vashti has its
+   own `bun run pull`, which does the same);
 2. `bunx duckdown upgrade X.Y.Z`, and read what it compares and prints;
 3. do what the changelog asks of a site;
 4. commit `package.json`, `bun.lock` and the skill, with a line in its ledger;

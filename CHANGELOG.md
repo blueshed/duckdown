@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.16.0 — 2026-09-27
+
+- **`duckdown bucket pull` and `push`: a served site's content, between its
+  bucket and a folder.** What is written at /edit lives only in the bucket;
+  `bucket pull [folder]` brings it home (into the folder named, else
+  `DUCKDOWN_SEED`, else `DUCKDOWN_PATH`), so git and `duckdown upgrade`'s
+  comparison see the live site. It deletes nothing, and lists what only the
+  folder has. `bucket push` goes the other way: it refuses a bucket that
+  already has a site unless given `--force`, keeps each file it replaces in
+  `.history/` where Restore finds it, and deletes nothing. Neither moves
+  `users.json`, `.history/` or `reports/`. Run them with the site's
+  environment: `railway run --service <name> bunx duckdown bucket pull`.
+  Every served site had been copying vashti's own script for this.
+- `duckdown --help` (or `-h`, or `help`) lists the commands, rather than
+  starting the server.
+
 ## 0.15.1 — 2026-09-27
 
 - **A new site has its top bar.** `duckdown init` wrote `site.html`, which

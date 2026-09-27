@@ -828,6 +828,24 @@ published from the editor on the machine where it is edited. Set
 - It uses this machine's git: its identity, its credentials, its signing.
   The branch needs an upstream (`git push -u` once).
 
+**A served site's bucket, and a folder here.** A served site's content lives
+in its bucket, and what is written at /edit is only there. Run with the
+site's environment (on Railway, `railway run --service <name>`, which names
+the bucket and its keys for the length of the run):
+
+- `duckdown bucket pull [folder]` brings it home: every file the bucket has
+  that the folder doesn't hold the same (`.widths.json` too), into the folder
+  named, else `DUCKDOWN_SEED` (the folder a served site seeded its bucket
+  from), else `DUCKDOWN_PATH`. Nothing is deleted: a file only the folder has
+  is listed, to remove by hand if it was deleted at /edit. Then `git diff`
+  is what changed on the site.
+- `duckdown bucket push [folder]` goes the other way, and replaces what an
+  editor wrote. It refuses a bucket that already has a site unless given
+  `--force`, keeps each file it replaces in `.history/` first (Earlier
+  versions, Restore), and deletes nothing. Pull first, and push only what you
+  mean to change.
+- Either way `users.json`, `.history/` and `reports/` stay where they are.
+
 Where the output goes is otherwise the site's own business, not duckdown's:
 its README.md or CLAUDE.md says how it's deployed — read whichever it has.
 Don't invent a deployment step that isn't written down.
@@ -873,7 +891,8 @@ is compared too, and it says so. A version that won't
 install, or can't export the site, is put back. It commits nothing — look at
 what it reports, then commit `package.json`, `bun.lock` and the skill. A site
 whose content also lives somewhere else (a served site's bucket) should bring
-that here first, so the comparison is of the content that is live. A site made
+that here first — `railway run --service <name> bunx duckdown bucket pull` —
+so the comparison is of the content that is live. A site made
 by `bun create` owns its code and has no upgrade.
 
 After a deploy, the site's `/health` says which duckdown it runs

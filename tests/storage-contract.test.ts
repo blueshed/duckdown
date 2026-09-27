@@ -13,7 +13,7 @@ import { fakeS3 } from "./fake-s3";
 const s3 = fakeS3();
 afterAll(() => s3.server.stop(true));
 
-const backends: [string, () => Storage][] = [
+const backends: [string, () => LocalStorage | S3Storage][] = [
   ["a folder on disk", () => new LocalStorage(mkdtempSync(join(RUN, "contract-")))],
   ["a bucket", () => new S3Storage("bucket", `contract-${crypto.randomUUID()}/`, s3.endpoint, "us-east-1", {
     accessKeyId: "test", secretAccessKey: "test",
@@ -66,6 +66,13 @@ for (const [what, make] of backends) {
       expect(await store.read("My Folder/a b.md")).toBe("spaced");
       expect(await store.read("/guide/pages.md")).toBe("pages");
       expect(new TextDecoder().decode(await store.readBytes("index.md"))).toBe("home");
+    });
+
+    test("keys are every file, flat and sorted, . names and all", async () => {
+      await ready;
+      expect((await store.keys()).filter((k) => k !== "gone.md")).toEqual([
+        ".history/x", "My Folder/a b.md", "guide/.widths.json", "guide/deep/more.md", "guide/pages.md", "index.md",
+      ]);
     });
 
     test("exists is for files: not a folder, not what isn't there; remove takes one away", async () => {
