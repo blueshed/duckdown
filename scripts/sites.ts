@@ -11,8 +11,10 @@
 // skipping archive/) whose package.json depends on github:blueshed/duckdown,
 // or links a working copy of it (file:, shown as linked, never behind). Its
 // address is the DUCKDOWN_ORIGIN its .railway/railway.ts declares first; when
-// that isn't duckdown yet (a domain not moved to Railway), the service's own
-// <service>-production.up.railway.app is asked instead, and the row says so.
+// that isn't duckdown yet (a domain not moved to Railway, or none set), the
+// service's own railway.app address is asked instead, as `railway status
+// --json` in the site's folder names it (Railway adds a suffix to some, so it
+// can't be guessed), and the row says so.
 
 import { existsSync, readdirSync, readFileSync } from "fs";
 import { homedir } from "os";
@@ -51,15 +53,35 @@ function spec(dir: string): string | null {
   return typeof s === "string" && (s.startsWith("github:blueshed/duckdown") || (s.startsWith("file:") && s.endsWith("/duckdown"))) ? s : null;
 }
 
-// What railway.ts declares: the site's address, and the service's name.
-function railway(dir: string): { origin: string; service: string } {
+// What railway.ts declares: the site's address, its service and its project.
+function railway(dir: string): { origin: string; service: string; project: string } {
   const path = join(dir, ".railway", "railway.ts");
-  if (!existsSync(path)) return { origin: "", service: "" };
+  if (!existsSync(path)) return { origin: "", service: "", project: "" };
   const code = readFileSync(path, "utf8").split("\n").filter((l) => !l.trim().startsWith("//")).join("\n");
-  return {
-    origin: code.match(/DUCKDOWN_ORIGIN:\s*["'`]([^"'`]+)["'`]/)?.[1] ?? "",
-    service: code.match(/service\(\s*["'`]([^"'`]+)["'`]/)?.[1] ?? "",
-  };
+  const named = (call: string) => code.match(new RegExp(`${call}\\(\\s*["'\`]([^"'\`]+)["'\`]`))?.[1] ?? "";
+  return { origin: code.match(/DUCKDOWN_ORIGIN:\s*["'`]([^"'`]+)["'`]/)?.[1] ?? "", service: named("service"), project: named("project") };
+}
+
+// Each service's own railway.app address in production, by name, asked of
+// Railway once per project: sites in one project share the answer.
+const projects = new Map<string, Promise<Record<string, string>>>();
+function ownAddresses(dir: string, project: string): Promise<Record<string, string>> {
+  const key = project || dir;
+  if (!projects.has(key)) projects.set(key, (async () => {
+    const status = await spawnRun(["railway", "status", "--json"], dir);
+    if (status.code !== 0) return {};
+    try {
+      const envs = JSON.parse(status.out).environments?.edges ?? [];
+      const production = envs.find((e: any) => e.node?.name === "production")?.node;
+      return Object.fromEntries((production?.serviceInstances?.edges ?? []).flatMap((e: any) => {
+        const domain = e.node?.domains?.serviceDomains?.[0]?.domain;
+        return domain ? [[e.node.serviceName, `https://${domain}`]] : [];
+      }));
+    } catch {
+      return {};   // not linked, or not signed in: the row says there's no address
+    }
+  })());
+  return projects.get(key)!;
 }
 
 async function live(at: string): Promise<string> {
@@ -98,11 +120,8 @@ async function row(dir: string, s: string, newest: string): Promise<Row> {
   let at = declared.origin;
   const [g, first] = await Promise.all([git(dir), live(at)]);
   let l = first;
-  if (declared.service && (l === "not duckdown" || l === "no answer" || l === "—")) {
-    const own = `https://${declared.service}-production.up.railway.app`;
-    const there = await live(own);
-    if (/^\d|^OK/.test(there)) [at, l] = [`${own} (${declared.origin ? `${declared.origin}: ${first}` : "no DUCKDOWN_ORIGIN"})`, there];
-  }
+  const own = declared.service && !/^\d/.test(l) ? (await ownAddresses(dir, declared.project))[declared.service] : undefined;
+  if (own) [at, l] = [`${own} (${declared.origin ? `${declared.origin}: ${first}` : "no DUCKDOWN_ORIGIN"})`, await live(own)];
   const behind = linked ? [] : [
     pin !== newest && "pin",
     installed !== newest && "installed",

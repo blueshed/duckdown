@@ -68,8 +68,11 @@ export async function scaffold(root: string, o: { vendored: boolean; name?: stri
 Your new site is ready. [Login to edit](/login).
 `);
     copyFileSync(join(seed, "static", "theme.css"), join(root, "site", "static", "theme.css"));
-    // The seed's template, not a second copy of it: the two drifted once.
-    copyFileSync(join(seed, "templates", "site.html"), join(root, "site", "templates", "site.html"));
+    // The seed's template, not a second copy of it: the two drifted once. And
+    // the top bar it includes, the nav and the search, or every page says so.
+    for (const template of ["site.html", "topbar.html"]) {
+      copyFileSync(join(seed, "templates", template), join(root, "site", "templates", template));
+    }
     // The password is hashed, never stored in plaintext.
     const admin = await Bun.password.hash("admin");
     writeFileSync(join(root, "site", "users.json"), JSON.stringify({ admin }, null, 2) + "\n");

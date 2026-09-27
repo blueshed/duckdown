@@ -140,6 +140,9 @@ describe("install: bun add, then bunx duckdown init", () => {
     // The content, the config, the skill from the installed package
     expect(read(root, "site/pages/index.md")).toStartWith("title: installed\n\n# Welcome to installed");
     expect(read(root, "site/templates/site.html")).toBe(read(repo, "tests/example/templates/site.html"));
+    // and the top bar it includes, so a new site has its nav and search
+    expect(read(root, "site/templates/site.html")).toContain("{{include topbar}}");
+    expect(read(root, "site/templates/topbar.html")).toBe(read(repo, "tests/example/templates/topbar.html"));
     expect(existsSync(join(root, "site", "static", "site.css"))).toBe(false);
     expect(read(root, ".env")).toStartWith("DUCKDOWN_PATH=./site\n");
     expect(read(root, ".gitignore")).toBe("mine\nnode_modules\ndist/\n.env\n*.pid\n.DS_Store\nsite/users.json\nsite/.history/\n");
@@ -224,7 +227,7 @@ describe("the two ways in differ in one thing", () => {
     const installed = join(RUN, "installed");
     // (index.md, CLAUDE.md and .railway/railway.ts all name the site or the way
     // in, so these are the ones that are byte for byte)
-    for (const file of ["site/static/theme.css", "site/templates/site.html"]) {
+    for (const file of ["site/static/theme.css", "site/templates/site.html", "site/templates/topbar.html"]) {
       expect(read(created, file)).toBe(read(installed, file));
     }
   });

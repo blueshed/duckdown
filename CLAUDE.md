@@ -599,8 +599,9 @@ under `~/Workshop` that depends on duckdown and shows where each stands: its
 pin, what is installed, its copy of the skill, whether git has the upgrade,
 and what its address's `/health` says it runs (`OK duckdown X.Y.Z`; before
 0.14.4 only `OK`). The address is the `DUCKDOWN_ORIGIN` in its
-`.railway/railway.ts`, or, while that domain isn't on Railway yet, the
-service's own `<service>-production.up.railway.app`; the domains themselves
+`.railway/railway.ts`, or, while that domain isn't on Railway yet (or none
+is set), the service's own railway.app address as `railway status --json`
+names it (some carry a suffix Railway chose); the domains themselves
 are DNS in blueshed/domains. A site another session is still making shows up
 too: leave it to that session, and tell it the release is out.
 For each site that's behind, in its folder and by its own CLAUDE.md — the

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.15.1 — 2026-09-27
+
+- **A new site has its top bar.** `duckdown init` wrote `site.html`, which
+  includes `topbar.html` (the nav and the search), but not `topbar.html`
+  itself, so a new site had neither, and every page said so in the log. It
+  writes both now. A site that already has its templates is unchanged.
+- In duckdown's own repository, `bun run sites` asks Railway (`railway status
+  --json`) for a service's own address rather than guessing it: some carry a
+  suffix Railway chose.
+
 ## 0.15.0 — 2026-09-27
 
 - **Extensions: routes a site adds.** An extension is a module whose default
