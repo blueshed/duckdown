@@ -4,8 +4,52 @@
     {
       "name": "duckdown",
       "runtimeExecutable": "bun",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
       "port": 8080
+    },
+    {
+      "name": "vashti",
+      "runtimeExecutable": "bun",
+      "runtimeArgs": [
+        "run",
+        "--cwd",
+        "/Users/peterb/Workshop/vashti",
+        "dev"
+      ],
+      "port": 8090
+    },
+    {
+      "name": "website",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "PORT=8081",
+        "DUCKDOWN_PID=",
+        "bun",
+        "run",
+        "--cwd",
+        "/Users/peterb/Workshop/blueshed/website",
+        "dev"
+      ],
+      "port": 8081
+    },
+    {
+      "name": "tony-site",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "PORT=8082",
+        "DUCKDOWN_PID=",
+        "DEBUG=1",
+        "DUCKDOWN_PATH=/Users/peterb/Workshop/tony-site/site",
+        "bun",
+        "run",
+        "--cwd",
+        "/Users/peterb/Workshop/tony-site",
+        "node_modules/duckdown/server/main.ts"
+      ],
+      "port": 8082
     }
   ]
 }
