@@ -561,6 +561,14 @@ describe("reports", () => {
     expect(html).toContain('name="robots" content="noindex"');
   });
 
+  // A report holds what strangers asked for, and is read on the editor's own
+  // address: a report written before cell() escaped a path can still hold a
+  // javascript: link (hardening review). Its page runs no script at all.
+  test("a report's page runs no script: no javascript: link, no inline script", async () => {
+    const res = await fetch(`${BASE}/edit/reports/2026-09/index.md`, authed());
+    expect(res.headers.get("content-security-policy")).toBe("script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'");
+  });
+
   test("?raw is the markdown, and a file that isn't markdown is itself", async () => {
     expect(await (await fetch(`${BASE}/edit/reports/2026-09/index.md?raw`, authed())).text()).toStartWith("title: September");
     expect(await (await fetch(`${BASE}/edit/reports/2026-09/data.json`, authed())).text()).toBe("{}");

@@ -8,6 +8,12 @@ import { asFile } from "../headers";
 
 const reports = createReportStorage();
 
+// A report is read on the editor's own address, and holds what strangers
+// asked for (the paths nobody found, the sites that sent readers): its page
+// runs no script, so not even a javascript: link a report written before
+// cell() escaped its paths could hold (report.ts).
+const REPORT_POLICY = "script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'";
+
 // reports/ is where a site's own tasks leave what they found (a usage report a
 // month, an error when one failed) for the people who edit it. It is written
 // by those tasks, not by the editor, so this is read-only: a folder is its
@@ -31,7 +37,7 @@ export const handleReports = {
         return new Response(source, { headers: { "Content-Type": type, "Cache-Control": "private, no-cache", ...asFile(type) } });
       }
       return new Response(reportPage(key, source), {
-        headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "private, no-cache" },
+        headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "private, no-cache", "Content-Security-Policy": REPORT_POLICY },
       });
     }
     return Response.json(await reports.list(key));

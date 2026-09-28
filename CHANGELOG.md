@@ -109,6 +109,16 @@
   Chrome shows it: WebKit (Safari) leaves the frame blank, so a site that
   frames a PDF should embed it or link to it instead. A song or a film is
   still left out: neither loads in a sandbox.
+- **A report shows what was asked for as text.** `duckdown report` wrote
+  each path into its tables as it came, so an anonymous request for
+  `/[x](javascript:alert(document.domain))` became, in Not found, a
+  `javascript:` link on the editor's own address, which ran as the editor
+  who clicked it. Every mark markdown reads in a line is now escaped in a
+  cell — the paths of Most read and Not found, and the referring sites
+  (the log keeps no browser and no query) — and a report's page runs no
+  script at all (`Content-Security-Policy: script-src 'none'`), which
+  covers a report written before this. Running `duckdown report` again
+  over the same log writes those days afresh.
 
 ## 0.16.0 — 2026-09-27
 

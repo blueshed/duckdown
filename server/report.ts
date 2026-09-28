@@ -58,7 +58,13 @@ export const isProbe = (path: string) => {
 type Tally = Map<string, number>;
 const count = (tally: Tally, key: string) => tally.set(key, (tally.get(key) ?? 0) + 1);
 const top = (tally: Tally, n = TOP) => [...tally].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, n);
-const cell = (text: string) => text.replace(/\|/g, "\\|");
+// What a cell holds is text: a path or a host is whatever someone asked with,
+// and a report is read on the editor's own address. Every mark that means
+// something inline — a link or picture ([ ] ( ) !), HTML, an entity or an
+// autolink (< > & : @, and www.), code or emphasis (` * _ ~), the table's |
+// and the escape itself — is escaped, so /[x](javascript:…) is shown, never
+// linked.
+const cell = (text: string) => text.replace(/[\\`*_~[\]()!<>&|:@]|(?<=www)\./gi, "\\$&");
 const number = (n: number) => n.toLocaleString("en-GB");
 const day = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
 

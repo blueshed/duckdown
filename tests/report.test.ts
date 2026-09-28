@@ -7,6 +7,7 @@ import { viewLine, parseView } from "../server/log";
 import { reportMarkdown, reportCommand, isProbe, dayOf, monthMarkdown, countViews } from "../server/report";
 import { LocalStorage } from "../server/storage";
 import { cli } from "../server/cli";
+import { renderMarkdown } from "../server/markdown";
 
 const NOW = new Date("2026-09-24T12:00:00Z");
 
@@ -103,6 +104,31 @@ describe("the report", () => {
     expect(dayOf("2026-09-25T00:30:00+01:00")).toBe("2026-09-24");          // a day is UTC's
     expect(dayOf("")).toBeNull();
     expect(dayOf("yesterday")).toBeNull();
+  });
+
+  // A path is whatever someone asked for: an anonymous request for
+  // /[x](javascript:alert(document.domain)) went into Not found as it was,
+  // and the report page made it a javascript: link on the editor's own
+  // address, run by the editor who clicked it (hardening review). So is a
+  // referring host, which may hold ( ) * _ ! ~.
+  test("what a cell holds is shown as text, never read as markdown", () => {
+    const asked = ["/[x](javascript:alert(document.domain))", "/![x](javascript:alert(1))", "/[[javascript:alert(1)]]",
+      "/<javascript:alert(1)>", "/<b>b</b>", "/<!--x-->", "/`x`", "/**b**", "/~~s~~", "/a&amp;b", "/x\\", "/a|b",
+      "/{http://evil.example/}", "/{a@b.example}", "/{www.evil.example}", "/\\*e\\*", "/\\[\\[x\\]\\]"];
+    const view = (path: string, status: number, from = "") => ({ path, status, ms: 1, from, crawler: false, at: "" });
+    const views = [...asked.map((path) => view(path, 404)),
+      view("/[r](javascript:alert(1))", 200, "a(b)*c*_d_~~e~~"), view("/", 200, "www.example.com")];
+    const div = document.createElement("div");
+    div.innerHTML = renderMarkdown(reportMarkdown(views, NOW)).content;
+    const tables = [...div.querySelectorAll("table")];
+    const column = (heading: string) => {
+      const table = tables.find((t) => t.querySelector("th")!.textContent === heading)!;
+      return [...table.querySelectorAll("tbody tr td:first-child")].map((td) => td.textContent).sort();
+    };
+    expect(column("Address")).toEqual([...asked].sort());
+    expect(column("Page")).toEqual(["/", "/[r](javascript:alert(1))"]);
+    expect(column("Site")).toEqual(["a(b)*c*_d_~~e~~", "www.example.com"]);
+    expect(tables.flatMap((t) => [...t.querySelectorAll("td *")].map((e) => e.outerHTML))).toEqual([]);   // no link, picture, code or emphasis
   });
 
   test("says so when there's nothing to put in a table, and no span without timestamps", () => {
