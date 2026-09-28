@@ -16,10 +16,12 @@ export class BadRequest extends Error {
 }
 
 // A URL path with its %-escapes undone, or null when they are malformed
-// ("/%E0%A4%A"). Scanners send these all day; none of them is a bug.
+// ("/%E0%A4%A") or undo to a NUL ("/static/%00"), which no file's name holds
+// and Bun.file() throws on. Scanners send these all day; none of them is a bug.
 export function decodePath(path: string): string | null {
   try {
-    return decodeURIComponent(path);
+    const decoded = decodeURIComponent(path);
+    return decoded.includes("\0") ? null : decoded;
   } catch {
     return null; // a malformed escape is the answer, not a failure to report
   }

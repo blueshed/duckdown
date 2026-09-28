@@ -72,6 +72,10 @@ describe("serveDist", () => {
     expect((await ask("/search/index.json", dist, { "If-None-Match": '"another"' })).res.status).toBe(200);
   });
 
+  test("a path with a NUL is a 400, as one that won't decode is", async () => {
+    for (const path of ["/%00", "/static/a%00.css"]) expect((await ask(path)).res.status).toBe(400);
+  });
+
   test("a folder without its slash moves to the one with, keeping the query", async () => {
     const { res } = await ask("/blog?page=2");
     expect(res.status).toBe(301);

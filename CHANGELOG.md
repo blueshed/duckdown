@@ -44,7 +44,8 @@
   has one now.
 - A path that climbs out of the site (`/static/..%2Fusers.json`,
   `/..%2Ffeed.xml`) is a 400, with nothing in the log. It was refused, but
-  as a 500 with a stack, for every scanner that tried.
+  as a 500 with a stack, for every scanner that tried. So is a path with a
+  NUL in it (`/static/%00`), on both servers.
 - **A WebP or an AVIF is served as a picture.** The served site typed a
   file by a table of its own, which had neither, so `/static/…/x.webp` came
   back `application/octet-stream` — and duckdown makes WebP widths itself.

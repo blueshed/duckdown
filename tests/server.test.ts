@@ -1294,8 +1294,9 @@ describe("a URL that won't decode", () => {
   test("is a 400 on the site and on /static/, not a 500 with a stack in the log", async () => {
     const error = spyOn(console, "error").mockImplementation(() => {});
     try {
-      for (const path of ["/%E0%A4%A", "/static/%E0%A4%A", "/blog/%E0%A4%A"]) {
-        const res = await fetch(`${BASE}${path}`);
+      // A NUL is no file's name, and Bun.file() throws on one (a 500, seen in review).
+      for (const path of ["/%E0%A4%A", "/static/%E0%A4%A", "/blog/%E0%A4%A", "/static/%00", "/static/a%00.css", "/%00", "/edit/browse/%00"]) {
+        const res = await fetch(`${BASE}${path}`, path.startsWith("/edit/") ? authed() : undefined);
         expect(res.status).toBe(400);
         expect(await res.text()).toBe("Bad Request");
       }
