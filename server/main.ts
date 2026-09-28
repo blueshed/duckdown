@@ -66,7 +66,7 @@ export const server = Bun.serve({
     "/edit/help": handleHelp,                  // the Help drawer's pages, shipped with duckdown
     "/edit/publish": handlePublish,            // this copy and where it is published: status, publish, pull
     "/edit/collection/*": handleCollectionFiles,   // a collection's pictures, and what's wrong with it
-    "/search.json": handleSearch,              // the whole index, for a site's own search.js from before the parts
+    "/search.json": handleSearch,              // the whole index, for a search.js from before the parts
     "/search/index.json": handleSearchFile,    // the index in parts: which shards of words there are,
     "/search/words/:file": handleSearchFile,   // a shard: the words starting with two letters, and where,
     "/search/pages/:file": handleSearchFile,   // and a page's entries, for a result shown

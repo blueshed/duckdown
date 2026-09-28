@@ -12,7 +12,7 @@
 //
 // Each is fetched once, the first time a search needs it, and the index is
 // asked about again at each search. (/search.json, the whole index as one
-// file, is still there for a site's own search.js from before this.)
+// file, is still there for a search.js from before this.)
 //
 // It is ordinary site code, in static/, and you can edit it: the template
 // includes it, and duckdown's job ends at handing you the index.

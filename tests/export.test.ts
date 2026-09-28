@@ -66,8 +66,10 @@ describe("exportSite", () => {
     const words: string[] = JSON.parse(read(dir, "search/index.json")).words;
     expect(words).toContain("wr");
     expect(JSON.parse(read(dir, "search/words/wr.json")).write).toBeDefined();
-    // The whole index as one file is for a site's own search.js, and this site has none.
-    expect(existsSync(join(dir, "search.json"))).toBe(false);
+    // And whole, as one file, for a search.js from before the parts: a
+    // reader's browser may still hold duckdown's, and a site may have its own.
+    // Written an entry at a time, the same bytes as JSON.stringify makes.
+    expect(read(dir, "search.json")).toBe(JSON.stringify(index));
 
     // static/ comes along, bytes and all.
     expect(read(dir, "static/site.css")).toContain("--accent");
@@ -308,24 +310,6 @@ describe("an export's pages, written as they are rendered", () => {
     expect(existsSync(join(dir, "old.html"))).toBe(false);
     expect(read(dir, "index.html")).toContain("Welcome to duckdown");
     rmSync(dir, { recursive: true, force: true });
-  });
-});
-
-describe("a site's own search.js", () => {
-  test("gets the whole index as one file too, as a search.js from before the parts reads it, and is told why", async () => {
-    const own = join(SITE, "static", "search.js");
-    writeFileSync(own, "// this site's own");
-    const dir = out("own-search");
-    const said: string[] = [];
-    try {
-      await exportSite({ out: dir, say: (l) => said.push(l) });
-      expect(JSON.parse(read(dir, "search.json"))).toEqual(indexIn(dir));
-      expect(read(dir, "static/search.js")).toBe("// this site's own");
-      expect(said.join("\n")).toContain("static/search.js is this site's own, so search.json (the whole index) is written for it too");
-    } finally {
-      rmSync(own);
-      rmSync(dir, { recursive: true, force: true });
-    }
   });
 });
 

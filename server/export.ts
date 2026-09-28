@@ -13,13 +13,13 @@
 // It reads through the storage layer, so it exports a folder on disk or a
 // live bucket, whichever this environment is pointed at.
 
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, renameSync, rmSync, writeFileSync } from "fs";
+import { closeSync, cpSync, existsSync, mkdirSync, mkdtempSync, openSync, readdirSync, renameSync, rmSync, writeFileSync, writeSync } from "fs";
 import { basename, dirname, join } from "path";
 import { tmpdir } from "os";
 import { ORIGIN, STATIC_PATH, IS_S3, BUCKET, BUCKET_PREFIX, APP_PATH } from "./config";
 import { createPageStorage, createStaticStorage, type Storage } from "./storage";
 import { parsePage, pageHtml, itemPage } from "./page";
-import { buildSite, searchFiles, searchFileList } from "./search";
+import { buildSite, searchFiles, searchFileList, type Entry } from "./search";
 import { COLLECTION_FILE, collectionProblems, loadCollection } from "./collection";
 import { canonicalPath, escapeHtml } from "./utils";
 import { Links } from "./links";
@@ -85,6 +85,20 @@ export function lands(out: string, path: string): boolean {
     dir = join(dir, segment);
   }
   return true;
+}
+
+// The whole index as one file, as search.json was before the parts, written an
+// entry at a time rather than made as one string first (68 MB at 20,000
+// pages): the same bytes as JSON.stringify(entries).
+function writeWhole(path: string, entries: Entry[]): void {
+  const fd = openSync(path, "w");
+  try {
+    writeSync(fd, "[");
+    entries.forEach((entry, i) => writeSync(fd, (i ? "," : "") + JSON.stringify(entry)));
+    writeSync(fd, "]");
+  } finally {
+    closeSync(fd);
+  }
 }
 
 // Whether a process is still there: signal 0 asks without sending anything.
@@ -307,13 +321,12 @@ export async function exportSite(o: {
       write(path, body);
       count.files++;
     }
-    // A site's own search.js may be from before the parts, and read the whole
-    // index as one file: a site that has one gets that file too.
-    if (statics.has("search.js")) {
-      write("search.json", JSON.stringify(entries));
-      count.files++;
-      say("static/search.js is this site's own, so search.json (the whole index) is written for it too; duckdown's own reads search/ instead.");
-    }
+    // And the whole index as one file, as before the parts, for a search.js
+    // from then: a reader's browser may still hold duckdown's, and a site may
+    // have its own copy. To go once no browser can have the old one.
+    writeWhole(join(next, "search.json"), entries);
+    written.add("search.json");
+    count.files++;
     // A sitemap needs absolute addresses, so it needs the origin; so does a feed.
     if (origin) {
       write("sitemap.xml", sitemapXml(listed, origin));
