@@ -870,6 +870,15 @@ markdown isn't `pages/`, so a link in one should start from the root
 (`[[/about]]`): a relative link resolves from the extension's folder. What it
 collects goes under `reports/`, which only signed-in editors read.
 
+**An address an extension answers is the extension's.** A page written at
+one — `/`, `/about`, anything under an extension's `/forms/` — is never shown
+on the site: both servers answer the extension first, and nothing refuses
+the page or says so when it is saved (the export still writes it). The
+server names those addresses as it starts:
+`extensions answer /rsvp: a page at any of those addresses is never shown`.
+On a site with extensions, check that line (or the site's CLAUDE.md) before
+giving a page a new address, and choose another name if it is taken.
+
 ## Upgrading duckdown
 
 A site that has duckdown as a dependency (`github:blueshed/duckdown#vX.Y.Z` in
@@ -911,6 +920,7 @@ After a deploy, the site's `/health` says which duckdown it runs
 | A folder's page isn't found | Give the folder an `index.md`: `/blog` is served by `pages/blog/index.md` |
 | An item of a collection is "not found" | Its slug isn't what you think: it comes from the title, cleaned to `[a-z0-9-]`. Open `{{items}}` and follow the link, or give the item a `slug` |
 | An item's page is a page you wrote | A page in that folder has the same address, and a page always wins. Duckdown names the item in the preview and in `bun run export` |
+| A page shows something else on the site, though the preview and the export show it | An extension answers that address, and an extension always wins. The server names its addresses as it starts (`extensions answer …`): give the page another name |
 | `{{items}}` shows nothing | No `collection.json` in that folder (the server log says so) — on a page elsewhere, say `collection: <folder>` — or every item's field is `skip` |
 | The thumbnails aren't links, and every item is "not found" | The collection has no each: page: a page in its folder saying `each: true` |
 | `{{item-year}}` is empty on every item | The field isn't declared, or is spelt differently — the log names it |

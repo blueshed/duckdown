@@ -1,6 +1,6 @@
 // Extensions (extensions.ts): routes a site adds to duckdown's own, given the
 // site's storage and its look, on the served site and the published one.
-import { describe, test, expect } from "bun:test";
+import { describe, test, expect, spyOn } from "bun:test";
 import { mkdtempSync } from "fs";
 import { join } from "path";
 import { RUN, SITE } from "./helpers";
@@ -18,6 +18,9 @@ const hello: Extension = (site) => ({
       }),
   },
 });
+
+// What the server says as it starts, unheard where a test isn't asking.
+const quiet = () => {};
 
 describe("the site an extension is given", () => {
   test("renders its markdown in the site's template, canonical at the address it is served from (n173)", async () => {
@@ -42,7 +45,7 @@ describe("routes an extension adds", () => {
 
   test("join the server's own, an extension that has to wait included", async () => {
     const later: Extension = async () => ({ "/later": new Response("later") });
-    const routes = await withExtensions({ "/health": new Response("OK") }, site, [hello, later]);
+    const routes = await withExtensions({ "/health": new Response("OK") }, site, [hello, later], quiet);
     expect(Object.keys(routes)).toEqual(["/health", "/hello/:name", "/later"]);
   });
 
@@ -51,6 +54,18 @@ describe("routes an extension adds", () => {
     await expect(withExtensions({ "/health": new Response("OK") }, site, [health]))
       .rejects.toThrow("An extension's route /health clashes with one already there");
     await expect(withExtensions({}, site, [hello, hello])).rejects.toThrow("/hello/:name clashes");
+  });
+
+  // A page isn't a route: it comes through fetch, after every route, so a page
+  // at an extension's address is never shown. That isn't refused — pages
+  // change while the server runs, and what an editor writes never stops it —
+  // it is said, as the server starts (n177).
+  test("are said as the server starts, since a page at one of their addresses is never shown", async () => {
+    const said: string[] = [];
+    const home: Extension = () => ({ "/": new Response("mine") });
+    await withExtensions({ "/health": new Response("OK") }, site, [hello, home], (line) => said.push(line));
+    await withExtensions({ "/health": new Response("OK") }, site, [], (line) => said.push(line));
+    expect(said).toEqual(["extensions answer /hello/:name, /: a page at any of those addresses is never shown"]);
   });
 });
 
@@ -74,7 +89,7 @@ describe("the extensions a site declares", () => {
       { "rsvp.ts": 'export default () => ({ "/rsvp": new Response("rsvp") });\n' },
     );
     const [rsvp] = await loadExtensions(dir);
-    const routes = await withExtensions({}, siteFor(), [rsvp!]);
+    const routes = await withExtensions({}, siteFor(), [rsvp!], quiet);
     expect(await (routes["/rsvp"] as Response).text()).toBe("rsvp");
   });
 
@@ -92,7 +107,9 @@ describe("a published site with an extension", () => {
   test("serves the extension beside dist/, on the same host, and keeps /health its own", async () => {
     const dist = mkdtempSync(join(RUN, "extensions-dist-"));
     await Bun.write(join(dist, "index.html"), "<h1>home</h1>");
+    const log = spyOn(console, "log").mockImplementation(() => {});
     const server = await listen(dist, 0, "", [hello]);
+    log.mockRestore();
     try {
       const at = (path: string) => fetch(`http://localhost:${server.port}${path}`);
       expect(await (await at("/")).text()).toBe("<h1>home</h1>");
@@ -105,5 +122,19 @@ describe("a published site with an extension", () => {
     }
     const health: Extension = () => ({ "/health": new Response("mine") });
     await expect(listen(dist, 0, "", [health])).rejects.toThrow("/health clashes");
+  });
+
+  test("answers an extension's address before the page there, and says so as it starts (n177)", async () => {
+    const dist = mkdtempSync(join(RUN, "extensions-dist-"));
+    await Bun.write(join(dist, "index.html"), "<h1>home</h1>");
+    const log = spyOn(console, "log").mockImplementation(() => {});
+    const server = await listen(dist, 0, "", [() => ({ "/": new Response("mine") })]);
+    try {
+      expect(log.mock.calls.map((c) => c[0])).toContain("extensions answer /: a page at any of those addresses is never shown");
+      expect(await (await fetch(`http://localhost:${server.port}/`)).text()).toBe("mine");
+    } finally {
+      log.mockRestore();
+      server.stop(true);
+    }
   });
 });

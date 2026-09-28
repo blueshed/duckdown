@@ -42,14 +42,24 @@ export function siteFor(storage: Storage = storageAt(), origin = ORIGIN): Site {
 // An extension may not take a path duckdown or another extension already has:
 // a server that won't start says why, where one route hiding another says
 // nothing.
-export async function withExtensions<T extends object>(own: T, site: Site, extensions: Extension[]): Promise<T & Routes> {
+//
+// A page is no route: the site's pages come through fetch, after every route,
+// so an extension's address is its own and a page there is never shown
+// (n177). That is not checked against the pages. They change while the
+// server runs (the editor, a bucket), and what an editor writes must never
+// stop it; a check at start would miss every page written since. So the
+// addresses are said as the server starts instead.
+export async function withExtensions<T extends object>(own: T, site: Site, extensions: Extension[], say = console.log): Promise<T & Routes> {
   const routes: Record<string, unknown> = { ...(own as Record<string, unknown>) };
+  const added: string[] = [];
   for (const extension of extensions) {
     for (const [path, route] of Object.entries(await extension(site))) {
       if (path in routes) throw new Error(`An extension's route ${path} clashes with one already there`);
       routes[path] = route;
+      added.push(path);
     }
   }
+  if (added.length) say(`extensions answer ${added.join(", ")}: a page at any of those addresses is never shown`);
   return routes as T & Routes;
 }
 

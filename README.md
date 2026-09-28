@@ -101,7 +101,9 @@ same code, so you can change your mind.
   report`) made into a report in the editor's Reports tab — most read, not
   found, where readers came from
 - **Extensions**: routes a site adds (a form, an RSVP), declared in its
-  `package.json` and served by both servers, in the site's own template
+  `package.json` and served by both servers, in the site's own template, at
+  addresses of their own (a page at one is never shown; the server says
+  which they are as it starts)
 - Local filesystem or S3 storage
 - Zero build step — Bun serves everything
 

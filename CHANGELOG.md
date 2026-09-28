@@ -8,6 +8,16 @@
   It now asks Bun's table, the one the published server (`serve.ts`)
   already answered from, so the two agree on every file: a PDF, a video, a
   font, and a stylesheet's or script's `charset=utf-8` too (n176).
+- **An extension's address is its own, and the server says which they
+  are.** Both servers answer an extension's routes before the site's pages,
+  so a page at an address an extension takes (`/`, `/about`) was never
+  shown, with nothing said. That is the rule, now written down (CLAUDE.md,
+  the skill, the README), and a server with extensions says as it starts:
+  `extensions answer /rsvp: a page at any of those addresses is never
+  shown`. It doesn't refuse to start over a page, because pages change
+  while it runs and what an editor writes must never stop the server. A
+  site whose extension shares a page's address should rename one of them
+  (n177).
 
 ## 0.16.0 — 2026-09-27
 
