@@ -1,94 +1,7 @@
 # Changelog
 
-## 0.17.0 — 2026-09-28
+## 0.17.1 — 2026-09-28
 
-- **A save to a folder's name is refused, and leaves nothing behind.**
-  `PUT /edit/pages/guide`, with `guide/` a folder, or a save to a section
-  itself (`PUT /edit/pages/`), failed half-way with a 500 and left its
-  temporary file beside it — `pages/.guide.<random>.tmp`, or
-  `.pages.<random>.tmp` at the site's root — listed nowhere, but carried by
-  `duckdown bucket push` and a git Publish. It is a 400 now, on disk and in
-  a bucket (which took the name as a file beside the folder), and a write
-  that fails for any other reason takes its temporary file with it. A site
-  can look for any left behind with `find site -name '.*.tmp'`.
-- **A link to `reports/`, `.history/` or the site's own folder lists
-  nothing.** A link to a file in them was refused, but one to the folder
-  itself listed its names in the editor (`pages/r` → `../reports`), and one
-  to the site's folder (`pages/up` → `..`) listed `users.json` with its
-  size. Each now lists empty, as the bucket `duckdown bucket push` fills
-  does, and is said once in the log (n172).
-- **An SVG or HTML file in `static/` runs no script on the site's
-  address.** An SVG with a `<script>` in it, opened on its own, ran it on the
-  site's own address, where a script acts as whoever is signed in; since
-  n176 so did a `.htm`, `.shtml`, `.xhtml`, `.svgz` or `.xsl`. A file handed
-  out as it is — `/static/…`, the root files, the editor's `/edit/static/`,
-  `/edit/pages/`, `/edit/templates/` and `/edit/browse/`, and `static/` on
-  the published server — now carries `Content-Security-Policy: sandbox`, so
-  it is shown and runs nothing. The site's pages don't, and nothing changes
-  for a stylesheet, a script or a picture a page uses. A song or a film
-  doesn't either: neither loads under such a policy, and neither runs a
-  script on the site. And every answer from both servers says
-  `X-Content-Type-Options: nosniff`, so no browser takes a file for another
-  type than the one it was sent as — all but the editor's own page and its
-  bundle, which Bun answers itself.
-- **The published server serves only a file in `dist/`.** `serve.ts`
-  followed a link anywhere: `dist/static/passwd.txt` linked to `/etc/passwd`
-  was served with the file. It now holds a link to storage's rule (n172):
-  where the path really is must be a file inside `dist/` (which may itself
-  be a link), else it is not found. The export writes no links, so a
-  published site is unchanged.
-- Three of storage's checks had no test that failed without them: that
-  `keys()` lists nothing of a section that is a link (its test's folder
-  was empty), and that a read opens without waiting and refuses what it
-  holds when that is not a file (a pipe swapped in under the read). Each
-  has one now.
-- A path that climbs out of the site (`/static/..%2Fusers.json`,
-  `/..%2Ffeed.xml`) is a 400, with nothing in the log. It was refused, but
-  as a 500 with a stack, for every scanner that tried. So is a path with a
-  NUL in it (`/static/%00`), on both servers.
-- **A WebP or an AVIF is served as a picture.** The served site typed a
-  file by a table of its own, which had neither, so `/static/…/x.webp` came
-  back `application/octet-stream` — and duckdown makes WebP widths itself.
-  It now asks Bun's table, the one the published server (`serve.ts`)
-  already answered from, so the two agree on every file: a PDF, a video, a
-  font, and a stylesheet's or script's `charset=utf-8` too (n176).
-- **An extension's address is its own, for the methods it answers, and
-  the server says which they are.** Both servers answer an extension's
-  routes before the site's pages, so a page at an address an extension
-  takes (`/`, `/about`) was never shown for the methods the route answers,
-  with nothing said; a route that answers only POST still lets a GET reach
-  the page. That is the rule, now written down (CLAUDE.md, the skill, the
-  README), and a server with extensions says as it starts, naming each
-  route's methods: `extensions answer /rsvp (POST): a page at one of those
-  addresses is never shown for the methods it answers`. It doesn't refuse
-  to start over a page, because pages change while it runs and what an
-  editor writes must never stop the server. A site whose extension shares
-  a page's address should rename one of them (n177).
-- **A page that is a link is followed, when it leads to a file in the
-  site.** A symlinked page was left out of the nav, the listings, search
-  and the export, with nothing said. A link to a file anywhere in the site
-  (from `pages/` to `static/`, say) is now that file, as a bucket holds it
-  once `duckdown bucket push` has copied it. Links are judged against the
-  whole site, never the folder they sit in, and these are left out,
-  refused and said once in the log: a link out of the site; a link to
-  `users.json`, `.history/` or `reports/`, from anywhere (a template linked
-  to `users.json` put the passwords' hashes in every page, and `bucket
-  push` would have sent them); a link to a folder, or to nothing; and a
-  folder of the site that is itself a link — `static/`, `static/images/`,
-  `pages/`, `templates/` — which was served whole as if it were the site's,
-  so a linked `static/` handed its target's files to anyone and the export
-  copied them. A page or static file that was a link out used to be served
-  at its address though listed nowhere; now it is not found. A site with
-  any of these should put the files themselves there. A read is judged
-  before its file is opened, and again by the file held open, so a link
-  swapped under a read is refused rather than read; and only a file is
-  read, since a link to a named pipe froze the whole server. A write or a
-  remove is still a check and then an act:
-  someone who can swap a folder of the site for a link while an editor
-  saves can land that save outside the site (review did, seven times in
-  three seconds), so keep the site's folders writable by the server alone.
-  A hard link can't be told from the file it shares: don't hard-link
-  anything from outside the site into it (n172).
 - **Search fetches what a search needs, not every word on the site.** The
   index was one file, `search.json`, fetched whole before a reader's first
   result: 68 MB at 20,000 pages. It now comes in parts, served at
@@ -137,6 +50,97 @@
 - `bun run bench` says how much memory it peaked at, what search wrote to
   `dist/` and what a first search fetches, and times the export alone, in
   a process of its own.
+- **A path with a NUL in it is a 400** (`/static/%00`), on both servers, not a
+  500 with a stack in the log.
+
+## 0.17.0 — 2026-09-28
+
+- **A save to a folder's name is refused, and leaves nothing behind.**
+  `PUT /edit/pages/guide`, with `guide/` a folder, or a save to a section
+  itself (`PUT /edit/pages/`), failed half-way with a 500 and left its
+  temporary file beside it — `pages/.guide.<random>.tmp`, or
+  `.pages.<random>.tmp` at the site's root — listed nowhere, but carried by
+  `duckdown bucket push` and a git Publish. It is a 400 now, on disk and in
+  a bucket (which took the name as a file beside the folder), and a write
+  that fails for any other reason takes its temporary file with it. A site
+  can look for any left behind with `find site -name '.*.tmp'`.
+- **A link to `reports/`, `.history/` or the site's own folder lists
+  nothing.** A link to a file in them was refused, but one to the folder
+  itself listed its names in the editor (`pages/r` → `../reports`), and one
+  to the site's folder (`pages/up` → `..`) listed `users.json` with its
+  size. Each now lists empty, as the bucket `duckdown bucket push` fills
+  does, and is said once in the log (n172).
+- **An SVG or HTML file in `static/` runs no script on the site's
+  address.** An SVG with a `<script>` in it, opened on its own, ran it on the
+  site's own address, where a script acts as whoever is signed in; since
+  n176 so did a `.htm`, `.shtml`, `.xhtml`, `.svgz` or `.xsl`. A file handed
+  out as it is — `/static/…`, the root files, the editor's `/edit/static/`,
+  `/edit/pages/`, `/edit/templates/` and `/edit/browse/`, and `static/` on
+  the published server — now carries `Content-Security-Policy: sandbox`, so
+  it is shown and runs nothing. The site's pages don't, and nothing changes
+  for a stylesheet, a script or a picture a page uses. A song or a film
+  doesn't either: neither loads under such a policy, and neither runs a
+  script on the site. And every answer from both servers says
+  `X-Content-Type-Options: nosniff`, so no browser takes a file for another
+  type than the one it was sent as — all but the editor's own page and its
+  bundle, which Bun answers itself.
+- **The published server serves only a file in `dist/`.** `serve.ts`
+  followed a link anywhere: `dist/static/passwd.txt` linked to `/etc/passwd`
+  was served with the file. It now holds a link to storage's rule (n172):
+  where the path really is must be a file inside `dist/` (which may itself
+  be a link), else it is not found. The export writes no links, so a
+  published site is unchanged.
+- Three of storage's checks had no test that failed without them: that
+  `keys()` lists nothing of a section that is a link (its test's folder
+  was empty), and that a read opens without waiting and refuses what it
+  holds when that is not a file (a pipe swapped in under the read). Each
+  has one now.
+- A path that climbs out of the site (`/static/..%2Fusers.json`,
+  `/..%2Ffeed.xml`) is a 400, with nothing in the log. It was refused, but
+  as a 500 with a stack, for every scanner that tried.
+- **A WebP or an AVIF is served as a picture.** The served site typed a
+  file by a table of its own, which had neither, so `/static/…/x.webp` came
+  back `application/octet-stream` — and duckdown makes WebP widths itself.
+  It now asks Bun's table, the one the published server (`serve.ts`)
+  already answered from, so the two agree on every file: a PDF, a video, a
+  font, and a stylesheet's or script's `charset=utf-8` too (n176).
+- **An extension's address is its own, for the methods it answers, and
+  the server says which they are.** Both servers answer an extension's
+  routes before the site's pages, so a page at an address an extension
+  takes (`/`, `/about`) was never shown for the methods the route answers,
+  with nothing said; a route that answers only POST still lets a GET reach
+  the page. That is the rule, now written down (CLAUDE.md, the skill, the
+  README), and a server with extensions says as it starts, naming each
+  route's methods: `extensions answer /rsvp (POST): a page at one of those
+  addresses is never shown for the methods it answers`. It doesn't refuse
+  to start over a page, because pages change while it runs and what an
+  editor writes must never stop the server. A site whose extension shares
+  a page's address should rename one of them (n177).
+- **A page that is a link is followed, when it leads to a file in the
+  site.** A symlinked page was left out of the nav, the listings, search
+  and the export, with nothing said. A link to a file anywhere in the site
+  (from `pages/` to `static/`, say) is now that file, as a bucket holds it
+  once `duckdown bucket push` has copied it. Links are judged against the
+  whole site, never the folder they sit in, and these are left out,
+  refused and said once in the log: a link out of the site; a link to
+  `users.json`, `.history/` or `reports/`, from anywhere (a template linked
+  to `users.json` put the passwords' hashes in every page, and `bucket
+  push` would have sent them); a link to a folder, or to nothing; and a
+  folder of the site that is itself a link — `static/`, `static/images/`,
+  `pages/`, `templates/` — which was served whole as if it were the site's,
+  so a linked `static/` handed its target's files to anyone and the export
+  copied them. A page or static file that was a link out used to be served
+  at its address though listed nowhere; now it is not found. A site with
+  any of these should put the files themselves there. A read is judged
+  before its file is opened, and again by the file held open, so a link
+  swapped under a read is refused rather than read; and only a file is
+  read, since a link to a named pipe froze the whole server. A write or a
+  remove is still a check and then an act:
+  someone who can swap a folder of the site for a link while an editor
+  saves can land that save outside the site (review did, seven times in
+  three seconds), so keep the site's folders writable by the server alone.
+  A hard link can't be told from the file it shares: don't hard-link
+  anything from outside the site into it (n172).
 
 ### Security
 
