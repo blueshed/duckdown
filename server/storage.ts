@@ -1,6 +1,6 @@
 import { resolve, join, dirname, basename, relative, sep } from "path";
 import { readdir, stat, lstat, writeFile, unlink, mkdir, rename } from "fs/promises";
-import { existsSync, cpSync, realpathSync, lstatSync, openSync, fstatSync, closeSync } from "fs";
+import { existsSync, cpSync, realpathSync, lstatSync, statSync, openSync, fstatSync, closeSync, constants } from "fs";
 import { S3Client } from "bun";
 import {
   IS_S3, APP_PATH, SEED_PATH, BUCKET, BUCKET_PREFIX, BUCKET_ENDPOINT, BUCKET_REGION,
@@ -145,15 +145,20 @@ export class LocalStorage implements Storage {
   // judged by where the one opened really is — the file there must be the
   // one held open (its device and inode) — because a link swapped between a
   // check and a read handed over whatever it led to by then: SECRET 2,431
-  // times in 2.8 seconds, in review. Opened and closed by descriptor, which
-  // costs a fifth of a FileHandle; the read itself is not in the way.
+  // times in 2.8 seconds, in review. It is judged before it is opened, too,
+  // and must be a file: a named pipe is opened only once something writes to
+  // it, and a link out to one froze the whole server until it was killed. It
+  // is opened without waiting, so one swapped in between is refused, not
+  // waited on. Opened and closed by descriptor, which costs a fifth of a
+  // FileHandle; the read itself is not in the way.
   private async opened(key: string): Promise<Uint8Array> {
-    const fullPath = safePath(this.root, key);      // ".." is refused before anything is opened
-    const fd = openSync(fullPath, "r");
+    const fullPath = this.at(key);
+    if (!statSync(fullPath).isFile()) throw new Error(`${key} is not a file`);
+    const fd = openSync(fullPath, constants.O_RDONLY | constants.O_NONBLOCK);
     try {
       const { to, why } = this.judge(fullPath);
       const [held, there] = [fstatSync(fd), why ? null : lstatSync(to)];   // gone since: a miss
-      if (!there || there.ino !== held.ino || there.dev !== held.dev) throw new Error("Path traversal denied");
+      if (!there || !held.isFile() || there.ino !== held.ino || there.dev !== held.dev) throw new Error("Path traversal denied");
       return await Bun.file(fd).bytes();
     } finally {
       closeSync(fd);
@@ -170,7 +175,7 @@ export class LocalStorage implements Storage {
   private async follows(path: string): Promise<boolean> {
     if (!(await lstat(path)).isSymbolicLink()) return true;
     const to = await stat(path).catch(() => null);   // a link to nothing has nothing to stat
-    const why = !to ? "to nothing" : this.judge(path).why || (to.isDirectory() ? "to a folder" : "");
+    const why = !to ? "to nothing" : this.judge(path).why || (to.isDirectory() ? "to a folder" : to.isFile() ? "" : "to what is not a file");
     if (why) sayOnce(`${path} is a link ${why}: duckdown lists only a link to a file in the site, so this one is left out`);
     return !why;
   }

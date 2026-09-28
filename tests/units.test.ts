@@ -383,6 +383,44 @@ describe("storage", () => {
     expect(seen.get("inside")).toBeGreaterThan(0);
   });
 
+  // A named pipe is opened only once something writes to it, so a read that
+  // opened one waited — and a link out to one froze the whole server, event
+  // loop and all, until it was killed (review's fifo.ts). A read is judged,
+  // and must be of a file, before anything is opened. The reads run in a
+  // child, killed if it waits, so a pipe opened here fails the test rather
+  // than freezing the suite; listing and exists() open nothing.
+  test("LocalStorage refuses a named pipe, in the site or through a link, without waiting on it", async () => {
+    const root = scratch("piped");
+    mkdirSync(join(root, "sub"), { recursive: true });
+    const pipe = scratch("piped-away.fifo");
+    Bun.spawnSync(["mkfifo", pipe]);
+    Bun.spawnSync(["mkfifo", join(root, "in.md")]);
+    symlinkSync(pipe, join(root, "out.css"));
+    symlinkSync(join(root, "in.md"), join(root, "linked.md"));
+    const read = `const { LocalStorage } = await import(${JSON.stringify(join(import.meta.dir, "..", "server", "storage.ts"))});
+      const store = new LocalStorage(${JSON.stringify(root)});
+      for (const key of ["in.md", "linked.md", "out.css"]) console.log(key, "-", await store.read(key).then(() => "read", (e) => e.message));`;
+    const child = Bun.spawn(["bun", "-e", read], { stdout: "pipe", stderr: "ignore" });
+    const waited = setTimeout(() => child.kill(), 3000);
+    const said = (await new Response(child.stdout).text()).trim().split("\n");
+    await child.exited;
+    clearTimeout(waited);
+    expect(said).toEqual(["in.md - in.md is not a file", "linked.md - linked.md is not a file", "out.css - Path traversal denied"]);
+    const store = new LocalStorage(root);
+    const warn = spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      await expect(store.read("sub")).rejects.toThrow("sub is not a file");
+      expect(await store.exists("in.md")).toBe(false);
+      expect(await store.list("")).toEqual({ files: [], folders: [{ name: "sub", path: "sub", file: false }] });
+      expect(warn.mock.calls.map((c) => c[0]).sort()).toEqual([
+        `${join(root, "linked.md")} is a link to what is not a file: duckdown lists only a link to a file in the site, so this one is left out`,
+        `${join(root, "out.css")} is a link out of the site: duckdown lists only a link to a file in the site, so this one is left out`,
+      ]);
+    } finally {
+      warn.mockRestore();
+    }
+  }, 10000);
+
   test("seedLocalSite copies the seed once, and only for a local site with a seed", () => {
     const seed = scratch("seed");
     mkdirSync(join(seed, "pages"), { recursive: true });
