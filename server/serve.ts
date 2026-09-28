@@ -9,7 +9,8 @@
 //
 //   bun run node_modules/duckdown/server/serve.ts     (SITE_DIR, PORT)
 
-import { join, normalize, resolve } from "path";
+import { join, normalize, resolve, sep } from "path";
+import { realpath, stat } from "fs/promises";
 import { logView } from "./log";
 import { decodePath, HEALTH } from "./utils";
 import { hostAnswer, hostOf, looking } from "./hosts";
@@ -23,12 +24,18 @@ export { looking };
 // the other form is a redirect rather than a second copy of the page.
 const MOVED = 301;
 
+const inside = (root: string, path: string) => path === root || path.startsWith(root + sep);
+
+// Under dir or nowhere: a path never climbs out of it, by ".." or through a
+// link, and only a file is served — the rule storage has (n172). A link in
+// dist/ to /etc/passwd handed it over. What is served is the file the path
+// really is, typed by the name it was asked for.
 async function file(dir: string, path: string): Promise<Bun.BunFile | null> {
-  // Under dir or nowhere: a path is never allowed to climb out of it.
   const full = normalize(join(dir, path));
-  if (full !== dir && !full.startsWith(dir + "/")) return null;
-  const f = Bun.file(full);
-  return (await f.exists()) ? f : null;
+  if (!inside(dir, full)) return null;
+  const [root, to] = await Promise.all([realpath(dir), realpath(full)]).catch(() => []);   // nothing there: a miss
+  if (!root || !to || !inside(root, to) || !(await stat(to)).isFile()) return null;
+  return Bun.file(to, { type: Bun.file(full).type });
 }
 
 // What one request gets. `html` says whether the answer is a page: only pages

@@ -1,6 +1,6 @@
 // The published flavour: a folder of files and nothing else.
 import { describe, test, expect } from "bun:test";
-import { mkdirSync, rmSync, writeFileSync } from "fs";
+import { mkdirSync, rmSync, symlinkSync, writeFileSync } from "fs";
 import { join } from "path";
 import { RUN } from "./helpers";
 import { serveDist, listen, looking } from "../server/serve";
@@ -59,6 +59,37 @@ describe("serveDist", () => {
     expect((await ask("/../secret")).res.status).toBe(404);
     expect((await ask("/%2e%2e/secret")).res.status).toBe(404);
     expect((await ask("/blog/..%2f..%2fsecret")).res.status).toBe(404);
+  });
+
+  // The rule storage has for a link (n172): what a path really is must be a
+  // file in the folder. dist/static/passwd.txt linked to /etc/passwd was
+  // served, 200, with the file. A dist that is itself a link is still the
+  // folder, and a link to a file in it is that file.
+  test("never leaves the folder through a link, and serves only a file", async () => {
+    const away = join(RUN, "dist-away");
+    mkdirSync(away, { recursive: true });
+    writeFileSync(join(away, "secret.txt"), "SECRET");
+    const links: [string, string][] = [
+      [join(away, "secret.txt"), join(dist, "static", "secret.txt")],
+      [away, join(dist, "away")],
+      [join(dist, "static", "site.css"), join(dist, "static", "alias.css")],
+      [dist, join(RUN, "dist-linked")],
+    ];
+    for (const [to, at] of links) symlinkSync(to, at);
+    Bun.spawnSync(["mkfifo", join(dist, "static", "pipe.css")]);
+    try {
+      expect((await ask("/static/secret.txt")).res.status).toBe(404);
+      expect((await ask("/away/secret.txt")).res.status).toBe(404);
+      const alias = (await ask("/static/alias.css")).res;
+      expect(alias.status).toBe(200);
+      expect(await alias.text()).toBe("body{}");
+      expect(alias.headers.get("content-type")).toContain("text/css");
+      expect(await (await ask("/blog/", join(RUN, "dist-linked"))).res.text()).toBe("<h1>blog</h1>");
+      expect((await ask("/static/pipe.css")).res.status).toBe(404);   // a named pipe is no file
+    } finally {
+      for (const [, at] of links) rmSync(at);
+      rmSync(join(dist, "static", "pipe.css"));
+    }
   });
 
   test("a malformed escape is a 400, not a throw", async () => {

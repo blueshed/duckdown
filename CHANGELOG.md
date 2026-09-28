@@ -31,6 +31,12 @@
   `X-Content-Type-Options: nosniff`, so no browser takes a file for another
   type than the one it was sent as — all but the editor's own page and its
   bundle, which Bun answers itself.
+- **The published server serves only a file in `dist/`.** `serve.ts`
+  followed a link anywhere: `dist/static/passwd.txt` linked to `/etc/passwd`
+  was served with the file. It now holds a link to storage's rule (n172):
+  where the path really is must be a file inside `dist/` (which may itself
+  be a link), else it is not found. The export writes no links, so a
+  published site is unchanged.
 - **A WebP or an AVIF is served as a picture.** The served site typed a
   file by a table of its own, which had neither, so `/static/…/x.webp` came
   back `application/octet-stream` — and duckdown makes WebP widths itself.
