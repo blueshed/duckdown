@@ -566,6 +566,22 @@ describe("reports", () => {
     expect(await (await fetch(`${BASE}/edit/reports/2026-09/data.json`, authed())).text()).toBe("{}");
   });
 
+  // What an extension collects lands here too (CLAUDE.md, Extensions), so a
+  // file in reports/ is as someone put it: handed out as it is, it is
+  // sandboxed, as every other route hands one out (hardening review).
+  test("a file handed out as it is runs nothing: the raw markdown, and any file that isn't markdown", async () => {
+    writeFileSync(join(SITE, "reports", "2026-09", "evil.svg"), `<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>`);
+    try {
+      for (const path of ["2026-09/data.json", "2026-09/index.md?raw", "2026-09/evil.svg"]) {
+        const res = await fetch(`${BASE}/edit/reports/${path}`, authed());
+        expect([path, res.headers.get("content-security-policy"), res.headers.get("x-content-type-options")])
+          .toEqual([path, "sandbox", "nosniff"]);
+      }
+    } finally {
+      rmSync(join(SITE, "reports", "2026-09", "evil.svg"));
+    }
+  });
+
   test("only for an editor: a fetch is a 401, a page load goes to sign in", async () => {
     expect((await fetch(`${BASE}/edit/reports/`)).status).toBe(401);
     const res = await fetch(`${BASE}/edit/reports/2026-09/index.md`, { headers: { Accept: "text/html" }, redirect: "manual" });

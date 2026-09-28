@@ -98,6 +98,11 @@
   script ran on the site's address in Chrome and WebKit. It now asks where
   the file really is in `dist/`: under `static/`, or one of the root files.
   The served site already answers all three as not found.
+- **A file in `reports/` is sandboxed too.** `/edit/reports/…` handed out a
+  file that isn't markdown, and a report's `?raw`, with no policy, so an
+  SVG or HTML file there — what an extension collects is kept in
+  `reports/` — ran its script as the editor who opened it. It is handed
+  out as every other route hands out a file.
 
 ## 0.16.0 — 2026-09-27
 

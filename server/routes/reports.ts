@@ -4,6 +4,7 @@ import { createReportStorage } from "../storage";
 import { renderMarkdown } from "../markdown";
 import { plainKey } from "../history";
 import { after, escapeHtml } from "../utils";
+import { asFile } from "../headers";
 
 const reports = createReportStorage();
 
@@ -22,8 +23,12 @@ export const handleReports = {
 
     if (key && (await reports.exists(key))) {
       const source = await reports.read(key);
+      // The markdown itself (?raw), or a file that isn't markdown — what an
+      // extension collects lands here too — is handed out as it is: as a
+      // file, never a page (headers.ts).
       if (!key.endsWith(".md") || new URL(req.url).searchParams.has("raw")) {
-        return new Response(source, { headers: { "Content-Type": reports.mime(key), "Cache-Control": "private, no-cache" } });
+        const type = reports.mime(key);
+        return new Response(source, { headers: { "Content-Type": type, "Cache-Control": "private, no-cache", ...asFile(type) } });
       }
       return new Response(reportPage(key, source), {
         headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "private, no-cache" },
