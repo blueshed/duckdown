@@ -121,7 +121,9 @@
   it was. One killed between its two renames leaves no `dist/` until the
   next export, which puts the old site back first, and says so, even if it
   fails itself. Two exports at once each write their own folder
-  (`.dist.next-<pid>-…`), and `dist/` is one whole site. A `dist/` that
+  (`.dist.next-<pid>-…`) and both succeed, the later one's site in
+  `dist/`; one beaten to it five times over gives up and says another
+  export is running. `dist/` is always one whole site. A `dist/` that
   can't be moved aside (a mount point) is emptied and filled instead, and
   the export says so. A stopped export's folder stays until the next
   export clears it: add `.dist.next-*/` and `.dist.old-*/` to a site's
