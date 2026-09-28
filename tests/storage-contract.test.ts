@@ -8,6 +8,8 @@ import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from "fs";
 import { dirname, isAbsolute, join } from "path";
 import { RUN } from "./helpers";
 import { LocalStorage, S3Storage, type Storage } from "../server/storage";
+import { History, HISTORY_PATH } from "../server/history";
+import { push } from "../server/bucket";
 import { fakeS3 } from "./fake-s3";
 
 const s3 = fakeS3();
@@ -151,3 +153,83 @@ for (const [what, make] of backends) {
     });
   });
 }
+
+// n172, again, after review: a site is sections — pages/, static/,
+// static/images/, templates/ — each its own storage, and a link is judged
+// against the one site they are all in, not the section it sits in. A link
+// from one section to another is followed. A section that is itself a link
+// isn't the site's, so nothing in it is read: static/ linked elsewhere served
+// that folder, keys and all, to anyone. And no link leads to what is read only
+// by its own name — users.json, .history/, reports/ — whichever storage asks,
+// the whole site's too, which page.ts reads the templates through: a template
+// linked to users.json put the hashes in every page. The bucket holds what
+// `duckdown bucket push` sends of the same folder, so the two must agree.
+describe("a site's sections, and the links between them", () => {
+  const base = mkdtempSync(join(RUN, "sections-"));
+  const site = join(base, "site");
+  const away = join(base, "away");
+  const put = (path: string, body: string) => {
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, body);
+  };
+  const ln = (to: string, at: string) => {
+    mkdirSync(dirname(join(site, at)), { recursive: true });
+    symlinkSync(to, join(site, at));
+  };
+  put(join(away, "imgs", "leak.png"), "LEAKPNG");
+  put(join(site, "users.json"), '{"admin":"$argon2id$HASH"}');
+  put(join(site, ".history", "pages", "index.md", "v1"), "old");
+  put(join(site, "reports", "r.md"), "report");
+  put(join(site, "pages", "index.md"), "home");
+  put(join(site, "static", "notes.md"), "notes");
+  ln("../static/notes.md", "pages/notes.md");
+  ln("../users.json", "pages/hashes.md");
+  ln("../.history/pages/index.md/v1", "pages/past.md");
+  ln("../reports/r.md", "pages/report.md");
+  ln("../users.json", "templates/site.html");
+  ln(join(away, "imgs"), "static/images");
+
+  const prefix = `sections-${crypto.randomUUID()}/`;
+  const bucketAt = (sub: string) => new S3Storage("bucket", prefix + sub, s3.endpoint, "us-east-1", {
+    accessKeyId: "test", secretAccessKey: "test",
+  });
+  const pushed = (async () => {
+    const said = spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      await push(bucketAt(""), new LocalStorage(site), false, () => {}, (section) => new History(bucketAt(`${HISTORY_PATH}${section}`)));
+    } finally {
+      said.mockRestore();
+    }
+  })();
+
+  const sites: [string, (sub: string) => Storage][] = [
+    ["a folder on disk", (sub) => new LocalStorage(join(site, sub), site)],
+    ["the bucket it was pushed to", bucketAt],
+  ];
+  for (const [what, at] of sites) {
+    test(`${what}: a link between sections is followed; one to what is read by name, or a section that is a link, is nothing`, async () => {
+      await pushed;
+      const said = spyOn(console, "warn").mockImplementation(() => {});   // the disk says which (units.test.ts)
+      try {
+        const pages = at("pages/");
+        expect(await shape(pages, "")).toEqual({ files: ["index.md index.md", "notes.md notes.md"], folders: [] });
+        expect(await pages.read("notes.md")).toBe("notes");
+        for (const key of ["hashes.md", "past.md", "report.md"]) {
+          expect(await pages.exists(key)).toBe(false);
+          await expect(pages.read(key)).rejects.toThrow();
+        }
+        expect(await shape(at("templates/"), "")).toEqual({ files: [], folders: [] });
+        expect(await at("templates/").exists("site.html")).toBe(false);
+        expect(await at("").exists("templates/site.html")).toBe(false);
+        await expect(at("").read("templates/site.html")).rejects.toThrow();
+        expect(await shape(at("static/"), "")).toEqual({ files: ["notes.md notes.md"], folders: [] });
+        const images = at("static/images/");
+        expect(await shape(images, "")).toEqual({ files: [], folders: [] });
+        expect(await images.exists("leak.png")).toBe(false);
+        await expect(images.readBytes("leak.png")).rejects.toThrow();
+      } finally {
+        said.mockRestore();
+      }
+    });
+  }
+});

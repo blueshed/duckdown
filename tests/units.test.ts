@@ -1,5 +1,5 @@
 import { describe, test, expect, spyOn } from "bun:test";
-import { mkdirSync, writeFileSync, existsSync, readFileSync, symlinkSync } from "fs";
+import { mkdirSync, writeFileSync, existsSync, readFileSync, symlinkSync, rmSync } from "fs";
 import { join } from "path";
 import { RUN, SITE } from "./helpers";
 import { readPid, isAlive, claimPidFile, releasePidFile, exitOnSignal, stopServer } from "../server/pid";
@@ -305,8 +305,51 @@ describe("storage", () => {
     await expect(store.readBytes("out.md")).rejects.toThrow("Path traversal denied");
     await expect(store.write("out/x.md", "x")).rejects.toThrow("Path traversal denied");
     await expect(store.remove("out.md")).rejects.toThrow("Path traversal denied");
-    await expect(store.list("out")).rejects.toThrow("Path traversal denied");
+    expect(await store.list("out")).toEqual({ files: [], folders: [] });   // as a bucket, which holds nothing there
     expect(existsSync(join(away, "folder", "x.md"))).toBe(false);
+  });
+
+  // After review: the contract's sections (storage-contract.test.ts), and what
+  // only the disk can show — what is said, once, and that nothing is written
+  // through a section that is a link out.
+  test("LocalStorage says once which section is a link and which link leads to what is read by name, and writes through neither", async () => {
+    const site = scratch("sectioned");
+    const away = scratch("sectioned-away");
+    mkdirSync(join(site, "pages"), { recursive: true });
+    mkdirSync(join(site, "static"), { recursive: true });
+    mkdirSync(away, { recursive: true });
+    writeFileSync(join(site, "users.json"), "{}");
+    symlinkSync("../users.json", join(site, "pages", "hashes.md"));
+    symlinkSync(away, join(site, "static", "images"));
+    const pages = new LocalStorage(join(site, "pages"), site);
+    const images = new LocalStorage(join(site, "static", "images"), site);
+    const warn = spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      await pages.list("");
+      await pages.list("");
+      expect(await images.exists("x.png")).toBe(false);
+      expect(await images.list("")).toEqual({ files: [], folders: [] });
+      await expect(images.write("x.png", "x")).rejects.toThrow("Path traversal denied");
+      expect(await images.keys()).toEqual([]);
+      expect(warn.mock.calls.map((c) => c[0])).toEqual([
+        `${join(site, "pages", "hashes.md")} is a link to users.json, which is read only by its own name: duckdown lists only a link to a file in the site, so this one is left out`,
+        `${join(site, "static", "images")} is a link, and a section of the site is read only from its own folder there: nothing in it is read, listed or written`,
+      ]);
+    } finally {
+      warn.mockRestore();
+    }
+    expect(existsSync(join(away, "x.png"))).toBe(false);
+    // A storage made inside the site's folder, as bucket.ts and remote.ts make
+    // theirs, is judged against the site too: a link from its pages to the
+    // site's static/ is in the site, not out of pages/. (A . name, so nothing
+    // else here lists it.)
+    const linked = join(SITE, "pages", ".linked-theme.css");
+    symlinkSync("../static/theme.css", linked);
+    try {
+      expect(await new LocalStorage(join(SITE, "pages")).exists(".linked-theme.css")).toBe(true);
+    } finally {
+      rmSync(linked);
+    }
   });
 
   test("seedLocalSite copies the seed once, and only for a local site with a seed", () => {

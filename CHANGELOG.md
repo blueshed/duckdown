@@ -20,13 +20,22 @@
   (n177).
 - **A page that is a link is followed, when it leads to a file in the
   site.** A symlinked page was left out of the nav, the listings, search
-  and the export, with nothing said. A link to a file in the site is now
-  that file, as a bucket holds it once `duckdown bucket push` has copied
-  it. A link out of the site, to a folder, or to nothing is still left out,
-  and the log says so, once for each. And no link is a way out of the site
-  any more: a page or a static file that was a link out used to be served
-  at its address though listed nowhere; now it is not found. A site that
-  had one should put the file itself there (n172).
+  and the export, with nothing said. A link to a file anywhere in the site
+  (from `pages/` to `static/`, say) is now that file, as a bucket holds it
+  once `duckdown bucket push` has copied it. Links are judged against the
+  whole site, never the folder they sit in, and these are left out,
+  refused and said once in the log: a link out of the site; a link to
+  `users.json`, `.history/` or `reports/`, from anywhere (a template linked
+  to `users.json` put the passwords' hashes in every page, and `bucket
+  push` would have sent them); a link to a folder, or to nothing; and a
+  folder of the site that is itself a link — `static/`, `static/images/`,
+  `pages/`, `templates/` — which was served whole as if it were the site's,
+  so a linked `static/` handed its target's files to anyone and the export
+  copied them. A page or static file that was a link out used to be served
+  at its address though listed nowhere; now it is not found. A site with
+  any of these should put the files themselves there. A hard link can't be
+  told from the file it shares: don't hard-link anything from outside the
+  site into it (n172).
 
 ## 0.16.0 — 2026-09-27
 

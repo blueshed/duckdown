@@ -1,11 +1,12 @@
 import { resolve, join, dirname, basename, relative, sep } from "path";
 import { readdir, stat, lstat, readFile, writeFile, unlink, mkdir, rename } from "fs/promises";
-import { existsSync, cpSync, realpathSync } from "fs";
+import { existsSync, cpSync, realpathSync, lstatSync } from "fs";
 import { S3Client } from "bun";
 import {
   IS_S3, APP_PATH, SEED_PATH, BUCKET, BUCKET_PREFIX, BUCKET_ENDPOINT, BUCKET_REGION,
-  PAGE_PATH, STATIC_PATH, IMAGES_PATH, TEMPLATES_PATH, REPORTS_PATH,
+  PAGE_PATH, STATIC_PATH, IMAGES_PATH, TEMPLATES_PATH, REPORTS_PATH, USERS_PATH,
 } from "./config";
+import { HISTORY_PATH } from "./history";
 
 // --- Types ---
 
@@ -75,49 +76,94 @@ function real(path: string): string {
   return folder === path ? path : join(real(folder), basename(path));
 }
 
-// The links a walk has met and left out, said once each rather than at every
+// What no link may lead to, from any section or from the whole site: the
+// users' hashes, the history, the reports — the three `duckdown bucket` leaves
+// where they are. Each is read by its own name or not at all.
+const BY_NAME = [USERS_PATH, HISTORY_PATH, REPORTS_PATH];
+const byName = (key: string) => BY_NAME.find((name) => (name.endsWith("/") ? key.startsWith(name) : key === name));
+
+// A link left out, or a section refused, said once each rather than at every
 // walk of the site (n172).
-const unfollowed = new Set<string>();
+const said = new Set<string>();
+function sayOnce(line: string): void {
+  if (said.has(line)) return;
+  said.add(line);
+  console.warn(line);
+}
 
 export class LocalStorage implements Storage {
-  constructor(private root: string) {}
+  // `site` is the folder every link is judged against, whichever section this
+  // is: the site's for a storage inside it (storageAt, bucket.ts, remote.ts),
+  // else this storage's own root.
+  constructor(private root: string, private site = inside(APP_PATH, resolve(root)) ? APP_PATH : root) {}
 
-  // A link may lead elsewhere in the root, never out of it (n172): through
-  // one, a key could reach anything on the machine.
-  private within(path: string): boolean {
-    return inside(real(this.root), real(path));
+  // The site's folder, really: kept once it is there, since every judgement
+  // asks and a realpath is most of what one costs.
+  private realSite = "";
+  private siteReally(): string {
+    if (this.realSite) return this.realSite;
+    const site = real(this.site);
+    if (existsSync(this.site)) this.realSite = site;
+    return site;
   }
 
-  // Where a key is on disk: never out of the root, by ".." or through a link.
+  // Whether a link is on the way from the site's folder down to this path.
+  private throughLink(path: string): boolean {
+    const site = resolve(this.site);
+    for (let at = resolve(path); at !== site && inside(site, at); at = dirname(at)) {
+      if (lstatSync(at, { throwIfNoEntry: false })?.isSymbolicLink()) return true;
+    }
+    return false;
+  }
+
+  // Where a path really is, and why the site may not go there ("" when it
+  // may), judged against the one site every section is in (n172, after
+  // review). The section must be the site's own folder of that name: one
+  // that is a link made its target the root, and served it — keys and all.
+  // Past that, a link may lead anywhere in the site, pages/ to static/ say,
+  // but not out of it, and not to what is read only by its own name.
+  private judge(path: string): { to: string; why: string } {
+    const to = real(path);
+    if (this.throughLink(this.root)) {
+      sayOnce(`${this.root} is a link, and a section of the site is read only from its own folder there: nothing in it is read, listed or written`);
+      return { to, why: "in a section that is a link" };
+    }
+    const site = this.siteReally();
+    if (!inside(site, to)) return { to, why: "out of the site" };
+    const name = byName(relative(site, to).split(sep).join("/"));
+    return { to, why: name && this.throughLink(path) ? `to ${name}, which is read only by its own name` : "" };
+  }
+
+  // Where a key is on disk: never out of the site, by ".." or through a link.
   private at(key: string): string {
     const fullPath = safePath(this.root, key);
-    if (!this.within(fullPath)) throw new Error("Path traversal denied");
+    if (this.judge(fullPath).why) throw new Error("Path traversal denied");
     return fullPath;
   }
 
   // Whether a walk takes this entry: anything but a link, and a link only to
-  // a file in the root, which it then is — as a bucket holds it, once pushed,
-  // a copy (n172). Not one out of the root, which would be a way out of it;
-  // not one to a folder, since two such can send a walk round forever; not
-  // one to nothing. Each of those is said, where a page used to vanish from
-  // the nav, the listings and the export without a word.
+  // a file in the site, which it then is — as a bucket holds it, once pushed,
+  // a copy (n172). Not one out of the site, which would be a way out of it;
+  // not one to what is read only by its own name; not one to a folder, since
+  // two such can send a walk round forever; not one to nothing. Each of those
+  // is said, where a page used to vanish from the nav, the listings and the
+  // export without a word.
   private async follows(path: string): Promise<boolean> {
     if (!(await lstat(path)).isSymbolicLink()) return true;
     const to = await stat(path).catch(() => null);   // a link to nothing has nothing to stat
-    const why = !to ? "to nothing" : !this.within(path) ? "out of the site" : to.isDirectory() ? "to a folder" : "";
-    if (why && !unfollowed.has(path)) {
-      unfollowed.add(path);
-      console.warn(`${path} is a link ${why}: duckdown lists only a link to a file in the site, so this one is left out`);
-    }
+    const why = !to ? "to nothing" : this.judge(path).why || (to.isDirectory() ? "to a folder" : "");
+    if (why) sayOnce(`${path} is a link ${why}: duckdown lists only a link to a file in the site, so this one is left out`);
     return !why;
   }
 
   async list(prefix: string): Promise<Listing> {
-    const dirPath = this.at(prefix);
+    const dirPath = safePath(this.root, prefix);
     const files: FileEntry[] = [];
     const folders: FolderEntry[] = [];
 
-    if (!existsSync(dirPath)) return { files, folders };
+    // A folder the site may not go into lists as a bucket's does, which has
+    // nothing there.
+    if (!existsSync(dirPath) || this.judge(dirPath).why) return { files, folders };
 
     const entries = await readdir(dirPath, { withFileTypes: true });
     const rootLen = resolve(this.root).length;
@@ -175,7 +221,7 @@ export class LocalStorage implements Storage {
   async exists(key: string): Promise<boolean> {
     if (!key) return false;
     const fullPath = safePath(this.root, key);
-    return existsSync(fullPath) && this.within(fullPath) && (await stat(fullPath)).isFile();
+    return existsSync(fullPath) && !this.judge(fullPath).why && (await stat(fullPath)).isFile();
   }
 
   mime(key: string): string {
@@ -186,7 +232,8 @@ export class LocalStorage implements Storage {
   // is made of (duckdown bucket), where list() is what a person is shown.
   // The links list() follows, and no other.
   async keys(): Promise<string[]> {
-    return existsSync(this.root) ? (await filesUnder(this.root, (path) => this.follows(path))).sort() : [];
+    if (!existsSync(this.root) || this.judge(this.root).why) return [];
+    return (await filesUnder(this.root, (path) => this.follows(path))).sort();
   }
 }
 
@@ -335,7 +382,7 @@ export async function seedBucketSite(seed = SEED_PATH, store?: Storage, s3 = IS_
 // Storage rooted at a sub-path of the site (pages/, static/, …), on S3 or disk.
 export function storageAt(sub = "", s3 = IS_S3): Storage {
   if (s3) return new S3Storage(BUCKET, BUCKET_PREFIX + sub, BUCKET_ENDPOINT, BUCKET_REGION);
-  return new LocalStorage(join(APP_PATH, sub));
+  return new LocalStorage(join(APP_PATH, sub), APP_PATH);
 }
 
 export const createStorage = () => storageAt();

@@ -305,7 +305,13 @@ The server writes its pid to `duckdown.pid` (`DUCKDOWN_PID` moves it; set it emp
 
 Swappable via env vars. Set `DUCKDOWN_BUCKET` to use S3, otherwise local filesystem.
 
-A bucket has no links, so on disk a link is what a bucket would hold once `duckdown bucket push` had copied it (n172): a link to a file inside the storage's root is that file, listed, read and kept like any other, until a write replaces the link with a file of its own. A link out of the root, to a folder (two can send a walk of the site round forever), or to nothing is in no listing and no `keys()`, and `follows()` says so once per link in the log. No key reaches out of the root through a link either: `real()` resolves every link on the way, and read, write and remove refuse one that leads out as they refuse `..`, while `exists()` answers false.
+A bucket has no links, so on disk a link is what a bucket would hold once `duckdown bucket push` had copied it (n172, and again after review; `storage-contract.test.ts` asks both). `judge()` weighs every link against the one site root — `LocalStorage`'s `site`: `APP_PATH` for `storageAt()` and for any storage made inside it (bucket.ts, remote.ts), else the storage's own root — never against the section it sits in:
+
+- **A section is the site's own folder.** pages/, static/, static/images/, templates/, reports/ or a history that is a link, or sits under one, is refused whole and said once: taken as its own root, a linked static/ served its target's files, keys and all, to anyone. It lists empty, as a bucket's would, and nothing in it is read or written.
+- **A link to a file anywhere in the site is that file** — pages/ to static/ is fine — listed, read and kept like any other, until a write replaces the link with a file of its own.
+- **Any other link is nothing there**: one out of the site; one to what is read only by its own name (`BY_NAME`: users.json, .history/, reports/), from any storage, the whole site's included, which page.ts reads the templates through; one to a folder, since two can send a walk round forever; one to nothing. It is in no listing and no `keys()`, `follows()` says so once, read, write and remove refuse it as they refuse `..`, and `exists()` answers false.
+
+A hard link can't be told apart: it is the file itself, under another name, so a hard link to something outside the site reads as a page of it. Nothing duckdown writes makes one; don't make one.
 
 ```sh
 # Local dev: edit a copy, never the seed — the first run copies DUCKDOWN_SEED
