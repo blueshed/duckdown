@@ -310,7 +310,7 @@ describe("storage", () => {
         `${join(root, "nothing.md")} is a link to nothing: ${why}`,
         `${join(root, "out")} is a link out of the site: ${why}`,
         `${join(root, "out.md")} is a link out of the site: ${why}`,
-        `${join(root, "round")} is a link to a folder: ${why}`,
+        `${join(root, "round")} is a link to the site's own folder: ${why}`,
       ]);
     } finally {
       warn.mockRestore();

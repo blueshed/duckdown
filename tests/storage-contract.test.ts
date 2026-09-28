@@ -204,6 +204,9 @@ describe("a site's sections, and the links between them", () => {
   ln("../reports/r.md", "pages/report.md");
   ln("../users.json", "templates/site.html");
   ln(join(away, "imgs"), "static/images");
+  ln("../reports", "pages/r");
+  ln("../.history", "pages/h");
+  ln("..", "pages/up");
 
   const prefix = `sections-${crypto.randomUUID()}/`;
   const bucketAt = (sub: string) => new S3Storage("bucket", prefix + sub, s3.endpoint, "us-east-1", {
@@ -243,6 +246,22 @@ describe("a site's sections, and the links between them", () => {
         expect(await shape(images, "")).toEqual({ files: [], folders: [] });
         expect(await images.exists("leak.png")).toBe(false);
         await expect(images.readBytes("leak.png")).rejects.toThrow();
+      } finally {
+        said.mockRestore();
+      }
+    });
+
+    // A link to reports/ or .history/ themselves, not a file in them, listed
+    // their names, and one to the site's own folder listed users.json's name
+    // and size: a listing judged only the folder, and the folder matched no
+    // name read only by its own. Each lists as the bucket does, empty.
+    test(`${what}: a link to a folder read only by its own name, or to the site itself, lists nothing`, async () => {
+      await pushed;
+      const said = spyOn(console, "warn").mockImplementation(() => {});
+      try {
+        const pages = at("pages/");
+        for (const folder of ["r", "h", "up", "up/", "up/reports"]) expect(await shape(pages, folder)).toEqual({ files: [], folders: [] });
+        expect(await shape(pages, "")).toEqual({ files: ["index.md index.md", "notes.md notes.md"], folders: [] });
       } finally {
         said.mockRestore();
       }

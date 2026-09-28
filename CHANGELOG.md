@@ -11,6 +11,12 @@
   a bucket (which took the name as a file beside the folder), and a write
   that fails for any other reason takes its temporary file with it. A site
   can look for any left behind with `find site -name '.*.tmp'`.
+- **A link to `reports/`, `.history/` or the site's own folder lists
+  nothing.** A link to a file in them was refused, but one to the folder
+  itself listed its names in the editor (`pages/r` → `../reports`), and one
+  to the site's folder (`pages/up` → `..`) listed `users.json` with its
+  size. Each now lists empty, as the bucket `duckdown bucket push` fills
+  does, and is said once in the log (n172).
 - **A WebP or an AVIF is served as a picture.** The served site typed a
   file by a table of its own, which had neither, so `/static/…/x.webp` came
   back `application/octet-stream` — and duckdown makes WebP widths itself.

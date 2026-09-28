@@ -86,9 +86,10 @@ function real(path: string): string {
 
 // What no link may lead to, from any section or from the whole site: the
 // users' hashes, the history, the reports — the three `duckdown bucket` leaves
-// where they are. Each is read by its own name or not at all.
+// where they are. Each is read by its own name or not at all: a folder's
+// files, and the folder itself, which a link to it would list.
 const BY_NAME = [USERS_PATH, HISTORY_PATH, REPORTS_PATH];
-const byName = (key: string) => BY_NAME.find((name) => (name.endsWith("/") ? key.startsWith(name) : key === name));
+const byName = (key: string) => BY_NAME.find((name) => key === name.replace(/\/$/, "") || (name.endsWith("/") && key.startsWith(name)));
 
 // A link left out, or a section refused, said once each rather than at every
 // walk of the site (n172).
@@ -129,7 +130,8 @@ export class LocalStorage implements Storage {
   // review). The section must be the site's own folder of that name: one
   // that is a link made its target the root, and served it — keys and all.
   // Past that, a link may lead anywhere in the site, pages/ to static/ say,
-  // but not out of it, and not to what is read only by its own name.
+  // but not out of it, not to what is read only by its own name, and not to
+  // the site's own folder, whose listing names users.json and its size.
   private judge(path: string): { to: string; why: string } {
     const to = real(path);
     if (this.throughLink(this.root)) {
@@ -138,8 +140,10 @@ export class LocalStorage implements Storage {
     }
     const site = this.siteReally();
     if (!inside(site, to)) return { to, why: "out of the site" };
-    const name = byName(relative(site, to).split(sep).join("/"));
-    return { to, why: name && this.throughLink(path) ? `to ${name}, which is read only by its own name` : "" };
+    const key = relative(site, to).split(sep).join("/");
+    const name = key && byName(key);
+    const why = !key ? "to the site's own folder" : name ? `to ${name}, which is read only by its own name` : "";
+    return { to, why: why && this.throughLink(path) ? why : "" };
   }
 
   // Where a key is on disk: never out of the site, by ".." or through a link.
