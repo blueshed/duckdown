@@ -1,6 +1,6 @@
 import { resolve, join, dirname, basename, relative, sep } from "path";
-import { readdir, stat, readFile, writeFile, unlink, mkdir, rename } from "fs/promises";
-import { existsSync, cpSync } from "fs";
+import { readdir, stat, lstat, readFile, writeFile, unlink, mkdir, rename } from "fs/promises";
+import { existsSync, cpSync, realpathSync } from "fs";
 import { S3Client } from "bun";
 import {
   IS_S3, APP_PATH, SEED_PATH, BUCKET, BUCKET_PREFIX, BUCKET_ENDPOINT, BUCKET_REGION,
@@ -52,24 +52,68 @@ function guessMime(path: string): string {
 
 // --- Local filesystem ---
 
+// Inside the root, not merely sharing its prefix: "…/pages-old" must not
+// pass for "…/pages".
+function inside(root: string, path: string): boolean {
+  return path === root || path.startsWith(root + sep);
+}
+
 function safePath(base: string, userPath: string): string {
   // A key's leading slash is no part of it — as a bucket takes it (n169) —
   // not a way to name the machine's root.
   const resolved = resolve(base, userPath.replace(/^\/+/, ""));
-  // Inside the root, not merely sharing its prefix: "…/pages-old" must not
-  // pass for "…/pages".
-  const root = resolve(base);
-  if (resolved !== root && !resolved.startsWith(root + sep)) {
-    throw new Error("Path traversal denied");
-  }
+  if (!inside(resolve(base), resolved)) throw new Error("Path traversal denied");
   return resolved;
 }
+
+// Where a path really is, through every link on the way. What isn't there
+// yet is where its folder really is, and its name: a new file is judged by
+// the folder it would be written into.
+function real(path: string): string {
+  if (existsSync(path)) return realpathSync(path);
+  const folder = dirname(path);
+  return folder === path ? path : join(real(folder), basename(path));
+}
+
+// The links a walk has met and left out, said once each rather than at every
+// walk of the site (n172).
+const unfollowed = new Set<string>();
 
 export class LocalStorage implements Storage {
   constructor(private root: string) {}
 
+  // A link may lead elsewhere in the root, never out of it (n172): through
+  // one, a key could reach anything on the machine.
+  private within(path: string): boolean {
+    return inside(real(this.root), real(path));
+  }
+
+  // Where a key is on disk: never out of the root, by ".." or through a link.
+  private at(key: string): string {
+    const fullPath = safePath(this.root, key);
+    if (!this.within(fullPath)) throw new Error("Path traversal denied");
+    return fullPath;
+  }
+
+  // Whether a walk takes this entry: anything but a link, and a link only to
+  // a file in the root, which it then is — as a bucket holds it, once pushed,
+  // a copy (n172). Not one out of the root, which would be a way out of it;
+  // not one to a folder, since two such can send a walk round forever; not
+  // one to nothing. Each of those is said, where a page used to vanish from
+  // the nav, the listings and the export without a word.
+  private async follows(path: string): Promise<boolean> {
+    if (!(await lstat(path)).isSymbolicLink()) return true;
+    const to = await stat(path).catch(() => null);   // a link to nothing has nothing to stat
+    const why = !to ? "to nothing" : !this.within(path) ? "out of the site" : to.isDirectory() ? "to a folder" : "";
+    if (why && !unfollowed.has(path)) {
+      unfollowed.add(path);
+      console.warn(`${path} is a link ${why}: duckdown lists only a link to a file in the site, so this one is left out`);
+    }
+    return !why;
+  }
+
   async list(prefix: string): Promise<Listing> {
-    const dirPath = safePath(this.root, prefix);
+    const dirPath = this.at(prefix);
     const files: FileEntry[] = [];
     const folders: FolderEntry[] = [];
 
@@ -83,7 +127,7 @@ export class LocalStorage implements Storage {
       const fullPath = join(dirPath, entry.name);
       const relPath = fullPath.substring(rootLen + 1);   // past the root and its slash
 
-      if (entry.isFile()) {
+      if (entry.isFile() || (entry.isSymbolicLink() && await this.follows(fullPath))) {
         const s = await stat(fullPath);
         files.push({
           name: entry.name, path: relPath, file: true,
@@ -97,12 +141,12 @@ export class LocalStorage implements Storage {
   }
 
   async read(key: string): Promise<string> {
-    const fullPath = safePath(this.root, key);
+    const fullPath = this.at(key);
     return readFile(fullPath, "utf-8");
   }
 
   async readBytes(key: string): Promise<Uint8Array> {
-    const fullPath = safePath(this.root, key);
+    const fullPath = this.at(key);
     return new Uint8Array(await readFile(fullPath));
   }
 
@@ -112,8 +156,10 @@ export class LocalStorage implements Storage {
   // collection pane writes on every change, so "a few times a day" becomes
   // "while you are watching". Rename within a folder is atomic; the temporary
   // name starts with a dot, so nothing lists it if a crash leaves one behind.
+  // Written to, a link becomes a file of its own: the rename replaces the
+  // link, never what it led to.
   async write(key: string, body: string | Uint8Array): Promise<void> {
-    const fullPath = safePath(this.root, key);
+    const fullPath = this.at(key);
     const dir = dirname(fullPath);
     if (!existsSync(dir)) await mkdir(dir, { recursive: true });
     const temp = join(dir, `.${basename(fullPath)}.${Math.random().toString(36).slice(2)}.tmp`);
@@ -122,14 +168,14 @@ export class LocalStorage implements Storage {
   }
 
   async remove(key: string): Promise<void> {
-    const fullPath = safePath(this.root, key);
+    const fullPath = this.at(key);
     await unlink(fullPath);
   }
 
   async exists(key: string): Promise<boolean> {
     if (!key) return false;
     const fullPath = safePath(this.root, key);
-    return existsSync(fullPath) && (await stat(fullPath)).isFile();
+    return existsSync(fullPath) && this.within(fullPath) && (await stat(fullPath)).isFile();
   }
 
   mime(key: string): string {
@@ -138,8 +184,9 @@ export class LocalStorage implements Storage {
 
   // Every file, flat and sorted, . names too: what a copy of the whole site
   // is made of (duckdown bucket), where list() is what a person is shown.
+  // The links list() follows, and no other.
   async keys(): Promise<string[]> {
-    return existsSync(this.root) ? (await filesUnder(this.root)).sort() : [];
+    return existsSync(this.root) ? (await filesUnder(this.root, (path) => this.follows(path))).sort() : [];
   }
 }
 
@@ -250,12 +297,15 @@ export function seedLocalSite(seed = SEED_PATH, target = APP_PATH, s3 = IS_S3): 
   console.log(`seeded ${target} from ${seed}`);
 }
 
-// Every file under `root`, as keys relative to it and separated by "/".
-async function filesUnder(root: string, dir = root): Promise<string[]> {
+// Every file under `root`, as keys relative to it and separated by "/", less
+// what `follows` turns away: a site's links it doesn't follow (n172). A seed
+// is copied whole, through its links.
+async function filesUnder(root: string, follows: (path: string) => Promise<boolean> = async () => true, dir = root): Promise<string[]> {
   const found: string[] = [];
   for (const name of await readdir(dir)) {
     const path = join(dir, name);
-    if ((await stat(path)).isDirectory()) found.push(...(await filesUnder(root, path)));
+    if (!(await follows(path))) continue;
+    if ((await stat(path)).isDirectory()) found.push(...(await filesUnder(root, follows, path)));
     else found.push(relative(root, path).split(sep).join("/"));
   }
   return found;

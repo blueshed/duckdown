@@ -18,6 +18,15 @@
   while it runs and what an editor writes must never stop the server. A
   site whose extension shares a page's address should rename one of them
   (n177).
+- **A page that is a link is followed, when it leads to a file in the
+  site.** A symlinked page was left out of the nav, the listings, search
+  and the export, with nothing said. A link to a file in the site is now
+  that file, as a bucket holds it once `duckdown bucket push` has copied
+  it. A link out of the site, to a folder, or to nothing is still left out,
+  and the log says so, once for each. And no link is a way out of the site
+  any more: a page or a static file that was a link out used to be served
+  at its address though listed nowhere; now it is not found. A site that
+  had one should put the file itself there (n172).
 
 ## 0.16.0 — 2026-09-27
 

@@ -1,5 +1,5 @@
 import { describe, test, expect, spyOn } from "bun:test";
-import { mkdirSync, writeFileSync, existsSync, readFileSync } from "fs";
+import { mkdirSync, writeFileSync, existsSync, readFileSync, symlinkSync } from "fs";
 import { join } from "path";
 import { RUN, SITE } from "./helpers";
 import { readPid, isAlive, claimPidFile, releasePidFile, exitOnSignal, stopServer } from "../server/pid";
@@ -271,6 +271,42 @@ describe("storage", () => {
     const store = new LocalStorage(scratch("pages"));
     await expect(store.read("../../etc/passwd")).rejects.toThrow("Path traversal denied");
     await expect(store.read("../units-pages-old/x.md")).rejects.toThrow("Path traversal denied");
+  });
+
+  // The disk's half of the contract's links (n172): each one it doesn't
+  // follow is said, once, where a page used to vanish without a word; and
+  // none is a way out of the root, to read, write or remove through.
+  test("LocalStorage says once which links it doesn't follow, and goes out of its root through none", async () => {
+    const root = scratch("linked");
+    const away = scratch("linked-away");
+    mkdirSync(join(away, "folder"), { recursive: true });
+    writeFileSync(join(away, "away.md"), "not the site's");
+    const store = new LocalStorage(root);
+    await store.write("page.md", "mine");
+    symlinkSync(join(away, "away.md"), join(root, "out.md"));
+    symlinkSync(join(away, "folder"), join(root, "out"));
+    symlinkSync(root, join(root, "round"));                          // a walk into it would never end
+    symlinkSync(join(root, "gone.md"), join(root, "nothing.md"));
+    const warn = spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      expect(await store.list("")).toMatchObject({ files: [{ name: "page.md" }], folders: [] });
+      await store.list("");
+      expect(await store.keys()).toEqual(["page.md"]);
+      const why = "duckdown lists only a link to a file in the site, so this one is left out";
+      expect(warn.mock.calls.map((c) => c[0]).sort()).toEqual([
+        `${join(root, "nothing.md")} is a link to nothing: ${why}`,
+        `${join(root, "out")} is a link out of the site: ${why}`,
+        `${join(root, "out.md")} is a link out of the site: ${why}`,
+        `${join(root, "round")} is a link to a folder: ${why}`,
+      ]);
+    } finally {
+      warn.mockRestore();
+    }
+    await expect(store.readBytes("out.md")).rejects.toThrow("Path traversal denied");
+    await expect(store.write("out/x.md", "x")).rejects.toThrow("Path traversal denied");
+    await expect(store.remove("out.md")).rejects.toThrow("Path traversal denied");
+    await expect(store.list("out")).rejects.toThrow("Path traversal denied");
+    expect(existsSync(join(away, "folder", "x.md"))).toBe(false);
   });
 
   test("seedLocalSite copies the seed once, and only for a local site with a seed", () => {

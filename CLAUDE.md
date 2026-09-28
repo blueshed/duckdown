@@ -149,7 +149,7 @@ duckdown/
 │   ├── editor.test.tsx     # The editor's code in happy-dom, against that server
 │   ├── units.test.ts       # pid, config, storage, auth, error handler
 │   ├── s3.test.ts          # S3Storage via Bun's S3 client + fake-s3.ts
-│   ├── storage-contract.test.ts # The same questions of disk and a bucket, the same answers: path shapes, . names
+│   ├── storage-contract.test.ts # The same questions of disk and a bucket, the same answers: path shapes, . names, types, links
 │   ├── markdown.test.ts    # Front-matter, rendering, nav, themes
 │   ├── contrast.test.ts    # WCAG AA for every colour pair, light and dark: the editor, site.css, the seed theme
 │   ├── process.test.ts     # Real subprocesses: pid lock, SIGTERM, seeding
@@ -304,6 +304,8 @@ The server writes its pid to `duckdown.pid` (`DUCKDOWN_PID` moves it; set it emp
 ## Storage
 
 Swappable via env vars. Set `DUCKDOWN_BUCKET` to use S3, otherwise local filesystem.
+
+A bucket has no links, so on disk a link is what a bucket would hold once `duckdown bucket push` had copied it (n172): a link to a file inside the storage's root is that file, listed, read and kept like any other, until a write replaces the link with a file of its own. A link out of the root, to a folder (two can send a walk of the site round forever), or to nothing is in no listing and no `keys()`, and `follows()` says so once per link in the log. No key reaches out of the root through a link either: `real()` resolves every link on the way, and read, write and remove refuse one that leads out as they refuse `..`, while `exists()` answers false.
 
 ```sh
 # Local dev: edit a copy, never the seed — the first run copies DUCKDOWN_SEED

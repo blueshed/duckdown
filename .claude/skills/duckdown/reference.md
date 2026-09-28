@@ -914,6 +914,7 @@ After a deploy, the site's `/health` says which duckdown it runs
 | A page isn't in the navigation | Not a folder's `index.md`; no `nav`/`title`; its folder starts with `-`; or, in production only, written to disk after the nav was built (save a page in the editor, or restart) |
 | A line like `author: Peter` shows up in the page | It isn't a key duckdown reads: fence the block with `---` to keep it as metadata |
 | A page is "not found" although the file is there | `draft: true` — sign in to the editor to read it, or take the line out to publish |
+| A page is in no listing, and the log says it "is a link" | The file is a link (`ls -l`) out of the site, to a folder, or to nothing, which duckdown doesn't follow. Put the file itself there; a link to a file inside the site is fine |
 | A stylesheet doesn't apply | The template doesn't link it (check `templates/site.html`), or a page's `css:` names a file that isn't in `static/` |
 | An SVG ignores the stylesheet's colours | It's shown with `<img>` or `![…]`, which CSS can't reach into: use it as a mask (above) |
 | An SVG shows nothing at all | It isn't valid XML — check with `xmllint --noout file.svg`; a `--` inside a comment is the usual culprit |
