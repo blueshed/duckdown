@@ -210,6 +210,17 @@ describe("search.js, fetching what a search needs", () => {
     expect(asked.slice(first).filter((a) => a.startsWith("/search/words/"))).toEqual(["/search/words/p.json"]);   // its letter's shard, not every p-shard
   });
 
+  test("a letter that is part of a hyphenated word is that letter, not every word it starts", async () => {
+    start([
+      entry({ url: "/a.html", title: "Showing a part", text: "use v-if to show it, and e-mail us" }),
+      entry({ url: "/b.html", title: "Safety", text: "a vulnerable site, if left, gets email" }),
+    ]);
+    const paths = async (q: string) => hrefs(await search(q)).map((h) => h.split("#")[0]);
+    expect(await paths("v-if")).toEqual(["/a.html"]);    // not "vulnerable" and "if"
+    expect(await paths("e-mail")).toEqual(["/a.html"]);  // not "email"
+    expect(await paths("v")).toEqual(["/a.html", "/b.html"]);   // a letter on its own still starts words
+  });
+
   test("the query's words are cut as the index cuts a page's: at anything but a letter or a digit, accents and all", async () => {
     start([
       entry({ url: "/a.html", title: "Café society", text: "tree-lined streets" }),
