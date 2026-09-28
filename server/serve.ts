@@ -12,7 +12,7 @@
 import { join, normalize, relative, resolve, sep } from "path";
 import { realpath, stat } from "fs/promises";
 import { logView } from "./log";
-import { decodePath, HEALTH } from "./utils";
+import { conditional, decodePath, HEALTH } from "./utils";
 import { hostAnswer, hostOf, looking } from "./hosts";
 import { rootFile } from "./base";
 import { loadExtensions, siteFor, withExtensions, type Extension } from "./extensions";
@@ -68,11 +68,15 @@ async function route(req: Request, dir: string, origin: string): Promise<{ res: 
   if (found) {
     // Short: nothing here is content-hashed, so a stylesheet edited this
     // morning has to be able to show up. The search index's parts are asked
-    // about every time (search.ts): they name each other by number, and a
-    // browser must not keep one from before a deploy beside one from after.
+    // about every time (search.ts), with an ETag so the answer is mostly a
+    // 304: they name each other by number, and a browser must not keep one
+    // from before a deploy beside one from after.
     const { body, key } = found;
+    if (key.startsWith("search/")) {
+      return { res: conditional(req, await body.bytes(), { "Content-Type": body.type, "Cache-Control": "no-cache" }), html: false };
+    }
     return {
-      res: new Response(body, { headers: { "Cache-Control": path.startsWith("/search/") ? "no-cache" : "public, max-age=300", ...(handedOut(key) ? asFile(body.type) : {}) } }),
+      res: new Response(body, { headers: { "Cache-Control": "public, max-age=300", ...(handedOut(key) ? asFile(body.type) : {}) } }),
       html: !!body.name?.endsWith(".html"),
     };
   }

@@ -94,9 +94,10 @@
   `/search/…` and exported to `dist/search/`, and a reader's browser fetches
   the index, a part per word typed and the pages of the results it shows:
   211 KB for a first search of a word on each of those pages (n166). Both
-  servers send `search/` `no-cache`, and its index carries a version, so a
-  reader never mixes parts from before a save or a deploy with parts from
-  after. `search.json` is still served and exported, for a `search.js` from
+  servers send `search/` `no-cache` with an ETag (a part that hasn't
+  changed is a 304), and its index carries a version, so a reader never
+  mixes parts from before a save or a deploy with parts from after.
+  `search.json` is still served and exported, for a `search.js` from
   before the parts: one a reader's browser kept, or a site's own. A site
   with its own `static/search.js` keeps working; to take the parts, merge
   duckdown's `server/base/search.js` into it, or delete it. At 20,000 pages

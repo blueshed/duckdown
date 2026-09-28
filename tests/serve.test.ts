@@ -20,9 +20,9 @@ for (const [path, body] of Object.entries(files)) {
 }
 
 // What was logged, as [path, status], without printing anything.
-async function ask(path: string, dir = dist) {
+async function ask(path: string, dir = dist, headers: Record<string, string> = {}) {
   const logged: [string, number][] = [];
-  const res = await serveDist(new Request(`http://site${path}`), dir, (req, status) =>
+  const res = await serveDist(new Request(`http://site${path}`, { headers }), dir, (req, status) =>
     void logged.push([new URL(req.url).pathname, status]));
   return { res, logged };
 }
@@ -57,6 +57,19 @@ describe("serveDist", () => {
     expect(await res.text()).toContain('"version"');
     expect(res.headers.get("cache-control")).toBe("no-cache");
     expect((await ask("/search.json")).res.headers.get("cache-control")).toBe("public, max-age=300");
+  });
+
+  // After review: asked about every time, and never told "unchanged", a
+  // reader fetched every part again at each search.
+  test("and one that hasn't changed is a 304, as the served site's are", async () => {
+    const first = (await ask("/search/index.json")).res;
+    const etag = first.headers.get("etag")!;
+    expect(etag).toMatch(/^"\w+"$/);
+    expect(first.headers.get("content-type")).toContain("application/json");
+    const again = (await ask("/search/index.json", dist, { "If-None-Match": etag })).res;
+    expect(again.status).toBe(304);
+    expect(await again.text()).toBe("");
+    expect((await ask("/search/index.json", dist, { "If-None-Match": '"another"' })).res.status).toBe(200);
   });
 
   test("a folder without its slash moves to the one with, keeping the query", async () => {
