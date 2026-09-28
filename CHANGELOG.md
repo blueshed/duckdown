@@ -25,9 +25,9 @@
   `/edit/pages/`, `/edit/templates/` and `/edit/browse/`, and `static/` on
   the published server — now carries `Content-Security-Policy: sandbox`, so
   it is shown and runs nothing. The site's pages don't, and nothing changes
-  for a stylesheet, a script or a picture a page uses. A PDF, a song or a
-  film doesn't either: Chrome shows none of them under such a policy, and
-  none runs a script on the site. And every answer from both servers says
+  for a stylesheet, a script or a picture a page uses. A song or a film
+  doesn't either: neither loads under such a policy, and neither runs a
+  script on the site. And every answer from both servers says
   `X-Content-Type-Options: nosniff`, so no browser takes a file for another
   type than the one it was sent as — all but the editor's own page and its
   bundle, which Bun answers itself.
@@ -103,6 +103,12 @@
   SVG or HTML file there — what an extension collects is kept in
   `reports/` — ran its script as the editor who opened it. It is handed
   out as every other route hands out a file.
+- **A PDF is sandboxed too.** It was left out on the belief that a
+  sandboxed PDF shows blank; Chrome and WebKit both show one opened on its
+  own, or through a page's `<embed>` or `<object>`. In an `<iframe>` only
+  Chrome shows it: WebKit (Safari) leaves the frame blank, so a site that
+  frames a PDF should embed it or link to it instead. A song or a film is
+  still left out: neither loads in a sandbox.
 
 ## 0.16.0 — 2026-09-27
 

@@ -796,23 +796,24 @@ describe("what an answer says about itself", () => {
 
   test("a file as someone put it in the site is sandboxed wherever it is handed out; a page never is", async () => {
     writeFileSync(join(SITE, "static", "evil.svg"), `<svg xmlns="http://www.w3.org/2000/svg"><script>alert(document.cookie)</script></svg>`);
-    writeFileSync(join(SITE, "static", "leaflet.pdf"), "%PDF-1.4\n");
+    const media = ["leaflet.pdf", "song.wav", "film.mp4"];
+    for (const name of media) writeFileSync(join(SITE, "static", name), "bytes");
     try {
-      for (const path of ["/static/evil.svg", "/static/theme.css", "/static/site.css", "/static/images/logo.svg", "/favicon.ico"]) {
+      for (const path of ["/static/evil.svg", "/static/theme.css", "/static/site.css", "/static/images/logo.svg", "/favicon.ico",
+        "/static/leaflet.pdf"]) {
         expect(await header(path, "content-security-policy")).toEqual([path, "sandbox"]);
       }
       for (const path of ["/edit/static/evil.svg", "/edit/templates/site.html", "/edit/browse/logo.svg", "/edit/browse/logo.svg?thumb=32"]) {
         expect(await header(path, "content-security-policy", authed())).toEqual([path, "sandbox"]);
       }
-      // Chrome shows a PDF, a song or a film under no such policy (a PDF
-      // opens blank even under script-src 'none'), and none runs a script
-      // on the site's address. The site's pages, and the editor, are its own.
-      for (const path of ["/static/leaflet.pdf", "/", "/guide/", "/search.json", "/edit"]) {
+      // A song or a film won't load in a sandbox, and runs no script on the
+      // site's address. The site's pages, and the editor, are its own.
+      for (const path of ["/static/song.wav", "/static/film.mp4", "/", "/guide/", "/search.json", "/edit"]) {
         expect(await header(path, "content-security-policy")).toEqual([path, null]);
       }
     } finally {
       rmSync(join(SITE, "static", "evil.svg"));
-      rmSync(join(SITE, "static", "leaflet.pdf"));
+      for (const name of media) rmSync(join(SITE, "static", name));
     }
   });
 

@@ -187,17 +187,18 @@ describe("serveDist", () => {
   // an SVG with a <script> in it — runs nothing on the site's address.
   test("every answer says its type is the one it is; a file from static/ is sandboxed, a page never is", async () => {
     writeFileSync(join(dist, "static", "evil.svg"), "<svg><script>alert(1)</script></svg>");
-    writeFileSync(join(dist, "static", "leaflet.pdf"), "%PDF-1.4\n");
+    const media = ["leaflet.pdf", "song.wav", "film.mp4"];
+    for (const name of media) writeFileSync(join(dist, "static", name), "bytes");
     try {
       for (const path of ["/", "/blog/", "/blog", "/static/site.css", "/nope", "/%E0%A4%A", "/health", "/search.json"]) {
         expect([path, (await ask(path)).res.headers.get("x-content-type-options")]).toEqual([path, "nosniff"]);
       }
       const policy = async (path: string) => [path, (await ask(path)).res.headers.get("content-security-policy")];
-      for (const path of ["/static/evil.svg", "/static/site.css"]) expect(await policy(path)).toEqual([path, "sandbox"]);
-      for (const path of ["/static/leaflet.pdf", "/", "/blog/", "/search.json", "/nope"]) expect(await policy(path)).toEqual([path, null]);
+      for (const path of ["/static/evil.svg", "/static/site.css", "/static/leaflet.pdf"]) expect(await policy(path)).toEqual([path, "sandbox"]);
+      for (const path of ["/static/song.wav", "/static/film.mp4", "/", "/blog/", "/search.json", "/nope"]) expect(await policy(path)).toEqual([path, null]);
     } finally {
       rmSync(join(dist, "static", "evil.svg"));
-      rmSync(join(dist, "static", "leaflet.pdf"));
+      for (const name of media) rmSync(join(dist, "static", name));
     }
   });
 

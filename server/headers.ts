@@ -32,15 +32,17 @@ function answered(route: unknown): unknown {
   return route;
 }
 
-// A file as someone put it in the site — static/, the images, a file the
-// editor opens — is sandboxed: an SVG or an HTML file opened alone is shown,
-// and runs no script on the site's address, where a script acts as whoever is
-// signed in. A page is the site's own and never is; nor does this reach a
-// stylesheet, a script or a picture a page uses, which answer to the page's
-// policy, not their own. Nor a PDF, a song or a film: Chrome shows none of
-// them under a policy (a PDF opens blank even under script-src 'none', a song
-// won't load in a sandbox), and none runs a script on the site's address.
-const SHOWN = /^(application\/pdf|audio\/|video\/)/;
+// A file as someone put it in the site — static/, the images, a PDF, a file
+// the editor opens — is sandboxed: an SVG or an HTML file opened alone is
+// shown, and runs no script on the site's address, where a script acts as
+// whoever is signed in. A page is the site's own and never is; nor does this
+// reach a stylesheet, a script or a picture a page uses, which answer to the
+// page's policy, not their own. A PDF is shown under it, opened alone or
+// through a page's <embed> or <object>, in Chrome and WebKit; in an <iframe>
+// only Chrome shows it (WebKit leaves the frame blank). A song or a film is
+// not sandboxed: neither loads in a sandbox (a .wav opened alone plays
+// nothing, in either), and neither runs a script on the site's address.
+const SHOWN = /^(audio|video)\//;
 export function asFile(type: string): Record<string, string> {
   return SHOWN.test(type) ? {} : { "Content-Security-Policy": "sandbox" };
 }
