@@ -7,6 +7,7 @@ import {
   PAGE_PATH, STATIC_PATH, IMAGES_PATH, TEMPLATES_PATH, REPORTS_PATH, USERS_PATH,
 } from "./config";
 import { HISTORY_PATH } from "./history";
+import { BadRequest } from "./utils";
 
 // --- Types ---
 
@@ -58,6 +59,13 @@ function guessMime(path: string): string {
 function inside(root: string, path: string): boolean {
   return path === root || path.startsWith(root + sep);
 }
+
+// A key names a file: never the root, nor a folder, asked with its slash or
+// (on disk, once it is one) without. On disk a write there failed half-way
+// and left its temporary file beside it; a bucket took the name as a file
+// beside the folder of that name, which no disk can hold.
+const folderKey = (key: string) => !key.replace(/^\/+/, "") || key.endsWith("/");
+const notAFile = (key: string) => new BadRequest(`${key || "/"} is a folder, not a file`);
 
 function safePath(base: string, userPath: string): string {
   // A key's leading slash is no part of it — as a bucket takes it (n169) —
@@ -225,14 +233,23 @@ export class LocalStorage implements Storage {
   // "while you are watching". Rename within a folder is atomic; the temporary
   // name starts with a dot, so nothing lists it if a crash leaves one behind.
   // Written to, a link becomes a file of its own: the rename replaces the
-  // link, never what it led to.
+  // link, never what it led to. A folder is refused before anything is
+  // written, and a rename that fails anyway (a folder made there meanwhile)
+  // takes the temporary file with it: keys() lists . names, so `duckdown
+  // bucket push` and a git Publish would carry it.
   async write(key: string, body: string | Uint8Array): Promise<void> {
     const fullPath = this.at(key);
+    if (folderKey(key) || lstatSync(fullPath, { throwIfNoEntry: false })?.isDirectory()) throw notAFile(key);
     const dir = dirname(fullPath);
     if (!existsSync(dir)) await mkdir(dir, { recursive: true });
     const temp = join(dir, `.${basename(fullPath)}.${Math.random().toString(36).slice(2)}.tmp`);
     await writeFile(temp, body);
-    await rename(temp, fullPath);
+    try {
+      await rename(temp, fullPath);
+    } catch (e) {
+      await unlink(temp);
+      throw e;
+    }
   }
 
   async remove(key: string): Promise<void> {
@@ -326,7 +343,9 @@ export class S3Storage implements Storage {
     return this.client.file(this.key(key)).bytes();
   }
 
+  // A folder is a prefix something is under, or a folder marker.
   async write(key: string, body: string | Uint8Array): Promise<void> {
+    if (folderKey(key) || (await this.client.list({ prefix: `${this.key(key)}/`, maxKeys: 1 })).contents?.length) throw notAFile(key);
     await this.client.write(this.key(key), body);
   }
 

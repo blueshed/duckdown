@@ -10,6 +10,7 @@ import { RUN } from "./helpers";
 import { LocalStorage, S3Storage, type Storage } from "../server/storage";
 import { History, HISTORY_PATH } from "../server/history";
 import { push } from "../server/bucket";
+import { BadRequest } from "../server/utils";
 import { fakeS3 } from "./fake-s3";
 
 const s3 = fakeS3();
@@ -98,6 +99,21 @@ for (const [what, make] of backends) {
       expect((await store.keys()).filter((k) => k !== "gone.md")).toEqual([
         ".history/x", "My Folder/a b.md", "guide/.widths.json", "guide/deep/more.md", "guide/pages.md", "index.md",
       ]);
+    });
+
+    // A key names a file. The root is none, nor is a folder, asked with its
+    // slash or without: on disk a write there failed half-way (EISDIR, a
+    // 500) and left its temporary file beside it, a . name listed nowhere
+    // but in keys(), so `bucket push` and a git Publish carried it; a bucket
+    // took the name as a file beside the folder, which no disk can hold.
+    test("a write to the root or to a folder is refused, and leaves nothing behind", async () => {
+      await ready;
+      const before = await store.keys();
+      for (const key of ["", "/", "guide", "guide/", "/guide/deep", "fresh/"]) {
+        await expect(store.write(key, "x")).rejects.toBeInstanceOf(BadRequest);
+      }
+      expect(await store.keys()).toEqual(before);
+      expect(await shape(store, "guide")).toEqual({ files: ["pages.md guide/pages.md"], folders: ["deep guide/deep"] });
     });
 
     test("exists is for files: not a folder, not what isn't there; remove takes one away", async () => {

@@ -1,5 +1,5 @@
 import { describe, test, expect, spyOn } from "bun:test";
-import { mkdirSync, writeFileSync, existsSync, readFileSync, symlinkSync, rmSync } from "fs";
+import { mkdirSync, writeFileSync, existsSync, readFileSync, readdirSync, symlinkSync, rmSync } from "fs";
 import { join } from "path";
 import { RUN, SITE } from "./helpers";
 import { readPid, isAlive, claimPidFile, releasePidFile, exitOnSignal, stopServer } from "../server/pid";
@@ -271,6 +271,19 @@ describe("storage", () => {
     const store = new LocalStorage(scratch("pages"));
     await expect(store.read("../../etc/passwd")).rejects.toThrow("Path traversal denied");
     await expect(store.read("../units-pages-old/x.md")).rejects.toThrow("Path traversal denied");
+  });
+
+  // A write is judged, then made: a folder that appears at its name in
+  // between fails the rename, and the file written beside it goes too — a .
+  // name, listed nowhere, that keys() and so `bucket push` would carry.
+  test("LocalStorage leaves nothing beside a write that fails", async () => {
+    const root = scratch("late-folder");
+    const store = new LocalStorage(root);
+    await store.write("kept.md", "x");
+    const writing = store.write("late.md", "x");   // judged, and under way
+    mkdirSync(join(root, "late.md"));               // a folder there before it lands
+    await expect(writing).rejects.toThrow();
+    expect(readdirSync(root).sort()).toEqual(["kept.md", "late.md"]);
   });
 
   // The disk's half of the contract's links (n172): each one it doesn't

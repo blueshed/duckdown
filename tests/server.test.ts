@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeAll, spyOn } from "bun:test";
-import { mkdirSync, writeFileSync, readFileSync, renameSync, existsSync, rmSync } from "fs";
+import { mkdirSync, writeFileSync, readFileSync, readdirSync, renameSync, existsSync, rmSync } from "fs";
 import { join } from "path";
 import { BASE, SITE, signIn, authed, keepSite } from "./helpers";
 import { siteHandler } from "../server/routes/site";
@@ -246,6 +246,18 @@ describe("editor API", () => {
       }));
       expect(res.status).toBe(200);
       expect(await (await fetch(`${BASE}/edit/pages/brand-new.md`, authed())).text()).toBe("title: brand-new\n\n");
+    });
+
+    // A folder's name, or the section itself, is no file: that was a 500
+    // (EISDIR) that left pages/.guide.<random>.tmp, or .pages.<random>.tmp at
+    // the site's root, for `bucket push` and a git Publish to carry.
+    test("a folder, or pages/ itself, is refused as no file, and nothing is left beside it", async () => {
+      for (const path of ["guide", "guide/", ""]) {
+        expect((await fetch(`${BASE}/edit/pages/${path}`, authed({ method: "PUT", body: "x" }))).status).toBe(400);
+      }
+      const temporary = (dir: string) => readdirSync(dir).filter((name) => name.endsWith(".tmp"));
+      expect(temporary(join(SITE, "pages"))).toEqual([]);
+      expect(temporary(SITE)).toEqual([]);
     });
 
     test("names are decoded: 'About us' is stored as 'About us.md'", async () => {

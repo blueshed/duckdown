@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- **A save to a folder's name is refused, and leaves nothing behind.**
+  `PUT /edit/pages/guide`, with `guide/` a folder, or a save to a section
+  itself (`PUT /edit/pages/`), failed half-way with a 500 and left its
+  temporary file beside it — `pages/.guide.<random>.tmp`, or
+  `.pages.<random>.tmp` at the site's root — listed nowhere, but carried by
+  `duckdown bucket push` and a git Publish. It is a 400 now, on disk and in
+  a bucket (which took the name as a file beside the folder), and a write
+  that fails for any other reason takes its temporary file with it. A site
+  can look for any left behind with `find site -name '.*.tmp'`.
 - **A WebP or an AVIF is served as a picture.** The served site typed a
   file by a table of its own, which had neither, so `/static/…/x.webp` came
   back `application/octet-stream` — and duckdown makes WebP widths itself.
