@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.17.0
 
 - **A save to a folder's name is refused, and leaves nothing behind.**
   `PUT /edit/pages/guide`, with `guide/` a folder, or a save to a section
