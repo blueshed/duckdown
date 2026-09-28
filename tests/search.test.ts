@@ -338,7 +338,7 @@ describe("searchFiles", () => {
 
   test("the index names every shard there is, and nothing else answers", () => {
     expect(json("/search/index.json").words).toEqual(["2", "a", "ab", "an", "ca", "do", "fr", "ho", "mo", "th", "tr", "üb"]);
-    for (const path of ["/search/words/zz.json", "/search/words/tr", "/search/other.json", "/search.json", "/search/pages/x.json"]) {
+    for (const path of ["/search/words/zz.json", "/search/words/tr", "/search/other.json", "/search.json", "/search/pages/x.json", "/search/pages/00.json", "/search/pages/-1.json"]) {
       expect(searchFile(files, path)).toBeNull();
     }
   });

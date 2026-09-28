@@ -220,7 +220,7 @@ export function searchFile(files: SearchFiles, path: string): string | null {
   if (path === "/search/index.json") return files.index;
   const word = /^\/search\/words\/([a-z0-9_]+)\.json$/.exec(path);
   if (word) return files.words.get(word[1]!) ?? null;
-  const page = /^\/search\/pages\/(\d+)\.json$/.exec(path);
+  const page = /^\/search\/pages\/(0|[1-9]\d*)\.json$/.exec(path);   // one name a page: not 00.json
   const entries = page ? files.pages[Number(page[1])] : undefined;
   return entries ? JSON.stringify(entries) : null;
 }

@@ -537,7 +537,7 @@ describe("search", () => {
     const again = await fetch(`${BASE}/search/pages/${n}.json`);
     expect((await fetch(`${BASE}/search/pages/${n}.json`, { headers: { "If-None-Match": again.headers.get("etag")! } })).status).toBe(304);
 
-    for (const missing of ["/search/words/zz.json", "/search/pages/9999.json", "/search/pages/x.json"]) {
+    for (const missing of ["/search/words/zz.json", "/search/pages/9999.json", "/search/pages/x.json", "/search/pages/00.json"]) {
       expect((await fetch(`${BASE}${missing}`)).status).toBe(404);
     }
   });
