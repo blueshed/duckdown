@@ -66,11 +66,13 @@ async function route(req: Request, dir: string, origin: string): Promise<{ res: 
   const found = await file(dir, path.endsWith("/") ? `${path}index.html` : path)
     ?? (rootFile(path.slice(1)) === "apple-touch-icon.png" ? await file(dir, "/apple-touch-icon.png") : null);
   if (found) {
-    // Short, and the same for everything: nothing here is content-hashed,
-    // so a stylesheet edited this morning has to be able to show up.
+    // Short: nothing here is content-hashed, so a stylesheet edited this
+    // morning has to be able to show up. The search index's parts are asked
+    // about every time (search.ts): they name each other by number, and a
+    // browser must not keep one from before a deploy beside one from after.
     const { body, key } = found;
     return {
-      res: new Response(body, { headers: { "Cache-Control": "public, max-age=300", ...(handedOut(key) ? asFile(body.type) : {}) } }),
+      res: new Response(body, { headers: { "Cache-Control": path.startsWith("/search/") ? "no-cache" : "public, max-age=300", ...(handedOut(key) ? asFile(body.type) : {}) } }),
       html: !!body.name?.endsWith(".html"),
     };
   }

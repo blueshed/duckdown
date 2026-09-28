@@ -515,7 +515,8 @@ describe("search", () => {
     const index = await fetch(`${BASE}/search/index.json`);
     expect(index.headers.get("content-type")).toContain("application/json");
     expect(index.headers.get("cache-control")).toBe("no-cache");   // renumbered by a save: asked about each time
-    const { words } = await index.json();
+    const { version, words } = await index.json();
+    expect(version).toMatch(/^[0-9a-f]{12}$/);
     expect(words).toContain("wr");
 
     const shard = await (await fetch(`${BASE}/search/words/wr.json`)).json();

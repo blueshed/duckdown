@@ -346,11 +346,20 @@ describe("searchFiles", () => {
     expect(JSON.parse(searchFile(quoted, "/search/words/do.json")!)).toEqual({ "don't": [0, 0] });
   });
 
-  test("the index names every shard there is, and nothing else answers", () => {
-    expect(json("/search/index.json").words).toEqual(["2", "a", "ab", "an", "c", "ca", "d", "do", "f", "fr", "h", "ho", "m", "mo", "t", "th", "tr", "ü", "üb"]);
+  test("the index names every shard there is, and its version, and nothing else answers", () => {
+    const index = json("/search/index.json");
+    expect(index.words).toEqual(["2", "a", "ab", "an", "c", "ca", "d", "do", "f", "fr", "h", "ho", "m", "mo", "t", "th", "tr", "ü", "üb"]);
+    expect(index.version).toMatch(/^[0-9a-f]{12}$/);
     for (const path of ["/search/words/zz.json", "/search/words/tr", "/search/other.json", "/search.json", "/search/pages/x.json", "/search/pages/00.json", "/search/pages/-1.json"]) {
       expect(searchFile(files, path)).toBeNull();
     }
+  });
+
+  test("the version is the same for the same index, and another when anything in it changes", () => {
+    const version = (e: Entry[]) => JSON.parse(searchFiles(e).index).version;
+    expect(version(entries)).toBe(version(structuredClone(entries)));
+    expect(version(entries)).not.toBe(version([...entries.slice(0, 3), { ...entries[3]!, text: "Train 3" }]));
+    expect(version(entries)).not.toBe(version([...entries.slice(0, 3), { ...entries[3]!, date: "2026-09-28" }]));
   });
 
   test("the files, one at a time, are every one there is", () => {

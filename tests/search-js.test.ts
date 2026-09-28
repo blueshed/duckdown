@@ -157,9 +157,30 @@ describe("search.js, fetching what a search needs", () => {
     expect(hrefs(found)).toEqual(["/p7.html#s", "/p30.html#s:~:text=train"]);   // the heading first, as ever
     expect(asked).toEqual(["/search/index.json", "/search/words/tr.json", "/search/pages/7.json", "/search/pages/30.json"]);
     expect(asked).not.toContain("/search.json");
-    // What it has, it keeps: another word of the same shard, and a page already shown, cost nothing more.
+    // What it has, it keeps: another word of the same shard, and a page already
+    // shown, cost nothing more than asking whether the index is still the one.
     await search("trai");
-    expect(asked).toHaveLength(4);
+    expect(asked.slice(4)).toEqual(["/search/index.json"]);
+  });
+
+  test("a save that renumbers the pages: what was kept of the old index is dropped, not read beside the new", async () => {
+    const before = [
+      entry({ url: "/about.html", title: "About", text: "who we are" }),
+      entry({ url: "/trains.html", title: "Trains", text: "a train timetable" }),
+    ];
+    const after = [entry({ url: "/aardvark.html", title: "Aardvark", text: "an animal" }), ...before];
+    let files = searchFiles(before);
+    start(before);
+    globalThis.fetch = (async (url: string) => {
+      asked.push(url);
+      const body = searchFile(files, url);
+      return body === null ? new Response("Not Found", { status: 404 }) : new Response(body);
+    }) as unknown as typeof fetch;
+    expect((await search("train")).map((a) => a.textContent)).toEqual(["Trains"]);
+    files = searchFiles(after);                                                      // the save: page 1 is now About
+    expect((await search("trains")).map((a) => a.textContent)).toEqual(["Trains"]);  // not "About"
+    expect((await search("about")).map((a) => a.textContent)).toEqual(["About"]);
+    expect(asked.filter((a) => a === "/search/words/tr.json")).toHaveLength(2);    // fetched again for the new version
   });
 
   test("eight results at most, three of a page, and only their pages fetched however many match", async () => {

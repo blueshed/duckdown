@@ -12,6 +12,7 @@ const files: Record<string, string> = {
   "blog/index.html": "<h1>blog</h1>",
   "static/site.css": "body{}",
   "search.json": "[]",
+  "search/index.json": '{"version":"1","words":[]}',
 };
 for (const [path, body] of Object.entries(files)) {
   mkdirSync(join(dist, path, ".."), { recursive: true });
@@ -47,6 +48,15 @@ describe("serveDist", () => {
     expect(res.headers.get("cache-control")).toBe("public, max-age=300");
     expect(await (await ask("/")).res.text()).toBe("<h1>home</h1>");
     expect(await (await ask("/static/site.css")).res.text()).toBe("body{}");
+  });
+
+  // n166, after review: a browser kept a word's shard from before a deploy
+  // beside a page from after it, and the page numbers had moved.
+  test("the search index's parts are asked about every time: they name each other by number", async () => {
+    const { res } = await ask("/search/index.json");
+    expect(await res.text()).toContain('"version"');
+    expect(res.headers.get("cache-control")).toBe("no-cache");
+    expect((await ask("/search.json")).res.headers.get("cache-control")).toBe("public, max-age=300");
   });
 
   test("a folder without its slash moves to the one with, keeping the query", async () => {

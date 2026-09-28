@@ -5,14 +5,14 @@
 // The index comes in parts, so a reader fetches what their search needs rather
 // than every word on the site (68 MB at 20,000 pages):
 //
-//   /search/index.json        which shards of words there are
+//   /search/index.json        its version, and which shards of words there are
 //   /search/words/<xy>.json   every word starting xy, and where each one is
 //   /search/pages/<n>.json    page n's entries — its title, each section's
 //                             heading and words — for the results shown
 //
-// Each is fetched once, the first time a search needs it. (/search.json, the
-// whole index as one file, is still there for a site's own search.js from
-// before this.)
+// Each is fetched once, the first time a search needs it, and the index is
+// asked about again at each search. (/search.json, the whole index as one
+// file, is still there for a site's own search.js from before this.)
 //
 // It is ordinary site code, in static/, and you can edit it: the template
 // includes it, and duckdown's job ends at handing you the index.
@@ -72,27 +72,39 @@
   const shardOf = (word) => [...word].slice(0, 2).join("");
   const fileOf = (key) => key.replace(/[^a-z0-9]/gu, (c) => `_${c.codePointAt(0).toString(16)}_`);
 
-  // Fetched once each, on the first search that needs it rather than on page
-  // load: a reader who never searches never pays, and one who does pays for
-  // the words they typed. A file that isn't there, or won't come, is nothing
-  // found — said in the console, not to the reader.
+  // Each word and page is fetched once, on the first search that needs it
+  // rather than on page load: a reader who never searches never pays, and one
+  // who does pays for the words they typed. A file that isn't there, or won't
+  // come, is nothing found — said in the console, not to the reader.
+  //
+  // The index is asked for again at each search (a 304 when it hasn't
+  // changed): an editor's save can renumber the pages, and what was kept from
+  // another version of the index is dropped rather than read beside this one.
+  const load = (url, none, init) => fetch(url, init)
+    .then((r) => (r.ok ? r.json() : none))
+    .catch((e) => {
+      console.warn("search.js: couldn't fetch", url, e);
+      return none;
+    });
   const fetched = new Map();
   function get(url, none) {
-    if (!fetched.has(url)) {
-      fetched.set(url, fetch(url)
-        .then((r) => (r.ok ? r.json() : none))
-        .catch((e) => {
-          console.warn("search.js: couldn't fetch", url, e);
-          return none;
-        }));
-    }
+    if (!fetched.has(url)) fetched.set(url, load(url, none));
     return fetched.get(url);
   }
-  let shards = null;
-  const shard = async (key) => {
-    shards ??= get("/search/index.json", { words: [] }).then((index) => new Set(index.words));
-    return (await shards).has(key) ? get(`/search/words/${fileOf(key)}.json`, {}) : {};
-  };
+  let version = null;
+  let asking = null;   // one question at a time, however fast the keys come
+  function current() {
+    asking ??= load("/search/index.json", { words: [] }, { cache: "no-cache" }).then((index) => {
+      asking = null;
+      if (index.version !== version) {
+        fetched.clear();
+        version = index.version;
+      }
+      return new Set(index.words);
+    });
+    return asking;
+  }
+  const shard = (shards, key) => (shards.has(key) ? get(`/search/words/${fileOf(key)}.json`, {}) : {});
   const page = (n) => get(`/search/pages/${n}.json`, []);
 
   // Where in a text the query first starts a word, or -1: the snippet and the
@@ -122,9 +134,9 @@
   // title, 2 the heading, 1 the description, 0 the text).
   const WEIGHT = [1, 4, 8, 10];
   const AT = 1e6;   // an entry, as one number: page × AT + section
-  async function placesOf(term) {
+  async function placesOf(shards, term) {
     const best = new Map();
-    for (const [word, places] of Object.entries(await shard(shardOf(term)))) {
+    for (const [word, places] of Object.entries(await shard(shards, shardOf(term)))) {
       if (!word.startsWith(term)) continue;
       for (let i = 0, n = 0; i < places.length; i += 2) {
         n += places[i];
@@ -134,8 +146,8 @@
     }
     return best;
   }
-  async function rank(terms) {
-    const [first, ...rest] = await Promise.all(terms.map(placesOf));
+  async function rank(shards, terms) {
+    const [first, ...rest] = await Promise.all(terms.map((term) => placesOf(shards, term)));
     const hits = [];
     for (const [at, score] of first) {
       if (rest.every((other) => other.has(at))) hits.push({ at, total: rest.reduce((sum, other) => sum + other.get(at), score) });
@@ -214,7 +226,7 @@
     const wanted = words(query);
     if (!wanted.length) return show([], query);
     output.setAttribute("aria-busy", "true");
-    const hits = await rank(wanted);
+    const hits = await rank(await current(), wanted);
     if (input.value.trim() !== query) return;
     const found = await entries(hits);
     if (input.value.trim() !== query) return;

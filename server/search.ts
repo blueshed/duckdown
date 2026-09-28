@@ -146,7 +146,8 @@ export async function aliasTarget(pages: Storage, path: string, debug = DEBUG): 
 // of it fetched before a reader's first result. In parts, a search fetches the
 // words it asks for and the pages it shows, and nothing else:
 //
-//   search/index.json        which shards there are: {"words": ["a", "ab", …]}
+//   search/index.json        its version, and which shards there are:
+//                            {"version": "…", "words": ["a", "ab", …]}
 //   search/words/<xy>.json   every word starting xy, and where each one is
 //   search/words/<x>.json    every word starting x, as one: where the letter starts a word
 //   search/pages/<n>.json    page n's entries, just as the whole index has them
@@ -187,6 +188,10 @@ export type SearchFiles = {
 // on from its last one, then section × 4 + where it is (TITLE … TEXT), once
 // per section and at its best there — e.g. "train": [3, 6, 0, 8] is page 3's
 // section 1 in a heading, then its section 2 in the text.
+//
+// A save can renumber the pages, so the index carries a version, made from
+// everything in the parts: search.js asks for the index at each search and
+// drops what it kept of another version.
 export function searchFiles(entries: Entry[]): SearchFiles {
   const pages: Entry[][] = [];
   let at = "";
@@ -222,7 +227,10 @@ export function searchFiles(entries: Entry[]): SearchFiles {
 
   const keys = [...shards.keys()].sort();
   const words = new Map(keys.map((key) => [fileOf(key), JSON.stringify(Object.fromEntries(shards.get(key)!))]));
-  return { index: JSON.stringify({ words: keys }), words, pages };
+  const version = new Bun.CryptoHasher("sha1");
+  for (const body of words.values()) version.update(body);
+  for (const page of pages) version.update(JSON.stringify(page));
+  return { index: JSON.stringify({ version: version.digest("hex").slice(0, 12), words: keys }), words, pages };
 }
 
 // The file at `path` ("/search/words/tr.json"), or null when there is none.
