@@ -23,4 +23,15 @@ const run = Bun.spawn(["bun", join(import.meta.dir, "measure.ts"), join(root, "d
   env: { ...process.env, DUCKDOWN_PATH: site, DUCKDOWN_PID: "", DEBUG: "0", DUCKDOWN_BUCKET: "" },
 });
 process.exitCode = await run.exited;
+// What the export wrote for search, and what a reader fetches of it to search once.
+const dist = join(root, "dist");
+const listed = (...globs: string[]) => globs.flatMap((g) => [...new Bun.Glob(g).scanSync({ cwd: dist })]);
+const sized = (what: string, ...globs: string[]) => {
+  const found = listed(...globs);
+  const bytes = found.reduce((sum, f) => sum + Bun.file(join(dist, f)).size, 0);
+  console.log(`${what.padEnd(46)} ${`${(bytes / 1024 / 1024).toFixed(1)} MB`.padStart(10)} in ${found.length} file(s)`);
+};
+sized("search's files in dist/", "search.json", "search/**");
+sized("dist/ in all", "**");
+await Bun.spawn(["bun", join(import.meta.dir, "search.ts"), dist, "fox", "page 7", "work 1234"], { stdout: "inherit", stderr: "inherit" }).exited;
 console.log(`(the site and its export are in ${root})`);

@@ -140,3 +140,100 @@ export async function aliasTarget(pages: Storage, path: string, debug = DEBUG): 
   return (await site(pages, debug)).aliases.find((a) => a.from === key)?.to ?? null;
 }
 
+// ── The index in parts (n166) ──────────────────────────────────────────────
+//
+// Sent whole, the index is every word on the site: 68 MB at 20,000 pages, all
+// of it fetched before a reader's first result. In parts, a search fetches the
+// words it asks for and the pages it shows, and nothing else:
+//
+//   search/index.json        which shards there are: {"words": ["a", "ab", …]}
+//   search/words/<xy>.json   every word starting xy, and where each one is
+//   search/pages/<n>.json    page n's entries, just as the whole index has them
+//
+// The same files whether served or exported, so search.js can't tell the two
+// apart, and it still does all the matching: nothing here searches.
+
+// A word is a run of letters, marks, digits and _: the words of a page are cut
+// this way here and a query's the same way in search.js, so the one finds the
+// other. It is where `\b` put a word's start, and a letter outside a-z too.
+const WORD = /[\p{L}\p{M}\p{N}_]+/gu;
+const wordsOf = (text: string): string[] => text.toLowerCase().match(WORD) ?? [];
+
+// A word's shard is its first two letters — a word of one letter has one of
+// its own, so "2" is looked up alone and a first keystroke fetches little —
+// and the shard's file is that, with anything but a-z and 0-9 spelt as its
+// code point: "üb" is _fc_b.json. search.js has the same two lines.
+const shardOf = (word: string): string => [...word].slice(0, 2).join("");
+const fileOf = (key: string): string => key.replace(/[^a-z0-9]/gu, (c) => `_${c.codePointAt(0)!.toString(16)}_`);
+
+// Where in an entry a word is, at best — what search.js ranks by, and why a
+// word in the title outranks the same word in a page's text.
+const TITLE = 3, HEADING = 2, DESCRIPTION = 1, TEXT = 0;
+
+export type SearchFiles = {
+  index: string;                  // search/index.json
+  words: Map<string, string>;     // a shard's file name → its JSON
+  pages: Entry[][];               // each page's entries, its own first
+};
+
+// The whole index cut into its parts. A page is the entries in a row that
+// share its address (its own, then one per section), numbered in the order
+// the walk found them. A word's places are pairs of numbers: how many pages
+// on from its last one, then section × 4 + where it is (TITLE … TEXT), once
+// per section and at its best there — e.g. "train": [3, 6, 0, 8] is page 3's
+// section 1 in a heading, then its section 2 in the text.
+export function searchFiles(entries: Entry[]): SearchFiles {
+  const pages: Entry[][] = [];
+  let at = "";
+  for (const entry of entries) {
+    const page = entry.url.split("#")[0]!;
+    if (page === at) pages.at(-1)!.push(entry);
+    else pages.push([entry]);
+    at = page;
+  }
+
+  const shards = new Map<string, Map<string, number[]>>();
+  const last = new Map<string, number>();   // a word's last page, for the next one's gap
+  pages.forEach((page, n) => page.forEach((entry, section) => {
+    const best = new Map<string, number>();
+    for (const [place, field] of [[TITLE, entry.title], [HEADING, entry.section], [DESCRIPTION, entry.description], [TEXT, entry.text]] as const) {
+      for (const word of wordsOf(field)) if (!best.has(word)) best.set(word, place);   // best first, so the first is the best
+    }
+    for (const [word, place] of best) {
+      const key = shardOf(word);
+      if (!shards.has(key)) shards.set(key, new Map());
+      const shard = shards.get(key)!;
+      if (!shard.has(word)) shard.set(word, []);
+      shard.get(word)!.push(n - (last.get(word) ?? 0), section * 4 + place);
+      last.set(word, n);
+    }
+  }));
+
+  const keys = [...shards.keys()].sort();
+  const words = new Map(keys.map((key) => [fileOf(key), JSON.stringify(Object.fromEntries(shards.get(key)!))]));
+  return { index: JSON.stringify({ words: keys }), words, pages };
+}
+
+// The file at `path` ("/search/words/tr.json"), or null when there is none.
+// A page's is made when it is asked for: the whole index is already kept.
+export function searchFile(files: SearchFiles, path: string): string | null {
+  if (path === "/search/index.json") return files.index;
+  const word = /^\/search\/words\/([a-z0-9_]+)\.json$/.exec(path);
+  if (word) return files.words.get(word[1]!) ?? null;
+  const page = /^\/search\/pages\/(\d+)\.json$/.exec(path);
+  const entries = page ? files.pages[Number(page[1])] : undefined;
+  return entries ? JSON.stringify(entries) : null;
+}
+
+// Every file, as [path under dist/, body], one at a time: the export writes
+// each as it comes rather than holding them all.
+export function* searchFileList(files: SearchFiles): Generator<[string, string]> {
+  yield ["search/index.json", files.index];
+  for (const [file, body] of files.words) yield [`search/words/${file}.json`, body];
+  for (let n = 0; n < files.pages.length; n++) yield [`search/pages/${n}.json`, JSON.stringify(files.pages[n])];
+}
+
+// Kept with the index they are cut from, and dropped with it.
+const parts = kept(async (pages, _, debug) => searchFiles((await site(pages, debug)).entries));
+export const searchParts = (pages: Storage, debug = DEBUG): Promise<SearchFiles> => parts(pages, "", debug);
+

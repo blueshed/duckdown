@@ -10,6 +10,8 @@ const t = async (what: string, fn: () => Promise<unknown>) => {
   const s = performance.now(); await fn(); const ms = performance.now() - s;
   console.log(`${what.padEnd(46)} ${ms.toFixed(0).padStart(7)} ms`); return ms;
 };
+const mb = (n: number) => `${(n / 1024 / 1024).toFixed(1)} MB`;
+const peak = (what: string) => console.log(`${what.padEnd(46)} ${mb(process.resourceUsage().maxRSS * 1024).padStart(10)}`);
 const pages = createPageStorage();
 const render = async (key: string) => pageHtml(parsePage(key, await pages.read(key)), { origin: "https://example.com" } as any);
 await t("nav, cold", () => siteNav(pages));
@@ -23,4 +25,7 @@ await t("the front page ({{sitemap}}), kept", () => render("index.md"));
 siteChanged();
 await t("after a save: the next page render", () => render("folder-3/page-9.md"));
 await t("after a save: search index again", () => searchIndex(pages));
+console.log(`${"the whole index as one file (/search.json)".padEnd(46)} ${mb(JSON.stringify(await searchIndex(pages)).length).padStart(10)}`);
+peak("peak memory before the export");
 await t("the whole export", () => exportSite({ out: process.argv[2]!, origin: "https://example.com", say: () => {} } as any));
+peak("peak memory with the export");

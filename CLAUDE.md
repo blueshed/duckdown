@@ -22,7 +22,10 @@ Bun.serve({
     "/edit/templates/*": handleTemplateFiles,
     "/edit/static/*":    handleStaticFiles,
     "/edit/mark/":       handleMark,
-    "/search.json":      handleSearch,       // the index; the browser matches
+    "/search.json":      handleSearch,       // the whole index, for a site's own search.js from before the parts
+    "/search/index.json":  handleSearchFile, // the index in parts; the browser matches
+    "/search/words/:file": handleSearchFile,
+    "/search/pages/:file": handleSearchFile,
     "/sitemap.xml":      handleSitemap,      // the same index, for crawlers
     "/edit/browse/*":    handleBrowse,
     "/static/*":         handleStatic,
@@ -57,7 +60,7 @@ duckdown/
 │   ├── stop.ts             # bun run stop
 │   ├── log.ts              # The view log: what was read, never who; parseView reads a line back
 │   ├── report.ts           # duckdown report: view lines in, reports/<month>/<day>.md out
-│   ├── search.ts           # The index readers search, cached like the nav; page and item aliases
+│   ├── search.ts           # The index readers search, cached like the nav, and cut into parts; page and item aliases
 │   ├── sitemap.ts          # sitemap.xml from that index
 │   ├── feed.ts             # A folder's Atom feed (feed: true), cached like the nav; {{feed}}
 │   ├── collection.ts       # collection.json (the data) + its each: page (the page every item gets)
@@ -94,7 +97,7 @@ duckdown/
 │   │   ├── publish.ts      # /edit/publish — status, publish (checked), ?pull
 │   │   ├── collection.ts   # /edit/collection/* — a collection's pictures (upload + thumbnail), and its problems
 │   │   ├── static.ts       # /static/* — site static files
-│   │   ├── search.ts       # /search.json — the whole index, for the browser
+│   │   ├── search.ts       # /search/… — the index in parts, for the browser; /search.json whole, for an old fork
 │   │   ├── sitemap.ts      # /sitemap.xml
 │   │   ├── site.ts         # fetch fallback — the site, through page.ts
 │   │   └── error.ts        # error handler — log it, answer 500 with a line to show
@@ -140,8 +143,8 @@ duckdown/
 │   ├── helpers.ts          # The in-process server, signIn(), waitFor()
 │   ├── server.test.ts      # HTTP against the in-process server
 │   ├── export.test.ts      # bun run export, onto a scratch folder
-│   ├── search.test.ts      # plainText, the index, its cache, and the aliases from that walk
-│   ├── search-js.test.ts   # The browser half: server/base/search.js in happy-dom, against a staged index
+│   ├── search.test.ts      # plainText, the index, its cache, its parts, and the aliases from that walk
+│   ├── search-js.test.ts   # The browser half: server/base/search.js in happy-dom, against an index staged by searchFiles()
 │   ├── collection.test.ts  # collection.json: slugs, overviews, aliases, collisions
 │   ├── history.test.ts     # History: once a sitting, the limit, what was deleted
 │   ├── users.test.ts       # duckdown user, the password prompt, what a session is checked against
@@ -159,7 +162,7 @@ duckdown/
 │   ├── serve.test.ts       # serveDist(): traversal, redirects, 404.html, what is logged
 │   ├── setup-script.test.ts # both scaffold modes on scratch folders, and `bun run export` in each
 │   └── compose.yml         # MinIO for manual S3 runs (bun run dev:s3)
-├── bench/                  # bun run bench: a large site made and timed (n163); measures, doesn't check
+├── bench/                  # bun run bench: a large site made and timed (n163), its peak memory, what a first search fetches; measures, doesn't check
 ├── scripts/sites.ts        # bun run sites: every site under ~/Workshop on duckdown, and where each stands (not shipped)
 ├── bunfig.toml             # Test preload + the 100% coverage threshold
 ├── create/                 # `bun create blueshed/duckdown`: calls the scaffold, keeps code and tests
@@ -395,7 +398,7 @@ When a content feature changes (syntax, front matter, themes, navigation, the ed
 
 Styling is templates and stylesheets, and nothing else. `templates/site.html` links `static/site.css` (duckdown's base, everything drawn from CSS variables) and `static/theme.css` (this site's look, saying only what differs). There is no `theme:` key, no class on `<body>`, and no per-folder cascade: every page is styled because the template links the files, so a page can't opt in and can't forget to. Style new things through the variables so `theme.css` reaches them. For one page, `css:` links a stylesheet after the template's own; for a kind of page, `layout:` picks a template that links what that kind needs.
 
-Search happens in the browser. `search.ts` builds one entry per readable page and one per section of it — url (a section's ends `#id`, read out of the rendered HTML so it can't disagree with the page), title, section, description, date, and that section's words — and the whole thing goes over as `/search.json` (served) or `dist/search.json` (published). Nothing on the server searches: a few dozen pages is a few dozen kilobytes, and a linear scan of that in the browser beats asking anyone. Drafts are left out, because a result that 404s is worse than no result, and `server/base/search.js` is ordinary site code a site can fork by having its own. It ranks title > heading > description > body, shows at most three sections of a page, and links `url#id:~:text=…` (a text fragment, with `-` encoded), which a browser may honour, ignore, or (some Chromium builds) honour by giving up on the id as well — so `search.js` scrolls to the heading itself on `load` when the reader is still at the top. Every field matches at the start of a word, and `.search-results` scrolls inside its panel. The sitemap doesn't take its addresses from the sections: `buildSite()` returns the entries and a page list, from one walk and one cache. The index is cached exactly like the nav (`kept.ts`, below). That one walk also collects the aliases — an address a page or an item used to answer at — so `aliasTarget()` costs nothing extra and expires with the index.
+Search happens in the browser. `search.ts` builds one entry per readable page and one per section of it — url (a section's ends `#id`, read out of the rendered HTML so it can't disagree with the page), title, section, description, date, and that section's words — and `searchFiles()` cuts it into parts, the same files served (`/search/…`, `routes/search.ts`) or exported (`dist/search/`): `search/index.json` names the shards, `search/words/<xy>.json` holds every word starting with those two letters and where each is (pairs of numbers: pages on from the last, then section × 4 + where — 3 title, 2 heading, 1 description, 0 text — once per section, at its best there), and `search/pages/<n>.json` is page n's entries, just as the whole index has them. A reader's browser fetches the index, a shard per word of the query, and the pages of the results it shows — each once — so what it downloads follows what it searches (n166: at 20,000 pages the whole index was 68 MB before the first result). A word is a run of `[\p{L}\p{M}\p{N}_]`, cut the same way on both sides (so "tree-lined" is two words and "über" one), a word of one letter is a whole word (its own shard: "part 2" isn't "part 20"), and anything but a-z and 0-9 in a shard's file name is its code point (`_fc_b.json`). The parts name each other by number and a save renumbers them, so the served ones are `no-cache` with an ETag, and search.js leaves out a section a page no longer has. Nothing on the server searches. `/search.json`, the whole index as one file, is still served, and exported only for a site with its own `static/search.js` (which may predate the parts). Drafts are left out, because a result that 404s is worse than no result, and `server/base/search.js` is ordinary site code a site can fork by having its own. It ranks title > heading > description > body, shows at most three sections of a page, and links `url#id:~:text=…` (a text fragment, with `-` encoded), which a browser may honour, ignore, or (some Chromium builds) honour by giving up on the id as well — so `search.js` scrolls to the heading itself on `load` when the reader is still at the top. Every field matches at the start of a word, only the latest keystroke's answer is shown (the results are `aria-busy` while it fetches), and `.search-results` scrolls inside its panel. The sitemap doesn't take its addresses from the sections: `buildSite()` returns the entries and a page list, from one walk and one cache. The index is cached exactly like the nav (`kept.ts`, below). That one walk also collects the aliases — an address a page or an item used to answer at — so `aliasTarget()` costs nothing extra and expires with the index.
 
 What the site knows about itself lives in `nav.ts`: the nav, each folder's `{{pages}}` listing, and `{{sitemap}}` (the same walk, recursive: `folderEntries()` is what both are made from, so they agree on drafts, `-` folders and order). What counts as a page is decided once, in `listed.ts`, and every walk of `pages/` asks it — the nav, `{{pages}}` and the feed, `{{sitemap}}`, search and `sitemap.xml`, the export: `hidden()` (a `.` name, shown and published nowhere), `unlisted()` (that or a `-` name: served and exported, listed nowhere), `pageKey()` (markdown, not `404.md`) and `readable()` (not a draft, not an each: page). What each walk does with the answer, and in what order, stays its own. In production both are built once and kept (`kept()` in `kept.ts`, which every such cache goes through — the listings, the sitemap, the search index, the collections, the feeds); `siteChanged()` drops them all, and the pages route calls it whenever it writes, deletes, moves or restores, as a pull does — every write goes through the server, and a new write path to pages must call it too. A build that fails isn't kept. With `DEBUG=1` they're built per request instead, so pages written straight to disk (by hand, or by a session using the authoring skill) show up at once.
 
@@ -430,7 +433,7 @@ the walk renders every item into `dist/`), and both then go through
 `itemPage()` + `pageHtml()` with the item in `PageOptions.item`: `itemBody()`
 is the each: page's html filled for the item, `itemMeta()` its front matter.
 `search.ts` meets the same file in its own walk and emits an entry and a
-`PageRef` per item, so items are in `/search.json` and `sitemap.xml` for free.
+`PageRef` per item, so items are in the search index and `sitemap.xml` for free.
 The preview renders an overview like any page and returns
 `collectionProblems()` beside the html, which is how the editor's Notice hears
 that a slug collides with a page.

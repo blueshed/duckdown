@@ -88,6 +88,35 @@
   three seconds), so keep the site's folders writable by the server alone.
   A hard link can't be told from the file it shares: don't hard-link
   anything from outside the site into it (n172).
+- **Search fetches what a search needs, not every word on the site.** The
+  index was one file, `search.json`, downloaded whole before a reader's
+  first result: 68 MB at 20,000 pages. It now comes in parts, served at
+  `/search/…` and exported to `dist/search/`: `index.json` names the
+  shards, `words/<xy>.json` holds every word starting with those two
+  letters and where each one is, and `pages/<n>.json` is one page's
+  entries. A reader's browser fetches the index, a shard per word typed and
+  the pages of the results it shows, each once: on the bench's 20,000
+  pages, a first search for a word on every page fetches 211 KB (was 68 MB),
+  one for a single work 47 KB (n166). The ranking, the sections, the text
+  fragments and the three-a-page limit are as they were. What changes: a
+  word is letters and digits, so `tree-lined` is looked for as `tree` and
+  `lined`, and a word starting with a letter outside a-z (`über`, `École`)
+  is found at last; a query word of one letter matches only that word, so
+  `part 2` no longer finds `part 20`; only the latest keystroke's answer is
+  shown. The export writes 25,000 more small files at that size (72 MB in
+  all, against 68 MB in one).
+  - A site with **its own `static/search.js`** keeps working: the served
+    site still answers `/search.json`, and the export writes it for a site
+    that has its own search.js (and says so). To take the parts, merge
+    duckdown's `server/base/search.js` into yours, or delete yours to use
+    duckdown's; the export then stops writing `search.json`.
+  - A **published site** exported before this keeps its own `search.js`
+    and `search.json` until it is exported again. For five minutes after
+    that deploy, a reader whose browser kept the old `search.js` finds
+    nothing (it asks for a `search.json` that isn't there) until it
+    fetches the new one.
+- `bun run bench` also says how much memory it peaked at, what search wrote
+  to `dist/`, and what a first search for three queries fetches.
 
 ### Security
 

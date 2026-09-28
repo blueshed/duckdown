@@ -1,7 +1,7 @@
 // The index a reader searches: built here, matched in the browser.
 import { describe, test, expect } from "bun:test";
 import type { Storage, Listing } from "../server/storage";
-import { buildSite, searchIndex, pageList, aliasTarget } from "../server/search";
+import { buildSite, searchIndex, pageList, aliasTarget, searchFiles, searchFile, searchFileList, searchParts, type Entry } from "../server/search";
 import { siteMap } from "../server/nav";
 import { siteChanged } from "../server/kept";
 
@@ -298,6 +298,68 @@ describe("collections in the index", () => {
     expect(await aliasTarget(pages, "/battersea", false)).toBe("/works/battersea/");
     expect(await aliasTarget(pages, "/battersea/", false)).toBe("/works/battersea/");
     expect(await aliasTarget(pages, "/battersey", false)).toBeNull();
+    siteChanged();
+  });
+});
+
+// n166: the index in parts, so a reader fetches what a search needs.
+describe("searchFiles", () => {
+  const entry = (e: Partial<Entry>): Entry => ({ url: "/", title: "", section: "", description: "", date: "", text: "", ...e });
+  const entries = [
+    entry({ url: "/", title: "Home", description: "The front door" }),
+    entry({ url: "/#trains", title: "Home", section: "Trains", text: "a train, and another train" }),
+    entry({ url: "/about.html", title: "About trains", text: "Über a café" }),
+    entry({ url: "/about.html#more", title: "About trains", section: "More", text: "Train 2" }),
+  ];
+  const files = searchFiles(entries);
+  const json = (path: string) => JSON.parse(searchFile(files, path)!);
+
+  test("a page is its entries, in order, as the whole index had them", () => {
+    expect(json("/search/pages/0.json")).toEqual(entries.slice(0, 2));
+    expect(json("/search/pages/1.json")).toEqual(entries.slice(2));
+    expect(searchFile(files, "/search/pages/2.json")).toBeNull();
+  });
+
+  test("a word is filed under its first two letters, with where it is: pages on, then section × 4 + its best place", () => {
+    const tr = json("/search/words/tr.json");
+    // "trains": page 0 section 1's heading (2); page 1's title in both its entries (3).
+    expect(tr.trains).toEqual([0, 1 * 4 + 2, 1, 0 * 4 + 3, 0, 1 * 4 + 3]);
+    // "train": page 0 section 1's text (0), once however often; page 1 section 1's text.
+    expect(tr.train).toEqual([0, 1 * 4 + 0, 1, 1 * 4 + 0]);
+    expect(json("/search/words/fr.json")).toEqual({ front: [0, 1] });   // the description (1)
+  });
+
+  test("a word of one letter is filed alone; a letter outside a-z and 0-9 is its code point in the name", () => {
+    expect(json("/search/words/2.json")).toEqual({ 2: [1, 1 * 4 + 0] });
+    expect(json("/search/words/a.json")).toEqual({ a: [0, 4, 1, 0] });
+    expect(json("/search/words/_fc_b.json")).toEqual({ über: [1, 0] });
+    expect(json("/search/words/ca.json")).toEqual({ café: [1, 0] });
+  });
+
+  test("the index names every shard there is, and nothing else answers", () => {
+    expect(json("/search/index.json").words).toEqual(["2", "a", "ab", "an", "ca", "do", "fr", "ho", "mo", "th", "tr", "üb"]);
+    for (const path of ["/search/words/zz.json", "/search/words/tr", "/search/other.json", "/search.json", "/search/pages/x.json"]) {
+      expect(searchFile(files, path)).toBeNull();
+    }
+  });
+
+  test("the files, one at a time, are every one there is", () => {
+    const listed = [...searchFileList(files)];
+    expect(listed.map(([path]) => path)).toEqual([
+      "search/index.json",
+      ...json("/search/index.json").words.map((k: string) => `search/words/${k === "üb" ? "_fc_b" : k}.json`),
+      "search/pages/0.json", "search/pages/1.json",
+    ]);
+    for (const [path, body] of listed) expect(body).toBe(searchFile(files, `/${path}`)!);
+  });
+
+  test("kept like the index it is made from, until a page changes", async () => {
+    const pages = memory({ "index.md": "title: One\n\nfirst" });
+    const first = await searchParts(pages, false);
+    expect(await searchParts(pages, false)).toBe(first);
+    siteChanged();
+    expect(await searchParts(pages, false)).not.toBe(first);
+    expect(await searchParts(pages, true)).not.toBe(await searchParts(pages, true));
     siteChanged();
   });
 });

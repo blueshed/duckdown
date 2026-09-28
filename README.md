@@ -87,8 +87,9 @@ same code, so you can change your mind.
 - Styling in a few CSS variables: `static/theme.css`, linked by the template, with dark mode
 - **Templates and stylesheets are editable in the browser too**, in a pane
   below the page, so you watch the page change as you write them
-- Client-side search: one JSON index, matched in the browser — no service, no
-  dependency, and it works on a published site
+- Client-side search: a JSON index in parts, matched in the browser, which
+  fetches only the words a reader types and the pages it shows — no service,
+  no dependency, and it works on a published site
 - Image browser with upload
 - **Collections**: a gallery or catalogue kept as data in one file, with a page
   per item and as many overviews as you like, all written once in markdown —

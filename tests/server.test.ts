@@ -509,6 +509,50 @@ describe("search", () => {
       expect((await fetch(`${BASE}${entry.url}`)).status).toBe(200);
     }
   });
+
+  // n166: what the base search.js fetches, the same files the export writes.
+  test("the index in parts: which shards there are, a shard of words, a page's entries", async () => {
+    const index = await fetch(`${BASE}/search/index.json`);
+    expect(index.headers.get("content-type")).toContain("application/json");
+    expect(index.headers.get("cache-control")).toBe("no-cache");   // renumbered by a save: asked about each time
+    const { words } = await index.json();
+    expect(words).toContain("wr");
+
+    const shard = await (await fetch(`${BASE}/search/words/wr.json`)).json();
+    expect(Object.keys(shard).every((w) => w.startsWith("wr"))).toBe(true);
+
+    // The pages are the whole index's entries, page by page, numbered in its order.
+    const whole = await (await fetch(`${BASE}/search.json`)).json();
+    const urls = [...new Set(whole.map((e: any) => e.url.split("#")[0]))];
+    const n = urls.indexOf("/");
+    const front = await (await fetch(`${BASE}/search/pages/${n}.json`)).json();
+    expect(front).toEqual(whole.filter((e: any) => e.url === "/" || e.url.startsWith("/#")));
+    // "Write markdown" is in the front page's text: that page, the section, in its words (0).
+    const places: [number, number, number][] = [];
+    for (let i = 0, page = 0; i < shard.write.length; i += 2) places.push([page += shard.write[i], shard.write[i + 1] >> 2, shard.write[i + 1] & 3]);
+    const section = front.findIndex((e: any) => e.text.includes("Write markdown"));
+    expect(places).toContainEqual([n, section, 0]);
+
+    // A browser that has the file already is told so.
+    const again = await fetch(`${BASE}/search/pages/${n}.json`);
+    expect((await fetch(`${BASE}/search/pages/${n}.json`, { headers: { "If-None-Match": again.headers.get("etag")! } })).status).toBe(304);
+
+    for (const missing of ["/search/words/zz.json", "/search/pages/9999.json", "/search/pages/x.json"]) {
+      expect((await fetch(`${BASE}${missing}`)).status).toBe(404);
+    }
+  });
+
+  test("a page of the site's own under /search/ is still the site's", async () => {
+    const page = join(SITE, "pages", "search", "index.md");
+    mkdirSync(join(SITE, "pages", "search"), { recursive: true });
+    writeFileSync(page, "title: Find things\n\n# Find things\n");
+    try {
+      expect(await (await fetch(`${BASE}/search/`)).text()).toContain("Find things");
+    } finally {
+      rmSync(join(SITE, "pages", "search"), { recursive: true, force: true });
+      siteChanged();
+    }
+  });
 });
 
 describe("image browser", () => {

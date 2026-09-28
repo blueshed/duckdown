@@ -26,7 +26,8 @@ function exportIn(root: string) {
   expect(read(root, "dist/index.html")).toContain("Welcome to");
   expect(read(root, "dist/static/site.css")).toContain("--accent");   // the base, from duckdown
   expect(existsSync(join(root, "dist", "static", "search.js"))).toBe(true);
-  expect(existsSync(join(root, "dist", "search.json"))).toBe(true);
+  expect(existsSync(join(root, "dist", "search", "index.json"))).toBe(true);   // the index, in parts
+  expect(existsSync(join(root, "dist", "search", "pages", "0.json"))).toBe(true);
 }
 
 // A clone of duckdown as bun create leaves it (server/ is the real one, so the

@@ -19,7 +19,7 @@ import { tmpdir } from "os";
 import { ORIGIN, STATIC_PATH, IS_S3, BUCKET, BUCKET_PREFIX, APP_PATH } from "./config";
 import { createPageStorage, createStaticStorage, type Storage } from "./storage";
 import { parsePage, pageHtml, itemPage } from "./page";
-import { buildSite } from "./search";
+import { buildSite, searchFiles, searchFileList } from "./search";
 import { COLLECTION_FILE, collectionProblems, loadCollection } from "./collection";
 import { canonicalPath, escapeHtml } from "./utils";
 import { brokenLinks } from "./links";
@@ -219,12 +219,21 @@ export async function exportSite(o: {
     count.files++;
   }
 
-  // The same index the served site answers at /search.json, as a file. A
-  // published site has no server to ask, so the browser fetches this and does
-  // the matching itself.
+  // The index the browser searches, in the parts the served site answers
+  // with (search.ts): a published site has no server to ask, so the browser
+  // fetches the files its search needs and does the matching itself.
   const { entries, pages: listed } = await buildSite(pages);
-  write("search.json", JSON.stringify(entries));
-  count.files++;
+  for (const [path, body] of searchFileList(searchFiles(entries))) {
+    write(path, body);
+    count.files++;
+  }
+  // A site's own search.js may be from before the parts, and read the whole
+  // index as one file: a site that has one gets that file too.
+  if (statics.has("search.js")) {
+    write("search.json", JSON.stringify(entries));
+    count.files++;
+    say("static/search.js is this site's own, so search.json (the whole index) is written for it too; duckdown's own reads search/ instead.");
+  }
   // A sitemap needs absolute addresses, so it needs the origin; so does a feed.
   if (origin) {
     write("sitemap.xml", sitemapXml(listed, origin));

@@ -740,9 +740,19 @@ Keep the page's own content in `<main>`, and — when there's a nav before it �
 
 Readers search in the browser. duckdown builds one entry per page and one per
 section of it — `url`, `title`, `section`, `description`, `date` and the words
-of that section, cut at each heading — and
-hands the lot over at `/search.json`; `bun run export` writes the same thing to
-`dist/search.json`, so search works on a published site with no server.
+of that section, cut at each heading — and hands it over in parts, served at
+`/search/…` and written by `bun run export` to `dist/search/`, so search works
+on a published site with no server:
+
+- `search/index.json` names the shards of words there are;
+- `search/words/<xy>.json` is every word starting with those two letters, and
+  which page, which section, and where in it (title, heading, description,
+  text) it is;
+- `search/pages/<n>.json` is one page's entries.
+
+A reader's browser fetches the index, a shard for each word typed, and the
+pages of the results it shows, each once — not every word on the site, which
+at 20,000 pages was 68 MB before the first result.
 
 - **Every page a reader can open is in it**: not drafts, not `404.md`, and not
   anything named with a leading `-`, which is listed nowhere. There is
@@ -756,7 +766,9 @@ hands the lot over at `/search.json`; `bun run export` writes the same thing to
   every page) scrolls to the heading itself once the page has loaded, if
   nothing else has. Words match where a word starts, so `train` is not found in
   `constraints`. Long pages want real headings, and the result list scrolls
-  inside its panel.
+  inside its panel. A word is letters and digits, so `tree-lined` is looked
+  for as `tree` and `lined`, and `über` is a word like any other; a query word
+  of one letter matches only that word, so `part 2` doesn't find `part 20`.
 - **Drafts are left out.** A result leading to a 404 is worse than no result.
   So is the 404 page.
 - **`title` ranks above a section's heading, which ranks above `description`,
@@ -767,7 +779,10 @@ hands the lot over at `/search.json`; `bun run export` writes the same thing to
 - **The matching is the site's own code**, `static/search.js` in the seed,
   included by `templates/site.html` along with a `.search` form. Both are
   editable in the editor. A site that wants search copies them; one that
-  doesn't, doesn't.
+  doesn't, doesn't. `/search.json`, the whole index as one file, is still
+  served for a site's own `search.js` written before the parts, and exported
+  only for a site that has its own `static/search.js`; duckdown's reads the
+  parts.
 
 ## Publishing
 
@@ -790,6 +805,7 @@ DUCKDOWN_ORIGIN=https://example.com bun run export     # into ./dist
 - Every page at its one canonical address: `/` and `/blog/` as `index.html`,
   `about.md` as `about.html`. Nothing written twice.
 - `static/` copied alongside, bytes and all, with the base files (`site.css`, `search.js`) the site has no copy of; `robots.txt`, `favicon.ico` and `apple-touch-icon.png` (and its `-precomposed` copy) also at the root.
+- The search index in parts under `search/` (above), and `search.json`, the whole of it, only for a site with its own `static/search.js`.
 - `sitemap.xml` at the root, from the same list of pages as search (no drafts, no 404 page), with `<lastmod>` from a page's `date:`. It needs `DUCKDOWN_ORIGIN`, being absolute addresses; the export says so when it is missing. The served site answers `/sitemap.xml` too. To point crawlers at it, add `Sitemap: https://example.com/sitemap.xml` to `robots.txt`.
 - Links are checked: every relative `href` and `src` that points at nothing in the site is reported as `page -> link`. It reports and carries on; `bun run export --strict` (or `DUCKDOWN_STRICT=1`) makes it a failure, for a deploy that should stop. Other sites, `#fragments` and the editor's own addresses are left alone.
 - An export that finds no pages at all — `DUCKDOWN_PATH` unset or wrong, an empty bucket — fails, and leaves `dist/` as it was, rather than publish an empty site and go green.

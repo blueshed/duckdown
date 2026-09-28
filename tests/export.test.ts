@@ -5,11 +5,18 @@ import { join } from "path";
 import { RUN, SITE } from "./helpers";
 import { exportSite, outPath, aliasFile, main, lands } from "../server/export";
 import { brokenLinks } from "../server/links";
-import { LocalStorage } from "../server/storage";
+import { LocalStorage, createPageStorage } from "../server/storage";
 import { siteChanged } from "../server/kept";
+import { searchIndex, type Entry } from "../server/search";
 
 const out = (name: string) => join(RUN, `export-${name}`);
 const read = (dir: string, path: string) => readFileSync(join(dir, path), "utf8");
+// The whole index an export wrote, page by page from its parts (search.ts).
+function indexIn(dir: string): Entry[] {
+  const entries: Entry[] = [];
+  for (let n = 0; existsSync(join(dir, "search", "pages", `${n}.json`)); n++) entries.push(...JSON.parse(read(dir, `search/pages/${n}.json`)));
+  return entries;
+}
 const quiet = () => {};
 
 describe("outPath", () => {
@@ -48,13 +55,19 @@ describe("exportSite", () => {
     expect(home).not.toContain("user-edit");
     expect(home).not.toMatch(/\{\{\w+\}\}/);
 
-    // The index the browser searches, as a file: a published site has no
-    // server to ask for it.
-    const index = JSON.parse(read(dir, "search.json"));
+    // The index the browser searches, as files: a published site has no
+    // server to ask for it. In parts, and all of it (n166).
+    const index = indexIn(dir);
     // Every page but the 404 page, and its sections after it.
-    expect(index.filter((e: { url: string }) => !e.url.includes("#")).length).toBe(count.pages - 1);
-    expect(index.some((e: { url: string }) => e.url === "/guide/pages.html#front-matter")).toBe(true);
-    expect(index.find((e: { url: string }) => e.url === "/").title).toBe("duckdown");
+    expect(index.filter((e) => !e.url.includes("#")).length).toBe(count.pages - 1);
+    expect(index.some((e) => e.url === "/guide/pages.html#front-matter")).toBe(true);
+    expect(index.find((e) => e.url === "/")!.title).toBe("duckdown");
+    expect(index).toEqual(await searchIndex(createPageStorage()));
+    const words: string[] = JSON.parse(read(dir, "search/index.json")).words;
+    expect(words).toContain("wr");
+    expect(JSON.parse(read(dir, "search/words/wr.json")).write).toBeDefined();
+    // The whole index as one file is for a site's own search.js, and this site has none.
+    expect(existsSync(join(dir, "search.json"))).toBe(false);
 
     // static/ comes along, bytes and all.
     expect(read(dir, "static/site.css")).toContain("--accent");
@@ -100,6 +113,24 @@ describe("exportSite", () => {
       expect(read(dir, "index.html")).toContain('<link rel="canonical" href="/">');
     } finally {
       log.mockRestore();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("a site's own search.js", () => {
+  test("gets the whole index as one file too, as a search.js from before the parts reads it, and is told why", async () => {
+    const own = join(SITE, "static", "search.js");
+    writeFileSync(own, "// this site's own");
+    const dir = out("own-search");
+    const said: string[] = [];
+    try {
+      await exportSite({ out: dir, say: (l) => said.push(l) });
+      expect(JSON.parse(read(dir, "search.json"))).toEqual(indexIn(dir));
+      expect(read(dir, "static/search.js")).toBe("// this site's own");
+      expect(said.join("\n")).toContain("static/search.js is this site's own, so search.json (the whole index) is written for it too");
+    } finally {
+      rmSync(own);
       rmSync(dir, { recursive: true, force: true });
     }
   });
@@ -355,8 +386,7 @@ describe("collections", () => {
     expect(read(dir, "by-year.html")).toContain("<h2>1961 - Early work</h2>");
 
     // Items are pages to search and to the sitemap, from the same walk.
-    const index = JSON.parse(read(dir, "search.json"));
-    expect(index.some((e: { url: string }) => e.url === "/gallery/study-in-green/")).toBe(true);
+    expect(indexIn(dir).some((e) => e.url === "/gallery/study-in-green/")).toBe(true);
     expect(read(dir, "sitemap.xml")).toContain("https://example.com/gallery/study-in-green/");
 
     // The thumbnails a collection points at are links like any other, so a

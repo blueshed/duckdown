@@ -1,21 +1,33 @@
 // The browser half of search: the real search.js, in happy-dom, against an index
 // we stage. Nothing here is duckdown's server; it is the script a site serves.
+// The index's files are made from the entries by searchFiles(), the one thing
+// of the server's it uses, so the two halves can't disagree about the format.
 import { describe, test, expect, beforeEach, afterEach, spyOn } from "bun:test";
 import { readFileSync } from "fs";
 import { join } from "path";
 import { waitFor } from "./helpers";
+import { searchFiles, searchFile, type Entry } from "../server/search";
 
 const script = readFileSync(join(import.meta.dir, "..", "server", "base", "search.js"), "utf8");
-type Entry = { url: string; title: string; section: string; description: string; date: string; text: string };
 const entry = (e: Partial<Entry>): Entry => ({ url: "/", title: "", section: "", description: "", date: "", text: "", ...e });
 
 const realFetch = globalThis.fetch;
 let form: HTMLFormElement;
+let asked: string[] = [];
 
 // A page with the seed template's search form, and search.js started on it,
-// answering from `index`.
-function start(index: Entry[]) {
-  globalThis.fetch = (async () => new Response(JSON.stringify(index))) as unknown as typeof fetch;
+// answering from `index` as the served site and the export both would, and
+// noting each address it asks for. `hold` keeps a file's answer back until
+// the promise it names settles.
+function start(index: Entry[], hold: Record<string, Promise<unknown>> = {}) {
+  const files = searchFiles(index);
+  asked = [];
+  globalThis.fetch = (async (url: string) => {
+    asked.push(url);
+    await hold[url];
+    const body = searchFile(files, url);
+    return body === null ? new Response("Not Found", { status: 404 }) : new Response(body);
+  }) as unknown as typeof fetch;
   document.body.innerHTML = `<form class="search" role="search">
     <button type="button" class="search-toggle" aria-expanded="false"></button>
     <div class="search-panel"><input type="search"><div class="search-results"></div></div>
@@ -31,12 +43,17 @@ afterEach(() => {
   delete (document as any).readyState;
 });
 
-async function search(query: string): Promise<HTMLAnchorElement[]> {
-  (form.querySelector(".search-toggle") as HTMLElement).click();
+function type(query: string): void {
+  if (!form.hasAttribute("data-open")) (form.querySelector(".search-toggle") as HTMLElement).click();
   const input = form.querySelector("input")!;
   input.value = query;
   input.dispatchEvent(new Event("input"));
-  await waitFor(() => form.querySelector(".search-results")!.children.length > 0);
+}
+// What a search shows, once it has shown it: the results are busy while it fetches.
+async function search(query: string): Promise<HTMLAnchorElement[]> {
+  type(query);
+  const results = form.querySelector(".search-results")!;
+  await waitFor(() => !results.hasAttribute("aria-busy") && results.children.length > 0);
   return [...form.querySelectorAll<HTMLAnchorElement>(".search-results a")];
 }
 const hrefs = (links: HTMLAnchorElement[]) => links.map((a) => a.getAttribute("href"));
@@ -123,6 +140,101 @@ describe("search.js, on a word's start", () => {
     expect(found[0]).toBe("/jadd.html#train");                                    // the heading first
     expect(found).toContain("/notes.html");                                       // "trainspotter" starts with it
     expect(found).toContain("/other.html#:~:text=Train%20home");                  // and the fragment starts at that word
+  });
+});
+
+// n166: the whole index was 68 MB at 20,000 pages, all of it fetched before a
+// reader's first result. Now a search fetches what it needs.
+describe("search.js, fetching what a search needs", () => {
+  const pages = Array.from({ length: 40 }, (_, n) => [
+    entry({ url: `/p${n}.html`, title: `Page ${n}`, description: n % 2 ? "an odd one" : "" }),
+    entry({ url: `/p${n}.html#s`, title: `Page ${n}`, section: n === 7 ? "Train song" : "Words", text: `a quick brown fox ${n === 30 ? "and a train" : ""}` }),
+  ]).flat();
+
+  test("which words there are, the shard of each word asked for, and the pages it shows: never the whole index", async () => {
+    start(pages);
+    const found = await search("train");
+    expect(hrefs(found)).toEqual(["/p7.html#s", "/p30.html#s:~:text=train"]);   // the heading first, as ever
+    expect(asked).toEqual(["/search/index.json", "/search/words/tr.json", "/search/pages/7.json", "/search/pages/30.json"]);
+    expect(asked).not.toContain("/search.json");
+    // What it has, it keeps: another word of the same shard, and a page already shown, cost nothing more.
+    await search("trai");
+    expect(asked).toHaveLength(4);
+  });
+
+  test("eight results at most, three of a page, and only their pages fetched however many match", async () => {
+    start(pages);
+    const found = await search("fox");
+    expect(found).toHaveLength(8);
+    expect(asked.filter((a) => a.startsWith("/search/pages/"))).toEqual(
+      ["/search/pages/0.json", "/search/pages/1.json", "/search/pages/2.json", "/search/pages/3.json",
+        "/search/pages/4.json", "/search/pages/5.json", "/search/pages/6.json", "/search/pages/7.json"]);
+  });
+
+  test("every word must be somewhere, and each word's best place counts: title, then heading, description, text", async () => {
+    start(pages);
+    // "odd" is in the odd pages' descriptions; "page" in every title; "fox" in every section's text.
+    expect(hrefs(await search("odd page"))).toEqual(["/p1.html", "/p3.html", "/p5.html", "/p7.html", "/p9.html", "/p11.html", "/p13.html", "/p15.html"]);
+    expect(hrefs(await search("odd fox"))).toEqual([]);   // no one entry has both: the one is on the page's, the other in its section
+    expect(form.querySelector(".search-none")!.textContent).toBe("Nothing matches “odd fox”.");
+  });
+
+  test("a word of one letter is a whole word, so 'page 3' is page 3 and not 30", async () => {
+    start(pages);
+    expect((await search("page 3")).map((a) => a.textContent)).toEqual(["Page 3", "Page 3 – Words"]);
+    expect(asked).toContain("/search/words/3.json");   // the words that are just "3", and no other
+  });
+
+  test("the query's words are cut as the index cuts a page's: at anything but a letter or a digit, accents and all", async () => {
+    start([
+      entry({ url: "/a.html", title: "Café society", text: "tree-lined streets" }),
+      entry({ url: "/b.html", title: "Über alles", text: "naïve art" }),
+    ]);
+    expect(hrefs(await search("tree-lined"))).toEqual(["/a.html#:~:text=tree%2Dlined%20streets"]);
+    expect(hrefs(await search("CAFÉ"))).toEqual(["/a.html"]);
+    expect(hrefs(await search("über"))).toEqual(["/b.html"]);   // a word may start with a letter that isn't a-z
+    expect(asked).toContain("/search/words/_fc_b.json");        // spelt as its code point in the file's name
+    expect(hrefs(await search("naïve"))).toEqual(["/b.html#:~:text=na%C3%AFve%20art"]);
+    expect(hrefs(await search("ve"))).toEqual([]);               // "naïve" is one word, not "na" and "ve"
+    expect(hrefs(await search("—"))).toEqual([]);                // nothing to look for
+  });
+
+  test("a slow answer to an earlier keystroke doesn't replace a later one's", async () => {
+    let release!: () => void;
+    const slow = new Promise<void>((r) => (release = r));
+    start(pages, { "/search/words/fo.json": slow });
+    type("fox");
+    expect(form.querySelector(".search-results")!.getAttribute("aria-busy")).toBe("true");   // said while it fetches
+    const found = await search("train");
+    expect(hrefs(found)).toEqual(["/p7.html#s", "/p30.html#s:~:text=train"]);
+    release();
+    await Bun.sleep(10);
+    expect(hrefs([...form.querySelectorAll<HTMLAnchorElement>(".search-results a")])).toEqual(hrefs(found));
+  });
+
+  test("a file that isn't there, or won't come, is nothing found rather than a failure, and the console says which", async () => {
+    const warn = spyOn(console, "warn").mockImplementation(() => {});
+    start(pages);
+    globalThis.fetch = (async (url: string) => {
+      asked.push(url);
+      if (url === "/search/index.json") return new Response(JSON.stringify({ words: ["tr", "fo"] }));
+      if (url === "/search/words/fo.json") throw new TypeError("offline");
+      return new Response("Not Found", { status: 404 });
+    }) as unknown as typeof fetch;
+    expect(hrefs(await search("train"))).toEqual([]);
+    expect(hrefs(await search("fox"))).toEqual([]);
+    expect(hrefs(await search("zebra"))).toEqual([]);            // no such shard: not asked for at all
+    expect(asked).not.toContain("/search/words/ze.json");
+    expect(warn.mock.calls.map((c) => c.slice(0, 2))).toEqual([["search.js: couldn't fetch", "/search/words/fo.json"]]);
+    warn.mockRestore();
+  });
+
+  test("a result whose section the page no longer has is left out", async () => {
+    start(pages);
+    const files = searchFiles(pages);
+    globalThis.fetch = (async (url: string) =>
+      new Response(url === "/search/pages/7.json" ? "[]" : searchFile(files, url))) as unknown as typeof fetch;
+    expect(hrefs(await search("train"))).toEqual(["/p30.html#s:~:text=train"]);
   });
 });
 
