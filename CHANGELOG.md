@@ -89,45 +89,46 @@
   A hard link can't be told from the file it shares: don't hard-link
   anything from outside the site into it (n172).
 - **Search fetches what a search needs, not every word on the site.** The
-  index was one file, `search.json`, downloaded whole before a reader's
-  first result: 68 MB at 20,000 pages. It now comes in parts, served at
-  `/search/…` and exported to `dist/search/`: `index.json` names the
-  shards, `words/<xy>.json` holds every word starting with those two
-  letters and where each one is, and `pages/<n>.json` is one page's
-  entries. A reader's browser fetches the index, a shard per word typed and
-  the pages of the results it shows, each once: on the bench's 20,000
-  pages, a first search for a word on every page fetches 211 KB (was 68 MB),
-  one for a single work 47 KB (n166). The ranking, the sections, the text
-  fragments and the three-a-page limit are as they were. What changes: a
-  word is letters and digits, so `tree-lined` is looked for as `tree` and
-  `lined`, and a word starting with a letter outside a-z (`über`, `École`)
-  is found at last; a query word of one letter matches only that word, so
-  `part 2` no longer finds `part 20`; only the latest keystroke's answer is
-  shown. The export writes 25,000 more small files at that size (72 MB in
-  all, against 68 MB in one).
-  - A site with **its own `static/search.js`** keeps working: the served
-    site still answers `/search.json`, and the export writes it for a site
-    that has its own search.js (and says so). To take the parts, merge
-    duckdown's `server/base/search.js` into yours, or delete yours to use
-    duckdown's; the export then stops writing `search.json`.
-  - A **published site** exported before this keeps its own `search.js`
-    and `search.json` until it is exported again. For five minutes after
-    that deploy, a reader whose browser kept the old `search.js` finds
-    nothing (it asks for a `search.json` that isn't there) until it
-    fetches the new one.
-- `bun run bench` also says how much memory it peaked at, what search wrote
-  to `dist/`, and what a first search for three queries fetches.
+  index was one file, `search.json`, fetched whole before a reader's first
+  result: 68 MB at 20,000 pages. It now comes in parts, served at
+  `/search/…` and exported to `dist/search/`, and a reader's browser fetches
+  the index, a part per word typed and the pages of the results it shows:
+  211 KB for a first search of a word on each of those pages (n166). Both
+  servers send `search/` `no-cache`, and its index carries a version, so a
+  reader never mixes parts from before a save or a deploy with parts from
+  after. `search.json` is still served and exported, for a `search.js` from
+  before the parts: one a reader's browser kept, or a site's own. A site
+  with its own `static/search.js` keeps working; to take the parts, merge
+  duckdown's `server/base/search.js` into it, or delete it. At 20,000 pages
+  the export writes 25,000 more small files (72 MB, beside `search.json`'s
+  68). Ranking, sections, text fragments, three results a page and
+  one-letter searches are as they were: on blueshed.co.uk, vashti, daisy
+  and tony-site, 34 searches each gave 0.16.0's results but for these:
+  - `'` and `’` are the same, and an apostrophe inside a word is part of
+    it: `don't` finds `don’t`, and `ve` no longer finds `I've`.
+  - A query word with punctuation in it is looked for as its parts:
+    `docker-compose` finds `docker` and `compose` anywhere in a section, so
+    it can find more. The link still goes to `docker-compose`.
+  - A word with a letter outside a-z is one word: `über` and `École` are
+    found, and `ve` no longer finds `naïve`.
+  - Only the latest keystroke's answer is shown, `aria-busy` while it
+    fetches.
 - **The export writes each page as it renders it**, into a folder beside
-  `dist/` (`.dist.next`) that takes `dist/`'s place once the whole site is
-  written, rather than holding every page in memory until the last one was
-  done. A fresh export of the bench's 20,000 pages, as a build machine runs
-  it, peaked at 1.7-2.7 GB and now at 1.0-1.4 GB, in the same time (n167).
-  The promise is kept and widened: an export that fails part-way, not only
-  one that finds no pages, leaves the last good `dist/` as it was. A
-  `dist/` that can't be moved aside (a mount point) is emptied and filled
-  instead, and the export says so. A run that is stopped leaves
-  `.dist.next` behind, and the next export clears it.
-- `bun run bench` times the export alone too, in a process of its own.
+  `dist/` that takes `dist/`'s place once the whole site is written, rather
+  than holding every page in memory: a fresh export of 20,000 pages peaked
+  at 1.7-2.7 GB, and now 1.0-1.4 GB, in the same time (n167). An export
+  that fails part-way, not only one that finds no pages, leaves `dist/` as
+  it was. One killed between its two renames leaves no `dist/` until the
+  next export, which puts the old site back first, and says so, even if it
+  fails itself. Two exports at once each write their own folder
+  (`.dist.next-<pid>-…`), and `dist/` is one whole site. A `dist/` that
+  can't be moved aside (a mount point) is emptied and filled instead, and
+  the export says so. A stopped export's folder stays until the next
+  export clears it: add `.dist.next-*/` and `.dist.old-*/` to a site's
+  `.gitignore` (`init` does for a new site).
+- `bun run bench` says how much memory it peaked at, what search wrote to
+  `dist/` and what a first search fetches, and times the export alone, in
+  a process of its own.
 
 ### Security
 
