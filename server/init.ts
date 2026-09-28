@@ -128,10 +128,11 @@ DUCKDOWN_ORIGIN=
 `);
 
   // .gitignore is added to rather than kept or replaced: a site has its own
-  // lines already, and needs these.
+  // lines already, and needs these. .dist.next-*/ and .dist.old-*/ are what
+  // an export that was stopped leaves beside dist/ until the next clears them.
   const ignore = join(root, ".gitignore");
   const have = existsSync(ignore) ? readFileSync(ignore, "utf8").split("\n").map((l) => l.trim()) : [];
-  const missing = ["node_modules", "dist/", ".env", "*.pid", ".DS_Store", "site/users.json", "site/.history/"].filter((l) => !have.includes(l));
+  const missing = ["node_modules", "dist/", ".dist.next-*/", ".dist.old-*/", ".env", "*.pid", ".DS_Store", "site/users.json", "site/.history/"].filter((l) => !have.includes(l));
   if (missing.length) {
     const lead = have.length && have.at(-1) !== "" ? "\n" : "";
     appendFileSync(ignore, `${lead}${missing.join("\n")}\n`);

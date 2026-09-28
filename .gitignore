@@ -8,6 +8,8 @@ node_modules
 
 # bun run export
 dist/
+.dist.next-*/
+.dist.old-*/
 
 # agent worktrees
 .claude/worktrees/
