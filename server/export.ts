@@ -98,33 +98,53 @@ function running(pid: number): boolean {
 }
 
 // What an export that was stopped left beside dist/, told from a running one's
-// by the process in its name: it goes.
-function tidy(at: string, name: string): void {
-  for (const kind of ["next", "old"]) {
+// by the process in its name, goes — but for the site it had moved aside,
+// when it was stopped between its two renames: with no dist/, that goes back.
+function tidy(at: string, name: string, out: string, say: (line: string) => void): void {
+  for (const kind of ["old", "next"]) {
     const prefix = `.${name}.${kind}-`;
     for (const left of readdirSync(at).filter((n) => n.startsWith(prefix))) {
-      if (!running(parseInt(left.slice(prefix.length)))) rmSync(join(at, left), { recursive: true, force: true });
+      if (running(parseInt(left.slice(prefix.length)))) continue;
+      if (kind === "old" && !existsSync(out)) {
+        renameSync(join(at, left), out);
+        say(`${out} was missing, left beside it as ${left} by an export that was stopped: it is back.`);
+      } else {
+        rmSync(join(at, left), { recursive: true, force: true });
+      }
     }
   }
 }
 
 // Put a new site where the old one was: the old aside, the new in its place,
 // then the old gone. Two renames, so dist/ is never part of one and part of
-// the other. A folder that can't be moved aside (a mount point) is emptied
-// and the new site copied in instead — no longer at once, but still only once
-// the new site is whole — and the reason it couldn't is the answer.
+// the other; if the second fails, the old goes back (or, if another export's
+// site took the place first, goes), and a run stopped between them has it put
+// back by the next (tidy). A dist/ gone by the time it is moved (another
+// export's, mid-swap) is nothing to move. A folder that can't be moved aside (a mount point)
+// is emptied and the new site copied in instead — no longer at once, but
+// still only once the new site is whole — and the reason it couldn't is the
+// answer.
 export function swapIn(next: string, out: string, old: string, rename: typeof renameSync = renameSync): string | null {
   if (existsSync(out)) {
     try {
       rename(out, old);
     } catch (e) {
-      for (const name of readdirSync(out)) rmSync(join(out, name), { recursive: true, force: true });
-      cpSync(next, out, { recursive: true });
-      rmSync(next, { recursive: true, force: true });
-      return (e as NodeJS.ErrnoException).code ?? (e as Error).message;
+      const code = (e as NodeJS.ErrnoException).code;
+      if (code !== "ENOENT") {
+        for (const name of readdirSync(out)) rmSync(join(out, name), { recursive: true, force: true });
+        cpSync(next, out, { recursive: true });
+        rmSync(next, { recursive: true, force: true });
+        return code ?? (e as Error).message;
+      }
     }
   }
-  rename(next, out);
+  try {
+    rename(next, out);
+  } catch (e) {
+    if (existsSync(out)) rmSync(old, { recursive: true, force: true });
+    else if (existsSync(old)) rename(old, out);
+    throw e;
+  }
   rmSync(old, { recursive: true, force: true });
   return null;
 }
@@ -157,7 +177,7 @@ export async function exportSite(o: {
   // exports at once never write into one folder or clear the other's.
   const [at, name] = [dirname(out), basename(out)];
   mkdirSync(at, { recursive: true });
-  tidy(at, name);
+  tidy(at, name, out, say);
   const next = mkdtempSync(join(at, `.${name}.next-${process.pid}-`));
   const old = join(at, `.${name}.old-${basename(next).slice(`.${name}.next-`.length)}`);
 

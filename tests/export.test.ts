@@ -177,6 +177,38 @@ describe("an export's pages, written as they are rendered", () => {
     for (const d of [dir, join(RUN, running)]) rmSync(d, { recursive: true, force: true });
   });
 
+  test("a run stopped between its two renames: the next puts yesterday's site back first, though it fails itself", async () => {
+    const dir = out("crashed");
+    const gone = Bun.spawnSync(["true"]).pid;
+    for (const [left, body] of [[`.export-crashed.old-${gone}-abc`, "yesterday's site"], [`.export-crashed.next-${gone}-abc`, "today's, not yet in"]]) {
+      mkdirSync(join(RUN, left!), { recursive: true });
+      writeFileSync(join(RUN, left!, "index.html"), body!);
+    }
+    const pages = watched(() => { throw new Error("storage is down"); });
+    const said: string[] = [];
+    await expect(exportSite({ out: dir, pages, say: (l) => said.push(l) })).rejects.toThrow("storage is down");
+    expect(readdirSync(dir)).toEqual(["index.html"]);
+    expect(read(dir, "index.html")).toBe("yesterday's site");
+    expect(said).toEqual([`${dir} was missing, left beside it as .export-crashed.old-${gone}-abc by an export that was stopped: it is back.`]);
+    expect(readdirSync(RUN).filter((n) => n.startsWith(".export-crashed"))).toEqual([]);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  test("a second rename that fails puts yesterday's site back", async () => {
+    const dir = out("halfway");
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "index.html"), "yesterday's site");
+    const rename = ((from: string, to: string) => {
+      if (from.includes(".export-halfway.next-")) throw Object.assign(new Error("no space left"), { code: "ENOSPC" });
+      renameSync(from, to);
+    }) as typeof renameSync;
+    await expect(exportSite({ out: dir, say: quiet, rename })).rejects.toThrow("no space left");
+    expect(readdirSync(dir)).toEqual(["index.html"]);
+    expect(read(dir, "index.html")).toBe("yesterday's site");
+    expect(readdirSync(RUN).filter((n) => n.startsWith(".export-halfway"))).toEqual([]);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
   test("two at once into one dist/ each write a folder of their own, and dist/ is one whole site", async () => {
     const [one, dir] = [out("once"), out("twice")];
     await exportSite({ out: one, say: quiet });
@@ -217,6 +249,48 @@ describe("an export's pages, written as they are rendered", () => {
     // A refusal with no code is said by its message.
     mkdirSync(next);
     expect(swapIn(next, dist, old, (() => { throw new Error("not today"); }) as typeof renameSync)).toBe("not today");
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  test("another export's site that takes dist/'s place between the two renames stays, and yesterday's goes", () => {
+    const root = join(RUN, "swap-lost");
+    rmSync(root, { recursive: true, force: true });
+    const [dist, next, old] = [join(root, "dist"), join(root, ".dist.next-1-a"), join(root, ".dist.old-1-a")];
+    for (const [dir, file] of [[dist, "yesterday.html"], [next, "mine.html"]]) {
+      mkdirSync(dir!, { recursive: true });
+      writeFileSync(join(dir!, file!), "");
+    }
+    const rename = ((from: string, to: string) => {
+      if (from === next) {
+        mkdirSync(dist);
+        writeFileSync(join(dist, "theirs.html"), "");
+        throw Object.assign(new Error("directory not empty"), { code: "ENOTEMPTY" });
+      }
+      renameSync(from, to);
+    }) as typeof renameSync;
+    expect(() => swapIn(next, dist, old, rename)).toThrow("directory not empty");
+    expect(readdirSync(dist)).toEqual(["theirs.html"]);
+    expect(existsSync(old)).toBe(false);
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  test("a dist/ another export moved aside first is nothing to move: the new site goes in", () => {
+    const root = join(RUN, "swap-gone");
+    rmSync(root, { recursive: true, force: true });
+    const [dist, next, old] = [join(root, "dist"), join(root, ".dist.next-1-a"), join(root, ".dist.old-1-a")];
+    for (const [dir, file] of [[dist, "yesterday.html"], [next, "mine.html"]]) {
+      mkdirSync(dir!, { recursive: true });
+      writeFileSync(join(dir!, file!), "");
+    }
+    const rename = ((from: string, to: string) => {
+      if (from === dist) {
+        renameSync(dist, join(root, ".dist.old-2-b"));   // the other export, between its two renames
+        throw Object.assign(new Error("no such file or directory"), { code: "ENOENT" });
+      }
+      renameSync(from, to);
+    }) as typeof renameSync;
+    expect(swapIn(next, dist, old, rename)).toBeNull();
+    expect(readdirSync(dist)).toEqual(["mine.html"]);
     rmSync(root, { recursive: true, force: true });
   });
 
