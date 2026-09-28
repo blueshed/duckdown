@@ -1,6 +1,6 @@
 // The site written out as files, rendered by the same code that serves it.
 import { describe, test, expect, spyOn } from "bun:test";
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "fs";
 import { join } from "path";
 import { RUN, SITE } from "./helpers";
 import { exportSite, outPath, aliasFile, main, lands, swapIn } from "../server/export";
@@ -150,6 +150,17 @@ describe("an export's pages, written as they are rendered", () => {
     expect(existsSync(join(dir, "blog", "a-post-with-its-own-layout.html"))).toBe(true);
     expect(count.pages).toBeGreaterThan(10);
     expect(readdirSync(RUN).filter((n) => n.startsWith(".export-streamed"))).toEqual([]);   // nothing left beside it
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  // After review: mkdtemp makes a folder only its owner can open, and a web
+  // server running as another user (nginx, a Docker image, a web root that
+  // dist/ is copied into with rsync -a) was refused every file in it.
+  test("dist/ is a folder anyone may read, as mkdir makes one, not mkdtemp's owner-only", async () => {
+    const dir = out("mode");
+    await exportSite({ out: dir, say: quiet });
+    expect(statSync(dir).mode & 0o777).toBe(0o777 & ~process.umask());
+    expect(statSync(join(dir, "blog")).mode & 0o777).toBe(0o777 & ~process.umask());
     rmSync(dir, { recursive: true, force: true });
   });
 

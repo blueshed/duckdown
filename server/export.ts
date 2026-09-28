@@ -13,7 +13,7 @@
 // It reads through the storage layer, so it exports a folder on disk or a
 // live bucket, whichever this environment is pointed at.
 
-import { closeSync, cpSync, existsSync, mkdirSync, mkdtempSync, openSync, readdirSync, renameSync, rmSync, writeFileSync, writeSync } from "fs";
+import { chmodSync, closeSync, cpSync, existsSync, mkdirSync, mkdtempSync, openSync, readdirSync, renameSync, rmSync, writeFileSync, writeSync } from "fs";
 import { basename, dirname, join } from "path";
 import { tmpdir } from "os";
 import { ORIGIN, STATIC_PATH, IS_S3, BUCKET, BUCKET_PREFIX, APP_PATH } from "./config";
@@ -193,6 +193,7 @@ export async function exportSite(o: {
   mkdirSync(at, { recursive: true });
   tidy(at, name, out, say);
   const next = mkdtempSync(join(at, `.${name}.next-${process.pid}-`));
+  chmodSync(next, 0o777 & ~process.umask());   // mkdtemp's is its owner's alone; dist/ is for a web server to read
   const old = join(at, `.${name}.old-${basename(next).slice(`.${name}.next-`.length)}`);
 
   const put = (path: string, body: string | Uint8Array) => {
