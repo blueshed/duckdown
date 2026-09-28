@@ -3,14 +3,16 @@
 // — N pages over F folders, each folder's index listing its pages with a
 // feed, a front page with {{sitemap}}, and a collection of C works — then
 // times what the site knows about itself cold and kept, a page render, what a
-// save costs, and the whole export.
+// save costs, and the whole export; then the export alone in a process of its
+// own (as a build runs it) and the memory it peaks at, what search wrote to
+// dist/, and what a first search fetches of it (n166, n167).
 //
 //   bun run bench                    5,000 pages, 50 folders, 2,000 works
 //   bun run bench 20000 100 5000     larger
 //
 // Not part of the suite: it measures, it doesn't check. See n163's note for
 // what it found on 2026-09-25.
-import { mkdtempSync } from "fs";
+import { mkdtempSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 
@@ -23,6 +25,12 @@ const run = Bun.spawn(["bun", join(import.meta.dir, "measure.ts"), join(root, "d
   env: { ...process.env, DUCKDOWN_PATH: site, DUCKDOWN_PID: "", DEBUG: "0", DUCKDOWN_BUCKET: "" },
 });
 process.exitCode = await run.exited;
+const alone = Bun.spawn(["bun", join(import.meta.dir, "export.ts"), join(root, "dist-alone")], {
+  cwd: root, stdout: "inherit", stderr: "inherit",
+  env: { ...process.env, DUCKDOWN_PATH: site, DUCKDOWN_PID: "", DEBUG: "0", DUCKDOWN_BUCKET: "" },
+});
+await alone.exited;
+rmSync(join(root, "dist-alone"), { recursive: true, force: true });
 // What the export wrote for search, and what a reader fetches of it to search once.
 const dist = join(root, "dist");
 const listed = (...globs: string[]) => globs.flatMap((g) => [...new Bun.Glob(g).scanSync({ cwd: dist })]);

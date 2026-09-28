@@ -48,16 +48,43 @@ export function linksIn(html: string, from: string): Link[] {
 const reaches = (file: string, has: (path: string) => boolean) =>
   has(file) || has(`${file}index.html`) || has(`${file}/index.html`);
 
-// Every link on every page that points at nothing in `known` (the files the
-// export wrote), as "page -> link".
-export function brokenLinks(pages: Map<string, string>, known: Set<string>): string[] {
-  const broken: string[] = [];
-  for (const [from, html] of pages) {
-    for (const { link, file } of linksIn(html, from)) {
-      if (!reaches(file, (p) => known.has(p))) broken.push(`${from} -> ${link}`);
-    }
+// The links of every page an export writes, gathered as it writes them and
+// kept small: each distinct link once, and a page as the numbers of its links
+// in order. Every page carries the whole nav, so its links as objects weighed
+// more than its HTML (n167's first try); as numbers, a few bytes each. A page
+// written again at the same address replaces its links, as its file is.
+export class Links {
+  private numbers: Map<string, number>;   // a link as written, and the file it asks for, → its number
+  private distinct: { link: string; file: string }[];
+  private pages: Map<string, Int32Array>;
+
+  constructor() {   // written out: an implicit constructor is a function coverage counts and never sees
+    this.numbers = new Map();
+    this.distinct = [];
+    this.pages = new Map();
   }
-  return broken;
+
+  add(from: string, html: string): void {
+    this.pages.set(from, Int32Array.from(linksIn(html, from), ({ link, file }) => {
+      const key = `${link}\0${file}`;
+      if (!this.numbers.has(key)) {
+        this.numbers.set(key, this.distinct.length);
+        this.distinct.push({ link, file });
+      }
+      return this.numbers.get(key)!;
+    }));
+  }
+
+  // Every link on every page that points at nothing in `known` (the files the
+  // export wrote), as "page -> link", in page order and each page's own.
+  broken(known: Set<string>): string[] {
+    const missing = this.distinct.map(({ file }) => !reaches(file, (p) => known.has(p)));
+    const broken: string[] = [];
+    for (const [from, links] of this.pages) {
+      for (const n of links) if (missing[n]) broken.push(`${from} -> ${this.distinct[n]!.link}`);
+    }
+    return broken;
+  }
 }
 
 // The links on one rendered page (at site address `from`, "/guide/pages.html")

@@ -117,6 +117,17 @@
     fetches the new one.
 - `bun run bench` also says how much memory it peaked at, what search wrote
   to `dist/`, and what a first search for three queries fetches.
+- **The export writes each page as it renders it**, into a folder beside
+  `dist/` (`.dist.next`) that takes `dist/`'s place once the whole site is
+  written, rather than holding every page in memory until the last one was
+  done. A fresh export of the bench's 20,000 pages, as a build machine runs
+  it, peaked at 1.7-2.7 GB and now at 1.0-1.4 GB, in the same time (n167).
+  The promise is kept and widened: an export that fails part-way, not only
+  one that finds no pages, leaves the last good `dist/` as it was. A
+  `dist/` that can't be moved aside (a mount point) is emptied and filled
+  instead, and the export says so. A run that is stopped leaves
+  `.dist.next` behind, and the next export clears it.
+- `bun run bench` times the export alone too, in a process of its own.
 
 ### Security
 

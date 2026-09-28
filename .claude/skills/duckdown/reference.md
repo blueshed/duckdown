@@ -812,8 +812,10 @@ DUCKDOWN_ORIGIN=https://example.com bun run export     # into ./dist
 - Drafts left out rather than hidden — there's no login to hide them behind.
 - `{{edit}}` empty, and `{{url}}` from `DUCKDOWN_ORIGIN`, because there's no
   request to take an origin from. Without it the canonical links are relative.
-- `dist/` is cleared once there is something to replace it with, so a page deleted since the last export doesn't
-  survive in the output.
+- The new site is written into a folder beside `dist/` (`.dist.next`), a
+  page at a time, and takes `dist/`'s place only once it is whole, so a page
+  deleted since the last export doesn't survive in the output, and an export
+  that fails part-way leaves the last good `dist/` as it was.
 - It reads through the storage layer, so it will export a live bucket as
   readily as a folder — a served site can be snapshotted without moving its
   content first.

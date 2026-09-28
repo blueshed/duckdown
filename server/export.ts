@@ -13,8 +13,8 @@
 // It reads through the storage layer, so it exports a folder on disk or a
 // live bucket, whichever this environment is pointed at.
 
-import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "fs";
-import { dirname, join } from "path";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, renameSync, rmSync, writeFileSync } from "fs";
+import { basename, dirname, join } from "path";
 import { tmpdir } from "os";
 import { ORIGIN, STATIC_PATH, IS_S3, BUCKET, BUCKET_PREFIX, APP_PATH } from "./config";
 import { createPageStorage, createStaticStorage, type Storage } from "./storage";
@@ -22,7 +22,7 @@ import { parsePage, pageHtml, itemPage } from "./page";
 import { buildSite, searchFiles, searchFileList } from "./search";
 import { COLLECTION_FILE, collectionProblems, loadCollection } from "./collection";
 import { canonicalPath, escapeHtml } from "./utils";
-import { brokenLinks } from "./links";
+import { Links } from "./links";
 import { hidden } from "./listed";
 import { yes } from "./markdown";
 import { BASE_FILES, ROOT_FILES, baseFile } from "./base";
@@ -87,6 +87,27 @@ export function lands(out: string, path: string): boolean {
   return true;
 }
 
+// Put a new site where the old one was: the old aside, the new in its place,
+// then the old gone. Two renames, so dist/ is never part of one and part of
+// the other. A folder that can't be moved aside (a mount point) is emptied
+// and the new site copied in instead — no longer at once, but still only once
+// the new site is whole — and the reason it couldn't is the answer.
+export function swapIn(next: string, out: string, old: string, rename: typeof renameSync = renameSync): string | null {
+  if (existsSync(out)) {
+    try {
+      rename(out, old);
+    } catch (e) {
+      for (const name of readdirSync(out)) rmSync(join(out, name), { recursive: true, force: true });
+      cpSync(next, out, { recursive: true });
+      rmSync(next, { recursive: true, force: true });
+      return (e as NodeJS.ErrnoException).code ?? (e as Error).message;
+    }
+  }
+  rename(next, out);
+  rmSync(old, { recursive: true, force: true });
+  return null;
+}
+
 export async function exportSite(o: {
   out: string;
   origin?: string;
@@ -95,6 +116,7 @@ export async function exportSite(o: {
   say?: (line: string) => void;
   strict?: boolean;   // a broken link is a failure, not just a report
   lands?: typeof lands;
+  rename?: typeof renameSync;
 }): Promise<Exported> {
   const out = o.out;
   // Trailing slash off, wherever it came from: canonicalPath supplies the
@@ -104,149 +126,171 @@ export async function exportSite(o: {
   const files = o.files ?? createStaticStorage();
   const say = o.say ?? console.log;
 
+  // Render into a folder beside dist/, a page at a time, and swap it in once
+  // the site is whole: a run that fails part-way, or finds nothing to publish
+  // (a folder that isn't there, a bucket that is empty), must not take a good
+  // dist with it, nor report success and let a deploy go green on an empty
+  // site. Beside it, so the swap is a rename; and what a run that was stopped
+  // left there goes first.
+  const next = join(dirname(out), `.${basename(out)}.next`);
+  const old = join(dirname(out), `.${basename(out)}.old`);
+  for (const left of [next, old]) rmSync(left, { recursive: true, force: true });
+  mkdirSync(next, { recursive: true });
+
   const put = (path: string, body: string | Uint8Array) => {
-    const full = join(out, path);
+    const full = join(next, path);
     mkdirSync(dirname(full), { recursive: true });
     writeFileSync(full, body);
   };
+  const written = new Set<string>();
+  const write = (path: string, body: string | Uint8Array) => { put(path, body); written.add(path); };
 
-  // Render first, wipe after: a run that finds nothing to publish (a folder
-  // that isn't there, a bucket that is empty) must not take a good dist with
-  // it, nor report success and let a deploy go green on an empty site.
-  const rendered = new Map<string, string>();
+  // Each page goes to disk as it is made, and only its links stay, kept small
+  // (links.ts): every page carries the whole nav, so held as HTML or as link
+  // objects the pages were most of an export's memory (n167).
+  const made = new Set<string>();   // the pages' files
+  const links = new Links();
+  const page = (path: string, html: string) => {
+    write(path, html);
+    made.add(path);
+    links.add(path, html);
+  };
   const count: Exported = { pages: 0, drafts: 0, files: 0, broken: 0, problems: 0 };
   const problems: string[] = [];
   const moved: { from: string; to: string }[] = [];
   const feeds: string[] = [];   // folders whose index says feed: true
+  let broken: string[];
+  let unmoved: string | null;
 
-  for (const key of await walk(pages)) {
-    // A folder's collection is a folder of pages: every item rendered at its
-    // own address, through the same pageHtml the site and the preview use. A
-    // feature that skipped the export wouldn't be a duckdown feature.
-    if (key === COLLECTION_FILE || key.endsWith(`/${COLLECTION_FILE}`)) {
-      const folder = key.slice(0, Math.max(key.length - COLLECTION_FILE.length - 1, 0));
-      problems.push(...await collectionProblems(pages, folder));
-      const collection = (await loadCollection(pages, folder))!;
-      // No each: page, no item pages: the data is shown only by its overviews.
-      for (const item of collection.each ? collection.items : []) {
-        const { html } = await pageHtml(itemPage({ collection, item }), { origin, editHref: "", item: { collection, item } });
-        rendered.set(outPath(item.key), html);
-        for (const alias of item.aliases) moved.push({ from: alias, to: item.href });
+  try {
+    for (const key of await walk(pages)) {
+      // A folder's collection is a folder of pages: every item rendered at its
+      // own address, through the same pageHtml the site and the preview use. A
+      // feature that skipped the export wouldn't be a duckdown feature.
+      if (key === COLLECTION_FILE || key.endsWith(`/${COLLECTION_FILE}`)) {
+        const folder = key.slice(0, Math.max(key.length - COLLECTION_FILE.length - 1, 0));
+        problems.push(...await collectionProblems(pages, folder));
+        const collection = (await loadCollection(pages, folder))!;
+        // No each: page, no item pages: the data is shown only by its overviews.
+        for (const item of collection.each ? collection.items : []) {
+          const { html } = await pageHtml(itemPage({ collection, item }), { origin, editHref: "", item: { collection, item } });
+          page(outPath(item.key), html);
+          for (const alias of item.aliases) moved.push({ from: alias, to: item.href });
+        }
+        continue;
       }
-      continue;
+      if (!key.endsWith(".md")) continue;   // pages/ holds pages
+      const parsed = parsePage(key, await pages.read(key));
+      if (parsed.meta.each) continue;   // written as its items, above
+      if (yes(parsed.meta.draft)) { count.drafts++; continue; }
+      // No edit link: there is no editor behind a folder of files.
+      const { html } = await pageHtml(parsed, { origin, editHref: "" });
+      page(outPath(key), html);
+      for (const alias of parsed.meta.aliases ?? []) moved.push({ from: alias, to: canonicalPath(key) });
+      if (yes(parsed.meta.feed) && (key === "index.md" || key.endsWith("/index.md"))) feeds.push(key.slice(0, -"index.md".length));
     }
-    if (!key.endsWith(".md")) continue;   // pages/ holds pages
-    const page = parsePage(key, await pages.read(key));
-    if (page.meta.each) continue;   // written as its items, above
-    if (yes(page.meta.draft)) { count.drafts++; continue; }
-    // No edit link: there is no editor behind a folder of files.
-    const { html } = await pageHtml(page, { origin, editHref: "" });
-    rendered.set(outPath(key), html);
-    for (const alias of page.meta.aliases ?? []) moved.push({ from: alias, to: canonicalPath(key) });
-    if (yes(page.meta.feed) && (key === "index.md" || key.endsWith("/index.md"))) feeds.push(key.slice(0, -"index.md".length));
-  }
-  if (!rendered.size) {
-    const where = IS_S3 ? `s3://${BUCKET}/${BUCKET_PREFIX}` : APP_PATH;
-    throw new Error(`No pages to export: nothing readable under pages/ in ${where}`
-      + (count.drafts ? ` (${count.drafts} draft(s) left out)` : "")
-      + `. Is DUCKDOWN_PATH set? ${out} was left as it was.`);
-  }
-  count.pages = rendered.size;
-
-  // Start from empty: a page deleted since the last export should not survive
-  // in the output, which is the whole site and not a pile of leftovers.
-  rmSync(out, { recursive: true, force: true });
-  const written = new Set<string>();
-  const write = (path: string, body: string | Uint8Array) => { put(path, body); written.add(path); };
-
-  for (const [path, html] of rendered) write(path, html);
-
-  // Old addresses, as redirect pages. Written under the name the request
-  // arrives as once it is decoded, so `/l"etoile-1976` is a folder called
-  // `l"etoile-1976` holding an index.html: this server finds it, and so does
-  // any host that maps a path to a file. A name a page already holds is left
-  // alone and said — the page is the thing at that address. So is a name this
-  // filesystem refuses (Windows won't take `"`; nowhere takes a segment of
-  // 256 bytes, or a folder where a file already is) or keeps under another
-  // spelling: the published site can't answer at that address, and an owner
-  // who isn't told finds out from a reader's 404.
-  for (const { from, to } of moved) {
-    const path = aliasFile(from);
-    if (path === null) {
-      problems.push(`alias ${from} climbs out of the site with . or .. — left out`);
-      continue;
+    if (!made.size) {
+      const where = IS_S3 ? `s3://${BUCKET}/${BUCKET_PREFIX}` : APP_PATH;
+      throw new Error(`No pages to export: nothing readable under pages/ in ${where}`
+        + (count.drafts ? ` (${count.drafts} draft(s) left out)` : "")
+        + `. Is DUCKDOWN_PATH set? ${out} was left as it was.`);
     }
-    if (rendered.has(path)) {
-      problems.push(`alias ${from} is already a page — left as it is`);
-      continue;
-    }
-    try {
-      put(path, redirectHtml(to));
-    } catch (e) {
-      problems.push(`alias ${from} can't be written here as ${path} (${(e as NodeJS.ErrnoException).code ?? (e as Error).message}) — left out`);
-      continue;
-    }
-    if (!(o.lands ?? lands)(out, path)) {
-      problems.push(`alias ${from} was written, but this filesystem spells ${path} another way — a request for it won't find it`);
-      continue;
-    }
-    written.add(path);
-    count.files++;
-  }
+    count.pages = made.size;
 
-  const statics = new Set<string>();
-  for (const key of await walk(files)) {
-    write(join(STATIC_PATH, key), await files.readBytes(key));
-    statics.add(key);
-    count.files++;
-  }
-  // The base a site didn't keep its own copy of, as the served site falls back
-  // to it, and the two files crawlers look for at the root.
-  for (const name of BASE_FILES) {
-    if (statics.has(name)) continue;
-    write(join(STATIC_PATH, name), new Uint8Array(await baseFile(name)!.arrayBuffer()));
-    count.files++;
-  }
-  for (const name of ROOT_FILES) {
-    if (!await files.exists(name)) continue;
-    write(name, await files.readBytes(name));
-    count.files++;
-  }
-  // The icon's other plain name, as a file of its own: a static host has no
-  // rule to answer it with. (serve.ts answers the sized names too.)
-  if (await files.exists("apple-touch-icon.png")) {
-    write("apple-touch-icon-precomposed.png", await files.readBytes("apple-touch-icon.png"));
-    count.files++;
-  }
-
-  // The index the browser searches, in the parts the served site answers
-  // with (search.ts): a published site has no server to ask, so the browser
-  // fetches the files its search needs and does the matching itself.
-  const { entries, pages: listed } = await buildSite(pages);
-  for (const [path, body] of searchFileList(searchFiles(entries))) {
-    write(path, body);
-    count.files++;
-  }
-  // A site's own search.js may be from before the parts, and read the whole
-  // index as one file: a site that has one gets that file too.
-  if (statics.has("search.js")) {
-    write("search.json", JSON.stringify(entries));
-    count.files++;
-    say("static/search.js is this site's own, so search.json (the whole index) is written for it too; duckdown's own reads search/ instead.");
-  }
-  // A sitemap needs absolute addresses, so it needs the origin; so does a feed.
-  if (origin) {
-    write("sitemap.xml", sitemapXml(listed, origin));
-    count.files++;
-    for (const folder of feeds) {
-      write(`${folder}${FEED_FILE}`, (await feedXml(pages, folder.replace(/\/$/, ""), origin, true))!);
+    // Old addresses, as redirect pages. Written under the name the request
+    // arrives as once it is decoded, so `/l"etoile-1976` is a folder called
+    // `l"etoile-1976` holding an index.html: this server finds it, and so does
+    // any host that maps a path to a file. A name a page already holds is left
+    // alone and said — the page is the thing at that address. So is a name this
+    // filesystem refuses (Windows won't take `"`; nowhere takes a segment of
+    // 256 bytes, or a folder where a file already is) or keeps under another
+    // spelling: the published site can't answer at that address, and an owner
+    // who isn't told finds out from a reader's 404.
+    for (const { from, to } of moved) {
+      const path = aliasFile(from);
+      if (path === null) {
+        problems.push(`alias ${from} climbs out of the site with . or .. — left out`);
+        continue;
+      }
+      if (made.has(path)) {
+        problems.push(`alias ${from} is already a page — left as it is`);
+        continue;
+      }
+      try {
+        put(path, redirectHtml(to));
+      } catch (e) {
+        problems.push(`alias ${from} can't be written here as ${path} (${(e as NodeJS.ErrnoException).code ?? (e as Error).message}) — left out`);
+        continue;
+      }
+      if (!(o.lands ?? lands)(next, path)) {
+        problems.push(`alias ${from} was written, but this filesystem spells ${path} another way — a request for it won't find it`);
+        continue;
+      }
+      written.add(path);
       count.files++;
     }
-  } else if (feeds.length) {
-    say(`${feeds.map((f) => `/${f}${FEED_FILE}`).join(", ")} not written: a feed needs DUCKDOWN_ORIGIN for its addresses.`);
-  }
 
-  const broken = brokenLinks(rendered, written);
+    const statics = new Set<string>();
+    for (const key of await walk(files)) {
+      write(join(STATIC_PATH, key), await files.readBytes(key));
+      statics.add(key);
+      count.files++;
+    }
+    // The base a site didn't keep its own copy of, as the served site falls back
+    // to it, and the two files crawlers look for at the root.
+    for (const name of BASE_FILES) {
+      if (statics.has(name)) continue;
+      write(join(STATIC_PATH, name), new Uint8Array(await baseFile(name)!.arrayBuffer()));
+      count.files++;
+    }
+    for (const name of ROOT_FILES) {
+      if (!await files.exists(name)) continue;
+      write(name, await files.readBytes(name));
+      count.files++;
+    }
+    // The icon's other plain name, as a file of its own: a static host has no
+    // rule to answer it with. (serve.ts answers the sized names too.)
+    if (await files.exists("apple-touch-icon.png")) {
+      write("apple-touch-icon-precomposed.png", await files.readBytes("apple-touch-icon.png"));
+      count.files++;
+    }
+
+    // The index the browser searches, in the parts the served site answers
+    // with (search.ts): a published site has no server to ask, so the browser
+    // fetches the files its search needs and does the matching itself.
+    const { entries, pages: listed } = await buildSite(pages);
+    for (const [path, body] of searchFileList(searchFiles(entries))) {
+      write(path, body);
+      count.files++;
+    }
+    // A site's own search.js may be from before the parts, and read the whole
+    // index as one file: a site that has one gets that file too.
+    if (statics.has("search.js")) {
+      write("search.json", JSON.stringify(entries));
+      count.files++;
+      say("static/search.js is this site's own, so search.json (the whole index) is written for it too; duckdown's own reads search/ instead.");
+    }
+    // A sitemap needs absolute addresses, so it needs the origin; so does a feed.
+    if (origin) {
+      write("sitemap.xml", sitemapXml(listed, origin));
+      count.files++;
+      for (const folder of feeds) {
+        write(`${folder}${FEED_FILE}`, (await feedXml(pages, folder.replace(/\/$/, ""), origin, true))!);
+        count.files++;
+      }
+    } else if (feeds.length) {
+      say(`${feeds.map((f) => `/${f}${FEED_FILE}`).join(", ")} not written: a feed needs DUCKDOWN_ORIGIN for its addresses.`);
+    }
+
+    broken = links.broken(written);
+    // The whole site is written: it takes dist/'s place.
+    unmoved = swapIn(next, out, old, o.rename);
+  } catch (e) {
+    rmSync(next, { recursive: true, force: true });
+    throw e;
+  }
+  if (unmoved) say(`${out} couldn't be moved aside (${unmoved}), so it was emptied and the new site copied in.`);
+
   count.broken = broken.length;
   for (const line of broken) say(`broken link: ${line}`);
   // A collection that can't have the addresses it asks for, said here as well

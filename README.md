@@ -181,7 +181,9 @@ canonical address — `/` and `/blog/` as `index.html`, `about.md` as
 Beside the pages it writes `sitemap.xml` (from `DUCKDOWN_ORIGIN`), `robots.txt` and
 `favicon.ico` at the root, and `404.html` from `pages/404.md`. It reports
 internal links that lead nowhere (`--strict` fails on them), and an export that
-finds no pages fails rather than publish an empty site.
+finds no pages fails rather than publish an empty site. It writes each page as
+it renders it, into a folder beside `dist/` that takes its place once the site
+is whole, so a failure part-way leaves the last good `dist/` alone.
 
 To hand `dist/` out: `bun run node_modules/duckdown/server/serve.ts` (or the
 `duckdown-serve` bin), with `SITE_DIR` and `PORT`. It logs page views the way

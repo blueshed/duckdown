@@ -1,10 +1,10 @@
 // The site written out as files, rendered by the same code that serves it.
 import { describe, test, expect, spyOn } from "bun:test";
-import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "fs";
 import { join } from "path";
 import { RUN, SITE } from "./helpers";
-import { exportSite, outPath, aliasFile, main, lands } from "../server/export";
-import { brokenLinks } from "../server/links";
+import { exportSite, outPath, aliasFile, main, lands, swapIn } from "../server/export";
+import { Links } from "../server/links";
 import { LocalStorage, createPageStorage } from "../server/storage";
 import { siteChanged } from "../server/kept";
 import { searchIndex, type Entry } from "../server/search";
@@ -115,6 +115,112 @@ describe("exportSite", () => {
       log.mockRestore();
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+// n167: every rendered page was held in memory until the last was rendered,
+// 2.7 GB at 20,000 pages, so that dist/ was never replaced by a broken site.
+// Now each goes to disk as it is made, into a folder beside dist/.
+describe("an export's pages, written as they are rendered", () => {
+  // The page storage, asking `check` before each read.
+  const watched = (check: (key: string) => void) => {
+    const store = createPageStorage();
+    return Object.assign(Object.create(store), {
+      read: async (key: string) => { check(key); return store.read(key); },
+    });
+  };
+
+  test("go into a folder beside dist/, which takes dist/'s place once the site is whole", async () => {
+    const dir = out("streamed");
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "index.html"), "yesterday's site");
+    let seen = false;
+    const pages = watched(() => {
+      const next = join(RUN, ".export-streamed.next");
+      if (existsSync(join(next, "index.html"))) {
+        seen = true;
+        expect(read(dir, "index.html")).toBe("yesterday's site");   // not replaced while it renders
+      }
+    });
+    const count = await exportSite({ out: dir, pages, say: quiet });
+    expect(seen).toBe(true);
+    expect(read(dir, "index.html")).toContain("Welcome to duckdown");
+    expect(existsSync(join(dir, "blog", "a-post-with-its-own-layout.html"))).toBe(true);
+    expect(count.pages).toBeGreaterThan(10);
+    expect(readdirSync(RUN).filter((n) => n.startsWith(".export-streamed"))).toEqual([]);   // nothing left beside it
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  test("a failure part-way leaves dist/ as it was, and nothing beside it", async () => {
+    const dir = out("failed");
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "index.html"), "yesterday's site");
+    const pages = watched((key) => { if (key === "guide/pages.md") throw new Error("storage is down"); });
+    await expect(exportSite({ out: dir, pages, say: quiet })).rejects.toThrow("storage is down");
+    expect(readdirSync(dir)).toEqual(["index.html"]);
+    expect(read(dir, "index.html")).toBe("yesterday's site");
+    expect(readdirSync(RUN).filter((n) => n.startsWith(".export-failed"))).toEqual([]);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  test("what a run that was stopped left beside dist/ is cleared by the next", async () => {
+    const dir = out("stopped");
+    for (const left of [".export-stopped.next", ".export-stopped.old"]) {
+      mkdirSync(join(RUN, left), { recursive: true });
+      writeFileSync(join(RUN, left, "stale.html"), "from a run that was stopped");
+    }
+    await exportSite({ out: dir, say: quiet });
+    expect(existsSync(join(dir, "stale.html"))).toBe(false);
+    expect(readdirSync(RUN).filter((n) => n.startsWith(".export-stopped"))).toEqual([]);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  test("a dist/ that can't be moved aside (a mount point) is emptied and filled instead, and it says so", () => {
+    const root = join(RUN, "swap");
+    rmSync(root, { recursive: true, force: true });
+    const [dist, next, old] = [join(root, "dist"), join(root, ".dist.next"), join(root, ".dist.old")];
+    mkdirSync(join(dist, "gone"), { recursive: true });
+    writeFileSync(join(dist, "gone", "old.html"), "old");
+    mkdirSync(join(next, "blog"), { recursive: true });
+    writeFileSync(join(next, "blog", "new.html"), "new");
+    const busy = ((from: string, to: string) => {
+      if (from === dist) throw Object.assign(new Error("resource busy"), { code: "EBUSY" });
+      renameSync(from, to);
+    }) as typeof renameSync;
+    expect(swapIn(next, dist, old, busy)).toBe("EBUSY");
+    expect(readdirSync(dist)).toEqual(["blog"]);
+    expect(read(dist, "blog/new.html")).toBe("new");
+    expect(existsSync(next)).toBe(false);
+    // The ordinary way: two renames, and no dist/ to move is no matter.
+    mkdirSync(next);
+    writeFileSync(join(next, "a.html"), "a");
+    expect(swapIn(next, dist, old)).toBeNull();
+    expect(readdirSync(dist)).toEqual(["a.html"]);
+    expect(readdirSync(root)).toEqual(["dist"]);
+    rmSync(dist, { recursive: true });
+    mkdirSync(next);
+    expect(swapIn(next, dist, old)).toBeNull();
+    expect(readdirSync(root)).toEqual(["dist"]);
+    // A refusal with no code is said by its message.
+    mkdirSync(next);
+    expect(swapIn(next, dist, old, (() => { throw new Error("not today"); }) as typeof renameSync)).toBe("not today");
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  test("the export says when dist/ was emptied and filled rather than moved", async () => {
+    const dir = out("busy");
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "old.html"), "yesterday's page");
+    const said: string[] = [];
+    const rename = ((from: string, to: string) => {
+      if (from === dir) throw Object.assign(new Error("resource busy"), { code: "EBUSY" });
+      renameSync(from, to);
+    }) as typeof renameSync;
+    await exportSite({ out: dir, say: (l) => said.push(l), rename });
+    expect(said).toContain(`${dir} couldn't be moved aside (EBUSY), so it was emptied and the new site copied in.`);
+    expect(existsSync(join(dir, "old.html"))).toBe(false);
+    expect(read(dir, "index.html")).toContain("Welcome to duckdown");
+    rmSync(dir, { recursive: true, force: true });
   });
 });
 
@@ -293,9 +399,25 @@ describe("the site map, exported", () => {
   });
 });
 
-describe("brokenLinks", () => {
+describe("Links, the export's check of every link", () => {
   const known = new Set(["index.html", "blog/index.html", "about.html", "a b.html", "static/site.css", "static/Hart'sLeap.jpg"]);
-  const one = (from: string, html: string) => brokenLinks(new Map([[from, html]]), known);
+  const one = (from: string, html: string) => {
+    const links = new Links();
+    links.add(from, html);
+    return links.broken(known);
+  };
+
+  test("each page's links in its own order, pages in the order written, and a page written again is its last", () => {
+    const links = new Links();
+    links.add("a.html", '<a href="/gone.html"></a><a href="/about.html"></a><a href="/gone.html"></a>');
+    links.add("blog/b.html", '<a href="/gone.html"></a><a href="gone.html"></a>');
+    links.add("c.html", '<a href="/gone.html"></a>');
+    links.add("c.html", '<a href="/about.html"></a>');
+    expect(links.broken(known)).toEqual([
+      "a.html -> /gone.html", "a.html -> /gone.html",
+      "blog/b.html -> /gone.html", "blog/b.html -> gone.html",
+    ]);
+  });
 
   test("finds a link to nothing, by page and as written", () => {
     expect(one("news/index.html", '<a href="include/music/x.mp3">x</a>')).toEqual(["news/index.html -> include/music/x.mp3"]);
