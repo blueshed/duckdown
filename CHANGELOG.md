@@ -35,12 +35,16 @@
   so a linked `static/` handed its target's files to anyone and the export
   copied them. A page or static file that was a link out used to be served
   at its address though listed nowhere; now it is not found. A site with
-  any of these should put the files themselves there. A file is opened
-  before it is judged, and judged by the file held open, so a link swapped
-  under a read is refused rather than read; and a read is only ever of a
-  file, judged before it is opened, since a link to a named pipe froze the
-  whole server. A hard link can't be told from the file it shares: don't
-  hard-link anything from outside the site into it (n172).
+  any of these should put the files themselves there. A read is judged
+  before its file is opened, and again by the file held open, so a link
+  swapped under a read is refused rather than read; and only a file is
+  read, since a link to a named pipe froze the whole server. A write or a
+  remove is still a check and then an act:
+  someone who can swap a folder of the site for a link while an editor
+  saves can land that save outside the site (review did, seven times in
+  three seconds), so keep the site's folders writable by the server alone.
+  A hard link can't be told from the file it shares: don't hard-link
+  anything from outside the site into it (n172).
 
 ## 0.16.0 — 2026-09-27
 
