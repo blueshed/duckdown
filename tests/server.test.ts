@@ -1170,34 +1170,34 @@ describe("a page's own stylesheet", () => {
   });
 });
 
+// A climb out is a request that can't be answered, not a failure of ours: a
+// 400 with nothing in the log, where it was a 500 with a stack for every
+// scanner that tried /static/..%2Fusers.json.
 describe("path traversal", () => {
-  test("blocks traversal in pages, even encoded", async () => {
+  const refused = async (path: string, init?: RequestInit) => {
     const error = hush("error");
     try {
-      const res = await fetch(`${BASE}/edit/pages/..%2F..%2F..%2Fetc%2Fpasswd`, authed());
-      expect(res.status).toBe(500);
-      expect(await res.text()).toBe("Server error");
-      expect(String(error.mock.calls[0]![0])).toContain("Path traversal denied");
+      const res = await fetch(`${BASE}${path}`, init);
+      expect([path, res.status, await res.text()]).toEqual([path, 400, "Bad Request"]);
+      expect(error).not.toHaveBeenCalled();
     } finally {
       error.mockRestore();
     }
+  };
+
+  test("blocks traversal in pages, even encoded", async () => {
+    await refused("/edit/pages/..%2F..%2F..%2Fetc%2Fpasswd", authed());
   });
 
   test("blocks a sibling folder that merely shares the prefix", async () => {
     mkdirSync(join(SITE, "pages-old"), { recursive: true });
     writeFileSync(join(SITE, "pages-old", "secret.md"), "secret");
-    const error = hush("error");
-    try {
-      const res = await fetch(`${BASE}/edit/pages/..%2Fpages-old%2Fsecret.md`, authed());
-      expect(res.status).toBe(500);
-      expect(await res.text()).not.toContain("secret");
-    } finally {
-      error.mockRestore();
-    }
+    await refused("/edit/pages/..%2Fpages-old%2Fsecret.md", authed());
   });
 
-  test("blocks traversal in static", async () => {
-    expect([404, 500]).toContain((await fetch(`${BASE}/static/../../../etc/passwd`)).status);
+  test("blocks traversal in static and on the site, and says nothing of it", async () => {
+    expect((await fetch(`${BASE}/static/../../../etc/passwd`)).status).toBe(404);   // the URL itself takes the ..
+    for (const path of ["/static/..%2Fusers.json", "/static/..%2F..%2Fetc%2Fpasswd", "/..%2Ffeed.xml", "/..%2F..%2Fx%2Ffeed.xml"]) await refused(path);
   });
 });
 

@@ -9,7 +9,7 @@ import { loadSecret, signJwt, verifyJwt, ensureAdmin } from "../server/auth";
 import { handleError } from "../server/routes/error";
 import { fromSite, viewLine, logView } from "../server/log";
 import { scaffoldNotice } from "../server/scaffold";
-import { dateHtml, canonicalPath, outsideCode } from "../server/utils";
+import { dateHtml, canonicalPath, outsideCode, BadRequest } from "../server/utils";
 import { kept, siteChanged } from "../server/kept";
 import type { Storage } from "../server/storage";
 
@@ -271,6 +271,8 @@ describe("storage", () => {
     const store = new LocalStorage(scratch("pages"));
     await expect(store.read("../../etc/passwd")).rejects.toThrow("Path traversal denied");
     await expect(store.read("../units-pages-old/x.md")).rejects.toThrow("Path traversal denied");
+    await expect(store.list("../..")).rejects.toBeInstanceOf(BadRequest);   // the asking's fault: a 400, not a stack
+    await expect(store.exists("../x.md")).rejects.toBeInstanceOf(BadRequest);
   });
 
   // A write is judged, then made: a folder that appears at its name in

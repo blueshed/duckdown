@@ -67,11 +67,13 @@ function inside(root: string, path: string): boolean {
 const folderKey = (key: string) => !key.replace(/^\/+/, "") || key.endsWith("/");
 const notAFile = (key: string) => new BadRequest(`${key || "/"} is a folder, not a file`);
 
+// A key's leading slash is no part of it — as a bucket takes it (n169) —
+// not a way to name the machine's root. A key that climbs out is the
+// asking's fault, not ours: a 400, where every scanner's /static/..%2F…
+// was a 500 with a stack in the log.
 function safePath(base: string, userPath: string): string {
-  // A key's leading slash is no part of it — as a bucket takes it (n169) —
-  // not a way to name the machine's root.
   const resolved = resolve(base, userPath.replace(/^\/+/, ""));
-  if (!inside(resolve(base), resolved)) throw new Error("Path traversal denied");
+  if (!inside(resolve(base), resolved)) throw new BadRequest("Path traversal denied");
   return resolved;
 }
 
