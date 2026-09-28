@@ -179,10 +179,14 @@ describe("search.js, fetching what a search needs", () => {
     expect(form.querySelector(".search-none")!.textContent).toBe("Nothing matches “odd fox”.");
   });
 
-  test("a word of one letter is a whole word, so 'page 3' is page 3 and not 30", async () => {
+  test("a word of one letter matches every word it starts, as before, from that letter's shard alone", async () => {
     start(pages);
-    expect((await search("page 3")).map((a) => a.textContent)).toEqual(["Page 3", "Page 3 – Words"]);
-    expect(asked).toContain("/search/words/3.json");   // the words that are just "3", and no other
+    const found = (await search("page 3")).map((a) => a.textContent);
+    expect(found.slice(0, 3)).toEqual(["Page 3", "Page 3 – Words", "Page 30"]);   // 3, then 30 to 39
+    expect(asked).toContain("/search/words/3.json");
+    const first = asked.length;
+    expect((await search("p")).length).toBe(8);                                   // a first keystroke finds, as it did
+    expect(asked.slice(first).filter((a) => a.startsWith("/search/words/"))).toEqual(["/search/words/p.json"]);   // its letter's shard, not every p-shard
   });
 
   test("the query's words are cut as the index cuts a page's: at anything but a letter or a digit, accents and all", async () => {

@@ -329,15 +329,22 @@ describe("searchFiles", () => {
     expect(json("/search/words/fr.json")).toEqual({ front: [0, 1] });   // the description (1)
   });
 
-  test("a word of one letter is filed alone; a letter outside a-z and 0-9 is its code point in the name", () => {
+  test("each letter is a shard of every word it starts, at its best, and a word of one letter is in it", () => {
+    // "t": the (description, 1), trains (heading, 2), then trains in the title (3) twice.
+    expect(json("/search/words/t.json")).toEqual({ t: [0, 1, 0, 1 * 4 + 2, 1, 3, 0, 1 * 4 + 3] });
+    expect(json("/search/words/a.json")).toEqual({ a: [0, 4, 1, 3, 0, 7] });   // a, and, another; then about
     expect(json("/search/words/2.json")).toEqual({ 2: [1, 1 * 4 + 0] });
-    expect(json("/search/words/a.json")).toEqual({ a: [0, 4, 1, 0] });
+    expect(json("/search/words/an.json")).toEqual({ and: [0, 4], another: [0, 4] });   // "a" isn't filed alone as well
+  });
+
+  test("a letter outside a-z and 0-9 is its code point in the name", () => {
     expect(json("/search/words/_fc_b.json")).toEqual({ über: [1, 0] });
+    expect(json("/search/words/_fc_.json")).toEqual({ ü: [1, 0] });
     expect(json("/search/words/ca.json")).toEqual({ café: [1, 0] });
   });
 
   test("the index names every shard there is, and nothing else answers", () => {
-    expect(json("/search/index.json").words).toEqual(["2", "a", "ab", "an", "ca", "do", "fr", "ho", "mo", "th", "tr", "üb"]);
+    expect(json("/search/index.json").words).toEqual(["2", "a", "ab", "an", "c", "ca", "d", "do", "f", "fr", "h", "ho", "m", "mo", "t", "th", "tr", "ü", "üb"]);
     for (const path of ["/search/words/zz.json", "/search/words/tr", "/search/other.json", "/search.json", "/search/pages/x.json", "/search/pages/00.json", "/search/pages/-1.json"]) {
       expect(searchFile(files, path)).toBeNull();
     }
@@ -345,9 +352,10 @@ describe("searchFiles", () => {
 
   test("the files, one at a time, are every one there is", () => {
     const listed = [...searchFileList(files)];
+    const file = (k: string) => k.replace(/[^a-z0-9]/gu, (c) => `_${c.codePointAt(0)!.toString(16)}_`);
     expect(listed.map(([path]) => path)).toEqual([
       "search/index.json",
-      ...json("/search/index.json").words.map((k: string) => `search/words/${k === "üb" ? "_fc_b" : k}.json`),
+      ...json("/search/index.json").words.map((k: string) => `search/words/${file(k)}.json`),
       "search/pages/0.json", "search/pages/1.json",
     ]);
     for (const [path, body] of listed) expect(body).toBe(searchFile(files, `/${path}`)!);

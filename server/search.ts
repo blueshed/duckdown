@@ -148,6 +148,7 @@ export async function aliasTarget(pages: Storage, path: string, debug = DEBUG): 
 //
 //   search/index.json        which shards there are: {"words": ["a", "ab", …]}
 //   search/words/<xy>.json   every word starting xy, and where each one is
+//   search/words/<x>.json    every word starting x, as one: where the letter starts a word
 //   search/pages/<n>.json    page n's entries, just as the whole index has them
 //
 // The same files whether served or exported, so search.js can't tell the two
@@ -159,10 +160,12 @@ export async function aliasTarget(pages: Storage, path: string, debug = DEBUG): 
 const WORD = /[\p{L}\p{M}\p{N}_]+/gu;
 const wordsOf = (text: string): string[] => text.toLowerCase().match(WORD) ?? [];
 
-// A word's shard is its first two letters — a word of one letter has one of
-// its own, so "2" is looked up alone and a first keystroke fetches little —
-// and the shard's file is that, with anything but a-z and 0-9 spelt as its
-// code point: "üb" is _fc_b.json. search.js has the same two lines.
+// A word's shard is its first two letters, and the shard's file is that with
+// anything but a-z and 0-9 spelt as its code point: "üb" is _fc_b.json. A
+// query of one letter matches every word starting with it, which would be
+// every shard of that letter, so each letter has a shard of its own that is
+// all of them at once — where any word starting with it is, at its best — and
+// a first keystroke fetches that alone. search.js has the same two lines.
 const shardOf = (word: string): string => [...word].slice(0, 2).join("");
 const fileOf = (key: string): string => key.replace(/[^a-z0-9]/gu, (c) => `_${c.codePointAt(0)!.toString(16)}_`);
 
@@ -193,20 +196,26 @@ export function searchFiles(entries: Entry[]): SearchFiles {
   }
 
   const shards = new Map<string, Map<string, number[]>>();
-  const last = new Map<string, number>();   // a word's last page, for the next one's gap
+  const last = new Map<string, number>();   // a word's (or a letter's) last page, for the next one's gap
+  const place = (key: string, word: string, n: number, section: number, where: number) => {
+    if (!shards.has(key)) shards.set(key, new Map());
+    const shard = shards.get(key)!;
+    if (!shard.has(word)) shard.set(word, []);
+    shard.get(word)!.push(n - (last.get(word) ?? 0), section * 4 + where);
+    last.set(word, n);
+  };
   pages.forEach((page, n) => page.forEach((entry, section) => {
     const best = new Map<string, number>();
-    for (const [place, field] of [[TITLE, entry.title], [HEADING, entry.section], [DESCRIPTION, entry.description], [TEXT, entry.text]] as const) {
-      for (const word of wordsOf(field)) if (!best.has(word)) best.set(word, place);   // best first, so the first is the best
+    for (const [where, field] of [[TITLE, entry.title], [HEADING, entry.section], [DESCRIPTION, entry.description], [TEXT, entry.text]] as const) {
+      for (const word of wordsOf(field)) if (!best.has(word)) best.set(word, where);   // best first, so the first is the best
     }
-    for (const [word, place] of best) {
-      const key = shardOf(word);
-      if (!shards.has(key)) shards.set(key, new Map());
-      const shard = shards.get(key)!;
-      if (!shard.has(word)) shard.set(word, []);
-      shard.get(word)!.push(n - (last.get(word) ?? 0), section * 4 + place);
-      last.set(word, n);
+    const letters = new Map<string, number>();
+    for (const [word, where] of best) {
+      const letter = [...word][0]!;
+      letters.set(letter, Math.max(letters.get(letter) ?? TEXT, where));
+      if (word !== letter) place(shardOf(word), word, n, section, where);   // a word of one letter is its letter's
     }
+    for (const [letter, where] of letters) place(letter, letter, n, section, where);
   }));
 
   const keys = [...shards.keys()].sort();

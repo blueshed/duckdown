@@ -64,9 +64,10 @@
   const LETTER = "\\p{L}\\p{M}\\p{N}_";
   const words = (s) => s.toLowerCase().match(new RegExp(`[${LETTER}]+`, "gu")) || [];
 
-  // A word's shard is its first two letters (a word of one letter has its
-  // own), and its file is that with anything but a-z and 0-9 spelt as its code
-  // point: "über" is in /search/words/_fc_b.json.
+  // A word's shard is its first two letters, and its file is that with
+  // anything but a-z and 0-9 spelt as its code point: "über" is in
+  // /search/words/_fc_b.json. A word of one letter is looked up in that
+  // letter's own shard, which is every word starting with it at once.
   const shardOf = (word) => [...word].slice(0, 2).join("");
   const fileOf = (key) => key.replace(/[^a-z0-9]/gu, (c) => `_${c.codePointAt(0).toString(16)}_`);
 
@@ -95,11 +96,10 @@
 
   // Each word of the query with the pattern that finds it in an entry's text,
   // for the snippet and the link. A word matches at the start of a word —
-  // "train" is not in "constraints", in the text any more than in the title —
-  // and a word of one letter only as itself, so "part 2" isn't "part 20".
+  // "train" is not in "constraints", in the text any more than in the title.
   const parseQuery = (query) => words(query).map((term) => ({
     term,
-    starts: new RegExp(`(^|[^${LETTER}])${term}${[...term].length === 1 ? `(?![${LETTER}])` : ""}`, "u"),
+    starts: new RegExp(`(^|[^${LETTER}])${term}`, "u"),
   }));
   const firstAt = (text, { starts }) => {
     const hit = starts.exec(text.toLowerCase());
