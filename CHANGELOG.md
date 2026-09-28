@@ -33,9 +33,11 @@
   so a linked `static/` handed its target's files to anyone and the export
   copied them. A page or static file that was a link out used to be served
   at its address though listed nowhere; now it is not found. A site with
-  any of these should put the files themselves there. A hard link can't be
-  told from the file it shares: don't hard-link anything from outside the
-  site into it (n172).
+  any of these should put the files themselves there. A file is opened
+  before it is judged, and judged by the file held open, so a link swapped
+  under a read is refused rather than read. A hard link can't be told from
+  the file it shares: don't hard-link anything from outside the site into
+  it (n172).
 
 ## 0.16.0 — 2026-09-27
 

@@ -352,6 +352,37 @@ describe("storage", () => {
     }
   });
 
+  // The check and the read are one: the file is opened, then judged by where
+  // the one opened really is. A link swapped between a check and a read was
+  // read where it led by then (the review's race.ts: SECRET 2,431 times in
+  // 2.8 seconds).
+  test("LocalStorage reads only what it judged, however fast a link is swapped under it", async () => {
+    const pages = scratch("race-pages");
+    mkdirSync(pages, { recursive: true });
+    writeFileSync(join(pages, "real.md"), "inside");
+    const secret = scratch("race-secret.txt");
+    writeFileSync(secret, "SECRET");
+    symlinkSync(join(pages, "real.md"), join(pages, "x.md"));
+    const store = new LocalStorage(pages);
+    const swap = `const { symlinkSync, renameSync } = require("fs");
+      const end = Date.now() + 1200;
+      for (let i = 0; Date.now() < end; i++) {
+        const tmp = ${JSON.stringify(pages)} + "/.swap" + i;
+        symlinkSync(i % 2 ? ${JSON.stringify(secret)} : ${JSON.stringify(join(pages, "real.md"))}, tmp);
+        renameSync(tmp, ${JSON.stringify(join(pages, "x.md"))});
+      }`;
+    const swapper = Bun.spawn(["bun", "-e", swap]);
+    const seen = new Map<string, number>();
+    const end = Date.now() + 1000;
+    while (Date.now() < end) {
+      const got = await store.read("x.md").catch((e: Error) => e.message.split(":")[0]!);
+      seen.set(got, (seen.get(got) ?? 0) + 1);
+    }
+    await swapper.exited;
+    expect(seen.get("SECRET")).toBeUndefined();
+    expect(seen.get("inside")).toBeGreaterThan(0);
+  });
+
   test("seedLocalSite copies the seed once, and only for a local site with a seed", () => {
     const seed = scratch("seed");
     mkdirSync(join(seed, "pages"), { recursive: true });
