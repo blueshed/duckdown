@@ -1,5 +1,5 @@
 // The index a reader searches: built here, matched in the browser.
-import { describe, test, expect } from "bun:test";
+import { describe, test, expect, spyOn } from "bun:test";
 import type { Storage, Listing } from "../server/storage";
 import { buildSite, searchIndex, pageList, aliasTarget, searchFiles, searchFile, searchFileList, searchParts, type Entry } from "../server/search";
 import { siteMap } from "../server/nav";
@@ -353,6 +353,22 @@ describe("searchFiles", () => {
     expect(index.version).toMatch(/^[0-9a-f]{12}$/);
     for (const path of ["/search/words/zz.json", "/search/words/tr", "/search/other.json", "/search.json", "/search/pages/x.json", "/search/pages/00.json", "/search/pages/-1.json"]) {
       expect(searchFile(files, path)).toBeNull();
+    }
+  });
+
+  // After review: at 20,000 pages the words cut from each page, garbage as
+  // soon as they are placed, added 0.6-1.5 GB to the export's peak before
+  // anything collected them. A collection every thousand pages takes the
+  // bench's site from 1.7 GB to 1.0.
+  test("collects as it goes: every thousand pages, and never for a small site", () => {
+    const gc = spyOn(Bun, "gc");
+    try {
+      searchFiles(entries);
+      expect(gc).not.toHaveBeenCalled();
+      searchFiles(Array.from({ length: 2500 }, (_, n) => entry({ url: `/p${n}.html`, title: `Page ${n}` })));
+      expect(gc.mock.calls).toEqual([[false], [false]]);
+    } finally {
+      gc.mockRestore();
     }
   });
 

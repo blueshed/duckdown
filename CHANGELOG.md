@@ -118,8 +118,11 @@
     fetches.
 - **The export writes each page as it renders it**, into a folder beside
   `dist/` that takes `dist/`'s place once the whole site is written, rather
-  than holding every page in memory: a fresh export of 20,000 pages peaked
-  at 1.7-2.7 GB, and now 1.0-1.4 GB, in the same time (n167). An export
+  than holding every page in memory (n167). At 20,000 pages it peaks at
+  1.0 GB on the bench's site (was 1.7) and about the same as before on one
+  with a varied vocabulary (2.3-2.4 GB, was 2.0-2.8), a few seconds slower
+  (24 s against 21, 27 against 22): cutting search into parts holds where
+  every word is while it cuts, up to 1 GB at that size. An export
   that fails part-way, not only one that finds no pages, leaves `dist/` as
   it was. One killed between its two renames leaves no `dist/` until the
   next export, which puts the old site back first, and says so, even if it

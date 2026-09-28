@@ -213,19 +213,25 @@ export function searchFiles(entries: Entry[]): SearchFiles {
     shard.get(word)!.push(n - (last.get(word) ?? 0), section * 4 + where);
     last.set(word, n);
   };
-  pages.forEach((page, n) => page.forEach((entry, section) => {
-    const best = new Map<string, number>();
-    for (const [where, field] of [[TITLE, entry.title], [HEADING, entry.section], [DESCRIPTION, entry.description], [TEXT, entry.text]] as const) {
-      for (const word of wordsOf(field)) if (!best.has(word)) best.set(word, where);   // best first, so the first is the best
-    }
-    const letters = new Map<string, number>();
-    for (const [word, where] of best) {
-      const letter = [...word][0]!;
-      letters.set(letter, Math.max(letters.get(letter) ?? TEXT, where));
-      place(shardOf(word), word, n, section, where);   // a word of one letter in its letter's shard
-    }
-    for (const [letter, where] of letters) place(letter, `${letter}*`, n, section, where);
-  }));
+  pages.forEach((page, n) => {
+    // A page's words are garbage once they are placed, and at 20,000 pages
+    // they added up to more than the index kept before anything collected
+    // them (n167): so it collects as it goes.
+    if (n && n % 1000 === 0) Bun.gc(false);
+    page.forEach((entry, section) => {
+      const best = new Map<string, number>();
+      for (const [where, field] of [[TITLE, entry.title], [HEADING, entry.section], [DESCRIPTION, entry.description], [TEXT, entry.text]] as const) {
+        for (const word of wordsOf(field)) if (!best.has(word)) best.set(word, where);   // best first, so the first is the best
+      }
+      const letters = new Map<string, number>();
+      for (const [word, where] of best) {
+        const letter = [...word][0]!;
+        letters.set(letter, Math.max(letters.get(letter) ?? TEXT, where));
+        place(shardOf(word), word, n, section, where);   // a word of one letter in its letter's shard
+      }
+      for (const [letter, where] of letters) place(letter, `${letter}*`, n, section, where);
+    });
+  });
 
   const keys = [...shards.keys()].sort();
   const words = new Map(keys.map((key) => [fileOf(key), JSON.stringify(Object.fromEntries(shards.get(key)!))]));
