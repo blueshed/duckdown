@@ -877,12 +877,15 @@ markdown isn't `pages/`, so a link in one should start from the root
 (`[[/about]]`): a relative link resolves from the extension's folder. What it
 collects goes under `reports/`, which only signed-in editors read.
 
-**An address an extension answers is the extension's.** A page written at
-one — `/`, `/about`, anything under an extension's `/forms/` — is never shown
-on the site: both servers answer the extension first, and nothing refuses
-the page or says so when it is saved (the export still writes it). The
-server names those addresses as it starts:
-`extensions answer /rsvp: a page at any of those addresses is never shown`.
+**An address an extension answers is the extension's, for the methods it
+answers.** A page written at one — `/`, `/about`, anything under an
+extension's `/forms/` — is never shown on the site for those methods: both
+servers answer the extension first, and nothing refuses the page or says so
+when it is saved (the export still writes it). An extension that answers
+only POST at an address still leaves a reader's GET to the page there. The
+server names those addresses, and their methods, as it starts:
+`extensions answer /rsvp (POST): a page at one of those addresses is never
+shown for the methods it answers`.
 On a site with extensions, check that line (or the site's CLAUDE.md) before
 giving a page a new address, and choose another name if it is taken.
 

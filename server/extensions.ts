@@ -44,11 +44,13 @@ export function siteFor(storage: Storage = storageAt(), origin = ORIGIN): Site {
 // nothing.
 //
 // A page is no route: the site's pages come through fetch, after every route,
-// so an extension's address is its own and a page there is never shown
-// (n177). That is not checked against the pages. They change while the
-// server runs (the editor, a bucket), and what an editor writes must never
-// stop it; a check at start would miss every page written since. So the
-// addresses are said as the server starts instead.
+// so an extension's address is its own and a page there is never shown for
+// the methods the route answers (n177). A Response or a handler answers
+// every method; a route of methods only those, so a GET to a POST-only form
+// still reaches the page there. That is not checked against the pages. They
+// change while the server runs (the editor, a bucket), and what an editor
+// writes must never stop it; a check at start would miss every page written
+// since. So the addresses, and their methods, are said as the server starts.
 export async function withExtensions<T extends object>(own: T, site: Site, extensions: Extension[], say = console.log): Promise<T & Routes> {
   const routes: Record<string, unknown> = { ...(own as Record<string, unknown>) };
   const added: string[] = [];
@@ -56,10 +58,10 @@ export async function withExtensions<T extends object>(own: T, site: Site, exten
     for (const [path, route] of Object.entries(await extension(site))) {
       if (path in routes) throw new Error(`An extension's route ${path} clashes with one already there`);
       routes[path] = route;
-      added.push(path);
+      added.push(route instanceof Response || typeof route === "function" ? path : `${path} (${Object.keys(route).join(", ")})`);
     }
   }
-  if (added.length) say(`extensions answer ${added.join(", ")}: a page at any of those addresses is never shown`);
+  if (added.length) say(`extensions answer ${added.join(", ")}: a page at one of those addresses is never shown for the methods it answers`);
   return routes as T & Routes;
 }
 

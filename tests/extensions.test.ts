@@ -65,7 +65,22 @@ describe("routes an extension adds", () => {
     const home: Extension = () => ({ "/": new Response("mine") });
     await withExtensions({ "/health": new Response("OK") }, site, [hello, home], (line) => said.push(line));
     await withExtensions({ "/health": new Response("OK") }, site, [], (line) => said.push(line));
-    expect(said).toEqual(["extensions answer /hello/:name, /: a page at any of those addresses is never shown"]);
+    expect(said).toEqual(["extensions answer /hello/:name (GET), /: a page at one of those addresses is never shown for the methods it answers"]);
+  });
+
+  // A route of methods answers only those: a GET to a POST-only form's
+  // address still reaches the page there (the review's routes.ts).
+  test("say which methods a route answers, since a page there still answers the rest", async () => {
+    const said: string[] = [];
+    const form: Extension = () => ({ "/rsvp": { POST: () => new Response("thanks") }, "/any": () => new Response("any") });
+    const server = Bun.serve({ port: 0, routes: await withExtensions({}, site, [form], (line) => said.push(line)), fetch: () => new Response("page") });
+    try {
+      expect(said).toEqual(["extensions answer /rsvp (POST), /any: a page at one of those addresses is never shown for the methods it answers"]);
+      expect(await (await fetch(`http://localhost:${server.port}/rsvp`)).text()).toBe("page");
+      expect(await (await fetch(`http://localhost:${server.port}/rsvp`, { method: "POST" })).text()).toBe("thanks");
+    } finally {
+      server.stop(true);
+    }
   });
 });
 
@@ -130,7 +145,7 @@ describe("a published site with an extension", () => {
     const log = spyOn(console, "log").mockImplementation(() => {});
     const server = await listen(dist, 0, "", [() => ({ "/": new Response("mine") })]);
     try {
-      expect(log.mock.calls.map((c) => c[0])).toContain("extensions answer /: a page at any of those addresses is never shown");
+      expect(log.mock.calls.map((c) => c[0])).toContain("extensions answer /: a page at one of those addresses is never shown for the methods it answers");
       expect(await (await fetch(`http://localhost:${server.port}/`)).text()).toBe("mine");
     } finally {
       log.mockRestore();
