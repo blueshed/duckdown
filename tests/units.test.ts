@@ -331,6 +331,7 @@ describe("storage", () => {
     mkdirSync(join(site, "pages"), { recursive: true });
     mkdirSync(join(site, "static"), { recursive: true });
     mkdirSync(away, { recursive: true });
+    writeFileSync(join(away, "leak.png"), "LEAK");   // what keys() would hand over, unjudged
     writeFileSync(join(site, "users.json"), "{}");
     symlinkSync("../users.json", join(site, "pages", "hashes.md"));
     symlinkSync(away, join(site, "static", "images"));
@@ -432,6 +433,51 @@ describe("storage", () => {
     } finally {
       warn.mockRestore();
     }
+  }, 10000);
+
+  // The stat before the open refuses a pipe that is there; one swapped in
+  // after it is what the open and the file held open are for. Opened
+  // without waiting (O_NONBLOCK), or the read waits for a writer that never
+  // comes; and refused because what is held is no file (held.isFile()), or
+  // the pipe, held and judged where it is, is read, and that waits too. A
+  // child swaps a link between a file and a pipe while another reads it,
+  // killed if it waits, so a pipe opened here fails the test rather than
+  // freezing the suite.
+  test("LocalStorage refuses a named pipe swapped in under a read, without waiting on it", async () => {
+    const root = scratch("swapped-pipe");
+    mkdirSync(root, { recursive: true });
+    writeFileSync(join(root, "real.md"), "inside");
+    Bun.spawnSync(["mkfifo", join(root, "pipe.md")]);
+    symlinkSync("real.md", join(root, "x.md"));
+    const swap = `const { symlinkSync, renameSync } = require("fs");
+      const end = Date.now() + 2000;
+      for (let i = 0; Date.now() < end; i++) {
+        const tmp = ${JSON.stringify(root)} + "/.swap" + i;
+        symlinkSync(i % 2 ? "pipe.md" : "real.md", tmp);
+        renameSync(tmp, ${JSON.stringify(join(root, "x.md"))});
+      }`;
+    const read = `const { LocalStorage } = await import(${JSON.stringify(join(import.meta.dir, "..", "server", "storage.ts"))});
+      const store = new LocalStorage(${JSON.stringify(root)});
+      const seen = {};
+      const end = Date.now() + 1500;
+      while (Date.now() < end) {
+        const got = await store.read("x.md").catch((e) => e.message);
+        seen[got] = (seen[got] ?? 0) + 1;
+      }
+      console.log(JSON.stringify(seen));`;
+    const swapper = Bun.spawn(["bun", "-e", swap]);
+    const reader = Bun.spawn(["bun", "-e", read], { stdout: "pipe", stderr: "ignore" });
+    const waited = setTimeout(() => reader.kill(), 5000);
+    const said = (await new Response(reader.stdout).text()).trim();
+    await reader.exited;
+    clearTimeout(waited);
+    swapper.kill();
+    await swapper.exited;
+    expect(reader.signalCode).toBeNull();   // it never waited on the pipe
+    const seen: Record<string, number> = JSON.parse(said);
+    expect(Object.keys(seen).filter((got) => !["inside", "x.md is not a file", "Path traversal denied"].includes(got))).toEqual([]);
+    expect(seen["inside"]).toBeGreaterThan(0);
+    expect(seen["Path traversal denied"]).toBeGreaterThan(0);   // the swap did land between the stat and the open
   }, 10000);
 
   test("seedLocalSite copies the seed once, and only for a local site with a seed", () => {

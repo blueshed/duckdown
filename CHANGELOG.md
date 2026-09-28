@@ -37,6 +37,11 @@
   where the path really is must be a file inside `dist/` (which may itself
   be a link), else it is not found. The export writes no links, so a
   published site is unchanged.
+- Three of storage's checks had no test that failed without them: that
+  `keys()` lists nothing of a section that is a link (its test's folder
+  was empty), and that a read opens without waiting and refuses what it
+  holds when that is not a file (a pipe swapped in under the read). Each
+  has one now.
 - **A WebP or an AVIF is served as a picture.** The served site typed a
   file by a table of its own, which had neither, so `/static/…/x.webp` came
   back `application/octet-stream` — and duckdown makes WebP widths itself.
