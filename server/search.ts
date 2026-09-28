@@ -149,7 +149,7 @@ export async function aliasTarget(pages: Storage, path: string, debug = DEBUG): 
 //   search/index.json        its version, and which shards there are:
 //                            {"version": "…", "words": ["a", "ab", …]}
 //   search/words/<xy>.json   every word starting xy, and where each one is
-//   search/words/<x>.json    every word starting x, as one: where the letter starts a word
+//   search/words/<x>.json    x*, every word starting x as one, and x, the word x itself
 //   search/pages/<n>.json    page n's entries, just as the whole index has them
 //
 // The same files whether served or exported, so search.js can't tell the two
@@ -166,9 +166,11 @@ const wordsOf = (text: string): string[] => (text.toLowerCase().match(WORD) ?? [
 // A word's shard is its first two letters, and the shard's file is that with
 // anything but a-z and 0-9 spelt as its code point: "üb" is _fc_b.json. A
 // query of one letter matches every word starting with it, which would be
-// every shard of that letter, so each letter has a shard of its own that is
-// all of them at once — where any word starting with it is, at its best — and
-// a first keystroke fetches that alone. search.js has the same two lines.
+// every shard of that letter, so each letter has a shard of its own holding
+// all of them at once as "x*" — where any word starting with it is, at its
+// best — and a first keystroke fetches that alone. It holds "x", the word of
+// that one letter, too: a letter cut from a longer word ("v-if") is only
+// itself. search.js has the same two lines.
 const shardOf = (word: string): string => [...word].slice(0, 2).join("");
 const fileOf = (key: string): string => key.replace(/[^a-z0-9]/gu, (c) => `_${c.codePointAt(0)!.toString(16)}_`);
 
@@ -220,9 +222,9 @@ export function searchFiles(entries: Entry[]): SearchFiles {
     for (const [word, where] of best) {
       const letter = [...word][0]!;
       letters.set(letter, Math.max(letters.get(letter) ?? TEXT, where));
-      if (word !== letter) place(shardOf(word), word, n, section, where);   // a word of one letter is its letter's
+      place(shardOf(word), word, n, section, where);   // a word of one letter in its letter's shard
     }
-    for (const [letter, where] of letters) place(letter, letter, n, section, where);
+    for (const [letter, where] of letters) place(letter, `${letter}*`, n, section, where);
   }));
 
   const keys = [...shards.keys()].sort();

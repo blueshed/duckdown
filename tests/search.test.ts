@@ -329,17 +329,18 @@ describe("searchFiles", () => {
     expect(json("/search/words/fr.json")).toEqual({ front: [0, 1] });   // the description (1)
   });
 
-  test("each letter is a shard of every word it starts, at its best, and a word of one letter is in it", () => {
-    // "t": the (description, 1), trains (heading, 2), then trains in the title (3) twice.
-    expect(json("/search/words/t.json")).toEqual({ t: [0, 1, 0, 1 * 4 + 2, 1, 3, 0, 1 * 4 + 3] });
-    expect(json("/search/words/a.json")).toEqual({ a: [0, 4, 1, 3, 0, 7] });   // a, and, another; then about
-    expect(json("/search/words/2.json")).toEqual({ 2: [1, 1 * 4 + 0] });
-    expect(json("/search/words/an.json")).toEqual({ and: [0, 4], another: [0, 4] });   // "a" isn't filed alone as well
+  test("each letter is a shard: x* is every word it starts, at its best, and x the word of one letter itself", () => {
+    // "t*": the (description, 1), trains (heading, 2), then trains in the title (3) twice; no word is "t".
+    expect(json("/search/words/t.json")).toEqual({ "t*": [0, 1, 0, 1 * 4 + 2, 1, 3, 0, 1 * 4 + 3] });
+    // "a" itself: page 0 section 1's text, page 1's; "a*": a, and, another, then about.
+    expect(json("/search/words/a.json")).toEqual({ a: [0, 4, 1, 0], "a*": [0, 4, 1, 3, 0, 7] });
+    expect(json("/search/words/2.json")).toEqual({ 2: [1, 1 * 4 + 0], "2*": [1, 1 * 4 + 0] });
+    expect(json("/search/words/an.json")).toEqual({ and: [0, 4], another: [0, 4] });
   });
 
   test("a letter outside a-z and 0-9 is its code point in the name; an apostrophe is inside a word, and ’ is '", () => {
     expect(json("/search/words/_fc_b.json")).toEqual({ über: [1, 0] });
-    expect(json("/search/words/_fc_.json")).toEqual({ ü: [1, 0] });
+    expect(json("/search/words/_fc_.json")).toEqual({ "ü*": [1, 0] });
     expect(json("/search/words/ca.json")).toEqual({ café: [1, 0] });
     const quoted = searchFiles([entry({ url: "/q.html", title: "Bunyan’s", text: "don't" })]);
     expect(JSON.parse(searchFile(quoted, "/search/words/bu.json")!)).toEqual({ "bunyan's": [0, 3] });

@@ -108,7 +108,8 @@
     it: `don't` finds `don’t`, and `ve` no longer finds `I've`.
   - A query word with punctuation in it is looked for as its parts:
     `docker-compose` finds `docker` and `compose` anywhere in a section, so
-    it can find more. The link still goes to `docker-compose`.
+    it can find more. The link still goes to `docker-compose`. A letter cut
+    off that way is only that letter: `v-if` doesn't find `vulnerable`.
   - A word with a letter outside a-z is one word: `über` and `École` are
     found, and `ve` no longer finds `naïve`.
   - Only the latest keystroke's answer is shown, `aria-busy` while it

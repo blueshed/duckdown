@@ -68,8 +68,17 @@
   // A word's shard is its first two letters, and its file is that with
   // anything but a-z and 0-9 spelt as its code point: "über" is in
   // /search/words/_fc_b.json. A word of one letter is looked up in that
-  // letter's own shard, which is every word starting with it at once.
+  // letter's own shard, which holds every word starting with it at once
+  // ("p*") and the word of that letter alone ("p").
   const shardOf = (word) => [...word].slice(0, 2).join("");
+
+  // The query's words, each with whether it must be a whole word: a letter on
+  // its own starts any word ("p" finds "page"), but a letter cut from a longer
+  // word ("v-if", "e-mail", "a-z") is only that letter, or it finds anything.
+  const terms = (query) => query.split(/\s+/).flatMap((typed) => {
+    const parts = words(typed);
+    return parts.map((term) => ({ term, whole: parts.length > 1 && [...term].length === 1 }));
+  });
   const fileOf = (key) => key.replace(/[^a-z0-9]/gu, (c) => `_${c.codePointAt(0).toString(16)}_`);
 
   // Each word and page is fetched once, on the first search that needs it
@@ -114,11 +123,11 @@
   // and "ve" is not in "I've".
   function firstAt(text, query) {
     const typed = query.toLowerCase().replace(/’/g, "'").split(/\s+/).find((t) => words(t).length);
-    const term = words(typed)[0];
+    const [{ term, whole }] = terms(typed);
     const lower = text.toLowerCase().replace(/’/g, "'");
     let first = -1;
     for (const hit of lower.matchAll(WORD)) {
-      if (!hit[0].startsWith(term)) continue;
+      if (whole ? hit[0] !== term : !hit[0].startsWith(term)) continue;
       if (lower.startsWith(typed, hit.index)) return hit.index;
       if (first < 0) first = hit.index;
     }
@@ -134,10 +143,10 @@
   // title, 2 the heading, 1 the description, 0 the text).
   const WEIGHT = [1, 4, 8, 10];
   const AT = 1e6;   // an entry, as one number: page × AT + section
-  async function placesOf(shards, term) {
+  async function placesOf(shards, { term, whole }) {
     const best = new Map();
     for (const [word, places] of Object.entries(await shard(shards, shardOf(term)))) {
-      if (!word.startsWith(term)) continue;
+      if (whole ? word !== term : !word.startsWith(term)) continue;
       for (let i = 0, n = 0; i < places.length; i += 2) {
         n += places[i];
         const at = n * AT + (places[i + 1] >> 2);
@@ -146,8 +155,8 @@
     }
     return best;
   }
-  async function rank(shards, terms) {
-    const [first, ...rest] = await Promise.all(terms.map((term) => placesOf(shards, term)));
+  async function rank(shards, wanted) {
+    const [first, ...rest] = await Promise.all(wanted.map((term) => placesOf(shards, term)));
     const hits = [];
     for (const [at, score] of first) {
       if (rest.every((other) => other.has(at))) hits.push({ at, total: rest.reduce((sum, other) => sum + other.get(at), score) });
@@ -223,7 +232,7 @@
   // earlier one whose files came slower is dropped when it arrives.
   async function search() {
     const query = input.value.trim();
-    const wanted = words(query);
+    const wanted = terms(query);
     if (!wanted.length) return show([], query);
     output.setAttribute("aria-busy", "true");
     const hits = await rank(await current(), wanted);

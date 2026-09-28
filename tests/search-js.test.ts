@@ -225,6 +225,20 @@ describe("search.js, fetching what a search needs", () => {
     expect(hrefs(await search("—"))).toEqual([]);                // nothing to look for
   });
 
+  // After review: "v-if" found eight pages through "vulnerable", where
+  // 0.16.0 found none; so did "a-z" and "e-mail".
+  test("a letter cut from a longer word is only that letter, where a letter on its own starts any word", async () => {
+    start([
+      entry({ url: "/a.html", title: "Vulnerable", text: "if in doubt, email us" }),
+      entry({ url: "/b.html", title: "Vue", text: "a v-if on the element" }),
+      entry({ url: "/c.html", title: "Post", text: "send an e-mail, from a to z" }),
+    ]);
+    expect(hrefs(await search("v-if"))).toEqual(["/b.html#:~:text=v%2Dif%20on%20the%20element"]);
+    expect(hrefs(await search("e-mail"))).toEqual(["/c.html#:~:text=e%2Dmail%2C%20from%20a%20to%20z"]);
+    expect(hrefs(await search("a-z"))).toEqual(["/c.html#:~:text=a%20to%20z"]);
+    expect(hrefs(await search("v"))).toEqual(["/a.html", "/b.html#:~:text=v%2Dif%20on%20the%20element"]);   // on its own: any word it starts
+  });
+
   test("a hyphenated word is looked for as its parts, and the link goes where the text has it as typed", async () => {
     start([entry({ url: "/a.html#x", title: "A", section: "X", text: "Docker first; then docker-compose.yml and Compose files" })]);
     expect(hrefs(await search("docker-compose"))).toEqual(["/a.html#x:~:text=docker%2Dcompose.yml%20and%20Compose%20files"]);
