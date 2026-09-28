@@ -1,4 +1,4 @@
-import { resolve, join, extname, dirname, basename, relative, sep } from "path";
+import { resolve, join, dirname, basename, relative, sep } from "path";
 import { readdir, stat, readFile, writeFile, unlink, mkdir, rename } from "fs/promises";
 import { existsSync, cpSync } from "fs";
 import { S3Client } from "bun";
@@ -42,17 +42,12 @@ export interface Storage {
 
 // --- MIME ---
 
-const MIME_TYPES: Record<string, string> = {
-  ".md": "text/markdown", ".html": "text/html", ".css": "text/css",
-  ".js": "application/javascript", ".json": "application/json",
-  ".svg": "image/svg+xml", ".png": "image/png", ".jpg": "image/jpeg",
-  ".jpeg": "image/jpeg", ".gif": "image/gif", ".ico": "image/x-icon",
-  ".woff": "font/woff", ".woff2": "font/woff2", ".ttf": "font/ttf",
-  ".txt": "text/plain", ".xml": "application/xml",
-};
-
+// Bun's own table, by the name alone (Bun.file reads nothing until asked):
+// the one the published server answers with, since serve.ts hands out a
+// Bun.file, so the two can't disagree. duckdown kept a table of its own,
+// which had no WebP or AVIF (n176).
 function guessMime(path: string): string {
-  return MIME_TYPES[extname(path).toLowerCase()] || "application/octet-stream";
+  return Bun.file(path).type;
 }
 
 // --- Local filesystem ---

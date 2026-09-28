@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- **A WebP or an AVIF is served as a picture.** The served site typed a
+  file by a table of its own, which had neither, so `/static/…/x.webp` came
+  back `application/octet-stream` — and duckdown makes WebP widths itself.
+  It now asks Bun's table, the one the published server (`serve.ts`)
+  already answered from, so the two agree on every file: a PDF, a video, a
+  font, and a stylesheet's or script's `charset=utf-8` too (n176).
+
 ## 0.16.0 — 2026-09-27
 
 - **`duckdown bucket pull` and `push`: a served site's content, between its

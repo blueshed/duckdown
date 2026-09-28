@@ -83,7 +83,23 @@ for (const [what, make] of backends) {
       await store.write("gone.md", "x");
       await store.remove("gone.md");
       expect(await store.exists("gone.md")).toBe(false);
-      expect(store.mime("a/b.css")).toBe("text/css");
+      expect(store.mime("a/b.css")).toContain("text/css");
+    });
+
+    // Typed as the published server types it (serve.ts hands out a Bun.file),
+    // so the served site and the published one agree: 0.16.0 answered a WebP,
+    // which widths.ts itself makes, as application/octet-stream (n176).
+    test("a file is typed by its name, listed or asked alone, as the published site types it", async () => {
+      await ready;
+      const names = ["a.webp", "b.AVIF", "c.png", "d.css", "e.woff2", "f.pdf", "g"];
+      for (const name of names) await store.write(`typed/${name}`, "x");
+      const { files } = await store.list("typed");
+      for (const name of names) {
+        expect(files.find((f) => f.name === name)?.type).toBe(Bun.file(name).type);
+        expect(store.mime(`typed/${name}`)).toBe(Bun.file(name).type);
+      }
+      expect(store.mime("typed/a.webp")).toBe("image/webp");
+      expect(store.mime("typed/b.AVIF")).toBe("image/avif");
     });
   });
 }
