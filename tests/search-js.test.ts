@@ -203,6 +203,20 @@ describe("search.js, fetching what a search needs", () => {
     expect(hrefs(await search("—"))).toEqual([]);                // nothing to look for
   });
 
+  test("an apostrophe inside a word is part of it, and ' finds ’", async () => {
+    start([
+      entry({ url: "/a.html", title: "Vashti Bunyan’s album", text: "don’t look back" }),
+      entry({ url: "/b.html", title: "Done", text: "it's done" }),
+      entry({ url: "/c.html", title: "Songs", text: "I've sung them" }),
+    ]);
+    expect(hrefs(await search("bunyan"))).toEqual(["/a.html"]);
+    expect(hrefs(await search("Bunyan's"))).toEqual(["/a.html"]);
+    expect(hrefs(await search("don't"))).toEqual(["/a.html#:~:text=don%E2%80%99t%20look%20back"]);   // not "done"
+    expect(hrefs(await search("don"))).toEqual(["/b.html#:~:text=done", "/a.html#:~:text=don%E2%80%99t%20look%20back"]);   // Done's title first
+    expect(hrefs(await search("it’s"))).toEqual(["/b.html#:~:text=it's%20done"]);
+    expect(hrefs(await search("ve"))).toEqual([]);   // "I've" is one word, and "ve" doesn't start it
+  });
+
   test("a slow answer to an earlier keystroke doesn't replace a later one's", async () => {
     let release!: () => void;
     const slow = new Promise<void>((r) => (release = r));

@@ -337,10 +337,13 @@ describe("searchFiles", () => {
     expect(json("/search/words/an.json")).toEqual({ and: [0, 4], another: [0, 4] });   // "a" isn't filed alone as well
   });
 
-  test("a letter outside a-z and 0-9 is its code point in the name", () => {
+  test("a letter outside a-z and 0-9 is its code point in the name; an apostrophe is inside a word, and ’ is '", () => {
     expect(json("/search/words/_fc_b.json")).toEqual({ über: [1, 0] });
     expect(json("/search/words/_fc_.json")).toEqual({ ü: [1, 0] });
     expect(json("/search/words/ca.json")).toEqual({ café: [1, 0] });
+    const quoted = searchFiles([entry({ url: "/q.html", title: "Bunyan’s", text: "don't" })]);
+    expect(JSON.parse(searchFile(quoted, "/search/words/bu.json")!)).toEqual({ "bunyan's": [0, 3] });
+    expect(JSON.parse(searchFile(quoted, "/search/words/do.json")!)).toEqual({ "don't": [0, 0] });
   });
 
   test("the index names every shard there is, and nothing else answers", () => {

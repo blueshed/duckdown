@@ -154,11 +154,13 @@ export async function aliasTarget(pages: Storage, path: string, debug = DEBUG): 
 // The same files whether served or exported, so search.js can't tell the two
 // apart, and it still does all the matching: nothing here searches.
 
-// A word is a run of letters, marks, digits and _: the words of a page are cut
-// this way here and a query's the same way in search.js, so the one finds the
-// other. It is where `\b` put a word's start, and a letter outside a-z too.
-const WORD = /[\p{L}\p{M}\p{N}_]+/gu;
-const wordsOf = (text: string): string[] => text.toLowerCase().match(WORD) ?? [];
+// A word is a run of letters, marks, digits and _, and an apostrophe inside
+// one (' or ’, read as ') is part of it: "Bunyan's" and "don't" are words.
+// The words of a page are cut this way here and a query's the same way in
+// search.js, so the one finds the other. It is where `\b` put a word's start,
+// but for a letter after an apostrophe, and a letter outside a-z starts one too.
+const WORD = /[\p{L}\p{M}\p{N}_]+(?:['’][\p{L}\p{M}\p{N}_]+)*/gu;
+const wordsOf = (text: string): string[] => (text.toLowerCase().match(WORD) ?? []).map((w) => w.replace(/’/g, "'"));
 
 // A word's shard is its first two letters, and the shard's file is that with
 // anything but a-z and 0-9 spelt as its code point: "üb" is _fc_b.json. A

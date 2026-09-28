@@ -58,11 +58,12 @@
     else { input.value = ""; output.innerHTML = ""; output.removeAttribute("aria-busy"); }
   }
 
-  // A word is a run of letters, marks, digits and _ — duckdown cut the site's
-  // words the same way (search.ts), so a query's words are looked up as they
-  // were filed: "tree-lined" is tree and lined, and "café" is one word.
-  const LETTER = "\\p{L}\\p{M}\\p{N}_";
-  const words = (s) => s.toLowerCase().match(new RegExp(`[${LETTER}]+`, "gu")) || [];
+  // A word is a run of letters, marks, digits and _, and an apostrophe inside
+  // one (' or ’, read as ') is part of it — duckdown cut the site's words the
+  // same way (search.ts), so a query's words are looked up as they were filed:
+  // "tree-lined" is tree and lined, "Bunyan's" and "café" are one word each.
+  const WORD = /[\p{L}\p{M}\p{N}_]+(?:['’][\p{L}\p{M}\p{N}_]+)*/gu;
+  const words = (s) => (s.toLowerCase().match(WORD) || []).map((w) => w.replace(/’/g, "'"));
 
   // A word's shard is its first two letters, and its file is that with
   // anything but a-z and 0-9 spelt as its code point: "über" is in
@@ -94,17 +95,13 @@
   };
   const page = (n) => get(`/search/pages/${n}.json`, []);
 
-  // Each word of the query with the pattern that finds it in an entry's text,
-  // for the snippet and the link. A word matches at the start of a word —
-  // "train" is not in "constraints", in the text any more than in the title.
-  const parseQuery = (query) => words(query).map((term) => ({
-    term,
-    starts: new RegExp(`(^|[^${LETTER}])${term}`, "u"),
-  }));
-  const firstAt = (text, { starts }) => {
-    const hit = starts.exec(text.toLowerCase());
-    return hit ? hit.index + hit[1].length : -1;
-  };
+  // Where in a text a word of the query first starts a word, or -1: the
+  // snippet and the link start there. "train" is not in "constraints", in the
+  // text any more than in the title, and "ve" is not in "I've".
+  function firstAt(text, term) {
+    for (const hit of text.toLowerCase().replace(/’/g, "'").matchAll(WORD)) if (hit[0].startsWith(term)) return hit.index;
+    return -1;
+  }
 
   // An entry is a page, or one section of it (its `section` is the heading and
   // its url ends #id). Every word has to appear somewhere in it, and where it
@@ -115,7 +112,7 @@
   // title, 2 the heading, 1 the description, 0 the text).
   const WEIGHT = [1, 4, 8, 10];
   const AT = 1e6;   // an entry, as one number: page × AT + section
-  async function placesOf({ term }) {
+  async function placesOf(term) {
     const best = new Map();
     for (const [word, places] of Object.entries(await shard(shardOf(term)))) {
       if (!word.startsWith(term)) continue;
@@ -186,7 +183,7 @@
       return;
     }
     const list = document.createElement("ul");
-    const wanted = parseQuery(query);
+    const wanted = words(query);
     for (const entry of results) {
       const li = document.createElement("li");
       const a = document.createElement("a");
@@ -205,7 +202,7 @@
   // earlier one whose files came slower is dropped when it arrives.
   async function search() {
     const query = input.value.trim();
-    const wanted = parseQuery(query);
+    const wanted = words(query);
     if (!wanted.length) return show([], query);
     output.setAttribute("aria-busy", "true");
     const hits = await rank(wanted);
