@@ -296,7 +296,9 @@ describe("editor API", () => {
       await put("kept/page.md", "third");                               // the same sitting
       const [v, ...rest] = await versions("kept/page.md");
       expect(rest).toEqual([]);
-      expect(await (await fetch(`${at("kept/page.md")}?version=${v!.id}`, authed())).text()).toBe("first");
+      const version = await fetch(`${at("kept/page.md")}?version=${v!.id}`, authed());
+      expect(await version.text()).toBe("first");
+      expect(version.headers.get("content-security-policy")).toBe("sandbox");   // a file as it was, never a page
       expect(existsSync(join(SITE, ".history", "pages", "kept", "page.md", v!.id))).toBe(true);
       // It is none of the site's business: not a page, not a file in the tree.
       expect((await fetch(`${BASE}/.history/pages/kept/page.md/${v!.id}`)).status).toBe(404);
@@ -755,6 +757,47 @@ describe("static files", () => {
 
   test("returns 404 for missing file", async () => {
     expect((await fetch(`${BASE}/static/nope.txt`)).status).toBe(404);
+  });
+});
+
+// Typed by Bun's table (n176), a .htm, .xhtml, .svgz or .xsl in static/ is
+// a document a browser runs, and nothing said otherwise: an SVG with a
+// <script>, opened alone, ran it on the site's own address, where a script
+// acts as whoever is signed in. And nothing told a browser not to take a
+// file for some other type than the one it was sent as.
+describe("what an answer says about itself", () => {
+  const header = async (path: string, name: string, init?: RequestInit) =>
+    [path, (await fetch(`${BASE}${path}`, init)).headers.get(name)];
+
+  test("every answer, whichever route makes it, says its type is the one it is", async () => {
+    const plain = ["/health", "/login", "/edit/styles.css", "/edit/icon.png", "/", "/guide/", "/nope", "/robots.txt",
+      "/static/site.css", "/static/theme.css", "/static/nope.css", "/search.json", "/sitemap.xml", "/static/%E0%A4%A", "/edit/pages/"];
+    for (const path of plain) expect(await header(path, "x-content-type-options")).toEqual([path, "nosniff"]);
+    for (const path of ["/edit/pages/index.md", "/edit/browse/", "/edit/browse/logo.svg", "/edit/users", "/edit/help"]) {
+      expect(await header(path, "x-content-type-options", authed())).toEqual([path, "nosniff"]);
+    }
+  });
+
+  test("a file as someone put it in the site is sandboxed wherever it is handed out; a page never is", async () => {
+    writeFileSync(join(SITE, "static", "evil.svg"), `<svg xmlns="http://www.w3.org/2000/svg"><script>alert(document.cookie)</script></svg>`);
+    writeFileSync(join(SITE, "static", "leaflet.pdf"), "%PDF-1.4\n");
+    try {
+      for (const path of ["/static/evil.svg", "/static/theme.css", "/static/site.css", "/static/images/logo.svg", "/favicon.ico"]) {
+        expect(await header(path, "content-security-policy")).toEqual([path, "sandbox"]);
+      }
+      for (const path of ["/edit/static/evil.svg", "/edit/templates/site.html", "/edit/browse/logo.svg", "/edit/browse/logo.svg?thumb=32"]) {
+        expect(await header(path, "content-security-policy", authed())).toEqual([path, "sandbox"]);
+      }
+      // Chrome shows a PDF, a song or a film under no such policy (a PDF
+      // opens blank even under script-src 'none'), and none runs a script
+      // on the site's address. The site's pages, and the editor, are its own.
+      for (const path of ["/static/leaflet.pdf", "/", "/guide/", "/search.json", "/edit"]) {
+        expect(await header(path, "content-security-policy")).toEqual([path, null]);
+      }
+    } finally {
+      rmSync(join(SITE, "static", "evil.svg"));
+      rmSync(join(SITE, "static", "leaflet.pdf"));
+    }
   });
 });
 

@@ -23,6 +23,7 @@ import { handleSite } from "./routes/site";
 import { handleError } from "./routes/error";
 import { HEALTH } from "./utils";
 import { loadExtensions, siteFor, withExtensions } from "./extensions";
+import { answering, everyAnswer } from "./headers";
 
 // The editor's stylesheet and icon at stable URLs, for the login page (which
 // is not an HTML import, so Bun never bundles its <link>s).
@@ -42,8 +43,9 @@ export const server = Bun.serve({
   port: PORT,
   development: DEBUG,
 
-  // An extension's routes join these, and may not take one of them.
-  routes: await withExtensions({
+  // An extension's routes join these, and may not take one of them. Every
+  // answer, theirs too, says its type is the one it is (headers.ts).
+  routes: everyAnswer(await withExtensions({
     // A platform's healthcheck: proves the process is listening without
     // reading storage, so a content mistake never reads as a dead service.
     // It names the version, which is how `bun run sites` reads a live site.
@@ -67,10 +69,10 @@ export const server = Bun.serve({
     "/search.json": handleSearch,
     "/sitemap.xml": handleSitemap,
     "/static/*": handleStatic,
-  }, siteFor(), extensions),
+  }, siteFor(), extensions)),
 
-  fetch: handleSite,
-  error: handleError,
+  fetch: answering(handleSite),
+  error: answering(handleError),
 });
 
 printConfig();

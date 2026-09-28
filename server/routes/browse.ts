@@ -6,6 +6,7 @@ import { after } from "../utils";
 import { makeWidths } from "../widths";
 import { siteChanged } from "../kept";
 import { WIDTH_NAME } from "../images";
+import { asFile } from "../headers";
 
 const images = createImageStorage();
 
@@ -38,7 +39,7 @@ export const handleBrowse = {
         }
       }
       return new Response(Buffer.from(await images.readBytes(path)), {
-        headers: { "Content-Type": images.mime(path), "Cache-Control": "private, max-age=86400" },
+        headers: { "Content-Type": images.mime(path), "Cache-Control": "private, max-age=86400", ...asFile(images.mime(path)) },
       });
     }
 

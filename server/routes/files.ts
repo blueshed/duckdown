@@ -3,6 +3,7 @@ import { requireAuth } from "../auth";
 import { storageAt, type Storage } from "../storage";
 import { History, HISTORY_PATH, plainKey } from "../history";
 import { after } from "../utils";
+import { asFile } from "../headers";
 
 // The editor's file API, over one folder of the site. `pages/` was the only
 // one for a while, which left the two files that actually make a site yours —
@@ -76,11 +77,11 @@ export function fileRoutes(
         if (q.has("versions")) return Response.json(await history.versions(key));
         const body = await history.read(key, q.get("version")!);
         if (!body) return new Response("No such version", { status: 404 });
-        return new Response(Buffer.from(body), { headers: { "Content-Type": store.mime(key) } });
+        return new Response(Buffer.from(body), { headers: { "Content-Type": store.mime(key), ...asFile(store.mime(key)) } });
       }
       if (key && (await store.exists(key))) {
         return new Response(await store.read(key), {
-          headers: { "Content-Type": store.mime(key) },
+          headers: { "Content-Type": store.mime(key), ...asFile(store.mime(key)) },
         });
       }
       // A missing file is a 404, not an empty folder listing in its place

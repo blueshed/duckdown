@@ -15,6 +15,7 @@ import { decodePath, HEALTH } from "./utils";
 import { hostAnswer, hostOf, looking } from "./hosts";
 import { rootFile } from "./base";
 import { loadExtensions, siteFor, withExtensions, type Extension } from "./extensions";
+import { asFile, everyAnswer, nosniff } from "./headers";
 
 export { looking };
 
@@ -52,9 +53,12 @@ async function route(req: Request, dir: string, origin: string): Promise<{ res: 
     ?? (rootFile(path.slice(1)) === "apple-touch-icon.png" ? await file(dir, "/apple-touch-icon.png") : null);
   if (found) {
     // Short, and the same for everything: nothing here is content-hashed,
-    // so a stylesheet edited this morning has to be able to show up.
+    // so a stylesheet edited this morning has to be able to show up. A file
+    // from static/, or one of the root files the export took from there, is
+    // a file, never a page (headers.ts), as the served site answers it.
+    const file = path.startsWith("/static/") || rootFile(path.slice(1)) ? asFile(found.type) : {};
     return {
-      res: new Response(found, { headers: { "Cache-Control": "public, max-age=300" } }),
+      res: new Response(found, { headers: { "Cache-Control": "public, max-age=300", ...file } }),
       html: !!found.name?.endsWith(".html"),
     };
   }
@@ -85,6 +89,7 @@ export async function serveDist(
 ): Promise<Response> {
   const startedAt = performance.now();
   const { res, html } = await route(req, resolve(dir), origin);
+  nosniff(res);
   if (looking(hostOf(req), origin)) res.headers.set("X-Robots-Tag", "noindex");
   if (html) log(req, res.status, startedAt);
   return res;
@@ -100,7 +105,7 @@ export async function listen(
 ) {
   const server = Bun.serve({
     port,
-    routes: await withExtensions({ "/health": new Response(HEALTH) }, siteFor(), extensions ?? (await loadExtensions())),
+    routes: everyAnswer(await withExtensions({ "/health": new Response(HEALTH) }, siteFor(), extensions ?? (await loadExtensions()))),
     fetch: (req) => serveDist(req, dir, logView, origin),
   });
   console.log(`serving ${resolve(dir)} on http://localhost:${server.port}/`);

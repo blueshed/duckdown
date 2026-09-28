@@ -145,8 +145,28 @@ describe("serveDist", () => {
     const server = await listen(dist, 0);
     try {
       expect(await (await fetch(`http://localhost:${server.port}/`)).text()).toBe("<h1>home</h1>");
+      expect((await fetch(`http://localhost:${server.port}/health`)).headers.get("x-content-type-options")).toBe("nosniff");
     } finally {
       server.stop(true);
+    }
+  });
+
+  // As the served site answers (server.test.ts): no answer lets a browser
+  // take a file for another type, and a file from static/ opened alone —
+  // an SVG with a <script> in it — runs nothing on the site's address.
+  test("every answer says its type is the one it is; a file from static/ is sandboxed, a page never is", async () => {
+    writeFileSync(join(dist, "static", "evil.svg"), "<svg><script>alert(1)</script></svg>");
+    writeFileSync(join(dist, "static", "leaflet.pdf"), "%PDF-1.4\n");
+    try {
+      for (const path of ["/", "/blog/", "/blog", "/static/site.css", "/nope", "/%E0%A4%A", "/health", "/search.json"]) {
+        expect([path, (await ask(path)).res.headers.get("x-content-type-options")]).toEqual([path, "nosniff"]);
+      }
+      const policy = async (path: string) => [path, (await ask(path)).res.headers.get("content-security-policy")];
+      for (const path of ["/static/evil.svg", "/static/site.css"]) expect(await policy(path)).toEqual([path, "sandbox"]);
+      for (const path of ["/static/leaflet.pdf", "/", "/blog/", "/search.json", "/nope"]) expect(await policy(path)).toEqual([path, null]);
+    } finally {
+      rmSync(join(dist, "static", "evil.svg"));
+      rmSync(join(dist, "static", "leaflet.pdf"));
     }
   });
 });

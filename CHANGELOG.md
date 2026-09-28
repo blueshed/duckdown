@@ -17,6 +17,20 @@
   to the site's folder (`pages/up` → `..`) listed `users.json` with its
   size. Each now lists empty, as the bucket `duckdown bucket push` fills
   does, and is said once in the log (n172).
+- **An SVG or HTML file in `static/` runs no script on the site's
+  address.** An SVG with a `<script>` in it, opened on its own, ran it on the
+  site's own address, where a script acts as whoever is signed in; since
+  n176 so did a `.htm`, `.shtml`, `.xhtml`, `.svgz` or `.xsl`. A file handed
+  out as it is — `/static/…`, the root files, the editor's `/edit/static/`,
+  `/edit/pages/`, `/edit/templates/` and `/edit/browse/`, and `static/` on
+  the published server — now carries `Content-Security-Policy: sandbox`, so
+  it is shown and runs nothing. The site's pages don't, and nothing changes
+  for a stylesheet, a script or a picture a page uses. A PDF, a song or a
+  film doesn't either: Chrome shows none of them under such a policy, and
+  none runs a script on the site. And every answer from both servers says
+  `X-Content-Type-Options: nosniff`, so no browser takes a file for another
+  type than the one it was sent as — all but the editor's own page and its
+  bundle, which Bun answers itself.
 - **A WebP or an AVIF is served as a picture.** The served site typed a
   file by a table of its own, which had neither, so `/static/…/x.webp` came
   back `application/octet-stream` — and duckdown makes WebP widths itself.
