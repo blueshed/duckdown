@@ -195,12 +195,20 @@ describe("search.js, fetching what a search needs", () => {
       entry({ url: "/b.html", title: "Über alles", text: "naïve art" }),
     ]);
     expect(hrefs(await search("tree-lined"))).toEqual(["/a.html#:~:text=tree%2Dlined%20streets"]);
+    expect(hrefs(await search("lined"))).toEqual(["/a.html#:~:text=lined%20streets"]);   // a word after a hyphen starts one
     expect(hrefs(await search("CAFÉ"))).toEqual(["/a.html"]);
     expect(hrefs(await search("über"))).toEqual(["/b.html"]);   // a word may start with a letter that isn't a-z
     expect(asked).toContain("/search/words/_fc_b.json");        // spelt as its code point in the file's name
     expect(hrefs(await search("naïve"))).toEqual(["/b.html#:~:text=na%C3%AFve%20art"]);
     expect(hrefs(await search("ve"))).toEqual([]);               // "naïve" is one word, not "na" and "ve"
     expect(hrefs(await search("—"))).toEqual([]);                // nothing to look for
+  });
+
+  test("a hyphenated word is looked for as its parts, and the link goes where the text has it as typed", async () => {
+    start([entry({ url: "/a.html#x", title: "A", section: "X", text: "Docker first; then docker-compose.yml and Compose files" })]);
+    expect(hrefs(await search("docker-compose"))).toEqual(["/a.html#x:~:text=docker%2Dcompose.yml%20and%20Compose%20files"]);
+    expect(hrefs(await search("compose docker"))).toEqual(["/a.html#x:~:text=compose.yml%20and%20Compose%20files"]);
+    expect(hrefs(await search("(docker"))).toEqual(["/a.html#x:~:text=Docker%20first%3B%20then%20docker%2Dcompose.yml%20and"]);
   });
 
   test("an apostrophe inside a word is part of it, and ' finds ’", async () => {

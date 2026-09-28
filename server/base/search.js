@@ -95,12 +95,22 @@
   };
   const page = (n) => get(`/search/pages/${n}.json`, []);
 
-  // Where in a text a word of the query first starts a word, or -1: the
-  // snippet and the link start there. "train" is not in "constraints", in the
-  // text any more than in the title, and "ve" is not in "I've".
-  function firstAt(text, term) {
-    for (const hit of text.toLowerCase().replace(/’/g, "'").matchAll(WORD)) if (hit[0].startsWith(term)) return hit.index;
-    return -1;
+  // Where in a text the query first starts a word, or -1: the snippet and the
+  // link start there. Its first word as typed, where the text has it
+  // ("docker-compose"), else the first place that word's first part is.
+  // "train" is not in "constraints", in the text any more than in the title,
+  // and "ve" is not in "I've".
+  function firstAt(text, query) {
+    const typed = query.toLowerCase().replace(/’/g, "'").split(/\s+/).find((t) => words(t).length);
+    const term = words(typed)[0];
+    const lower = text.toLowerCase().replace(/’/g, "'");
+    let first = -1;
+    for (const hit of lower.matchAll(WORD)) {
+      if (!hit[0].startsWith(term)) continue;
+      if (lower.startsWith(typed, hit.index)) return hit.index;
+      if (first < 0) first = hit.index;
+    }
+    return first;
   }
 
   // An entry is a page, or one section of it (its `section` is the heading and
@@ -151,9 +161,9 @@
   }
 
   // The words around the first hit, so a result says why it is a result.
-  function extract(entry, terms) {
+  function extract(entry, query) {
     if (entry.description) return entry.description;
-    const at = firstAt(entry.text, terms[0]);
+    const at = firstAt(entry.text, query);
     if (at < 0) return "";
     const from = Math.max(0, at - 60);
     return (from ? "… " : "") + entry.text.slice(from, from + 160).trim() + "…";
@@ -165,8 +175,8 @@
   // the text and not as lowercased for matching. A browser that doesn't know
   // fragments ignores everything after ":~:" and still lands on the heading.
   // "-" is fragment syntax, so it is encoded as well as what encodeURIComponent does.
-  function link(entry, terms) {
-    const at = firstAt(entry.text, terms[0]);
+  function link(entry, query) {
+    const at = firstAt(entry.text, query);
     const base = entry.url.includes("#") ? entry.url : `${entry.url}#`;
     if (at < 0) return entry.url;
     const phrase = entry.text.slice(at).split(" ").slice(0, 5).join(" ");
@@ -183,15 +193,14 @@
       return;
     }
     const list = document.createElement("ul");
-    const wanted = words(query);
     for (const entry of results) {
       const li = document.createElement("li");
       const a = document.createElement("a");
-      a.href = link(entry, wanted);
+      a.href = link(entry, query);
       // "Page – Section", unless the section is the page's own title.
       a.textContent = entry.section && entry.section !== entry.title ? `${entry.title} – ${entry.section}` : entry.title;
       const p = document.createElement("p");
-      p.textContent = extract(entry, wanted);
+      p.textContent = extract(entry, query);
       li.append(a, p);
       list.append(li);
     }
