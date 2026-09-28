@@ -200,6 +200,35 @@ describe("serveDist", () => {
       rmSync(join(dist, "static", "leaflet.pdf"));
     }
   });
+
+  // Whether a file is sandboxed is decided by the file, never by the address
+  // it was asked for: /%2Fstatic/…, //static/… and /x/..%2Fstatic/… each
+  // reach a file in static/ without starting /static/, and an SVG's script
+  // ran on the site's address in Chrome and WebKit (hardening review).
+  test("a file from static/ is sandboxed however its address is spelled", async () => {
+    mkdirSync(join(dist, "static", "images"), { recursive: true });
+    writeFileSync(join(dist, "static", "images", "evil.svg"), "<svg><script>alert(1)</script></svg>");
+    writeFileSync(join(dist, "static", "evil.html"), "<script>alert(1)</script>");
+    writeFileSync(join(dist, "robots.txt"), "User-agent: *\n");
+    try {
+      const policy = async (path: string) => {
+        const { res } = await ask(path);
+        return [path, res.status, res.headers.get("content-security-policy")];
+      };
+      for (const path of ["/%2Fstatic/images/evil.svg", "//static/images/evil.svg", "/x/..%2Fstatic/evil.html",
+        "/static/images/evil.svg", "/blog/..%2Fstatic/evil.html", "/%2Frobots.txt", "/x/..%2Frobots.txt"]) {
+        expect(await policy(path)).toEqual([path, 200, "sandbox"]);
+      }
+      // A page is the site's own, however it is reached.
+      for (const path of ["/blog/", "//blog/", "/x/..%2Fblog/index.html", "/static/..%2Findex.html"]) {
+        expect(await policy(path)).toEqual([path, 200, null]);
+      }
+    } finally {
+      rmSync(join(dist, "static", "images"), { recursive: true });
+      rmSync(join(dist, "static", "evil.html"));
+      rmSync(join(dist, "robots.txt"));
+    }
+  });
 });
 
 describe("an address the export moved", () => {

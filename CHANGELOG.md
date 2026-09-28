@@ -89,6 +89,16 @@
   A hard link can't be told from the file it shares: don't hard-link
   anything from outside the site into it (n172).
 
+### Security
+
+- **The published server sandboxes a file by what it is, not by its
+  address.** `serve.ts` sandboxed an address that began `/static/`, so
+  `/%2Fstatic/images/x.svg`, `//static/…` and `/x/..%2Fstatic/x.html`
+  reached the same file in `static/` without the policy, and an SVG's
+  script ran on the site's address in Chrome and WebKit. It now asks where
+  the file really is in `dist/`: under `static/`, or one of the root files.
+  The served site already answers all three as not found.
+
 ## 0.16.0 — 2026-09-27
 
 - **`duckdown bucket pull` and `push`: a served site's content, between its

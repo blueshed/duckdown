@@ -799,6 +799,25 @@ describe("what an answer says about itself", () => {
       rmSync(join(SITE, "static", "leaflet.pdf"));
     }
   });
+
+  // The published server told a file by its address, so /%2Fstatic/… reached
+  // static/ there unsandboxed (hardening review). Here static/ is read only
+  // by its own route or as a root file, both staticFile(), sandboxed by what
+  // it is; any other spelling is a page's address, and names no page. Asked
+  // of the site's handler, where each arrives: Bun's fetch would send
+  // //static/… as /static/….
+  test("static/ is reached only as itself: another spelling of its address is no file", async () => {
+    writeFileSync(join(SITE, "static", "evil.html"), "<script>alert(1)</script>");
+    try {
+      for (const path of ["/%2Fstatic/images/logo.svg", "//static/images/logo.svg", "/x/..%2Fstatic/evil.html",
+        "/%2Ffavicon.ico", "/x/..%2Ffavicon.ico"]) {
+        const res = await siteHandler("")(new Request(`${BASE}${path}`));
+        expect([path, res.status, (await res.text()).includes("<script>alert")]).toEqual([path, 404, false]);   // the site's 404 page
+      }
+    } finally {
+      rmSync(join(SITE, "static", "evil.html"));
+    }
+  });
 });
 
 describe("site rendering", () => {

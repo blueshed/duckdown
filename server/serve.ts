@@ -9,7 +9,7 @@
 //
 //   bun run node_modules/duckdown/server/serve.ts     (SITE_DIR, PORT)
 
-import { join, normalize, resolve, sep } from "path";
+import { join, normalize, relative, resolve, sep } from "path";
 import { realpath, stat } from "fs/promises";
 import { logView } from "./log";
 import { decodePath, HEALTH } from "./utils";
@@ -29,14 +29,21 @@ const inside = (root: string, path: string) => path === root || path.startsWith(
 // Under dir or nowhere: a path never climbs out of it, by ".." or through a
 // link, and only a file is served — the rule storage has (n172). A link in
 // dist/ to /etc/passwd handed it over. What is served is the file the path
-// really is, typed by the name it was asked for.
-async function file(dir: string, path: string): Promise<Bun.BunFile | null> {
+// really is, typed by the name it was asked for, with where it really is in
+// dist/ (`key`), which is what decides how it is handed out.
+async function file(dir: string, path: string): Promise<{ body: Bun.BunFile; key: string } | null> {
   const full = normalize(join(dir, path));
   if (!inside(dir, full)) return null;
   const [root, to] = await Promise.all([realpath(dir), realpath(full)]).catch(() => []);   // nothing there: a miss
   if (!root || !to || !inside(root, to) || !(await stat(to)).isFile()) return null;
-  return Bun.file(to, { type: Bun.file(full).type });
+  return { body: Bun.file(to, { type: Bun.file(full).type }), key: relative(root, to).split(sep).join("/") };
 }
+
+// A file from static/, or one of the root files the export took from there,
+// is a file, never a page (headers.ts), as the served site answers it. Told
+// by the file, never by the address: /%2Fstatic/…, //static/… and
+// /x/..%2Fstatic/… each reach static/ without starting /static/.
+const handedOut = (key: string) => key.startsWith("static/") || !!rootFile(key);
 
 // What one request gets. `html` says whether the answer is a page: only pages
 // are views (a stylesheet or an image fetched by one is not a reader arriving),
@@ -60,13 +67,11 @@ async function route(req: Request, dir: string, origin: string): Promise<{ res: 
     ?? (rootFile(path.slice(1)) === "apple-touch-icon.png" ? await file(dir, "/apple-touch-icon.png") : null);
   if (found) {
     // Short, and the same for everything: nothing here is content-hashed,
-    // so a stylesheet edited this morning has to be able to show up. A file
-    // from static/, or one of the root files the export took from there, is
-    // a file, never a page (headers.ts), as the served site answers it.
-    const file = path.startsWith("/static/") || rootFile(path.slice(1)) ? asFile(found.type) : {};
+    // so a stylesheet edited this morning has to be able to show up.
+    const { body, key } = found;
     return {
-      res: new Response(found, { headers: { "Cache-Control": "public, max-age=300", ...file } }),
-      html: !!found.name?.endsWith(".html"),
+      res: new Response(body, { headers: { "Cache-Control": "public, max-age=300", ...(handedOut(key) ? asFile(body.type) : {}) } }),
+      html: !!body.name?.endsWith(".html"),
     };
   }
 
@@ -80,7 +85,7 @@ async function route(req: Request, dir: string, origin: string): Promise<{ res: 
   const missing = await file(dir, "404.html");
   return {
     res: missing
-      ? new Response(missing, { status: 404, headers: { "Content-Type": "text/html; charset=utf-8" } })
+      ? new Response(missing.body, { status: 404, headers: { "Content-Type": "text/html; charset=utf-8" } })
       : new Response("Not Found", { status: 404 }),
     html: true,
   };
