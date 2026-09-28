@@ -8,6 +8,7 @@ import { LocalStorage } from "../server/storage";
 import { siteFor, withExtensions, loadExtensions, type Extension } from "../server/extensions";
 import { listen } from "../server/serve";
 import { HEALTH } from "../server/utils";
+import homepage from "../server/edit/index.html";
 
 // An extension as a site would write one: a page of its own, in the site's look
 const hello: Extension = (site) => ({
@@ -78,6 +79,26 @@ describe("routes an extension adds", () => {
       expect(said).toEqual(["extensions answer /rsvp (POST), /any: a page at one of those addresses is never shown for the methods it answers"]);
       expect(await (await fetch(`http://localhost:${server.port}/rsvp`)).text()).toBe("page");
       expect(await (await fetch(`http://localhost:${server.port}/rsvp`, { method: "POST" })).text()).toBe("thanks");
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  // A Bun.file answers every method, and so does an HTML import (in
+  // development only GET and HEAD, the rest 405): neither lets any request
+  // through to the page, so each is named alone, as a Response is. They
+  // printed "/f ()", as if they answered nothing (review).
+  test("name a file or an HTML import alone, since no method gets past either to the page", async () => {
+    const said: string[] = [];
+    const files: Extension = () => ({ "/f": Bun.file(join(SITE, "static", "theme.css")), "/html": homepage });
+    const server = Bun.serve({ port: 0, routes: await withExtensions({}, site, [files], (line) => said.push(line)), fetch: () => new Response("page") });
+    try {
+      expect(said).toEqual(["extensions answer /f, /html: a page at one of those addresses is never shown for the methods it answers"]);
+      for (const path of ["/f", "/html"]) {
+        for (const method of ["GET", "POST", "DELETE"]) {
+          expect(await (await fetch(`http://localhost:${server.port}${path}`, { method })).text()).not.toBe("page");
+        }
+      }
     } finally {
       server.stop(true);
     }

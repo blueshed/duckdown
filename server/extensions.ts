@@ -29,7 +29,10 @@ export type Site = {
 };
 
 type Handler = (req: BunRequest) => Response | Promise<Response>;
-export type Routes = Record<string, Response | Handler | Partial<Record<"GET" | "POST" | "PUT" | "PATCH" | "DELETE", Handler>>>;
+const METHODS = ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"] as const;
+// What Bun takes as a route: a Response, a handler, a file, an HTML import, or
+// handlers by method.
+export type Routes = Record<string, Response | Handler | Bun.BunFile | Bun.HTMLBundle | Partial<Record<(typeof METHODS)[number], Handler>>>;
 export type Extension = (site: Site) => Routes | Promise<Routes>;
 
 export function siteFor(storage: Storage = storageAt(), origin = ORIGIN): Site {
@@ -45,8 +48,10 @@ export function siteFor(storage: Storage = storageAt(), origin = ORIGIN): Site {
 //
 // A page is no route: the site's pages come through fetch, after every route,
 // so an extension's address is its own and a page there is never shown for
-// the methods the route answers (n177). A Response or a handler answers
-// every method; a route of methods only those, so a GET to a POST-only form
+// the methods the route answers (n177). A Response, a handler, a Bun.file or
+// an HTML import answers every method, or refuses it (an HTML import in
+// development answers 405 past GET and HEAD), and lets none through to the
+// page; a route of methods answers only those, so a GET to a POST-only form
 // still reaches the page there. That is not checked against the pages. They
 // change while the server runs (the editor, a bucket), and what an editor
 // writes must never stop it; a check at start would miss every page written
@@ -58,7 +63,8 @@ export async function withExtensions<T extends object>(own: T, site: Site, exten
     for (const [path, route] of Object.entries(await extension(site))) {
       if (path in routes) throw new Error(`An extension's route ${path} clashes with one already there`);
       routes[path] = route;
-      added.push(route instanceof Response || typeof route === "function" ? path : `${path} (${Object.keys(route).join(", ")})`);
+      const methods = Object.keys(route).filter((key) => (METHODS as readonly string[]).includes(key));
+      added.push(methods.length ? `${path} (${methods.join(", ")})` : path);
     }
   }
   if (added.length) say(`extensions answer ${added.join(", ")}: a page at one of those addresses is never shown for the methods it answers`);
