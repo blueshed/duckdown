@@ -87,6 +87,27 @@ export function lands(out: string, path: string): boolean {
   return true;
 }
 
+// Whether a process is still there: signal 0 asks without sending anything.
+function running(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (e) {
+    return (e as NodeJS.ErrnoException).code === "EPERM";   // there, but not ours to signal
+  }
+}
+
+// What an export that was stopped left beside dist/, told from a running one's
+// by the process in its name: it goes.
+function tidy(at: string, name: string): void {
+  for (const kind of ["next", "old"]) {
+    const prefix = `.${name}.${kind}-`;
+    for (const left of readdirSync(at).filter((n) => n.startsWith(prefix))) {
+      if (!running(parseInt(left.slice(prefix.length)))) rmSync(join(at, left), { recursive: true, force: true });
+    }
+  }
+}
+
 // Put a new site where the old one was: the old aside, the new in its place,
 // then the old gone. Two renames, so dist/ is never part of one and part of
 // the other. A folder that can't be moved aside (a mount point) is emptied
@@ -131,11 +152,14 @@ export async function exportSite(o: {
   // (a folder that isn't there, a bucket that is empty), must not take a good
   // dist with it, nor report success and let a deploy go green on an empty
   // site. Beside it, so the swap is a rename; and what a run that was stopped
-  // left there goes first.
-  const next = join(dirname(out), `.${basename(out)}.next`);
-  const old = join(dirname(out), `.${basename(out)}.old`);
-  for (const left of [next, old]) rmSync(left, { recursive: true, force: true });
-  mkdirSync(next, { recursive: true });
+  // left there goes first. Each run's folders are its own, named for its
+  // process and unique in it (.dist.next-<pid>-…, .dist.old-<pid>-…), so two
+  // exports at once never write into one folder or clear the other's.
+  const [at, name] = [dirname(out), basename(out)];
+  mkdirSync(at, { recursive: true });
+  tidy(at, name);
+  const next = mkdtempSync(join(at, `.${name}.next-${process.pid}-`));
+  const old = join(at, `.${name}.old-${basename(next).slice(`.${name}.next-`.length)}`);
 
   const put = (path: string, body: string | Uint8Array) => {
     const full = join(next, path);

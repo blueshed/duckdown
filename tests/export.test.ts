@@ -136,8 +136,8 @@ describe("an export's pages, written as they are rendered", () => {
     writeFileSync(join(dir, "index.html"), "yesterday's site");
     let seen = false;
     const pages = watched(() => {
-      const next = join(RUN, ".export-streamed.next");
-      if (existsSync(join(next, "index.html"))) {
+      const next = readdirSync(RUN).find((n) => n.startsWith(`.export-streamed.next-${process.pid}-`));
+      if (next && existsSync(join(RUN, next, "index.html"))) {
         seen = true;
         expect(read(dir, "index.html")).toBe("yesterday's site");   // not replaced while it renders
       }
@@ -163,16 +163,29 @@ describe("an export's pages, written as they are rendered", () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  test("what a run that was stopped left beside dist/ is cleared by the next", async () => {
+  test("what a run that was stopped left beside dist/ is cleared by the next, and a running one's is left alone", async () => {
     const dir = out("stopped");
-    for (const left of [".export-stopped.next", ".export-stopped.old"]) {
+    const gone = Bun.spawnSync(["true"]).pid;   // a process that has ended
+    const running = `.export-stopped.next-${process.pid}-another`;
+    for (const left of [`.export-stopped.next-${gone}-abc`, `.export-stopped.old-${gone}-abc`, running]) {
       mkdirSync(join(RUN, left), { recursive: true });
-      writeFileSync(join(RUN, left, "stale.html"), "from a run that was stopped");
+      writeFileSync(join(RUN, left, "stale.html"), "from another run");
     }
     await exportSite({ out: dir, say: quiet });
     expect(existsSync(join(dir, "stale.html"))).toBe(false);
-    expect(readdirSync(RUN).filter((n) => n.startsWith(".export-stopped"))).toEqual([]);
-    rmSync(dir, { recursive: true, force: true });
+    expect(readdirSync(RUN).filter((n) => n.startsWith(".export-stopped"))).toEqual([running]);
+    for (const d of [dir, join(RUN, running)]) rmSync(d, { recursive: true, force: true });
+  });
+
+  test("two at once into one dist/ each write a folder of their own, and dist/ is one whole site", async () => {
+    const [one, dir] = [out("once"), out("twice")];
+    await exportSite({ out: one, say: quiet });
+    const [a, b] = await Promise.all([exportSite({ out: dir, say: quiet }), exportSite({ out: dir, say: quiet })]);
+    expect(a).toEqual(b);
+    const files = (d: string) => readdirSync(d, { recursive: true }).map(String).sort();
+    expect(files(dir)).toEqual(files(one));
+    expect(readdirSync(RUN).filter((n) => n.startsWith(".export-twice"))).toEqual([]);
+    for (const d of [one, dir]) rmSync(d, { recursive: true, force: true });
   });
 
   test("a dist/ that can't be moved aside (a mount point) is emptied and filled instead, and it says so", () => {
