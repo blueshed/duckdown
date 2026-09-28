@@ -34,6 +34,8 @@ Bun.serve({
 
 Adding a new route: one import, one line. The route file is self-contained.
 
+Every answer says `nosniff` (`everyAnswer()` and `answering()` in `headers.ts` wrap the routes, `fetch` and `error`). A new route that hands out stored bytes as they are — a file of the site, an earlier version, a report's raw markdown — spreads `...asFile(type)` into its headers, so an SVG or an HTML file there runs no script on the site's address.
+
 A site's own routes come in as extensions (see [Extensions](#extensions)): `main.ts` passes its routes through `withExtensions()`, which adds a site's, refuses a clash, and says what they answer, since a page at one of their addresses is never shown for the methods it answers.
 
 ## Project Structure
@@ -78,6 +80,7 @@ duckdown/
 │   ├── export.ts           # bun run export — the whole site as files
 │   ├── links.ts            # The links a page makes, and which lead nowhere (the export and the preview ask)
 │   ├── utils.ts            # Shared helpers: paths, escaping, dates, a pass outside code
+│   ├── headers.ts          # What an answer says about itself: nosniff on every one; asFile() sandboxes a file handed out as it is
 │   ├── routes/
 │   │   ├── files.ts        # fileRoutes() — GET/PUT/DELETE over one folder
 │   │   ├── pages.ts        # /edit/pages/* — file CRUD, via fileRoutes
@@ -309,8 +312,14 @@ A bucket has no links, so on disk a link is what a bucket would hold once `duckd
 
 - **A section is the site's own folder.** pages/, static/, static/images/, templates/, reports/ or a history that is a link, or sits under one, is refused whole and said once: taken as its own root, a linked static/ served its target's files, keys and all, to anyone. It lists empty, as a bucket's would, and nothing in it is read or written.
 - **A link to a file anywhere in the site is that file** — pages/ to static/ is fine — listed, read and kept like any other, until a write replaces the link with a file of its own.
-- **Any other link is nothing there**: one out of the site; one to what is read only by its own name (`BY_NAME`: users.json, .history/, reports/), from any storage, the whole site's included, which page.ts reads the templates through; one to a folder, since two can send a walk round forever; one to nothing. It is in no listing and no `keys()`, `follows()` says so once, read, write and remove refuse it as they refuse `..`, and `exists()` answers false.
+- **Any other link is nothing there**: one out of the site; one to what is read only by its own name (`BY_NAME`: users.json, .history/, reports/), from any storage, the whole site's included, which page.ts reads the templates through; one to a folder, since two can send a walk round forever; one to nothing. It is in no listing and no `keys()`, `follows()` says so once, read, write and remove refuse it as they refuse `..`, and `exists()` answers false. Asked for by name, a link to the site's own folder, or to reports/ or .history/ themselves, lists empty.
 - **A read is of the file that was judged.** `opened()` opens it first, then judges where the file it holds really is: that path must pass, and the file there must be the very one open (device and inode). A link swapped between a check and a read handed over its new target 2,431 times in 2.8 seconds in review; now that read is refused. It is judged before it is opened too, and must be a file: a named pipe is opened only once something writes to it, and a link out to one froze the whole server. It is opened non-blocking, so one swapped in between is refused, not waited on.
+
+And a key, on disk and in a bucket:
+
+- **A key names a file.** A write to the root, to a name ending `/`, or to a folder's name is a 400 before anything is written; a rename that fails anyway deletes its temporary file, which `keys()` would list and `bucket push` or a Publish would carry.
+- **A key that climbs out of the site** (`/static/..%2Fusers.json`) is a `BadRequest` from `safePath()`: a 400 with nothing logged.
+- **`serve.ts` follows the same rule**: it serves only a real file inside `dist/` (which may itself be a link), and sandboxes it by where that file really is, under `static/` or a root file, never by the address it was asked by.
 
 A hard link can't be told apart: it is the file itself, under another name, so a hard link to something outside the site reads as a page of it. Nothing duckdown writes makes one; don't make one. And a write or a remove is still a check and then an act, as is a read through a folder swapped for a link in between: someone swapping links in the site's folders that fast could still move where a write lands, so keep them writable by the server alone.
 
