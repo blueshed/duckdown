@@ -610,6 +610,9 @@ Paths: storage keys are real names. The server decodes the URL path (`after()`);
 
 ## A release, and the sites that run it
 
+To do all of it, run `/release patch|minor|major` (or `/release sites` to bring the sites onto
+the newest tag): `.claude/commands/release.md` has every step, and the rules each site holds.
+
 A release is a commit named `X.Y.Z: what it does`, with `version` in
 package.json and a `## X.Y.Z` entry at the top of CHANGELOG.md, then the tag
 `vX.Y.Z`, both pushed: `git push && git push origin vX.Y.Z`. A site upgrades
