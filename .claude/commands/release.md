@@ -6,10 +6,14 @@ argument-hint: "[patch | minor | major | tag | sites]"
 # /release
 
 A duckdown release isn't out until the sites run it. This takes `master` to a tag, then each site
-that depends on duckdown onto that tag, each by its own CLAUDE.md. `$ARGUMENTS` is `patch`,
-`minor` or `major` (release, then the sites), `tag` (the version `package.json` already has, untagged: steps 2, 4 and on), or `sites` (skip to step 6: the newest tag, to the
-sites still behind it). With no argument, change nothing: report the state (below). Anything else: stop and print
-`Usage: /release [patch|minor|major|tag|sites]`.
+that depends on duckdown onto that tag, each by its own CLAUDE.md. `$ARGUMENTS` is:
+
+- `patch`, `minor` or `major`: release, then the sites.
+- `tag`: the version `package.json` already has, untagged: steps 2 and 4, then the sites.
+- `sites`: skip to step 6, the newest tag to the sites still behind it.
+- nothing: change nothing, and report the state (step 0).
+
+Anything else: stop and print `Usage: /release [patch|minor|major|tag|sites]`.
 
 Running this is the authority to release and deploy. Carry it through without asking again,
 except where a step below says to ask. CLAUDE.md's "A release, and the sites that run it" says why
@@ -21,12 +25,15 @@ Change nothing. Run `git fetch`, then `bun run sites`, and print:
 
 - **duckdown:** the version in `package.json`, the newest tag, and whether they match (an untagged
   version is ready to tag); the branch, whether the tree is clean, and how far it is ahead of or
-  behind `origin/master`; whether `CHANGELOG.md` has an `## Unreleased` section and how many entries.
+  behind `origin/master`; whether `CHANGELOG.md` has an `## Unreleased` section, and how many
+  entries.
 - **The sites:** the table `bun run sites` prints, and what it says is not yet on the tag.
-- **What to run next**, in one line: `/release patch` (or `minor`/`major`) when there are unreleased
-  entries; `/release tag` when the version is already bumped and untagged (a merged fix came with its own
-  bump and changelog entry; never bump on top of a version that was never tagged); `/release sites` when
-  the tag is out and sites are behind; nothing when every site is on the tag, deployed and live.
+- **What to run next**, in one line:
+  - `/release patch` (or `minor`/`major`) when there are unreleased entries;
+  - `/release tag` when the version is already bumped and untagged (a merged fix came with its own
+    bump and changelog entry; never bump on top of a version that was never tagged);
+  - `/release sites` when the tag is out and sites are behind;
+  - nothing, when every site is on the tag, deployed and live.
 
 ## 1. Preflight
 
