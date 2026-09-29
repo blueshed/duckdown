@@ -6,7 +6,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 
 import { join } from "path";
 import { RUN } from "./helpers";
 import { cli } from "../server/cli";
-import { upgradeCommand, spawnRun, newer, latestTag, changesBetween, compare, STAND_IN, type Run } from "../server/upgrade";
+import { upgradeCommand, spawnRun, newer, latestTag, changesBetween, compare, folded, STAND_IN, type Run } from "../server/upgrade";
 
 const CHANGELOG = [
   "# Changelog", "",
@@ -85,6 +85,15 @@ const quietly = () => {
 };
 
 describe("duckdown upgrade", () => {
+  // After review: 0.17.1 added a file per search part, and the upgrade
+  // printed a line for each before the notes a site owner has to act on.
+  test("a folder of many files is one line with its count; a few are named", () => {
+    const parts = Array.from({ length: 7 }, (_, i) => `search/pages/${i}.json`);
+    expect(folded([...parts, "static/search.js", "a.html", "b/one.html"])).toEqual(
+      ["search/ (7 files)", "static/search.js", "a.html", "b/one.html"]);
+    expect(folded(parts.slice(0, 5))).toEqual(parts.slice(0, 5));
+  });
+
   test("moves the pin to the newest tag, refreshes the skill, and compares the export", async () => {
     const root = site("0.12.1", { skill: true });
     const { run, ran } = runner({

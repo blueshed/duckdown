@@ -10,9 +10,10 @@ import { unlisted, pageKey, readable } from "./listed";
 
 // What a reader can search: one entry per page and one per section of it, so a
 // result can take the reader to the place and not just the page. Small enough
-// to send whole — a few dozen pages is tens of kilobytes, less over the wire —
-// so the browser does the matching and the server does no searching at all.
-// Nothing here is a search engine.
+// to fetch in parts (searchFiles() below) — what a reader downloads follows
+// what they search, not the size of the site — so the browser does the
+// matching and the server does no searching at all. Nothing here is a
+// search engine.
 export type Entry = {
   url: string;          // the page's address; a section's ends in #its-id
   title: string;        // the page's
@@ -164,7 +165,9 @@ const WORD = /[\p{L}\p{M}\p{N}_]+(?:['’][\p{L}\p{M}\p{N}_]+)*/gu;
 const wordsOf = (text: string): string[] => (text.toLowerCase().match(WORD) ?? []).map((w) => w.replace(/’/g, "'"));
 
 // A word's shard is its first two letters, and the shard's file is that with
-// anything but a-z and 0-9 spelt as its code point: "üb" is _fc_b.json. A
+// anything but a-z and 0-9 spelt as its code point between dashes: "üb" is
+// -fc-b.json (never a leading _, which Jekyll-based hosts refuse to publish; a
+// dash can't be in a key, so it can only be an escape). A
 // query of one letter matches every word starting with it, which would be
 // every shard of that letter, so each letter has a shard of its own holding
 // all of them at once as "x*" — where any word starting with it is, at its
@@ -172,7 +175,7 @@ const wordsOf = (text: string): string[] => (text.toLowerCase().match(WORD) ?? [
 // that one letter, too: a letter cut from a longer word ("v-if") is only
 // itself. search.js has the same two lines.
 const shardOf = (word: string): string => [...word].slice(0, 2).join("");
-const fileOf = (key: string): string => key.replace(/[^a-z0-9]/gu, (c) => `_${c.codePointAt(0)!.toString(16)}_`);
+const fileOf = (key: string): string => key.replace(/[^a-z0-9]/gu, (c) => `-${c.codePointAt(0)!.toString(16)}-`);
 
 // Where in an entry a word is, at best — what search.js ranks by, and why a
 // word in the title outranks the same word in a page's text.
@@ -245,7 +248,7 @@ export function searchFiles(entries: Entry[]): SearchFiles {
 // A page's is made when it is asked for: the whole index is already kept.
 export function searchFile(files: SearchFiles, path: string): string | null {
   if (path === "/search/index.json") return files.index;
-  const word = /^\/search\/words\/([a-z0-9_]+)\.json$/.exec(path);
+  const word = /^\/search\/words\/([a-z0-9-]+)\.json$/.exec(path);
   if (word) return files.words.get(word[1]!) ?? null;
   const page = /^\/search\/pages\/(0|[1-9]\d*)\.json$/.exec(path);   // one name a page: not 00.json
   const entries = page ? files.pages[Number(page[1])] : undefined;

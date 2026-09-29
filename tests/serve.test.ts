@@ -13,6 +13,7 @@ const files: Record<string, string> = {
   "static/site.css": "body{}",
   "search.json": "[]",
   "search/index.json": '{"version":"1","words":[]}',
+  "search/tips.html": "<h1>tips</h1>",   // a page of the site's own, not a part
 };
 for (const [path, body] of Object.entries(files)) {
   mkdirSync(join(dist, path, ".."), { recursive: true });
@@ -70,6 +71,19 @@ describe("serveDist", () => {
     expect(again.status).toBe(304);
     expect(await again.text()).toBe("");
     expect((await ask("/search/index.json", dist, { "If-None-Match": '"another"' })).res.status).toBe(200);
+    // Weak, in a list, or "*": each is a match (RFC 9110's weak comparison).
+    for (const header of [`W/${etag}`, `"another", ${etag}`, "*"]) {
+      expect((await ask("/search/index.json", dist, { "If-None-Match": header })).res.status).toBe(304);
+    }
+  });
+
+  // After review: every file under search/ was taken for a part, so a page of
+  // the site's own there was never logged as a view and was never cached.
+  test("a page of the site's own under search/ is a page: logged, and cached as one", async () => {
+    const { res, logged } = await ask("/search/tips.html");
+    expect(await res.text()).toBe("<h1>tips</h1>");
+    expect(res.headers.get("cache-control")).toBe("public, max-age=300");
+    expect(logged).toEqual([["/search/tips.html", 200]]);
   });
 
   test("a path with a NUL is a 400, as one that won't decode is", async () => {

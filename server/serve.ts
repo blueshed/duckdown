@@ -72,7 +72,7 @@ async function route(req: Request, dir: string, origin: string): Promise<{ res: 
     // 304: they name each other by number, and a browser must not keep one
     // from before a deploy beside one from after.
     const { body, key } = found;
-    if (key.startsWith("search/")) {
+    if (SEARCH_PART.test(key)) {
       return { res: conditional(req, await body.bytes(), { "Content-Type": body.type, "Cache-Control": "no-cache" }), html: false };
     }
     return {
@@ -96,6 +96,10 @@ async function route(req: Request, dir: string, origin: string): Promise<{ res: 
     html: true,
   };
 }
+
+// The three shapes of a search part (search.ts): a page of the site's own
+// under search/ is a page, and is logged and cached as one.
+const SEARCH_PART = /^search\/(index\.json|(words|pages)\/[^/]+\.json)$/;
 
 // One line per page view, as the served site prints: what was read and how
 // much, and nothing that identifies a reader. `bun run views` reads these.

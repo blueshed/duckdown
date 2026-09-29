@@ -1,7 +1,7 @@
 // The site written out as files, rendered by the same code that serves it.
 import { describe, test, expect, spyOn } from "bun:test";
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "fs";
-import { join } from "path";
+import { basename, join } from "path";
 import { RUN, SITE } from "./helpers";
 import { exportSite, outPath, aliasFile, main, lands, swapIn } from "../server/export";
 import { Links } from "../server/links";
@@ -602,6 +602,25 @@ describe("the export's report of broken links", () => {
       rmSync(page); log.mockRestore(); error.mockRestore();
     }
     expect(await exportSite({ out: out("mended"), strict: true, say: quiet }).then((c) => c.broken)).toBe(0);
+  });
+
+  // After review: --strict swapped the failing site into dist/ and only then threw.
+  test("--strict leaves dist/ as it was, the last good site, and nothing beside it", async () => {
+    const dir = out("strict-kept");
+    await exportSite({ out: dir, say: quiet });
+    const before = readFileSync(join(dir, "index.html"), "utf8");
+    writeFileSync(page, "title: Links\n\n[gone](/gone.html)\n");
+    const said: string[] = [];
+    try {
+      await expect(exportSite({ out: dir, strict: true, say: (l) => said.push(l) })).rejects.toThrow("--strict is on");
+    } finally {
+      rmSync(page);
+    }
+    expect(said).toContain("broken link: links.html -> /gone.html");
+    expect(readFileSync(join(dir, "index.html"), "utf8")).toBe(before);
+    expect(existsSync(join(dir, "links.html"))).toBe(false);
+    expect(readdirSync(RUN).filter((n) => n.startsWith(`.${basename(dir)}.`))).toEqual([]);
+    rmSync(dir, { recursive: true, force: true });
   });
 });
 

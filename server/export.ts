@@ -16,6 +16,7 @@
 import { chmodSync, closeSync, cpSync, existsSync, mkdirSync, mkdtempSync, openSync, readdirSync, renameSync, rmSync, writeFileSync, writeSync } from "fs";
 import { basename, dirname, join } from "path";
 import { tmpdir } from "os";
+import { isAlive } from "./pid";
 import { ORIGIN, STATIC_PATH, IS_S3, BUCKET, BUCKET_PREFIX, APP_PATH } from "./config";
 import { createPageStorage, createStaticStorage, type Storage } from "./storage";
 import { parsePage, pageHtml, itemPage } from "./page";
@@ -101,16 +102,6 @@ function writeWhole(path: string, entries: Entry[]): void {
   }
 }
 
-// Whether a process is still there: signal 0 asks without sending anything.
-function running(pid: number): boolean {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (e) {
-    return (e as NodeJS.ErrnoException).code === "EPERM";   // there, but not ours to signal
-  }
-}
-
 // What an export that was stopped left beside dist/, told from a running one's
 // by the process in its name, goes — but for the site it had moved aside,
 // when it was stopped between its two renames: with no dist/, that goes back.
@@ -118,7 +109,7 @@ function tidy(at: string, name: string, out: string, say: (line: string) => void
   for (const kind of ["old", "next"]) {
     const prefix = `.${name}.${kind}-`;
     for (const left of readdirSync(at).filter((n) => n.startsWith(prefix))) {
-      if (running(parseInt(left.slice(prefix.length)))) continue;
+      if (isAlive(parseInt(left.slice(prefix.length)))) continue;
       if (kind === "old" && !existsSync(out) && restore(join(at, left), out, rename)) {
         say(`${out} was missing, left beside it as ${left} by an export that was stopped: it is back.`);
         continue;
@@ -360,6 +351,12 @@ export async function exportSite(o: {
     }
 
     broken = links.broken(written);
+    // --strict refuses before the swap: a site that fails is not put in
+    // dist/'s place, where a server reading it would carry on with it.
+    if (o.strict && (broken.length || problems.length)) {
+      report(broken, problems, say);
+      throw new Error(strictLine(broken, problems));
+    }
     // The whole site is written: it takes dist/'s place.
     unmoved = swapIn(next, out, old, o.rename);
   } catch (e) {
@@ -369,11 +366,8 @@ export async function exportSite(o: {
   if (unmoved) say(`${out} couldn't be moved aside (${unmoved}), so it was emptied and the new site copied in.`);
 
   count.broken = broken.length;
-  for (const line of broken) say(`broken link: ${line}`);
-  // A collection that can't have the addresses it asks for, said here as well
-  // as in the log: the export is where a site owner finds out before a reader.
   count.problems = problems.length;
-  for (const line of problems) say(`collection: ${line}`);
+  report(broken, problems, say);
 
   say(`${count.pages} page(s) and ${count.files} file(s) written to ${out}/`);
   if (count.drafts) say(`${count.drafts} draft(s) left out.`);
@@ -382,11 +376,19 @@ export async function exportSite(o: {
       + "Set it to the site's address (https://example.com) to make them absolute.\n"
       + "It also decides whether sitemap.xml is written: it needs absolute addresses.");
   }
-  if ((broken.length || problems.length) && o.strict) {
-    throw new Error(`${broken.length} broken link(s) and ${problems.length} collection problem(s), and --strict is on.`);
-  }
   return count;
 }
+
+// Each broken link and, as well as in the log, each collection that can't have
+// the addresses it asks for: the export is where a site owner finds out before
+// a reader.
+function report(broken: string[], problems: string[], say: (line: string) => void): void {
+  for (const line of broken) say(`broken link: ${line}`);
+  for (const line of problems) say(`collection: ${line}`);
+}
+
+const strictLine = (broken: string[], problems: string[]): string =>
+  `${broken.length} broken link(s) and ${problems.length} collection problem(s), and --strict is on.`;
 
 // What would stop this site publishing cleanly, found the way the export finds
 // it — by doing the whole export, into a folder thrown away after: each broken

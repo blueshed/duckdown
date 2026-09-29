@@ -77,6 +77,20 @@ export function compare(before: string, after: string): { same: number; added: s
   return out;
 }
 
+// A list of paths as lines to print: a folder with more than FOLDED of them
+// (the search index's parts, a page each) is one line with its count, so the
+// notes below the list aren't scrolled away.
+const FOLDED = 5;
+export function folded(paths: string[]): string[] {
+  const byFolder = new Map<string, string[]>();
+  for (const path of paths) {
+    const folder = path.includes("/") ? path.slice(0, path.indexOf("/") + 1) : "";
+    byFolder.set(folder, [...(byFolder.get(folder) ?? []), path]);
+  }
+  return [...byFolder].flatMap(([folder, list]) =>
+    folder && list.length > FOLDED ? [`${folder} (${list.length} files)`] : list);
+}
+
 // The version of duckdown in a site's node_modules, or null with none there.
 function installed(cwd: string): string | null {
   const path = join(cwd, "node_modules", "duckdown", "package.json");
@@ -152,7 +166,7 @@ export async function upgradeCommand(
       : `The export: all ${d.same} file(s) the same.`);
     if (origin) say(`  (No DUCKDOWN_ORIGIN here, so both exports used ${STAND_IN}: the sharing tags, sitemap.xml and feeds were compared too.)`);
     for (const [what, list] of [["added", d.added], ["gone", d.removed], ["changed", d.changed]] as const) {
-      for (const path of list) say(`  ${what}: ${path}`);
+      for (const line of folded(list)) say(`  ${what}: ${line}`);
     }
     const changelog = join(cwd, "node_modules", "duckdown", "CHANGELOG.md");
     const notes = existsSync(changelog) ? changesBetween(readFileSync(changelog, "utf8"), from, to) : "";

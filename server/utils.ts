@@ -35,12 +35,19 @@ export function after(req: BunRequest, prefix: string): string {
   return path;
 }
 
+// Whether an If-None-Match names this tag: "*", or a list of tags in which a
+// weak one (W/"…", as a compressing proxy leaves it) counts, since the
+// comparison for a 304 is weak (RFC 9110).
+function matches(header: string | null, etag: string): boolean {
+  return !!header && header.split(",").some((t) => t.trim() === "*" || t.trim().replace(/^W\//, "") === etag);
+}
+
 // Answer with validators, so a browser that has the bytes already is told so
 // (304) instead of being sent them again. The tag is a hash of the bytes.
 export function conditional(req: Request, body: string | Uint8Array, headers: Record<string, string>): Response {
   const etag = `"${Bun.hash(body).toString(36)}"`;
   const all = { ...headers, ETag: etag };
-  if (req.headers.get("if-none-match") === etag) return new Response(null, { status: 304, headers: all });
+  if (matches(req.headers.get("if-none-match"), etag)) return new Response(null, { status: 304, headers: all });
   return new Response(typeof body === "string" ? body : Buffer.from(body), { headers: all });
 }
 
