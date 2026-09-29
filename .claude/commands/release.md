@@ -9,7 +9,7 @@ A duckdown release isn't out until the sites run it. This takes `master` to a ta
 that depends on duckdown onto that tag, each by its own CLAUDE.md. `$ARGUMENTS` is `patch`,
 `minor` or `major` (release, then the sites), `tag` (the version `package.json` already has, untagged: steps 2, 4 and on), or `sites` (skip to step 6: the newest tag, to the
 sites still behind it). With no argument, change nothing: report the state (below). Anything else: stop and print
-`Usage: /release [patch|minor|major|sites]`.
+`Usage: /release [patch|minor|major|tag|sites]`.
 
 Running this is the authority to release and deploy. Carry it through without asking again,
 except where a step below says to ask. CLAUDE.md's "A release, and the sites that run it" says why
