@@ -623,7 +623,10 @@ to a tag, never to master. The changelog entry is what each site reads when
 A release isn't out until the sites run it. `bun run sites` finds every folder
 under `~/Workshop` that depends on duckdown and shows where each stands: its
 pin, what is installed, its copy of the skill, whether git has the upgrade,
-and what its address's `/health` says it runs (`OK duckdown X.Y.Z`; before
+how Railway's latest deployment got there (`push <commit>`, or `railway up
+<time>`) and whether it holds HEAD (a push is compared by commit, a
+`railway up` by when HEAD was committed; "not deployed" otherwise), and what
+its address's `/health` says it runs (`OK duckdown X.Y.Z`; before
 0.14.4 only `OK`). The address is the `DUCKDOWN_ORIGIN` in its
 `.railway/railway.ts`, or, while that domain isn't on Railway yet (or none
 is set), the service's own railway.app address as `railway status --json`

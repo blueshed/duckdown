@@ -2,8 +2,10 @@
 
 // bun run sites [root]: every site that runs duckdown, and where each stands
 // against the newest tag — its pin, what is installed, its copy of the skill,
-// whether git has the upgrade, and which duckdown its address's /health says
-// it runs (from 0.14.4; an older one says only OK). It reads and changes
+// whether git has the upgrade, how Railway's latest deployment got there (a
+// push, which names the commit, or `railway up`, which doesn't) and whether it
+// is HEAD, and which duckdown its address's /health says it runs (from 0.14.4;
+// an older one says only OK). It reads and changes
 // nothing, and exits 0: what to do about a site that's behind is in that
 // site's own CLAUDE.md. A release is out when every row is on the newest tag.
 //
@@ -26,7 +28,7 @@ const REPO = "https://github.com/blueshed/duckdown.git";
 const SKILL = join(".claude", "skills", "duckdown");
 const SKIP = new Set(["node_modules", "archive"]);
 
-type Row = { site: string; pin: string; installed: string; skill: string; git: string; live: string; origin: string; behind: string[] };
+type Row = { site: string; pin: string; installed: string; skill: string; git: string; deploy: string; live: string; origin: string; behind: string[] };
 
 function folders(dir: string, depth: number): string[] {
   let entries;
@@ -62,10 +64,13 @@ function railway(dir: string): { origin: string; service: string; project: strin
   return { origin: code.match(/DUCKDOWN_ORIGIN:\s*["'`]([^"'`]+)["'`]/)?.[1] ?? "", service: named("service"), project: named("project") };
 }
 
-// Each service's own railway.app address in production, by name, asked of
-// Railway once per project: sites in one project share the answer.
-const projects = new Map<string, Promise<Record<string, string>>>();
-function ownAddresses(dir: string, project: string): Promise<Record<string, string>> {
+// Each service's own railway.app address in production and its latest
+// deployment, by name, asked of Railway once per project: sites in one project
+// share the answer. A deployment made by a push names its commit; one made by
+// `railway up` names none.
+type Deployed = { address?: string; commit?: string; at: number };
+const projects = new Map<string, Promise<Record<string, Deployed>>>();
+function services(dir: string, project: string): Promise<Record<string, Deployed>> {
   const key = project || dir;
   if (!projects.has(key)) projects.set(key, (async () => {
     const status = await spawnRun(["railway", "status", "--json"], dir);
@@ -73,15 +78,32 @@ function ownAddresses(dir: string, project: string): Promise<Record<string, stri
     try {
       const envs = JSON.parse(status.out).environments?.edges ?? [];
       const production = envs.find((e: any) => e.node?.name === "production")?.node;
-      return Object.fromEntries((production?.serviceInstances?.edges ?? []).flatMap((e: any) => {
+      return Object.fromEntries((production?.serviceInstances?.edges ?? []).map((e: any) => {
         const domain = e.node?.domains?.serviceDomains?.[0]?.domain;
-        return domain ? [[e.node.serviceName, `https://${domain}`]] : [];
+        const latest = e.node?.latestDeployment;
+        return [e.node.serviceName, {
+          address: domain ? `https://${domain}` : undefined,
+          commit: latest?.meta?.commitHash,
+          at: Date.parse(latest?.createdAt ?? "") || 0,
+        }];
       }));
     } catch {
       return {};   // not linked, or not signed in: the row says there's no address
     }
   })());
   return projects.get(key)!;
+}
+
+// How the latest deployment got there, and whether it holds HEAD: a push names
+// its commit, so it is compared with HEAD; `railway up` uploads the folder, so
+// it is compared with when HEAD was committed.
+async function deployment(dir: string, d: Deployed | undefined): Promise<string> {
+  if (!d?.at) return "—";
+  const head = (await spawnRun(["git", "rev-parse", "HEAD"], dir)).out.trim();
+  if (d.commit) return head.startsWith(d.commit) ? `push ${d.commit.slice(0, 7)}, HEAD` : `push ${d.commit.slice(0, 7)}, HEAD is ${head.slice(0, 7)}: not deployed`;
+  const committed = Number((await spawnRun(["git", "log", "-1", "--format=%ct"], dir)).out.trim()) * 1000;
+  const when = new Date(d.at).toISOString().slice(5, 16).replace("T", " ");
+  return committed > d.at ? `railway up ${when}, HEAD is newer: not deployed` : `railway up ${when}`;
 }
 
 async function live(at: string): Promise<string> {
@@ -120,16 +142,19 @@ async function row(dir: string, s: string, newest: string): Promise<Row> {
   let at = declared.origin;
   const [g, first] = await Promise.all([git(dir), live(at)]);
   let l = first;
-  const own = declared.service && !/^\d/.test(l) ? (await ownAddresses(dir, declared.project))[declared.service] : undefined;
+  const service = declared.service ? (await services(dir, declared.project))[declared.service] : undefined;
+  const own = !/^\d/.test(l) ? service?.address : undefined;
   if (own) [at, l] = [`${own} (${declared.origin ? `${declared.origin}: ${first}` : "no DUCKDOWN_ORIGIN"})`, await live(own)];
+  const deploy = await deployment(dir, service);
   const behind = linked ? [] : [
     pin !== newest && "pin",
     installed !== newest && "installed",
     skill === "differs" && "skill",
     (g === "upgrade not committed" || g.endsWith("unpushed")) && "git",
+    deploy.endsWith("not deployed") && "deploy",
     at ? l !== newest && "live" : "no address",
   ].filter((x): x is string => !!x);
-  return { site: relative(ROOT, dir), pin, installed, skill, git: g, live: l, origin: at || "(no DUCKDOWN_ORIGIN)", behind };
+  return { site: relative(ROOT, dir), pin, installed, skill, git: g, deploy, live: l, origin: at || "(no DUCKDOWN_ORIGIN)", behind };
 }
 
 const tags = await spawnRun(["git", "ls-remote", "--tags", "--refs", REPO], ROOT);
@@ -146,7 +171,7 @@ const sites = folders(ROOT, 2).flatMap((dir) => {
 const rows = (await Promise.all(sites.map(({ dir, s }) => row(dir, s, newest)))).sort((a, b) => a.site.localeCompare(b.site));
 
 const head: Record<keyof Omit<Row, "behind">, string> = {
-  site: "site", pin: "pin", installed: "installed", skill: "skill", git: "git", live: "live", origin: "address",
+  site: "site", pin: "pin", installed: "installed", skill: "skill", git: "git", deploy: "deployed", live: "live", origin: "address",
 };
 const cols = Object.keys(head) as (keyof typeof head)[];
 const width = Object.fromEntries(cols.map((c) => [c, Math.max(head[c].length, ...rows.map((r) => r[c].length))]));
