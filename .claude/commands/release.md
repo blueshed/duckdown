@@ -16,12 +16,16 @@ each step is there.
 
 ## 1. Preflight
 
+0. If `package.json`'s `version` already has no tag (a merged fix came with its own bump and
+   changelog entry), skip steps 1.2 and 3: gate it (step 2), tag that version and push the tag
+   (step 4), then go on to step 5. Never bump on top of a version that was never tagged.
 1. On `master`, with a clean tree (`git status --porcelain` prints nothing), and not behind
    `origin/master` (`git fetch`, then `git rev-list --count HEAD..origin/master` is `0`).
 2. `CHANGELOG.md` has a `## Unreleased` section with something under it. It is what every site
    reads when `duckdown upgrade` prints it, so what a site must do itself is said there.
 3. The release's diff (`git diff v<last>..HEAD`) has had a simplicity pass: KISS, DRY, YAGNI,
-   clean. If it hasn't, do one first, and keep only the cuts the gate proves.
+   clean. If it hasn't, do one first (`/simplify`), and keep a cut only if step 2 still passes
+   with it.
 4. `bun run sites`: see where every site stands before anything changes.
 
 ## 2. Gate
@@ -39,7 +43,7 @@ Parse `version` in `package.json` as `x.y.z` and bump it (`patch` → `x.y.(z+1)
 
 ```
 git add package.json CHANGELOG.md
-git commit -m "X.Y.Z: what it does"
+git commit -m "0.17.3: search shards no longer start with _"   # X.Y.Z: what it does
 git tag vX.Y.Z
 git push && git push origin vX.Y.Z
 ```
@@ -52,7 +56,8 @@ A pushed tag is what sites install. Never move one. If something is wrong after 
 List the Claude sessions working on duckdown or on a site (`ListAgents`). Tell each the release is
 out and which of its sites you are about to upgrade, and leave a site to its session if it is still
 making it, or asks you to. A site whose deploy ships the folder as it stands (`railway up`) is
-asked first. Tell them again when their site is done.
+asked first. Wait for an answer for as long as the site's own steps take; silence means skip that
+site and say so. Tell them again when their site is done.
 
 ## 6. Each site
 
@@ -71,7 +76,8 @@ tag, in its own folder, **read its CLAUDE.md and follow its steps**; they differ
    shipped. Delete one if it's there, and say so.
 6. Commit `package.json`, `bun.lock` and the skill, worded as that site's last upgrade commit, with
    a line in its ledger if it keeps one.
-7. Deploy it its own way: a push, or `railway up` from a clean tree. A served site is started
+7. Deploy it its own way: a push (Railway's GitHub source builds it), or `railway up` from a
+   clean tree. A served site is started
    locally once first, where its CLAUDE.md allows it.
 8. Check: `/health` says `OK duckdown X.Y.Z`; the home page and one inner page are 200;
    `X-Content-Type-Options: nosniff` is on them, and `Content-Security-Policy: sandbox` on a
@@ -90,14 +96,18 @@ If a step fails, leave that site as it was: never force anything. Go on to the n
   - Tell its session before you begin.
 - **daisy:** `railway up` ships the folder as it stands. The tree must be clean, and its session
   asked.
-- **MostlyMovies:** its remote is Oliver Dashiell's repository. Never push it unless Peter says so
-  for this release.
+- **MostlyMovies:** Peter's own, shared with his son Oliver (Dash). Its remote is Oliver's GitHub
+  repository, and pushing to it is fine; it deploys by `railway up`, not by the push.
+- **blueshed/website:** a push to `main` is its deploy, and Peter presses it. Commit the upgrade,
+  then stop and say it is ready to push.
 - **blueshed/duckdown-forms:** another session's, linked to duckdown's working copy. Leave it.
 
 ## 7. Report
 
 Run `bun run sites` until every site's row is on the tag, live included, or says why it isn't.
-Then report:
+Its `deployed` column must be `push <commit>, HEAD` or a `railway up` time with no "not
+deployed" after it: a site whose live version is right but whose deploy isn't HEAD isn't done.
+`git` says `no upstream` for a site with no remote (daisy, dash); that is expected. Then report:
 
 ```
 Released duckdown X.Y.Z (tag vX.Y.Z).
