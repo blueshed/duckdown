@@ -1,24 +1,35 @@
 ---
-description: "Release duckdown (patch | minor | major) and bring every site that runs it onto the tag; `sites` brings them onto the newest tag without releasing."
-argument-hint: "patch | minor | major | sites"
+description: "Release duckdown (patch | minor | major) and bring every site that runs it onto the tag; `sites` brings them onto the newest tag without releasing; with no argument, show where everything stands."
+argument-hint: "[patch | minor | major | tag | sites]"
 ---
 
 # /release
 
 A duckdown release isn't out until the sites run it. This takes `master` to a tag, then each site
 that depends on duckdown onto that tag, each by its own CLAUDE.md. `$ARGUMENTS` is `patch`,
-`minor` or `major` (release, then the sites), or `sites` (skip to step 6: the newest tag, to the
-sites still behind it). Anything else: stop and print `Usage: /release patch|minor|major|sites`.
+`minor` or `major` (release, then the sites), `tag` (the version `package.json` already has, untagged: steps 2, 4 and on), or `sites` (skip to step 6: the newest tag, to the
+sites still behind it). With no argument, change nothing: report the state (below). Anything else: stop and print
+`Usage: /release [patch|minor|major|sites]`.
 
 Running this is the authority to release and deploy. Carry it through without asking again,
 except where a step below says to ask. CLAUDE.md's "A release, and the sites that run it" says why
 each step is there.
 
+## 0. No argument: the state
+
+Change nothing. Run `git fetch`, then `bun run sites`, and print:
+
+- **duckdown:** the version in `package.json`, the newest tag, and whether they match (an untagged
+  version is ready to tag); the branch, whether the tree is clean, and how far it is ahead of or
+  behind `origin/master`; whether `CHANGELOG.md` has an `## Unreleased` section and how many entries.
+- **The sites:** the table `bun run sites` prints, and what it says is not yet on the tag.
+- **What to run next**, in one line: `/release patch` (or `minor`/`major`) when there are unreleased
+  entries; `/release tag` when the version is already bumped and untagged (a merged fix came with its own
+  bump and changelog entry; never bump on top of a version that was never tagged); `/release sites` when
+  the tag is out and sites are behind; nothing when every site is on the tag, deployed and live.
+
 ## 1. Preflight
 
-0. If `package.json`'s `version` already has no tag (a merged fix came with its own bump and
-   changelog entry), skip steps 1.2 and 3: gate it (step 2), tag that version and push the tag
-   (step 4), then go on to step 5. Never bump on top of a version that was never tagged.
 1. On `master`, with a clean tree (`git status --porcelain` prints nothing), and not behind
    `origin/master` (`git fetch`, then `git rev-list --count HEAD..origin/master` is `0`).
 2. `CHANGELOG.md` has a `## Unreleased` section with something under it. It is what every site
@@ -34,6 +45,9 @@ each step is there.
 test that runs git inherits `GIT_DIR` and writes into this repo's config (todo n180).
 
 ## 3. Version
+
+For `tag`, skip this step and the changelog check in 1.2: the version and its entry are already
+there, and step 4 tags them.
 
 Parse `version` in `package.json` as `x.y.z` and bump it (`patch` → `x.y.(z+1)`, `minor` →
 `x.(y+1).0`, `major` → `(x+1).0.0`). In `CHANGELOG.md`, replace `## Unreleased` with
