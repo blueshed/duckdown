@@ -339,8 +339,8 @@ describe("searchFiles", () => {
   });
 
   test("a letter outside a-z and 0-9 is its code point in the name; an apostrophe is inside a word, and ’ is '", () => {
-    expect(json("/search/words/_fc_b.json")).toEqual({ über: [1, 0] });
-    expect(json("/search/words/_fc_.json")).toEqual({ "ü*": [1, 0] });
+    expect(json("/search/words/-fc-b.json")).toEqual({ über: [1, 0] });
+    expect(json("/search/words/-fc-.json")).toEqual({ "ü*": [1, 0] });
     expect(json("/search/words/ca.json")).toEqual({ café: [1, 0] });
     const quoted = searchFiles([entry({ url: "/q.html", title: "Bunyan’s", text: "don't" })]);
     expect(JSON.parse(searchFile(quoted, "/search/words/bu.json")!)).toEqual({ "bunyan's": [0, 3] });
@@ -379,9 +379,18 @@ describe("searchFiles", () => {
     expect(version(entries)).not.toBe(version([...entries.slice(0, 3), { ...entries[3]!, date: "2026-09-28" }]));
   });
 
+  // After review: Jekyll-based hosts refuse to publish a file named _….
+  test("no file's name starts with _ or a dot, whatever the word starts with", () => {
+    const odd = searchFiles([{ url: "/a", title: "Ünder _score é 日本 .dot 'quote", section: "", description: "", date: "", text: "" }]);
+    const names = [...odd.words.keys()];
+    expect(names.length).toBeGreaterThan(5);
+    for (const name of names) expect(name).toMatch(/^[a-z0-9-][a-z0-9-]*$/);
+    expect(names.some((n) => n.startsWith("-"))).toBe(true);
+  });
+
   test("the files, one at a time, are every one there is", () => {
     const listed = [...searchFileList(files)];
-    const file = (k: string) => k.replace(/[^a-z0-9]/gu, (c) => `_${c.codePointAt(0)!.toString(16)}_`);
+    const file = (k: string) => k.replace(/[^a-z0-9]/gu, (c) => `-${c.codePointAt(0)!.toString(16)}-`);
     expect(listed.map(([path]) => path)).toEqual([
       "search/index.json",
       ...json("/search/index.json").words.map((k: string) => `search/words/${file(k)}.json`),

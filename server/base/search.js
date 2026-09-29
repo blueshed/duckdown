@@ -67,19 +67,21 @@
 
   // A word's shard is its first two letters, and its file is that with
   // anything but a-z and 0-9 spelt as its code point: "über" is in
-  // /search/words/_fc_b.json. A word of one letter is looked up in that
+  // /search/words/-fc-b.json. A word of one letter is looked up in that
   // letter's own shard, which holds every word starting with it at once
   // ("p*") and the word of that letter alone ("p").
   const shardOf = (word) => [...word].slice(0, 2).join("");
 
   // The query's words, each with whether it must be a whole word: a letter on
   // its own starts any word ("p" finds "page"), but a letter cut from a longer
-  // word ("v-if", "e-mail", "a-z") is only that letter, or it finds anything.
+  // token ("v-if", "e-mail", "a-z", "c++", "f#") is only that letter, or it
+  // finds anything.
   const terms = (query) => query.split(/\s+/).flatMap((typed) => {
     const parts = words(typed);
-    return parts.map((term) => ({ term, whole: parts.length > 1 && [...term].length === 1 }));
+    const cut = parts.length > 1 || typed.toLowerCase().replace(/’/g, "'") !== parts[0];
+    return parts.map((term) => ({ term, whole: cut && [...term].length === 1 }));
   });
-  const fileOf = (key) => key.replace(/[^a-z0-9]/gu, (c) => `_${c.codePointAt(0).toString(16)}_`);
+  const fileOf = (key) => key.replace(/[^a-z0-9]/gu, (c) => `-${c.codePointAt(0).toString(16)}-`);
 
   // Each word and page is fetched once, on the first search that needs it
   // rather than on page load: a reader who never searches never pays, and one
@@ -89,15 +91,23 @@
   // The index is asked for again at each search (a 304 when it hasn't
   // changed): an editor's save can renumber the pages, and what was kept from
   // another version of the index is dropped rather than read beside this one.
-  const load = (url, none, init) => fetch(url, init)
+  // A fetch that failed to arrive is forgotten, so the next search tries it
+  // again; one answered 404 is kept as nothing.
+  const load = (url, none, init, failed) => fetch(url, init)
     .then((r) => (r.ok ? r.json() : none))
     .catch((e) => {
       console.warn("search.js: couldn't fetch", url, e);
+      failed?.();
       return none;
     });
   const fetched = new Map();
   function get(url, none) {
-    if (!fetched.has(url)) fetched.set(url, load(url, none));
+    if (!fetched.has(url)) {
+      const p = load(url, none, undefined, () => {
+        if (fetched.get(url) === p) fetched.delete(url);
+      });
+      fetched.set(url, p);
+    }
     return fetched.get(url);
   }
   let version = null;

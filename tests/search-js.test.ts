@@ -210,17 +210,6 @@ describe("search.js, fetching what a search needs", () => {
     expect(asked.slice(first).filter((a) => a.startsWith("/search/words/"))).toEqual(["/search/words/p.json"]);   // its letter's shard, not every p-shard
   });
 
-  test("a letter that is part of a hyphenated word is that letter, not every word it starts", async () => {
-    start([
-      entry({ url: "/a.html", title: "Showing a part", text: "use v-if to show it, and e-mail us" }),
-      entry({ url: "/b.html", title: "Safety", text: "a vulnerable site, if left, gets email" }),
-    ]);
-    const paths = async (q: string) => hrefs(await search(q)).map((h) => h.split("#")[0]);
-    expect(await paths("v-if")).toEqual(["/a.html"]);    // not "vulnerable" and "if"
-    expect(await paths("e-mail")).toEqual(["/a.html"]);  // not "email"
-    expect(await paths("v")).toEqual(["/a.html", "/b.html"]);   // a letter on its own still starts words
-  });
-
   test("the query's words are cut as the index cuts a page's: at anything but a letter or a digit, accents and all", async () => {
     start([
       entry({ url: "/a.html", title: "Café society", text: "tree-lined streets" }),
@@ -230,7 +219,7 @@ describe("search.js, fetching what a search needs", () => {
     expect(hrefs(await search("lined"))).toEqual(["/a.html#:~:text=lined%20streets"]);   // a word after a hyphen starts one
     expect(hrefs(await search("CAFÉ"))).toEqual(["/a.html"]);
     expect(hrefs(await search("über"))).toEqual(["/b.html"]);   // a word may start with a letter that isn't a-z
-    expect(asked).toContain("/search/words/_fc_b.json");        // spelt as its code point in the file's name
+    expect(asked).toContain("/search/words/-fc-b.json");        // spelt as its code point in the file's name
     expect(hrefs(await search("naïve"))).toEqual(["/b.html#:~:text=na%C3%AFve%20art"]);
     expect(hrefs(await search("ve"))).toEqual([]);               // "naïve" is one word, not "na" and "ve"
     expect(hrefs(await search("—"))).toEqual([]);                // nothing to look for
@@ -248,6 +237,18 @@ describe("search.js, fetching what a search needs", () => {
     expect(hrefs(await search("e-mail"))).toEqual(["/c.html#:~:text=e%2Dmail%2C%20from%20a%20to%20z"]);
     expect(hrefs(await search("a-z"))).toEqual(["/c.html#:~:text=a%20to%20z"]);
     expect(hrefs(await search("v"))).toEqual(["/a.html", "/b.html#:~:text=v%2Dif%20on%20the%20element"]);   // on its own: any word it starts
+  });
+
+  // After review: "c++" was cut to "c" and found every word starting with c.
+  test("a letter followed by symbols (c++, f#) is that letter alone, not every word it starts", async () => {
+    start([
+      entry({ url: "/a.html", title: "Cats", text: "cars and cake" }),
+      entry({ url: "/b.html", title: "C++ basics", text: "a first program" }),
+      entry({ url: "/c.html", title: "F# basics", text: "another one" }),
+    ]);
+    expect(hrefs(await search("c++"))).toEqual(["/b.html"]);
+    expect(hrefs(await search("f#"))).toEqual(["/c.html"]);
+    expect(hrefs(await search("c")).map((h) => h!.split("#")[0])).toEqual(["/a.html", "/b.html"]);
   });
 
   test("a hyphenated word is looked for as its parts, and the link goes where the text has it as typed", async () => {
@@ -298,6 +299,25 @@ describe("search.js, fetching what a search needs", () => {
     expect(hrefs(await search("zebra"))).toEqual([]);            // no such shard: not asked for at all
     expect(asked).not.toContain("/search/words/ze.json");
     expect(warn.mock.calls.map((c) => c.slice(0, 2))).toEqual([["search.js: couldn't fetch", "/search/words/fo.json"]]);
+    warn.mockRestore();
+  });
+
+  // After review: a failed shard stayed failed until the page was reloaded.
+  test("a file that failed to arrive is asked for again by the next search, one answered 404 is not", async () => {
+    const warn = spyOn(console, "warn").mockImplementation(() => {});
+    start(pages);
+    const files = searchFiles(pages);
+    let online = false;
+    globalThis.fetch = (async (url: string) => {
+      asked.push(url);
+      if (url === "/search/words/tr.json" && !online) throw new TypeError("offline");
+      const body = searchFile(files, url);
+      return body === null ? new Response("Not Found", { status: 404 }) : new Response(body);
+    }) as unknown as typeof fetch;
+    expect(hrefs(await search("train"))).toEqual([]);
+    online = true;
+    expect(hrefs(await search("train"))).not.toEqual([]);
+    expect(asked.filter((a) => a === "/search/words/tr.json")).toHaveLength(2);
     warn.mockRestore();
   });
 

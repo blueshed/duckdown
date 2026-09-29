@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.17.2 — 2026-09-29
+
+- **A search shard's file name no longer starts with `_`.** A word starting
+  outside a-z and 0-9 is filed under its code point between dashes:
+  `über` is `search/words/-fc-b.json`, not `_fc_b.json`. Jekyll-based hosts
+  (GitHub Pages' branch deploy) refuse to publish a file whose name starts
+  with `_`, so every search for a word beginning é, ü or a non-Latin letter
+  found nothing there. Re-export to write the new names; a site with its
+  own `static/search.js` merges duckdown's (`server/base/search.js`) again.
+- **`c++`, `c#` and `f#` are searched as that letter alone**, as `v-if`
+  is, and no longer find every word starting with it.
+- **A search part that failed to arrive is asked for again** at the next
+  search, instead of staying empty until the page is reloaded.
+- **A page of the site's own under `search/`** (`pages/search/index.md`) is
+  served as a page by the published server: logged as a view and cached as
+  one, not taken for a part of the index.
+- **`If-None-Match` is compared weakly, and may be a list or `*`**, so a
+  proxy that weakens the ETag still gets a 304.
+- **`bun run export --strict` leaves `dist/` as it was** when a link is
+  broken or a collection has a problem, instead of swapping the failing
+  site in and then failing; it says what is wrong first, as before.
+- **`duckdown upgrade` prints a folder of many changed files as one line**
+  (`added: search/ (232 files)`), so the notes to act on stay in view.
+- Export's clean-up of an export that was stopped asks `pid.ts` whether its
+  process is alive, as the pid file does, and the search index's comment
+  describes the parts.
+
 ## 0.17.1 — 2026-09-28
 
 - **Search fetches what a search needs, not every word on the site.** The
@@ -18,7 +45,7 @@
   the export writes 25,000 more small files (72 MB, beside `search.json`'s
   68). Ranking, sections, text fragments, three results a page and
   one-letter searches are as they were: on blueshed.co.uk, vashti, daisy
-  and tony-site, 34 searches each gave 0.16.0's results but for these:
+  and tony-site, 37 searches each gave 0.16.0's results but for these:
   - `'` and `’` are the same, and an apostrophe inside a word is part of
     it: `don't` finds `don’t`, and `ve` no longer finds `I've`.
   - A query word with punctuation in it is looked for as its parts:

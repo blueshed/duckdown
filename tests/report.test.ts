@@ -95,7 +95,7 @@ describe("the report", () => {
       "/id_rsa", "/phpcs.xml", "/storage/logs/laravel.log", "/api", "/api/v1/config", "/@fs/proc/self/environ",
       "/_ignition/health-check", "/_image", "/search/config.json"]) expect([path, isProbe(path)]).toEqual([path, true]);
     for (const path of ["/", "/about.html", "/blog/", "/why-i-left-php-behind.html", "/static/site.css", "/static/search.js",
-      "/static/data/prices.csv", "/search.json", "/search/index.json", "/search/words/_fc_b.json", "/search/pages/3.json", "/sitemap.xml", "/blog/feed.xml", "/.well-known/security.txt", "/robots.txt",
+      "/static/data/prices.csv", "/search.json", "/search/index.json", "/search/words/-fc-b.json", "/search/pages/3.json", "/sitemap.xml", "/blog/feed.xml", "/.well-known/security.txt", "/robots.txt",
       "/favicon.ico", "/feed/", "/llms.txt", "/edit", "/apiary.html", "/blog/api/"]) expect([path, isProbe(path)]).toEqual([path, false]);
   });
 
