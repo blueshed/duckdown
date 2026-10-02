@@ -16,7 +16,7 @@
       "runtimeArgs": [
         "run",
         "--cwd",
-        "/Users/peterb/Workshop/vashti",
+        "/Users/peterb/Workshop/websites/vashti",
         "dev"
       ],
       "port": 8090
@@ -42,11 +42,11 @@
         "PORT=8082",
         "DUCKDOWN_PID=",
         "DEBUG=1",
-        "DUCKDOWN_PATH=/Users/peterb/Workshop/tony-site/site",
+        "DUCKDOWN_PATH=/Users/peterb/Workshop/websites/tony-site/site",
         "bun",
         "run",
         "--cwd",
-        "/Users/peterb/Workshop/tony-site",
+        "/Users/peterb/Workshop/websites/tony-site",
         "node_modules/duckdown/server/main.ts"
       ],
       "port": 8082
