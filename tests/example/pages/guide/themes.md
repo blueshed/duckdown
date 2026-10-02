@@ -1,5 +1,4 @@
 title: Styling your site
-nav: Styling
 toc: true
 
 # Styling your site

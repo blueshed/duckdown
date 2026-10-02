@@ -44,7 +44,10 @@ A translation that doesn't say what it was made from can't be checked. Press
 **Mark up to date** when you know it is current.
 
 `bun run export` lists the same: a translation that is out of date is reported
-with the broken links, and `--strict` fails on it.
+with the broken links, and `--strict` fails on it. From a terminal,
+`bunx duckdown translations status` says where each stands, and
+`bunx duckdown translations stamp cy/about.md` is **Mark up to date** for a page
+(or a folder of them, or a collection's words).
 
 ## What readers get
 

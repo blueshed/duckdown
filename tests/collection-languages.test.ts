@@ -196,6 +196,25 @@ describe("a collection in a language", () => {
     }
   });
 
+  test("a group key nothing has, and a labels field nothing declares, are said — not dropped in silence (n186)", async () => {
+    const said = spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const named = { ...WORKS, groups: [{ name: "early", label: "Early work", items: [{ src: "a.jpg", title: "First Light" }], groups: [{ name: "studies", items: [] }] }] };
+      const cy = json({ groups: { "Early work": "Gwaith cynnar", studies: "Astudiaethau", elsewhere: "Mewn man arall" }, labels: { year: { "1961": "x" }, decade: { "60s": "y" } } });
+      const collection = (await loadCollection(memory(SITE({ "works/collection.json": json(named), "cy/works/collection.json": cy })), "cy/works", true))!;
+      expect(collection.problems).toEqual([
+        'cy/works/collection.json: "Early work" isn\'t a group of works/collection.json — groups are keyed by a group\'s name, and "Early work" is the label of "early"',
+        'cy/works/collection.json: "elsewhere" isn\'t a group of works/collection.json — groups are keyed by a group\'s name',
+        'cy/works/collection.json: "decade" isn\'t a field of works/collection.json, so its labels are never shown',
+      ]);
+      expect(collection.groups[0]!.label).toBe("Early work");         // the wrong key changed nothing
+      expect(collection.groups[0]!.groups[0]!.label).toBe("Astudiaethau");   // a subgroup's name is a name
+      expect(said).toHaveBeenCalledTimes(3);
+    } finally {
+      said.mockRestore();
+    }
+  });
+
   test("a file that isn't JSON, or isn't an object, is the language with nothing translated, and says so", async () => {
     const said = spyOn(console, "error").mockImplementation(() => {});
     try {

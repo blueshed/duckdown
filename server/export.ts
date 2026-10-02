@@ -26,12 +26,13 @@ import { translationStandings } from "./translations";
 import { COLLECTION_FILE, collectionProblems, loadCollection } from "./collection";
 import { canonicalPath, escapeHtml } from "./utils";
 import { Links } from "./links";
-import { hidden } from "./listed";
+import { hidden, navIgnored } from "./listed";
 import { yes, folderOf } from "./markdown";
 import { joinKey } from "./slugs";
 import { BASE_FILES, ROOT_FILES, baseFile } from "./base";
 import { sitemapXml } from "./sitemap";
 import { feedXml, FEED_FILE } from "./feed";
+import { declaredAnswers, type Answers } from "./extensions";
 
 export type Exported = { pages: number; drafts: number; files: number; broken: number; problems: number; stale: number };
 
@@ -183,6 +184,7 @@ export async function exportSite(o: {
   files?: Storage;
   say?: (line: string) => void;
   strict?: boolean;   // a broken link is a failure, not just a report
+  answers?: Answers;  // the addresses a site's extensions answer, when not the package.json's (n194)
   lands?: typeof lands;
   rename?: typeof renameSync;
 }): Promise<Exported> {
@@ -270,6 +272,8 @@ export async function exportSite(o: {
       const parsed = parsePage(key, await pages.read(key));
       if (parsed.meta.each) continue;   // written as its items, above
       if (yes(parsed.meta.draft)) { count.drafts++; continue; }
+      const unused = navIgnored(key, parsed.meta);
+      if (unused) notes.push(unused);
       // No edit link: there is no editor behind a folder of files.
       const { html } = await pageHtml(parsed, { origin, editHref: "" });
       page(outPath(key), html);
@@ -398,7 +402,7 @@ export async function exportSite(o: {
       say(`${feeds.map((f) => `/${f}${FEED_FILE}`).join(", ")} not written: a feed needs DUCKDOWN_ORIGIN for its addresses.`);
     }
 
-    broken = links.broken(written);
+    broken = links.broken(written, o.answers ?? await declaredAnswers());
     // --strict refuses before the swap: a site that fails is not put in
     // dist/'s place, where a server reading it would carry on with it.
     if (o.strict && (broken.length || problems.length || stale.length)) {

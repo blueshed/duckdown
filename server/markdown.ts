@@ -18,9 +18,13 @@ export interface MarkdownResult {
 const KEYS = ["title", "nav", "toc", "layout", "css", "description", "draft", "date", "order", "aliases", "each", "collection", "feed", "image", "lang", "translated-from", "untranslated"];
 const isKey = (key: string) => KEYS.includes(key) || key.startsWith("x-");
 
+// A page from a CRLF editor is the same page: a line ends at \n or \r\n (n182).
+const LINES = /\r?\n/;
+const eolOf = (source: string) => (source.includes("\r\n") ? "\r\n" : "\n");
+
 export function parseFrontMatter(source: string): { meta: Record<string, string[]>; body: string } {
   const meta: Record<string, string[]> = {};
-  const lines = source.split("\n");
+  const lines = source.split(LINES);
   const fenced = lines[0]?.trim() === "---";
   let closed = !fenced;
   let i = fenced ? 1 : 0;
@@ -55,7 +59,7 @@ export function parseFrontMatter(source: string): { meta: Record<string, string[
 // a fenced block, the key lines of a bare one; null when it has none (a fence
 // nobody closed is none).
 function metaLines(source: string): [number, number] | null {
-  const lines = source.split("\n");
+  const lines = source.split(LINES);
   const { meta, body } = parseFrontMatter(source);
   if (lines[0]?.trim() === "---") {
     return body === source ? null : [1, lines.findIndex((line, i) => i > 0 && line.trim() === "---")];
@@ -68,10 +72,11 @@ function metaLines(source: string): [number, number] | null {
 // already; a page with none gets a block of its own, and a blank line to end it.
 export function addMeta(source: string, key: string, value: string): string {
   const range = metaLines(source);
-  if (!range) return `${key}: ${value}\n\n${source}`;
-  const lines = source.split("\n");
+  const eol = eolOf(source);
+  if (!range) return `${key}: ${value}${eol}${eol}${source}`;
+  const lines = source.split(LINES);
   lines.splice(range[1], 0, `${key}: ${value}`);
-  return lines.join("\n");
+  return lines.join(eol);
 }
 
 // The page without the front matter lines saying `key:` whose value `drop`
@@ -79,11 +84,11 @@ export function addMeta(source: string, key: string, value: string): string {
 export function dropMeta(source: string, key: string, drop: (value: string) => boolean): string {
   const range = metaLines(source);
   if (!range) return source;
-  return source.split("\n").filter((line, i) => {
+  return source.split(LINES).filter((line, i) => {
     if (i < range[0] || i >= range[1]) return true;
     const match = line.match(/^(\w[\w-]*)\s*:\s*(.*)$/);
     return !(match && match[1]!.toLowerCase() === key && drop(match[2]!.trim()));
-  }).join("\n");
+  }).join(eolOf(source));
 }
 
 // Render a page. `path` is where it lives ("guide/pages", or "guide/pages.md"),
@@ -98,7 +103,7 @@ export function renderMarkdown(source: string, path = ""): MarkdownResult {
     wikiLinks: true,
     headings: { ids: true, autolink: true }, // <h2 id="x"><a href="#x">…</a></h2>
   });
-  content = wikiLinks(callouts(scrollingTables(content)), folderOf(path));
+  content = wikiLinks(callouts(scrollingTables(explicitIds(content))), folderOf(path));
   if (yes(meta.toc)) content = withContents(content);
   return { content, meta, body };
 }
@@ -111,6 +116,19 @@ export function yes(value?: string[]): boolean {
 // The folder part of a page path: "guide/pages" → "guide", "index" → "".
 export function folderOf(path: string): string {
   return path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "";
+}
+
+// `## Heading {#id}`: the heading's id is the one written, not one made from
+// its words. Bun makes the id from the letters it knows, so an accented one
+// loses them ("yn ôl" → "yn-l") and a translation's anchors differ from its
+// original's; a writer who gives both headings the same `{#id}` has the same
+// anchor in every language, and one that doesn't change when the heading is
+// reworded (n187). Only at the end of a heading, and only [A-Za-z0-9_-].
+function explicitIds(html: string): string {
+  return html.replace(
+    /<h([1-6]) id="[^"]*"><a href="#[^"]*">(.*?)\s*\{#([\w-]+)\}<\/a><\/h\1>/g,
+    (_, level: string, inner: string, id: string) => `<h${level} id="${id}"><a href="#${id}">${inner}</a></h${level}>`,
+  );
 }
 
 // A markdown table wider than the screen scrolls inside a box of its own, not

@@ -2,10 +2,10 @@ import { computed } from "@blueshed/railroad";
 import { api, urlPath } from "./api";
 import { tell } from "./notice";
 import type { Row } from "../languages";
-import type { Standing } from "../standing";
+import { SAYS, type Standing } from "../standing";
 import { translations, languages, languageOf, refreshTranslations, loadFile, saveFile, editorContent, filePath, reloadBrowser } from "./store";
 
-export { refreshTranslations };
+export { refreshTranslations, SAYS };
 
 // A site in more than one language, in the editor (languages.ts): where each
 // page and each item of a collection stands in each language, what the tree
@@ -14,23 +14,10 @@ export { refreshTranslations };
 // count (routes/translations.ts); this is what the editor knows of it.
 const URL_ = "/edit/translations";
 
-// A language by its own name, which is how the person who wrote it knows it.
-export function languageName(code: string): string {
-  try {
-    return new Intl.DisplayNames([code], { type: "language" }).of(code) ?? code;
-  } catch {
-    return code;   // a tag the browser can't name is shown as it is
-  }
-}
-
-// How each standing is said, to a person.
-export const SAYS: Record<Standing, string> = {
-  fresh: "up to date",
-  stale: "out of date",
-  unchecked: "not checked",
-  own: "has no original",
-  missing: "not translated yet",
-};
+// A language by its own name, which is how the person who wrote it knows it:
+// the server's (translations.names), since the browser's locale data may not
+// have it. A code it hasn't been told is shown as it is.
+export const languageName = (code: string): string => translations.peek()?.names[code] ?? code;
 
 // The standings that want attention, and the symbol each is marked with.
 export const SYMBOL = { stale: "↻", unchecked: "?", missing: "–" } as const;

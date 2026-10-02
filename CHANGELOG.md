@@ -1,5 +1,66 @@
 # Changelog
 
+## Unreleased
+
+What water, the first site in two languages, found, and the small ones that
+waited. Nothing a site has to do; what a site may notice is said.
+
+- **`duckdown translations status|stamp`.** A site translated by script no longer
+  imports duckdown's modules by their paths to say what it has checked.
+  `status [lang] [--json]` is the Translations drawer from a terminal (each
+  language's counts, and what is out of date, not checked or not translated;
+  `--json` is the rows for a script); `stamp <path>…` is **Mark up to date** for a
+  translation, a collection's words, a folder of them, or a whole language, and
+  leaves what already says it is up to date untouched. Through the storage layer,
+  so it works against a bucket.
+- **A language's collection says when a key matches nothing.** `groups` is keyed
+  by a group's `name`, not its `label`; a wrong key was dropped in silence, as was
+  a `labels` field the collection doesn't declare. Both are now problems — in the
+  log, the preview, `bun run export` and `--strict` (so a translated collection
+  that keyed its groups by label will now fail a strict build, and say which key,
+  and which group it was the label of). The reference's example showed a label;
+  it shows a name now.
+- **`{{item-<field>-label}}`**: the word the collection's `labels` give a value,
+  else the value. A value that is also a CSS class or a data attribute can stay
+  one (`class="{{item-kind}}"`) and be shown in the language of the page
+  (`{{item-kind-label}}`).
+- **`## Heading {#id}`** gives a heading the id you write. Bun's ids drop letters
+  outside a-z ("yn ôl" is `#yn-l`), so a translation's anchors differed from the
+  original's; the same `{#id}` on both is the same anchor in every language, and
+  one that doesn't change when the heading is reworded. Headings without one are
+  as they were: nothing existing moves.
+- **A link that has the right page in the wrong form says so.** `/numbers/` for
+  the flat page `numbers.html`, or `/blog.html` for a folder, is a broken link as
+  before, now with `— did you mean /numbers.html?`, in the export and the preview.
+- **`nav:` on a page that isn't a folder's `index.md` says it does nothing**, in
+  the preview and as a note in the export (the seed's own guide had one, and no
+  longer does).
+- **A link to an address an extension answers** (`/figures.csv`, `/api/live`) is
+  no longer a broken link once the site says so: `"duckdown": { "answers":
+  ["/figures.csv", "/api/*"] }` in its package.json, in a route's own style.
+- **A page saved with Windows line endings has its front matter.** A CRLF page
+  showed its `title:` and `draft:` as text; it reads as any other now, and a page
+  that has CRLF keeps them when the editor adds an alias.
+- **`/CY/about.html` moves to `/cy/about.html`.** On a filesystem that doesn't tell
+  cases apart (macOS) the Welsh page was served as English through the default's
+  flow; a language spelled in another case is a 301 to the language's own.
+- **The editor names a language as the server does.** `/edit/translations` ships
+  each language by its own name ("Cymraeg"), where the browser's locale data
+  could say "Welsh".
+- **`duckdown init`**: `bun run build` is `export --strict` — a broken link, a
+  collection problem or a stale translation stops a deploy, and the live site is
+  left alone (a site's own `build` script is still its own). `--deploy up` writes
+  the `.railway/railway.ts` of a site with no GitHub source, deployed by `railway
+  up --service <name>`. A folder with a `.claude/CLAUDE.md` gets no second
+  `CLAUDE.md`. And the README, init's header and the scaffold's CLAUDE.md say
+  `bun install` comes before `bunx duckdown init` in a clone whose package.json
+  already names duckdown, and what Bun's "Couldn't find or open the file 'init'"
+  means.
+- **The tests no longer write into the repository they run under.** A test run by
+  a git hook or `git rebase --exec` inherited `GIT_DIR` and wrote into that
+  repository's config; every git call duckdown makes (publish, pull, the tests')
+  now names its own repository and nothing else.
+
 ## 0.18.0 — 2026-10-02
 
 - **A site can be in more than one language.** People translate; duckdown never

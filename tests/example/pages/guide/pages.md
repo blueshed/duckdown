@@ -113,6 +113,8 @@ function greet(name) {
 
 Every heading can be linked to: point at it and a `#` appears. Its link is the heading in lower case, with dashes for spaces — this section is `#headings-and-contents`.
 
+Say the id yourself by ending a heading with `{#id}`: `## Headings and contents {#headings}` is `#headings`. It's for a heading whose words are reworded or translated and whose link shouldn't change (the id takes letters, digits, `_` and `-`).
+
 Put `toc: true` in a page's front-matter and a list of its contents (its `##` and `###` headings) appears under its title, like the one at the top of this page.
 
 ## Callouts

@@ -5,6 +5,7 @@ import { mkdtempSync, cpSync, rmSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import { GlobalRegistrator } from "@happy-dom/global-registrator";
+import { REPOSITORY_ENV } from "../server/gitenv";
 
 // The server under test runs in this process on a scratch copy of the seed
 // site, with its own pid file (./duckdown.pid belongs to any dev server).
@@ -20,6 +21,10 @@ Object.assign(process.env, {
   DEBUG: "0",
   COOKIE_SECRET: "test-secret",
 });
+// A suite run from `git rebase --exec` (or a hook) inherits the variables that
+// name that repository, and a test that makes one of its own would write into
+// it: no test's git, or its children, may inherit them (n180).
+for (const name of REPOSITORY_ENV) delete process.env[name];
 // .env may point these at the dev site or a bucket; tests set their own.
 delete process.env.DUCKDOWN_SEED;
 delete process.env.DUCKDOWN_BUCKET;

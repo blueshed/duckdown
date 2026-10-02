@@ -97,6 +97,16 @@ describe("a site in English and Welsh", () => {
       }
     });
 
+    test("an address that spells the language in another case moves to the language's own (n183)", async () => {
+      for (const [asked, to] of [["/CY/about.html", "/cy/about.html"], ["/Cy", "/cy"], ["/CY/news/?a=1", "/cy/news/?a=1"]] as const) {
+        const { res } = await get(asked);
+        expect(res.status).toBe(301);
+        expect(res.headers.get("Location")).toBe(to);
+      }
+      expect((await get("/About.html")).res.status).not.toBe(301);   // only a language's name moves: the rest is the filesystem's
+      expect((await get("/cyfarwyddiadau")).res.status).toBe(404);
+    });
+
     test("the language's home answers at the language", async () => {
       for (const path of ["/cy", "/cy/", "/cy/index.html"]) {
         const { res, html } = await get(path);
@@ -592,8 +602,9 @@ describe("a site in English and Welsh", () => {
     });
 
     test("says the site's languages, and where each page stands in each", async () => {
-      const { main, others, rows } = await (await ask("")).json();
+      const { main, others, names, rows } = await (await ask("")).json();
       expect([main, others]).toEqual(["en", ["cy", "fr"]]);
+      expect(names).toEqual({ en: "English", cy: "Cymraeg", fr: "français" });   // each by its own name, from the server (n185)
       const row = (lang: string, key: string) => rows.find((r: { lang: string; key: string }) => r.lang === lang && r.key === key);
       expect(row("cy", "about.md")).toEqual({ lang: "cy", key: "about.md", standing: "unchecked", draft: false });
       expect(row("cy", "lleol.md").standing).toBe("own");

@@ -109,6 +109,8 @@ GitHub-flavoured markdown: headings, emphasis, `~~strikethrough~~`, links, lists
 
 Every heading gets an id — its text in lower case with dashes (`## Getting started` is `#getting-started`; a repeat becomes `-1`, `-2`) — and links to itself, so readers can copy a link to any section.
 
+Letters outside a-z and 0-9 are dropped from that id, not folded (`## Honiadau a dynnwyd yn ôl` is `#honiadau-a-dynnwyd-yn-l`), so in a site in another language a translation's anchors differ from its original's. End a heading with `{#id}` to say the id yourself — `## Withdrawn claims {#withdrawn}` and `## Honiadau a dynnwyd yn ôl {#withdrawn}` are both `#withdrawn` — which also keeps a link to it working when the heading is reworded. The id takes `a-z`, `A-Z`, `0-9`, `_` and `-`, shows nowhere, and is looked for only at the end of a heading; keep each unique on its page.
+
 `toc: true` puts a contents list of the page's `##` and `###` headings just after its first `#` heading (or at the top of a page without one). A page with no `##` or `###` headings gets no list.
 
 ### Callouts
@@ -394,6 +396,7 @@ names:
 | Placeholder | Becomes |
 |-------------|---------|
 | `{{item-<field>}}` | The item's value for that field: `{{item-title}}`, `{{item-caption}}`, `{{item-year}}`. Escaped, empty when unset or `skip` |
+| `{{item-<field>-label}}` | The word the collection's `labels` give that value (`"labels": { "kind": { "live": "byw" } }`), else the value itself: `class="{{item-kind}}"` keeps the value for a style, `{{item-kind-label}}` shows it, in the language of the page (a language's own `labels` override). Escaped |
 | `{{item-<image field>}}`, `{{item-thumb}}` | The picture and its thumbnail, as full URLs |
 | `{{item-href}}`, `{{item-slug}}` | The item's own address, and its slug |
 | `{{prev}}`, `{{next}}` | Links to the items either side, wrapping |
@@ -719,7 +722,7 @@ beside `pages/works/collection.json` holds only the words, by each item's slug:
   "items": {
     "first-light": { "title": "Golau cyntaf", "caption": "Inc ar bapur", "translated-from": "9f3a1c2e" }
   },
-  "groups": { "Early work": "Gwaith cynnar" },
+  "groups": { "paintings": "Paentiadau" },
   "labels": { "year": { "1961": "Blynyddoedd cynnar" } }
 }
 ```
@@ -731,7 +734,10 @@ beside `pages/works/collection.json` holds only the words, by each item's slug:
 - Only `text` and `long` fields are translated; the picture, a number and the
   rest are the default's. A field left out is the default's.
 - `translated-from` per item is a hash of the item's text and long fields,
-  tracked as a page's is. `groups` (by group name) and `labels` are not tracked.
+  tracked as a page's is. `groups` (keyed by the group's `name`, not its
+  `label`) and `labels` (by field, then value) are not tracked. A `groups` key
+  no group has, or a `labels` field the collection doesn't declare, is a
+  problem: in the log, the preview, `bun run export` and `--strict`.
 - The language's `each:` page is `pages/cy/works/item.md` when it has written
   one (the words around each work), else the default's. Its overviews are the
   language's: `{{items}}` in a Welsh page is its titles, its headings and its addresses.
@@ -753,6 +759,28 @@ translation it says where it stands, goes to the original, and **Mark up to
 date**. A collection's page in a language's folder opens the **words**: each
 item's original above a box for the language's, saved as the language's
 `collection.json`.
+
+### From the command line
+
+The same standings, for a site translated by script or checked from a terminal
+— through the storage layer, so it works on a folder and on a bucket, and
+nothing needs to import duckdown's modules by their paths:
+
+```sh
+bunx duckdown translations status              # each language's counts, and what is behind
+bunx duckdown translations status cy --json    # the rows: { lang, key, standing, draft }, for a script
+bunx duckdown translations stamp cy/about.md   # say it was made from about.md as it is now
+bunx duckdown translations stamp cy/guide      # every translation in a folder (and the collections' words)
+bunx duckdown translations stamp cy            # all of a language's
+```
+
+`stamp` is what a person who has read what changed says: it records the
+original's hash in `translated-from:` (in a collection's `collection.json`, per
+item that has words), and touches nothing that already says it is up to date. A
+page of the language's own, with no original, is left as it is and said. The
+files are written directly, not through the editor, so they keep no earlier
+version, and a running server shows the change after the next save in the
+editor or when it restarts.
 
 ## Styling
 
@@ -1086,6 +1114,16 @@ A name is a package the site depends on, or a path from the site's folder
 (`./extensions/rsvp.ts`). The served site and the published one both serve
 it, at the site's own address. If it won't load, the server won't start, and
 it says which one.
+
+A page that links to an address an extension answers (`/figures.csv`,
+`/api/live`) is reported as a broken link by the export and the editor's
+preview, which don't run the extensions. Say what they answer, beside them, in
+the route's own style (`:name` is one segment, a last `*` is anything), and the
+checks treat a link to one as reaching somewhere:
+
+```json
+"duckdown": { "extensions": ["./extensions/water.ts"], "answers": ["/figures.csv", "/api/*"] }
+```
 
 An extension's pages are rendered in the site's template. Where it keeps its
 markdown isn't `pages/`, so a link in one should start from the root

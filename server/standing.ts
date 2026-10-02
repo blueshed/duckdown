@@ -15,3 +15,13 @@ export type Standing = "fresh" | "stale" | "unchecked" | "own" | "missing";
 // A hash is read however it was typed, in capitals too.
 export const judge = (made: string | undefined, now: string): "fresh" | "stale" | "unchecked" =>
   !made ? "unchecked" : made.toLowerCase() === now ? "fresh" : "stale";
+
+// How each standing is said, to a person: in the editor, and by
+// `duckdown translations status`.
+export const SAYS: Record<Standing, string> = {
+  fresh: "up to date",
+  stale: "out of date",
+  unchecked: "not checked",
+  own: "has no original",
+  missing: "not translated yet",
+};

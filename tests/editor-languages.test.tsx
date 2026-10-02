@@ -116,7 +116,7 @@ async function welsh() {
 describe("translations, as the editor knows them", () => {
   test("a site with one language has none to say of", async () => {
     await refreshTranslations();
-    expect(translations.get()).toEqual({ main: "en", others: [], rows: [] });
+    expect(translations.get()).toEqual({ main: "en", others: [], names: { en: "English" }, rows: [] });
     expect(languages.get()).toEqual([]);
     expect(languageOf("cy/about.md")).toBeNull();
     expect(marksFor("about.md")).toEqual([]);
@@ -124,10 +124,13 @@ describe("translations, as the editor knows them", () => {
     expect(await collectionLanguage("cy/gallery")).toBeUndefined();
   });
 
-  test("a language by its own name; a tag the browser can't name is itself", () => {
+  test("a language by its own name, as the server says it (n185); one it hasn't been told is itself", () => {
+    translations.set({ main: "en", others: ["cy"], names: { en: "English", cy: "Cymraeg" }, rows: [] });
     expect(languageName("cy")).toBe("Cymraeg");
-    expect(languageName("fr")).toBe("français");
-    expect(languageName("aa-x1")).toBe("aa-x1");
+    expect(languageName("en")).toBe("English");
+    expect(languageName("fr")).toBe("fr");
+    translations.set(null);
+    expect(languageName("cy")).toBe("cy");
   });
 
   test("knows which language a key is in", async () => {
@@ -363,7 +366,7 @@ describe("the bar over the open page", () => {
   const bar = (host: ParentNode) => host.querySelector(".translation-bar");
 
   test("is not there when there is no other language, or the file isn't a page", async () => {
-    translations.set({ main: "en", others: [], rows: [] });
+    translations.set({ main: "en", others: [], names: {}, rows: [] });
     filePath.set("about.md");
     const { host, dispose } = render(() => <TranslationBar />);
     expect(bar(host)).toBeNull();
@@ -488,11 +491,11 @@ describe("the header's Translations", () => {
   });
 
   test("is there for a site with one language, with no badge, and asks the server again when something is written", async () => {
-    translations.set({ main: "en", others: [], rows: [] });
+    translations.set({ main: "en", others: [], names: {}, rows: [] });
     const asked: string[] = [];
     const restore = intercept((url) => {
       asked.push(url);
-      return Response.json({ main: "en", others: [], rows: [] });
+      return Response.json({ main: "en", others: [], names: {}, rows: [] });
     });
     const { host, dispose } = render(() => <TranslationsButton />);
     expect(button(host, "Translations")!.querySelector(".badge")).toBeNull();
@@ -510,8 +513,8 @@ describe("the header's Translations", () => {
 
 describe("the Translations drawer", () => {
   test("a site with one language is told so, and offered another", async () => {
-    translations.set({ main: "en", others: [], rows: [] });
-    const restore = intercept(() => Response.json({ main: "en", others: [], rows: [] }));
+    translations.set({ main: "en", others: [], names: {}, rows: [] });
+    const restore = intercept(() => Response.json({ main: "en", others: [], names: {}, rows: [] }));
     const { host, dispose } = render(() => <TranslationsDrawer />);
     expect(host.querySelector(".dialog-hint")!.textContent).toContain("This site is in one language");
     expect(host.querySelector('input[name="code"]')).not.toBeNull();
@@ -546,8 +549,8 @@ describe("the Translations drawer", () => {
   });
 
   test("says when everything is as it should be", async () => {
-    translations.set({ main: "en", others: ["cy"], rows: [{ lang: "cy", key: "about.md", standing: "fresh", draft: false }] });
-    const restore = intercept(() => Response.json({ main: "en", others: ["cy"], rows: [{ lang: "cy", key: "about.md", standing: "fresh", draft: false }] }));
+    translations.set({ main: "en", others: ["cy"], names: {}, rows: [{ lang: "cy", key: "about.md", standing: "fresh", draft: false }] });
+    const restore = intercept(() => Response.json({ main: "en", others: ["cy"], names: {}, rows: [{ lang: "cy", key: "about.md", standing: "fresh", draft: false }] }));
     const { host, dispose } = render(() => <TranslationsDrawer />);
     expect(host.querySelector(".translation-group .dialog-hint")!.textContent).toBe("Everything is translated, and up to date.");
     expect(host.querySelector(".dialog-hint")!.textContent).not.toContain("one language");
@@ -557,8 +560,8 @@ describe("the Translations drawer", () => {
 
   test("stops at a hundred a language, and says how many more", async () => {
     const rows = Array.from({ length: 130 }, (_, i) => ({ lang: "cy", key: `p${String(i).padStart(3, "0")}.md`, standing: "missing" as const, draft: false }));
-    translations.set({ main: "en", others: ["cy"], rows });
-    const restore = intercept(() => Response.json({ main: "en", others: ["cy"], rows }));
+    translations.set({ main: "en", others: ["cy"], names: {}, rows });
+    const restore = intercept(() => Response.json({ main: "en", others: ["cy"], names: {}, rows }));
     const { host, dispose } = render(() => <TranslationsDrawer />);
     expect(host.querySelectorAll(".translation-group li")).toHaveLength(100);
     expect(host.querySelector(".translation-group > .dialog-hint")!.textContent).toBe("…and 30 more.");

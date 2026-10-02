@@ -21,8 +21,19 @@ bun install
 bun run dev
 ```
 
-`bunx duckdown init` never overwrites: a `site/`, a `.env` or a script that is
-already there is left alone, and it says what it skipped.
+`bunx duckdown init` never overwrites: a `site/`, a `.env`, a `CLAUDE.md` (or a
+`.claude/CLAUDE.md`) or a script that is already there is left alone, and it
+says what it skipped. `bun run build` is the export with `--strict`: a deploy
+that would publish a broken link, a collection problem or a stale translation
+stops instead. A site that goes out by `railway up` rather than from a GitHub
+repository takes `bunx duckdown init --deploy up`, which writes the matching
+`.railway/railway.ts`.
+
+`bunx duckdown …` runs duckdown from `node_modules`, so it needs the dependency
+installed. `bun add` does that. In a folder whose `package.json` already names
+duckdown (a fresh clone, or a dependency you wrote by hand), run `bun install`
+first: until then Bun answers `Couldn't find or open the file 'init'`, which is
+Bun's way of saying there is no duckdown here yet, and nothing was written.
 
 **Create it** — when you want to own the code, or need a different duckdown.
 

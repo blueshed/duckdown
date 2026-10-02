@@ -6,7 +6,7 @@ import {
   SLUG, slugify, fragmentId, aliasKey, parseCollection, parseArgs,
   itemsHtml, groupsHtml, neighbour, itemValue, fillCollections, sortValues,
   loadCollection, collectionPath, collisions, collectionProblems, itemAt,
-  fillItem, itemMeta, itemBody, PLAIN,
+  fillItem, itemMeta, itemBody, itemText, PLAIN,
 } from "../server/collection";
 import { thumbName } from "../server/images";
 import { siteChanged } from "../server/kept";
@@ -561,6 +561,33 @@ describe("fields", () => {
     expect(collection.problems).toEqual([
       'works/collection.json: 1 item(s) say "year", and there are no "fields" — without them an item is src, title and caption; declare the fields',
     ]);
+  });
+
+  test("{{item-<field>-label}} is the word the collection's labels give a value, else the value (n188)", () => {
+    const warn = spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      siteChanged();
+      const collection = paged(parseCollection("works", json({
+        fields: ["title", "kind", "year", "kind-label"],
+        labels: { kind: { live: "byw & bywiog" }, year: { "1961": "Blynyddoedd cynnar" } },
+        groups: [group("all", [{ title: "A", kind: "live", year: "1961", "kind-label": "mine" }, { title: "B", kind: "estimate", year: "skip" }])],
+      })));
+      const [a, b] = collection.items.map((item) => ({ collection, item }));
+      expect(itemValue("item-kind", a!)).toBe("live");                          // the value, for a class
+      expect(itemValue("item-kind-label", a!)).toBe("mine");                    // a field really called kind-label is that field
+      expect(itemValue("item-year-label", a!)).toBe("Blynyddoedd cynnar");
+      expect(itemValue("item-year-label", b!)).toBe("");                        // skip is nothing, labelled or not
+      expect(itemText("item-kind", b!)).toBe("estimate");
+      collection.fields = collection.fields.filter((f) => f.name !== "kind-label");
+      expect(itemText("item-kind-label", a!)).toBe("byw & bywiog");
+      expect(itemValue("item-kind-label", a!)).toBe("byw &amp; bywiog");        // escaped where it is printed
+      expect(itemText("item-kind-label", b!)).toBe("estimate");                 // no label: the value
+      expect(itemText("item-nope-label", a!)).toBe("");
+      expect(warn.mock.calls.map((c) => c[0])).toEqual(['{{item-nope-label}}: works/collection.json has no field "nope"']);
+    } finally {
+      warn.mockRestore();
+      siteChanged();
+    }
   });
 
   test("asking for a field that isn't declared is a typo, said once in the log", () => {

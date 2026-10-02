@@ -1,7 +1,7 @@
 import type { BunRequest } from "bun";
 import { requireAuth } from "../auth";
 import { createPageStorage } from "../storage";
-import { languagesOf, splitLanguage, translationDraft, stamped, newLanguage, type Languages } from "../languages";
+import { languagesOf, splitLanguage, translationDraft, stamped, newLanguage, languageName, type Languages } from "../languages";
 import { translationStandings } from "../translations";
 import { translationView } from "../collection";
 import { parseFrontMatter } from "../markdown";
@@ -12,8 +12,9 @@ const pages = createPageStorage();
 // /edit/translations — what the editor needs to keep a site's languages
 // together (languages.ts). What it only asks is GET:
 //
-//   GET                              the site's languages, and where each page
-//                                    and item stands in each
+//   GET                              the site's languages (and each by its own
+//                                    name), and where each page and item
+//                                    stands in each
 //   GET ?draft=<lang>&key=<key>      what a translation of the page starts as
 //   GET ?items=<lang>&folder=<dir>   a collection beside what the language says
 //   POST ?stamp=<lang>&key=<key>     the body, saying it was made from the page
@@ -69,7 +70,11 @@ export const handleTranslations = {
       return view ? Response.json(view) : refused("There is no collection there to translate", 404);
     }
 
-    return Response.json({ main: languages.main, others: languages.others, rows: await translationStandings(pages) });
+    // Each language by its own name, as the server knows it: the browser's own
+    // locale data may lack one (Welsh in some builds), and the site's readers
+    // see this name in the switcher (n185).
+    const names = Object.fromEntries([languages.main, ...languages.others].map((lang) => [lang, languageName(lang)]));
+    return Response.json({ main: languages.main, others: languages.others, names, rows: await translationStandings(pages) });
   },
 
   async POST(req: BunRequest) {

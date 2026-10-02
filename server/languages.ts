@@ -72,8 +72,8 @@ export const shortHash = (text: string): string => new Bun.CryptoHasher("sha256"
 // something to retranslate. Line endings and trailing spaces don't count
 // either: a save from another editor must not mark every page stale.
 export function sourceHash(source: string): string {
-  // Before it is parsed: a page with Windows line endings has no front matter
-  // as far as the parser can tell, and would hash as one long body.
+  // A page with no front matter keeps its line endings as its body, so they
+  // are made one kind first.
   const { meta, body } = parseFrontMatter(source.replace(/\r\n?/g, "\n"));
   const text = [meta.title?.[0] ?? "", meta.description?.[0] ?? "", body]
     .map((part) => part.replace(/[ \t]+$/gm, "").trim())
@@ -126,6 +126,13 @@ export function languageAt(languages: Languages, name: string): { lang: string; 
   const { lang, key } = splitLanguage(languages, name);
   return lang === languages.main ? null : { lang, rest: key };
 }
+
+// The language an address's first part spells in another case — /CY/about, which
+// a filesystem that doesn't tell cases apart (macOS) would otherwise answer
+// through the default's flow as English. Null when it is spelled right or is
+// no language: the address to send it to is the language's own (n183).
+export const languageSpelled = (languages: Languages, first: string): string | null =>
+  languages.others.find((lang) => lang !== first && lang === first.toLowerCase()) ?? null;
 
 // Every language that has something to show for a page, and what: the page
 // itself in the language it is written in, a translation of it, or the

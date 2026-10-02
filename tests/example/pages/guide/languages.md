@@ -42,7 +42,9 @@ translated-from: 3f9a1c2e
 
 When the page changes, the editor marks the translation out of date and
 `bun run export` lists it (`--strict` fails on it). Read what changed, make
-yours say the same, and press **Mark up to date** in the editor.
+yours say the same, and press **Mark up to date** in the editor. From a
+terminal, `bunx duckdown translations status` lists them and
+`bunx duckdown translations stamp cy/about.md` says one is current.
 
 ## What a template needs
 

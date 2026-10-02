@@ -189,6 +189,7 @@ names all take these:
 | Placeholder | What it fills with |
 |-------------|--------------------|
 | `{{item-<field>}}` | The item's value for that field: `{{item-title}}`, `{{item-caption}}`, `{{item-year}}`. Escaped, and empty when unset |
+| `{{item-<field>-label}}` | The word the collection's `labels` give that value, else the value itself — `class="{{item-kind}}"` keeps the value for a style, `{{item-kind-label}}` shows it |
 | `{{item-src}}`, `{{item-thumb}}` | The picture and its thumbnail, as full URLs — `src` being this collection's image field |
 | `{{item-href}}` | The item's own address |
 | `{{prev}}`, `{{next}}` | Links to the items either side, wrapping |

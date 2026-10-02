@@ -84,7 +84,7 @@ export const resourceDirty = computed(() => resourceDraft.get() !== resourceSave
 // item stands in each language, as the server counts it. null until asked.
 // Kept here, with the rest of what the editor knows, because opening a page
 // or a collection depends on which language's folder it is in.
-export type Standings = { main: string; others: string[]; rows: Row[] };
+export type Standings = { main: string; others: string[]; names: Record<string, string>; rows: Row[] };
 export const translations = signal<Standings | null>(null);
 export const languages = computed(() => translations.get()?.others ?? []);
 

@@ -300,6 +300,23 @@ describe("parseFrontMatter", () => {
   });
 });
 
+describe("a page with Windows line endings (n182)", () => {
+  test("has its front matter, bare or fenced", () => {
+    expect(parseFrontMatter("title: A\r\ndraft: true\r\n\r\n# A\r\n")).toEqual({ meta: { title: ["A"], draft: ["true"] }, body: "# A\n" });
+    expect(parseFrontMatter("---\r\nauthor: B\r\n---\r\n\r\nbody")).toEqual({ meta: { author: ["B"] }, body: "body" });
+    expect(parseFrontMatter("---\r\nno fence closes this\r\n").meta).toEqual({});
+    expect(renderMarkdown("title: A\r\n\r\n# A\r\n").meta.title).toEqual(["A"]);
+  });
+
+  test("keeps its line endings through addMeta and dropMeta", () => {
+    const page = "title: A\r\nnav: yes\r\n\r\n# A\r\n";
+    const added = addMeta(page, "aliases", "/a.html");
+    expect(added).toBe("title: A\r\nnav: yes\r\naliases: /a.html\r\n\r\n# A\r\n");
+    expect(dropMeta(added, "aliases", () => true)).toBe(page);
+    expect(addMeta("# A\r\n", "aliases", "/a.html")).toBe("aliases: /a.html\r\n\r\n# A\r\n");
+  });
+});
+
 describe("addMeta and dropMeta", () => {
   test("a line goes at the end of the front matter, fenced or bare", () => {
     expect(addMeta("title: A\nnav: yes\n\n# A\n", "aliases", "/a.html")).toBe("title: A\nnav: yes\naliases: /a.html\n\n# A\n");
@@ -335,6 +352,21 @@ describe("renderMarkdown", () => {
     const { content } = renderMarkdown("## Two Words\n\n## Two Words");
     expect(content).toContain('<h2 id="two-words"><a href="#two-words">Two Words</a></h2>');
     expect(content).toContain('<h2 id="two-words-1">');
+  });
+
+  test("a heading that ends {#id} has that id, in its link, the contents and a wiki link to it (n187)", () => {
+    const source = "toc: true\n\n# Top {#start}\n\n## Honiadau a dynnwyd yn ôl {#withdrawn}\n\n## Plain *one* {#a_b-1}\n\nText {#not-a-heading}\n\n## Two {#x}\n\n## Two\n\n[[#withdrawn]] [[other#withdrawn]]";
+    const { content } = renderMarkdown(source, "guide/page");
+    expect(content).toContain('<h1 id="start"><a href="#start">Top</a></h1>');
+    expect(content).toContain('<h2 id="withdrawn"><a href="#withdrawn">Honiadau a dynnwyd yn ôl</a></h2>');
+    expect(content).toContain('<h2 id="a_b-1"><a href="#a_b-1">Plain <em>one</em></a></h2>');
+    expect(content).toContain("<p>Text {#not-a-heading}</p>");                      // only a heading's end
+    expect(content).toContain('<h2 id="x"><a href="#x">Two</a></h2>');
+    expect(content).toContain('<h2 id="two"><a href="#two">Two</a></h2>');         // the other, as it always was
+    expect(content).toContain('<li class="toc-h2"><a href="#withdrawn">Honiadau a dynnwyd yn ôl</a></li>');
+    expect(content).toContain('<a class="wikilink" href="#withdrawn">');
+    expect(content).toContain('<a class="wikilink" href="/guide/other.html#withdrawn">');
+    expect(renderMarkdown("## Open {#").content).toContain('id="open"');            // not an id: left as it was
   });
 
   test("toc: true lists the h2s and h3s under the title", () => {

@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeAll, spyOn } from "bun:test";
 import { mkdirSync, writeFileSync, readFileSync, readdirSync, renameSync, existsSync, rmSync } from "fs";
 import { join } from "path";
-import { BASE, SITE, signIn, authed, keepSite } from "./helpers";
+import { BASE, RUN, SITE, signIn, authed, keepSite } from "./helpers";
 import { siteHandler } from "../server/routes/site";
 import { feedXml } from "../server/feed";
 import type { Storage } from "../server/storage";
@@ -421,6 +421,30 @@ describe("markdown preview", () => {
     fetch(`${BASE}/edit/mark/?path=${encodeURIComponent(path)}`,
       authed({ method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ source, draft }) }));
 
+  test("a link to an address a site's extension answers is not dead, when the package.json says so (n194)", async () => {
+    const root = join(RUN, "preview-answers");
+    mkdirSync(root, { recursive: true });
+    writeFileSync(join(root, "package.json"), JSON.stringify({ duckdown: { answers: ["/figures.csv", "/api/*"] } }));
+    const source = "[data](/figures.csv) [live](/api/live) [gone](/gone.html)";
+    expect((await (await mark(source, "blog/linking.md")).json()).problems).toEqual(["Links that lead nowhere a reader can go: /figures.csv, /api/live, /gone.html"]);
+    const here = spyOn(process, "cwd").mockReturnValue(root);
+    try {
+      expect((await (await mark(source, "blog/linking.md")).json()).problems).toEqual(["Links that lead nowhere a reader can go: /gone.html"]);
+    } finally {
+      here.mockRestore();
+    }
+  });
+
+  test("says that nav: does nothing on a page that is no folder's index (n190)", async () => {
+    const said = async (path: string, source: string) => (await (await mark(source, path)).json()).problems;
+    expect(await said("about.md", "title: About\nnav: About us\n\nx")).toEqual([
+      "about.md says nav:, which only a folder's index.md uses: to put it in the navigation, make it about/index.md",
+    ]);
+    expect(await said("about/index.md", "title: About\nnav: About us\n\nx")).toEqual([]);
+    expect(await said("about.md", "title: About\n\nx")).toEqual([]);
+    expect((await (await mark("title: A template\nnav: x")).json()).problems).toEqual([]);   // no page: nothing to say
+  });
+
   // n110: a link a reader would follow to nothing is said while it is written.
   test("says which links lead nowhere a reader can go, each once, as written", async () => {
     await fetch(`${BASE}/edit/pages/blog/unready.md`, authed({ method: "PUT", body: "title: Unready\ndraft: true\n\nx" }));
@@ -433,10 +457,12 @@ describe("markdown preview", () => {
         "[a draft](/blog/unready.html) [nowhere](/nowhere.html) [nowhere again](/nowhere.html)",
         "[relative](missing.html) ![no picture](/static/images/missing.png) [no root file](/humans.txt)",
         "[the feed](/blog/feed.xml) [no feed](/guide/feed.xml)",
+        "[a page asked for as a folder](/guide/pages/) [a folder asked for as a page](/blog.html)",
       ].join("\n\n");
       const data = await (await mark(source, "blog/linking.md")).json();
       expect(data.problems).toEqual([
-        "Links that lead nowhere a reader can go: /blog/unready.html, /nowhere.html, missing.html, /static/images/missing.png, /humans.txt, /guide/feed.xml",
+        "Links that lead nowhere a reader can go: /blog/unready.html, /nowhere.html, missing.html, /static/images/missing.png, /humans.txt, /guide/feed.xml, "
+        + "/guide/pages/ — did you mean /guide/pages.html?, /blog.html — did you mean /blog/?",
       ]);
       // Fixed, it says nothing; and a template shown through a sample page has no address to check from.
       expect((await (await mark("[a page](/guide/pages.html)", "blog/linking.md")).json()).problems).toEqual([]);

@@ -1,3 +1,4 @@
+import { gitEnv } from "./gitenv";
 import { realpathSync } from "fs";
 import { join, relative, sep } from "path";
 import { APP_PATH, IS_S3, REMOTE } from "./config";
@@ -59,8 +60,8 @@ export function remoteFrom(spec = REMOTE, contentDir = APP_PATH, isS3 = IS_S3): 
 type Ran = { code: number; out: string; err: string; bytes: Uint8Array };
 
 async function git(cwd: string, args: string[]): Promise<Ran> {
-  // Never stop to ask for a password: there is nobody at this terminal.
-  const proc = Bun.spawn(["git", ...args], { cwd, stdout: "pipe", stderr: "pipe", env: { ...process.env, GIT_TERMINAL_PROMPT: "0" } });
+  // In the folder's own repository, whatever repository the environment names.
+  const proc = Bun.spawn(["git", ...args], { cwd, stdout: "pipe", stderr: "pipe", env: gitEnv() });
   const [bytes, err, code] = await Promise.all([new Response(proc.stdout).bytes(), new Response(proc.stderr).text(), proc.exited]);
   return { code, out: new TextDecoder().decode(bytes), err, bytes };
 }

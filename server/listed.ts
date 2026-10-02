@@ -25,3 +25,11 @@ export const pageKey = (key: string, others: string[] = []) =>
 // A page a reader can open at its own address: not a draft (404 but to the
 // editor), and not an each: page (it is its items, not a page).
 export const readable = (meta: Record<string, string[]>) => !yes(meta.draft) && !meta.each;
+
+// Only an index.md is in the navigation (labelled by its `nav:`), so `nav:` on
+// any other page does nothing — and the first place anyone looks for a menu
+// entry is `nav:` on about.md. Says what to do instead, or null (n190).
+export const navIgnored = (key: string, meta: Record<string, string[]>): string | null =>
+  meta.nav && key.endsWith(".md") && key.split("/").pop() !== "index.md"
+    ? `${key} says nav:, which only a folder's index.md uses: to put it in the navigation, make it ${key.replace(/\.md$/, "/index.md")}`
+    : null;

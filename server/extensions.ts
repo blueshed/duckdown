@@ -4,7 +4,13 @@
 // An extension is a module whose default export takes the Site and returns
 // Bun routes. The site declares it in its package.json, never in site/:
 //
-//   "duckdown": { "extensions": ["duckdown-forms", "./extensions/rsvp.ts"] }
+//   "duckdown": { "extensions": ["duckdown-forms", "./extensions/rsvp.ts"],
+//                 "answers": ["/figures.csv", "/api/*"] }
+//
+// `answers` says which addresses they answer, for the link checks: the export
+// (a build step with no server, which never loads them) and the preview would
+// otherwise call a link to /figures.csv broken. A route's own style: a segment
+// `:name` is any one, a last `*` is anything.
 //
 // site/ can be a bucket its editors write to; what runs on the server changes
 // only by a commit. Both servers take extensions: main.ts (served) and
@@ -93,4 +99,30 @@ export async function loadExtensions(root = process.cwd()): Promise<Extension[]>
     extensions.push(module.default as Extension);
   }
   return extensions;
+}
+
+// Whether an address is one an extension answers, as the site declares them. The
+// declaring is the site's: nothing here asks the routes, which exist only in a
+// running server (n194).
+export type Answers = (path: string) => boolean;
+
+export async function declaredAnswers(root = process.cwd()): Promise<Answers> {
+  const pkg = Bun.file(join(root, "package.json"));
+  if (!(await pkg.exists())) return () => false;
+  const declared: unknown = (await pkg.json()).duckdown?.answers ?? [];
+  if (!Array.isArray(declared) || !declared.every((address) => typeof address === "string" && address.startsWith("/"))) {
+    throw new Error(`package.json: "duckdown": { "answers" } is a list of addresses that start with /, as a route writes them (/api/*, /forms/:name)`);
+  }
+  const matchers = (declared as string[]).map(routeMatcher);
+  return (path) => matchers.some((matcher) => matcher.test(path));
+}
+
+// An address as a route writes it: `:name` is any one segment, a last `*` is anything.
+function routeMatcher(address: string): RegExp {
+  const parts = address.split("/").map((part) => {
+    if (part === "*") return ".*";
+    if (part.startsWith(":")) return "[^/]+";
+    return part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  });
+  return new RegExp(`^${parts.join("/")}$`);
 }

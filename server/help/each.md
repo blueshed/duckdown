@@ -19,6 +19,7 @@ title: {{item-title}}
 | `{{item-title}}` | The work's title (any field works: `{{item-year}}`) |
 | `{{item-src}}` | The work's picture |
 | `{{item-thumb}}` | Its small picture |
+| `{{item-year-label}}` | The word the collection's `labels` give that value (`1961` → `Early work`), or the value when it gives none |
 | `{{prev}}` `{{next}}` | Links to the works either side |
 | `{{group}}` | The name of the group it is in |
 | `{{groups}}` | The collection's sections, as a menu |

@@ -152,7 +152,7 @@ describe("install: bun add, then bunx duckdown init", () => {
     expect(installedRailway).toContain('partial = "installed"');
     expect(installedRailway).toContain('service("installed"');
     expect(installedRailway).toContain('healthcheck: "/health"');
-    expect(installedRailway).toContain('build: "bun run export"');
+    expect(installedRailway).toContain('build: "bun run export --strict"');   // a deploy that fails on a broken page, as the live site stays
     expect(installedRailway).toContain('start: "bun run node_modules/duckdown/server/serve.ts"');
     expect(installedRailway).toContain('DUCKDOWN_PATH: "./site"');
     expect(installedRailway).toContain('project("installed"');
@@ -197,6 +197,61 @@ describe("install: bun add, then bunx duckdown init", () => {
     const pkg = json(bare, "package.json");
     expect(pkg.dependencies.duckdown).toBe(`github:blueshed/duckdown#v${json(repo, "package.json").version}`);
     expect(pkg).toMatchObject({ name: "bare", private: true });
+  });
+
+  test("--deploy up writes the railway.ts of a site that goes out by railway up, and says so in its CLAUDE.md (n192)", async () => {
+    for (const flag of [["--deploy", "up"], ["--deploy=up"]]) {
+      const up = join(RUN, `deployed-by-up-${flag.length}`);
+      mkdirSync(join(up, "node_modules"), { recursive: true });
+      symlinkSync(repo, join(up, "node_modules", "duckdown"));
+      const log = quiet();
+      try {
+        expect(await cli(["init", ...flag], up)).toBe(0);
+      } finally {
+        log.mockRestore();
+      }
+      const railway = read(up, join(".railway", "railway.ts"));
+      expect(railway).not.toContain("github");
+      expect(railway).toContain("railway up --service deployed-by-up");
+      expect(railway).toContain('build: "bun run export --strict"');
+      expect(railway).toContain('DUCKDOWN_PATH: "./site"');
+      expect(read(up, "CLAUDE.md")).toContain("railway up --service deployed-by-up");
+      expect(read(up, "CLAUDE.md")).not.toContain("repository's path on GitHub");
+    }
+    // The default is the GitHub one, and says so.
+    expect(read(root, "CLAUDE.md")).toContain("repository's path on GitHub");
+    expect(read(root, "CLAUDE.md")).toContain("bun run build     # the same with --strict");
+    expect(read(root, "CLAUDE.md")).toContain("Couldn't find or open the file 'init'");
+  });
+
+  test("--deploy is github or up, and nothing else", async () => {
+    const odd = join(RUN, "odd-deploy");
+    mkdirSync(odd, { recursive: true });
+    const error = spyOn(console, "error").mockImplementation(() => {});
+    try {
+      expect(await cli(["init", "--deploy", "ftp"], odd)).toBe(1);
+      expect(await cli(["init", "--deploy"], odd)).toBe(1);
+      expect(String(error.mock.calls[0]![0])).toBe("duckdown init: --deploy is github (the default) or up (railway up), not ftp");
+      expect(String(error.mock.calls[1]![0])).toBe("duckdown init: --deploy is github (the default) or up (railway up), not nothing");
+    } finally {
+      error.mockRestore();
+    }
+    expect(existsSync(join(odd, "site"))).toBe(false);
+  });
+
+  test("a folder that keeps its notes under .claude/ gets no second CLAUDE.md (n192)", async () => {
+    const kept = join(RUN, "notes-under-claude");
+    mkdirSync(join(kept, ".claude"), { recursive: true });
+    writeFileSync(join(kept, ".claude", "CLAUDE.md"), "my notes");
+    const log = quiet();
+    try {
+      expect(await cli(["init"], kept)).toBe(0);
+      expect(said(log)).toContain("left alone: CLAUDE.md (.claude/CLAUDE.md is there)");
+    } finally {
+      log.mockRestore();
+    }
+    expect(existsSync(join(kept, "CLAUDE.md"))).toBe(false);
+    expect(read(kept, ".claude/CLAUDE.md")).toBe("my notes");
   });
 
   test("an unreadable package.json is an exit code and a message, not a stack", async () => {

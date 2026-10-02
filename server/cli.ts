@@ -5,15 +5,17 @@
 // with `user`, who can sign in, with `publish` and `pull`, the remote, with
 // `report`, the view log made into a page for the editors, with `upgrade`,
 // the site moved to another tag of duckdown and its export compared, with
-// `images`, the narrower widths of pictures already in static/images/, or with
+// `translations`, where each translation stands and one said to be checked,
+// with `images`, the narrower widths of pictures already in static/images/, or with
 // `bucket pull|push`, a served site's content between its bucket and a folder.
 
-import { scaffold } from "./init";
+import { scaffold, type Deploy } from "./init";
 
 export const USAGE = `duckdown                      the server (the editor at /edit)
-duckdown init                 the scaffold around duckdown in a new site
+duckdown init [--deploy up]   the scaffold around duckdown in a new site (up: deployed by railway up, not from GitHub)
 duckdown user <name>          who can sign in: add one, or set a password
 duckdown publish | pull       this copy of the site, to and from its git remote (DUCKDOWN_REMOTE)
+duckdown translations status [lang] [--json] | stamp <path>…   where each translation stands, and say one was checked
 duckdown bucket pull [folder] a served site's bucket into a folder (DUCKDOWN_SEED by default)
 duckdown bucket push [folder] a folder into the bucket: --force over a site, keeping what it replaces
 duckdown report [file]        the view log made into reports/ for the editors
@@ -34,9 +36,19 @@ const commands: Record<string, (args: string[]) => Promise<number>> = {
   report: async (args) => (await import("./report")).reportCommand(args),
   upgrade: async (args) => (await import("./upgrade")).upgradeCommand(args),
   images: async () => (await import("./widths")).imagesCommand(),
+  translations: async (args) => (await import("./translations")).translationsCommand(args),
   bucket: async (args) => (await import("./bucket")).bucketCommand(args),
   help, "--help": help, "-h": help,
 };
+
+// `--deploy up` (or `--deploy=up`): how the site reaches Railway.
+function deployOf(args: string[]): Deploy {
+  const i = args.findIndex((arg) => arg === "--deploy" || arg.startsWith("--deploy="));
+  if (i < 0) return "github";
+  const value = args[i]!.startsWith("--deploy=") ? args[i]!.slice("--deploy=".length) : args[i + 1];
+  if (value !== "github" && value !== "up") throw new Error(`--deploy is github (the default) or up (railway up), not ${value ?? "nothing"}`);
+  return value;
+}
 
 export async function cli(
   argv: string[],
@@ -58,7 +70,7 @@ export async function cli(
     return 0;
   }
   try {
-    const { wrote, skipped } = await scaffold(cwd, { vendored: false });
+    const { wrote, skipped } = await scaffold(cwd, { vendored: false, deploy: deployOf(argv.slice(1)) });
     for (const path of wrote) console.log(`wrote ${path}`);
     for (const path of skipped) console.log(`left alone: ${path}`);
     console.log("\nNext: bun install, then bun run dev, and open http://localhost:8080/edit (admin/admin).");

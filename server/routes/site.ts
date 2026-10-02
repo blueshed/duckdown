@@ -13,7 +13,7 @@ import { hostAnswer, hostOf, looking } from "../hosts";
 import { existsSync } from "fs";
 import { staticFile, CACHE } from "./static";
 import { feedXml, feedFolder, FEED_FILE } from "../feed";
-import { languagesOf, languageAt, translation } from "../languages";
+import { languagesOf, languageAt, languageSpelled, translation } from "../languages";
 
 const pages = createPageStorage();
 
@@ -167,7 +167,12 @@ const renderPage = async (req: Request) => {
     if (xml) return conditional(req, xml, { "Content-Type": "application/atom+xml; charset=utf-8", "Cache-Control": CACHE });
   }
   const name = path.replace(/\.html$/, "").replace(/\/$/, "") || "index";
-  const inLanguage = languageAt(await languagesOf(pages), name);
+  const languages = await languagesOf(pages);
+  // /CY/about is /cy/about, and says so, rather than a second address for it.
+  const first = path.split("/")[0]!;
+  const spelled = languageSpelled(languages, first);
+  if (spelled) return new Response(null, { status: 301, headers: { Location: encodeURI(`/${spelled}${decoded.slice(1 + first.length)}`) + url.search } });
+  const inLanguage = languageAt(languages, name);
   if (inLanguage) return languagePage(req, inLanguage.lang, inLanguage.rest, name, decoded);
   // A page, or the index of the folder of that name: /blog, /blog/ and
   // /blog/index.html all reach pages/blog/index.md.

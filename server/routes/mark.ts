@@ -4,7 +4,9 @@ import { parsePage, pageHtml, itemPage, type DraftTemplate } from "../page";
 import { createPageStorage, createStaticStorage } from "../storage";
 import { canonicalPath } from "../utils";
 import { deadLinks } from "../links";
+import { declaredAnswers } from "../extensions";
 import { folderOf } from "../markdown";
+import { navIgnored } from "../listed";
 import { collectionProblems, loadCollection, type ItemContext } from "../collection";
 import { siteOrigin } from "./site";
 
@@ -34,6 +36,8 @@ export const handleMark = {
     // back here: a slug that collides with a page, or a file that won't parse.
     // Failures speak, and the editor is where the person who can fix it is.
     const problems = await collectionProblems(pages, folderOf(path));
+    const unused = navIgnored(path, page.meta);
+    if (unused) problems.push(unused);
     // An each: page previews as the page its first item gets, drawn from the
     // unsaved source: what you are writing is every item page at once.
     let shown = page;
@@ -54,7 +58,7 @@ export const handleMark = {
     // A link a reader would follow to nothing, said while it is being
     // written rather than by the export later (or by a reader). Only for a
     // page: a template shown through a sample page has no address of its own.
-    const dead = path ? await deadLinks(html, canonicalPath(shown.key), pages, files) : [];
+    const dead = path ? await deadLinks(html, canonicalPath(shown.key), pages, files, await declaredAnswers()) : [];
     if (dead.length) problems.push(`Links that lead nowhere a reader can go: ${dead.join(", ")}`);
     return Response.json({ html, layout, includes, meta: page.meta, problems });
   },

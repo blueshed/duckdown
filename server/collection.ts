@@ -398,6 +398,10 @@ export function itemHash(collection: Collection, item: Item): string {
 type Said = { fields: Record<string, string>; from?: string };
 type Translations = { items: Map<Item, Said>; groups: Record<string, string>; labels: Record<string, Record<string, string>>; problems: string[] };
 
+// The item a translation's entry is for: by its slug, or by one it used to have.
+const itemFor = (base: Collection, key: string): Item | undefined =>
+  base.bySlug.get(key) ?? base.items.find((i) => i.aliases.some((alias) => aliasKey(alias).split("/").pop() === key));
+
 async function translationsIn(pages: Storage, base: Collection, file: string): Promise<Translations> {
   const out: Translations = { items: new Map(), groups: {}, labels: {}, problems: [] };
   if (!await pages.exists(file)) return out;
@@ -405,8 +409,7 @@ async function translationsIn(pages: Storage, base: Collection, file: string): P
   if (!raw) return out;
   const items = isRaw(raw.items) ? raw.items : {};
   for (const [key, entry] of Object.entries(items)) {
-    const item = base.bySlug.get(key)
-      ?? base.items.find((i) => i.aliases.some((alias) => aliasKey(alias).split("/").pop() === key));
+    const item = itemFor(base, key);
     if (!item) {
       out.problems.push(`${file}: "${key}" isn't an item of ${collectionPath(base.folder)}`);
       continue;
@@ -431,14 +434,59 @@ async function translationsIn(pages: Storage, base: Collection, file: string): P
     }
     out.items.set(item, said);
   }
+  // A key nothing has is said, as an unknown item is: it would otherwise be
+  // dropped in silence, and a label written for a group's label (not its name)
+  // is the likely mistake (n186).
   if (isRaw(raw.groups)) {
+    const all = allGroups(base.groups);
     for (const [name, label] of Object.entries(raw.groups)) {
+      if (!all.some((group) => group.name === name)) {
+        const labelled = all.find((group) => group.label === name);
+        out.problems.push(`${file}: "${name}" isn't a group of ${collectionPath(base.folder)} — groups are keyed by a group's name${labelled ? `, and "${name}" is the label of "${labelled.name}"` : ""}`);
+        continue;
+      }
       const words = text(label);
       if (words) out.groups[name] = words;
     }
   }
   out.labels = labelsOf(raw.labels);
+  for (const field of Object.keys(out.labels)) {
+    if (!base.fields.some((f) => f.name === field)) {
+      out.problems.push(`${file}: "${field}" isn't a field of ${collectionPath(base.folder)}, so its labels are never shown`);
+    }
+  }
   return out;
+}
+
+const allGroups = (groups: Group[]): Group[] => groups.flatMap((group) => [group, ...allGroups(group.groups)]);
+
+// Says that every item a language has words for was translated from the item
+// as it is now — what a person who has read what changed says in the editor
+// (`duckdown translations stamp`). The file is read and written as the pane
+// does, whole and otherwise as it was; an item with no words of its own is left
+// as it is, since there is nothing to have been made from anything. How many
+// items were stamped (one that already says it is up to date is not touched),
+// or null where the default has no collection or the language no file for it.
+export async function stampItems(pages: Storage, folder: string, lang: string): Promise<number | null> {
+  const base = await loadCollection(pages, folder, true);
+  const file = collectionPath(joinKey(lang, folder));
+  if (!base || !await pages.exists(file)) return null;
+  const problems: string[] = [];
+  const raw = rawObject(file, await pages.read(file), problems);
+  if (!raw) throw new Error(problems[0]);
+  let stamped = 0;
+  if (isRaw(raw.items)) {
+    for (const [key, entry] of Object.entries(raw.items)) {
+      const item = itemFor(base, key);
+      if (!item || !isRaw(entry) || !Object.keys(entry).some((name) => name !== "translated-from")) continue;
+      const hash = itemHash(base, item);
+      if (judge(text(entry["translated-from"]) ?? undefined, hash) === "fresh") continue;
+      entry["translated-from"] = hash;
+      stamped++;
+    }
+  }
+  if (stamped) await pages.write(file, `${JSON.stringify(raw, null, 2)}\n`);
+  return stamped;
 }
 
 // Whether an item is translated: it has words of its own in the language.
@@ -741,17 +789,26 @@ function unknownField(collection: Collection, field: string, where: string): voi
 }
 
 // An item's value as text, unescaped: {{item-<field>}} for anything the item
-// says (empty when unset, like an x- key; the picture field as its URL), and
-// {{group}} — the label of the group it sits in.
+// says (empty when unset, like an x- key; the picture field as its URL),
+// {{item-<field>-label}} for the word the collection's `labels` give that value
+// (the value itself when they give none) — so a template can keep a value for a
+// class or a data attribute and show its label, in the language of the page —
+// and {{group}}, the label of the group it sits in.
+const LABEL = "-label";
 export function itemText(name: string, { collection, item }: ItemContext): string {
   if (name === "group") return item.group.label;
-  const field = name.slice("item-".length);
+  let field = name.slice("item-".length);
+  const declared = (f: string) => BUILT_IN.includes(f) || collection.fields.some((x) => x.name === f);
+  const labelled = field.endsWith(LABEL) && !declared(field);   // a field really called "x-label" is a field
+  if (labelled) field = field.slice(0, -LABEL.length);
   unknownField(collection, field, `{{${name}}}`);
-  if (field === collection.image) return item.src;
-  if (field === "thumb") return item.thumb;
-  if (field === "href") return item.href;
-  const value = item.fields[field] ?? "";
-  return value === SKIP ? "" : value;
+  let value: string;
+  if (field === collection.image) value = item.src;
+  else if (field === "thumb") value = item.thumb;
+  else if (field === "href") value = item.href;
+  else value = item.fields[field] ?? "";
+  if (value === SKIP) value = "";
+  return labelled ? collection.labels[field]?.[value] ?? value : value;
 }
 
 // The same, escaped for HTML, plus {{prev}} and {{next}}, which are links.

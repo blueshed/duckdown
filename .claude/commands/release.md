@@ -48,8 +48,9 @@ Change nothing. Run `git fetch`, then `bun run sites`, and print:
 
 ## 2. Gate
 
-`bun run test` (100% coverage) and `bun run check`. Never run them under `git rebase --exec`: a
-test that runs git inherits `GIT_DIR` and writes into this repo's config (todo n180).
+`bun run test` (100% coverage) and `bun run check`. A test that runs git no longer inherits
+`GIT_DIR` and its kin (`gitenv.ts`, and `tests/setup.ts` clears them), so they are safe under a hook or
+`git rebase --exec` too (n180).
 
 ## 3. Version
 

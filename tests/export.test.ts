@@ -715,6 +715,20 @@ describe("a site in more than one language, exported: a collection", () => {
   });
 });
 
+describe("nav: on a page that is no folder's index (n190)", () => {
+  test("is said as a note, and fails nothing", async () => {
+    await withWelsh(async (dir, said) => {
+      await exportSite({ out: dir, origin: "https://example.com", say: (l) => said.push(l) });
+      expect(said).toContain("note: cy/menu.md says nav:, which only a folder's index.md uses: to put it in the navigation, make it cy/menu/index.md");
+      expect(said.filter((l) => l.includes("says nav:"))).toHaveLength(1);        // a folder's index, and a draft, say nothing
+    }, "nav-unused", {
+      "cy/menu.md": "title: Dewislen\nnav: Bwydlen\n\nx",
+      "cy/menu2/index.md": "title: Un arall\nnav: Un arall\n\nx",
+      "cy/draft.md": "title: Drafft\nnav: Drafft\ndraft: true\n\nx",
+    });
+  });
+});
+
 describe("a site in more than one language, exported: what is out of date", () => {
   test("says which translations have fallen behind, and what can't be checked, and how much is not translated", async () => {
     await withWelsh(async (dir, said) => {
@@ -801,6 +815,22 @@ describe("Links, the export's check of every link", () => {
     expect(one("index.html", "<img src='/missing.png'>")).toEqual(["index.html -> /missing.png"]);
   });
 
+  test("says what a link may have meant: a flat page is .html, a folder's index has the slash (n189)", () => {
+    expect(one("index.html", '<a href="/about/"></a><a href="/about"></a><a href="/blog.html"></a>')).toEqual([
+      "index.html -> /about/ — did you mean /about.html?",
+      "index.html -> /about — did you mean /about.html?",
+      "index.html -> /blog.html — did you mean /blog/?",
+    ]);
+    expect(one("index.html", '<a href="/nothing/"></a><a href="/nothing.html"></a><a href="/index.html/"></a>'))
+      .toEqual(["index.html -> /nothing/", "index.html -> /nothing.html", "index.html -> /index.html/"]);
+  });
+
+  test("an address an extension answers is not broken (n194)", () => {
+    const links = new Links();
+    links.add("index.html", '<a href="/figures.csv"></a><a href="/api/live?x=1"></a><a href="/nope"></a>');
+    expect(links.broken(known, (path) => path === "/figures.csv" || path.startsWith("/api/"))).toEqual(["index.html -> /nope"]);
+  });
+
   test("passes what is there: a file, a folder's index, a folder without its slash", () => {
     expect(one("index.html", '<a href="/about.html"></a><a href="/blog/"></a><a href="/blog"></a><a href="/"></a><link href="/static/site.css">')).toEqual([]);
   });
@@ -842,6 +872,31 @@ describe("the export's report of broken links", () => {
       const count = await exportSite({ out: dir, say: (l) => said.push(l) });
       expect(count.broken).toBe(1);
       expect(said).toContain("broken link: links.html -> /gone.html");
+      rmSync(dir, { recursive: true, force: true });
+    } finally {
+      rmSync(page);
+    }
+  });
+
+  test("an address a site says its extensions answer is somewhere, from the package.json or as given (n194)", async () => {
+    writeFileSync(page, "title: Links\n\n[data](/figures.csv) [live](/api/live?x=1) [gone](/gone.html)\n");
+    try {
+      const said: string[] = [];
+      const dir = out("answers");
+      const count = await exportSite({ out: dir, say: (l) => said.push(l), answers: (p) => p === "/figures.csv" || p.startsWith("/api/") });
+      expect(count.broken).toBe(1);
+      expect(said).toContain("broken link: links.html -> /gone.html");
+      rmSync(dir, { recursive: true, force: true });
+      // As the site's package.json says: the working folder's, whatever it is.
+      const root = join(RUN, "answers-site");
+      mkdirSync(root, { recursive: true });
+      writeFileSync(join(root, "package.json"), JSON.stringify({ duckdown: { answers: ["/figures.csv", "/api/*"] } }));
+      const here = spyOn(process, "cwd").mockReturnValue(root);
+      try {
+        expect((await exportSite({ out: dir, say: quiet })).broken).toBe(1);
+      } finally {
+        here.mockRestore();
+      }
       rmSync(dir, { recursive: true, force: true });
     } finally {
       rmSync(page);

@@ -5,7 +5,7 @@ import { mkdtempSync } from "fs";
 import { join } from "path";
 import { RUN, SITE } from "./helpers";
 import { LocalStorage } from "../server/storage";
-import { siteFor, withExtensions, loadExtensions, type Extension } from "../server/extensions";
+import { siteFor, withExtensions, loadExtensions, declaredAnswers, type Extension } from "../server/extensions";
 import { listen } from "../server/serve";
 import { HEALTH } from "../server/utils";
 import homepage from "../server/edit/index.html";
@@ -171,6 +171,31 @@ describe("a published site with an extension", () => {
     } finally {
       log.mockRestore();
       server.stop(true);
+    }
+  });
+});
+
+describe("the addresses a site says its extensions answer (n194)", () => {
+  const folder = async (pkg?: unknown) => {
+    const dir = mkdtempSync(join(RUN, "answers-"));
+    if (pkg !== undefined) await Bun.write(join(dir, "package.json"), JSON.stringify(pkg));
+    return dir;
+  };
+
+  test("are none with no package.json, or one that says none", async () => {
+    expect((await declaredAnswers(await folder()))("/figures.csv")).toBe(false);
+    expect((await declaredAnswers(await folder({ duckdown: {} })))("/figures.csv")).toBe(false);
+  });
+
+  test("match as a route's own address does: exactly, by :segment, by a last *", async () => {
+    const answers = await declaredAnswers(await folder({ duckdown: { answers: ["/figures.csv", "/api/*", "/forms/:name", "/rsvp"] } }));
+    for (const yes of ["/figures.csv", "/api/live", "/api/a/b", "/forms/join", "/rsvp"]) expect(answers(yes)).toBe(true);
+    for (const no of ["/figures.csv/x", "/figuresXcsv", "/api", "/forms", "/forms/join/more", "/rsvp2", "/x/rsvp", "/"]) expect(answers(no)).toBe(false);
+  });
+
+  test("must be a list of addresses starting with /", async () => {
+    for (const answers of ["/api/*", [1], ["api/live"]]) {
+      await expect(declaredAnswers(await folder({ duckdown: { answers } }))).rejects.toThrow('package.json: "duckdown": { "answers" } is a list of addresses that start with /');
     }
   });
 });

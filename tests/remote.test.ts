@@ -5,13 +5,14 @@ import { describe, test, expect, beforeAll, spyOn } from "bun:test";
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync, readdirSync, renameSync } from "fs";
 import { join } from "path";
 import { RUN, BASE, signIn, authed } from "./helpers";
+import { gitEnv, REPOSITORY_ENV } from "../server/gitenv";
 import { remoteFrom, gitRemote, parseStatus, RemoteRefused, defaultMessage, publishSite, remoteCommand, type Remote } from "../server/remote";
 import { publishRoutes } from "../server/routes/publish";
 import { checkSite } from "../server/export";
 import { cli } from "../server/cli";
 
 function sh(cwd: string, ...args: string[]): string {
-  const ran = Bun.spawnSync(["git", ...args], { cwd, env: { ...process.env, GIT_TERMINAL_PROMPT: "0" } });
+  const ran = Bun.spawnSync(["git", ...args], { cwd, env: gitEnv() });
   if (ran.exitCode !== 0) throw new Error(`git ${args.join(" ")}: ${ran.stderr.toString()}`);
   return ran.stdout.toString();
 }
@@ -70,6 +71,38 @@ describe("remoteFrom", () => {
       { path: "pages/gone.md", state: "deleted" },
     ]);
     expect(parseStatus("A  pages/a.md\0", "")).toEqual([{ path: "pages/a.md", state: "added" }]);
+  });
+});
+
+// n180: a test run under `git rebase --exec` (or a hook) inherits GIT_DIR and its
+// kin, and every git call here then worked on the repository that named, writing
+// its config. setup.ts clears them for the process; gitEnv() clears them for git.
+describe("the repository the environment names", () => {
+  test("the tests start without one, and git is never handed one", () => {
+    for (const name of REPOSITORY_ENV) expect(process.env[name]).toBeUndefined();
+    process.env.GIT_DIR = "/nowhere";
+    process.env.GIT_TERMINAL_PROMPT = "1";
+    try {
+      const env = gitEnv();
+      expect(env.GIT_DIR).toBeUndefined();
+      expect(env.GIT_TERMINAL_PROMPT).toBe("0");
+      expect(env.PATH).toBe(process.env.PATH);
+    } finally {
+      delete process.env.GIT_DIR;
+      delete process.env.GIT_TERMINAL_PROMPT;
+    }
+  });
+
+  test("a decoy GIT_DIR doesn't move a site's status to another repository", async () => {
+    const s = sites();
+    const decoy = join(mkdtempSync(join(RUN, "decoy-")), "decoy.git");
+    sh(RUN, "init", "-q", "--bare", decoy);
+    process.env.GIT_DIR = decoy;
+    try {
+      expect(await gitRemote(s.content).status()).toEqual({ remote: "git origin/main", changes: [], ahead: 0, behind: 0 });
+    } finally {
+      delete process.env.GIT_DIR;
+    }
   });
 });
 
