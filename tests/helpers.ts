@@ -17,7 +17,9 @@ export const RUN = process.env.DUCKIE_TEST_RUN!;
 // tests and put back after them, and what the server had cached is dropped.
 export function keepSite(): void {
   const kept = mkdtempSync(join(RUN, "kept-site-"));
-  beforeAll(() => cpSync(SITE, kept, { recursive: true }));
+  // What the server kept of another file's site (or of a scratch storage a test
+  // made) is not this file's: it starts from what is on disk.
+  beforeAll(() => { cpSync(SITE, kept, { recursive: true }); siteChanged(); });
   afterAll(() => {
     rmSync(SITE, { recursive: true, force: true });
     cpSync(kept, SITE, { recursive: true });

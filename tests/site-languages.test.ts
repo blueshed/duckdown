@@ -635,12 +635,11 @@ describe("a site in English and Welsh", () => {
       expect(view.file).toBe("cy/gallery/collection.json");
       expect(view.fields.map((f: { name: string }) => f.name)).toEqual(["title", "caption", "year"]);   // the text and long ones: not the picture
       const first = view.items.find((i: { slug: string }) => i.slug === "first-light");
-      expect(first.said.title).toBe("Golau cyntaf");
-      expect(first.standing).toBe("stale");                       // it says 00000000
       expect(first.hash).toMatch(/^[0-9a-f]{8}$/);
       expect(first.fields.title).toBe("First Light");
-      expect(view.items.find((i: { slug: string }) => i.slug === "study-in-green").standing).toBe("missing");
-      expect(view.groups[0]).toEqual({ name: "paintings", label: "Paintings", said: "Paentiadau" });
+      expect(first.thumb).toContain("one");
+      expect(view.items.map((i: { slug: string }) => i.slug)).toContain("study-in-green");
+      expect(view.groups[0]).toEqual({ name: "paintings", label: "Paintings" });   // what the language says of them is in its file
       expect((await ask("?items=zz&folder=gallery")).status).toBe(400);
       expect((await ask("?items=cy&folder=nowhere")).status).toBe(404);
       expect((await ask("?items=cy")).status).toBe(404);

@@ -1,7 +1,11 @@
 import type { Storage } from "./storage";
 import { parseFrontMatter, yes, addMeta, dropMeta } from "./markdown";
-import { unlisted, hidden, NOT_FOUND } from "./listed";
+import { unlisted, hidden, readable, NOT_FOUND } from "./listed";
 import { kept } from "./kept";
+import { joinKey } from "./slugs";
+import { judge, type Standing } from "./standing";
+
+export type { Standing };
 
 // A site in more than one language. Humans translate; duckdown never does, so
 // everything here is about *which page answers* and *whether its translation
@@ -43,18 +47,23 @@ async function buildLanguages(pages: Storage): Promise<Languages> {
   return { main, others };
 }
 
-const known = kept((pages) => buildLanguages(pages));
+const known = kept(buildLanguages);
 
 // The site's languages, kept like the nav (kept.ts): it changes when a page does.
 export const languagesOf = (pages: Storage, debug?: boolean): Promise<Languages> => known(pages, "", debug);
 
 // Which language a page key is in, and where it sits in the default language's
 // tree — the key its translations are named after: cy/blog/a-post.md is
-// ("cy", "blog/a-post.md"), blog/a-post.md is (the default, itself).
+// ("cy", "blog/a-post.md"), blog/a-post.md is (the default, itself). The
+// language's own folder, cy, is ("cy", "").
 export function splitLanguage(languages: Languages, key: string): { lang: string; key: string } {
-  const other = languages.others.find((lang) => key.startsWith(`${lang}/`));
+  const other = languages.others.find((lang) => key === lang || key.startsWith(`${lang}/`));
   return other ? { lang: other, key: key.slice(other.length + 1) } : { lang: languages.main, key };
 }
+
+// A short fingerprint of some text: eight hex characters, enough to tell that
+// what a translation was made from has changed.
+export const shortHash = (text: string): string => new Bun.CryptoHasher("sha256").update(text).digest("hex").slice(0, 8);
 
 // What a translator reads in a page: its title, its description, its words. A
 // translation records this (`translated-from`) as it was when they wrote it, so
@@ -69,12 +78,22 @@ export function sourceHash(source: string): string {
   const text = [meta.title?.[0] ?? "", meta.description?.[0] ?? "", body]
     .map((part) => part.replace(/[ \t]+$/gm, "").trim())
     .join("\n\0\n");
-  return new Bun.CryptoHasher("sha256").update(text).digest("hex").slice(0, 8);
+  return shortHash(text);
 }
 
 // A page as a reader gets it: not an each: page (it is its items), and not a
 // draft — which is the editor's alone to see, so `drafts` is the signed-in one.
-const shown = (meta: Record<string, string[]>, drafts: boolean) => !meta.each && (drafts || !yes(meta.draft));
+const shown = (meta: Record<string, string[]>, drafts: boolean) => drafts ? !meta.each : readable(meta);
+
+// Whether the file is there and is a page as that reader gets it.
+const showable = async (pages: Storage, key: string, drafts: boolean): Promise<boolean> =>
+  await pages.exists(key) && shown(parseFrontMatter(await pages.read(key)).meta, drafts);
+
+// Whether the language has a page of its own at `key` (named in the default's
+// tree), for a reader — or, with `drafts`, for the editor: the question the
+// fallback is the answer to when it is no.
+export const translated = (pages: Storage, lang: string, key: string, drafts = false): Promise<boolean> =>
+  showable(pages, `${lang}/${key}`, drafts);
 
 // What answers at `lang`'s address for the page `key` (named in the default
 // language's tree: "about.md", "blog/index.md"):
@@ -95,34 +114,8 @@ export async function translation(
   pages: Storage, lang: string, key: string, { drafts = false } = {},
 ): Promise<Translation | null> {
   if (!(await languagesOf(pages)).others.includes(lang)) return null;
-  const own = `${lang}/${key}`;
-  if (await pages.exists(own) && shown(parseFrontMatter(await pages.read(own)).meta, drafts)) {
-    return { kind: "translated", key: own };
-  }
-  if (await pages.exists(key) && shown(parseFrontMatter(await pages.read(key)).meta, drafts)) {
-    return { kind: "fallback", key };
-  }
-  return null;
-}
-
-// Where a translation stands against its source, for whoever is keeping them
-// together — the editor's tree and the export's list:
-//
-//   fresh     — it says it was made from the source as it is now;
-//   stale     — the source has changed since: needs retranslation;
-//   unchecked — it doesn't say what it was made from (written by hand, or
-//               before this was tracked), so nothing can be said;
-//   own       — there is no source: a page of this language's own;
-//   missing   — there is no translation yet.
-export type Standing = "fresh" | "stale" | "unchecked" | "own" | "missing";
-
-export async function standing(pages: Storage, lang: string, key: string): Promise<Standing> {
-  const own = `${lang}/${key}`;
-  if (!await pages.exists(own)) return "missing";
-  if (!await pages.exists(key)) return "own";
-  const made = parseFrontMatter(await pages.read(own)).meta["translated-from"]?.[0]?.toLowerCase();
-  if (!made) return "unchecked";
-  return made === sourceHash(await pages.read(key)) ? "fresh" : "stale";
+  if (await translated(pages, lang, key, drafts)) return { kind: "translated", key: `${lang}/${key}` };
+  return await showable(pages, key, drafts) ? { kind: "fallback", key } : null;
 }
 
 // The language an address is in, and what is left of it: "cy/about" is
@@ -130,8 +123,8 @@ export async function standing(pages: Storage, lang: string, key: string): Promi
 // language, which is every address of a site with no others. `name` is the
 // address as the site route reads it: no .html, no trailing slash.
 export function languageAt(languages: Languages, name: string): { lang: string; rest: string } | null {
-  const lang = languages.others.find((other) => name === other || name.startsWith(`${other}/`));
-  return lang ? { lang, rest: name.slice(lang.length + 1) } : null;
+  const { lang, key } = splitLanguage(languages, name);
+  return lang === languages.main ? null : { lang, rest: key };
 }
 
 // Every language that has something to show for a page, and what: the page
@@ -150,12 +143,11 @@ export async function counterparts(pages: Storage, key: string): Promise<Counter
   const { key: source } = splitLanguage(languages, key);
   const found: Counterpart[] = [];
   if (source === NOT_FOUND) return found;
-  if (await pages.exists(source) && shown(parseFrontMatter(await pages.read(source)).meta, false)) {
-    found.push({ lang: languages.main, kind: "translated", key: source });
-  }
+  const original = await showable(pages, source, false);
+  if (original) found.push({ lang: languages.main, kind: "translated", key: source });
   for (const lang of languages.others) {
-    const answer = await translation(pages, lang, source);
-    if (answer) found.push({ lang, ...answer });
+    if (await translated(pages, lang, source)) found.push({ lang, kind: "translated", key: `${lang}/${source}` });
+    else if (original) found.push({ lang, kind: "fallback", key: source });
   }
   return found;
 }
@@ -175,10 +167,10 @@ export async function untranslatedNote(pages: Storage, lang: string): Promise<{ 
 // A language by its own name — Cymraeg, English, français — which is how a
 // reader looks for it, and which the platform knows, so there is no table here
 // to keep. A code Intl can't name is shown as itself, and said once.
-const names = new Map<string, string>();
+const autonyms = new Map<string, string>();
 
 export function languageName(code: string): string {
-  const had = names.get(code);
+  const had = autonyms.get(code);
   if (had) return had;
   let name: string;
   try {
@@ -187,7 +179,7 @@ export function languageName(code: string): string {
     console.error(`lang: "${code}" is not a language tag Intl knows — the switcher shows it as it is`);
     name = code;
   }
-  names.set(code, name);
+  autonyms.set(code, name);
   return name;
 }
 
@@ -201,7 +193,7 @@ export function languageName(code: string): string {
 export async function treeOf(pages: Storage, lang: string, folder: string): Promise<{ files: string[]; folders: string[] }> {
   const { others } = await languagesOf(pages);
   const here = await pages.list(folder);
-  const there = await pages.list(folder ? `${lang}/${folder}` : lang);
+  const there = await pages.list(joinKey(lang, folder));
   const names = (entries: { name: string }[]) => entries.map((e) => e.name).filter((name) => !unlisted(name));
   // The default's top is where the language folders sit; the language's own
   // top is a tree like any, and may have a folder of that name of its own.
@@ -234,38 +226,45 @@ export async function keysUnder(
 ): Promise<string[]> {
   const { files, folders } = await pages.list(folder);
   const keys = files.filter((f) => wanted(f.name) && !hidden(f.name)).map((f) => f.path);
-  for (const sub of folders.filter((f) => !hidden(f.name) && !(folder === "" && skip.includes(f.name)))) {
+  for (const sub of folders.filter((f) => !hidden(f.name) && !skip.includes(f.name))) {
     keys.push(...await keysUnder(pages, sub.path, [], wanted));
   }
   return keys;
 }
 
-async function buildRows(pages: Storage, debug?: boolean): Promise<Row[]> {
+// Where every translation stands (rows above), found in one pass: each original
+// is read once, however many languages translate it, and each translation once.
+export async function translationRows(pages: Storage, debug?: boolean): Promise<Row[]> {
   const { others } = await languagesOf(pages, debug);
   if (!others.length) return [];
   const main = new Set(await keysUnder(pages, "", others));
+  const originals = new Map<string, { each: boolean; shown: boolean; hash: string }>();
+  const original = async (key: string) => {
+    let found = originals.get(key);
+    if (!found) {
+      const source = await pages.read(key);
+      const { meta } = parseFrontMatter(source);
+      found = { each: !!meta.each, shown: shown(meta, false), hash: sourceHash(source) };
+      originals.set(key, found);
+    }
+    return found;
+  };
   const rows: Row[] = [];
   for (const lang of others) {
     const own = new Set((await keysUnder(pages, lang)).map((key) => key.slice(lang.length + 1)));
     for (const key of new Set([...main, ...own])) {
-      const meta = async (file: string) => parseFrontMatter(await pages.read(file)).meta;
-      const source = main.has(key) ? await meta(key) : null;
-      const mine = own.has(key) ? await meta(`${lang}/${key}`) : null;
+      const source = main.has(key) ? await original(key) : null;
+      const mine = own.has(key) ? parseFrontMatter(await pages.read(`${lang}/${key}`)).meta : null;
       if (source?.each || mine?.each) continue;
       if (!mine) {
-        if (source && shown(source, false)) rows.push({ lang, key, standing: "missing", draft: false });
+        if (source?.shown) rows.push({ lang, key, standing: "missing", draft: false });
         continue;
       }
-      rows.push({ lang, key, standing: await standing(pages, lang, key), draft: yes(mine.draft) });
+      rows.push({ lang, key, standing: source ? judge(mine["translated-from"]?.[0], source.hash) : "own", draft: yes(mine.draft) });
     }
   }
   return rows;
 }
-
-const rowsKept = kept((pages, _, debug) => buildRows(pages, debug));
-
-// Kept like the nav, and dropped with it when a page changes (kept.ts).
-export const translationRows = (pages: Storage, debug?: boolean): Promise<Row[]> => rowsKept(pages, "", debug);
 
 // What a translation of a page starts as, for a translator to write over: the
 // page itself, a draft until it is done (so a reader keeps the default's
@@ -283,8 +282,8 @@ export function translationDraft(source: string, lang: string, key: string): str
 
 // A translation saying it was made from `source` as it is now: the translator
 // has read what changed and has made theirs say the same.
-export function stamped(translated: string, source: string): string {
-  return addMeta(dropMeta(translated, "translated-from", () => true), "translated-from", sourceHash(source));
+export function stamped(translation: string, source: string): string {
+  return addMeta(dropMeta(translation, "translated-from", () => true), "translated-from", sourceHash(source));
 }
 
 // Whether `lang` may be added as a language: a code, not the default's, not one

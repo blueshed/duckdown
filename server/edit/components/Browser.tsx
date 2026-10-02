@@ -1,10 +1,10 @@
-import { createElement, signal, computed, effect, list, when } from "@blueshed/railroad";
+import { createElement, signal, computed, effect, list, when, type ReadonlySignal } from "@blueshed/railroad";
 import type { FileEntry, FolderEntry, Listing } from "../../storage";
 import { Icon } from "./Icon";
 import { NewDialog, type NewKind } from "./NewDialog";
 import { openDeleted } from "../past";
 import { apiJson } from "../api";
-import { marksFor, type Mark } from "../translations";
+import { marksFor, folderMarks, type Mark } from "../translations";
 import {
   loadFile, createFile, createCollection, browserRevision, openCollection, reloadBrowser, COLLECTION_FILE,
   filePath, folder, openFolder, folderOf, folderUrl, languageOf, collectionLanguage, translations,
@@ -15,10 +15,10 @@ export const byName = (a: { name: string }, b: { name: string }) => a.name.local
 // What a site in more than one language needs looked at, on the row it is about:
 // a translation that has fallen behind, one nobody has begun. Said in words and
 // a symbol, never by colour alone, and named for a screen reader.
-function Marks(props: { marks: { get(): Mark[] } }) {
+function Marks(props: { marks: ReadonlySignal<Mark[]> }) {
   return (
     <span class="marks">
-      {list(props.marks as never, (m: Mark) => m.text, (m$: { get(): Mark; peek(): Mark; map: <T>(f: (m: Mark) => T) => { get(): T } }) => (
+      {list(props.marks, (m) => m.text, (m$) => (
         <span class={m$.map((m) => `mark mark-${m.kind}`)} role="img"
           aria-label={m$.map((m) => m.title)} title={m$.map((m) => m.title)}>{m$.map((m) => m.text)}</span>
       ))}
@@ -122,7 +122,7 @@ export function Browser() {
           <li class="folder">
             <button class="row" onclick={() => openFolder(f$.peek().path)}>
               <Icon name="folder" size={12} /> {f$.map((f) => f.name)}
-              <Marks marks={computed(() => marksFor(f$.get().path, true))} />
+              <Marks marks={computed(() => folderMarks(f$.get().path))} />
             </button>
           </li>
         ))}

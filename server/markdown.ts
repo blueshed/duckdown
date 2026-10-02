@@ -212,7 +212,7 @@ export async function buildNav(pages: Storage, prefix = "", skip: string[] = [])
   }
 
   // Recurse into subfolders, ordered
-  for (const folder of await sortFolders(pages, folders.filter((f) => !unlisted(f.name) && !(prefix === "" && skip.includes(f.name))))) {
+  for (const folder of await sortFolders(pages, folders.filter((f) => !unlisted(f.name) && !skip.includes(f.name)))) {
     const sub = await buildNav(pages, folder.path);
     if (sub) items.push(sub);
   }

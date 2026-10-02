@@ -4,7 +4,7 @@ import { aliasKey } from "./slugs";
 import { pageList, aliasTargets } from "./search";
 import { BASE_FILES, ROOT_FILES } from "./base";
 import { isFeed } from "./feed";
-import { languagesOf } from "./languages";
+import { languagesOf, languageAt } from "./languages";
 
 // The links a page makes, and whether anything answers them. The export asks
 // of every page it writes, against the files it wrote; the preview asks of
@@ -101,8 +101,8 @@ export async function deadLinks(html: string, from: string, pages: Storage, file
   const moved = new Set(await aliasTargets(pages));
   // A language answers every page of the default's, in its own words or with a
   // note (languages.ts), so a link into its folder leads where the default's does.
-  const { others } = await languagesOf(pages);
-  const answers = (p: string) => answered.has(p) || others.some((lang) => p.startsWith(`${lang}/`) && answered.has(p.slice(lang.length + 1)));
+  const languages = await languagesOf(pages);
+  const answers = (p: string) => answered.has(p) || answered.has(languageAt(languages, p)?.rest ?? "");
   const dead = new Set<string>();
   for (const { link, path, file } of links) {
     if (reaches(file, answers) || moved.has(aliasKey(path))) continue;

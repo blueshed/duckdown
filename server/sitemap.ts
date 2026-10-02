@@ -1,5 +1,5 @@
 import type { PageRef } from "./search";
-import type { Languages } from "./languages";
+import { splitLanguage, type Languages } from "./languages";
 import { escapeHtml } from "./utils";
 
 // The pages a reader can reach, as sitemap.xml: an absolute address each, and
@@ -15,32 +15,37 @@ import { escapeHtml } from "./utils";
 // is the default's page again), names nothing. A site with one language writes
 // the sitemap it always did.
 export function sitemapXml(entries: PageRef[], origin: string, languages?: Languages): string {
-  const others = languages?.others ?? [];
-  const folder = (url: string) => others.find((lang) => url.startsWith(`/${lang}/`));   // none: the default's
-  const langOf = (url: string) => folder(url) ?? languages?.main ?? "";
-  const rest = (url: string) => { const lang = folder(url); return lang ? url.slice(lang.length + 1) : url; };
-
-  const versions = new Map<string, { lang: string; url: string }[]>();
-  for (const { url } of others.length ? entries : []) {
-    const key = rest(url);
-    versions.set(key, [...versions.get(key) ?? [], { lang: langOf(url), url }]);
-  }
   const loc = (url: string) => escapeHtml(origin + encodeURI(url));
-  const link = (hreflang: string, url: string) =>
-    `<xhtml:link rel="alternate" hreflang="${escapeHtml(hreflang)}" href="${loc(url)}"/>`;
+  const alternates = languages?.others.length ? alternatesOf(entries, languages, loc) : new Map<string, string>();
 
   const urls = entries.map((e) => {
     const lastmod = /^\d{4}-\d{2}-\d{2}/.test(e.date) ? `<lastmod>${e.date.slice(0, 10)}</lastmod>` : "";
-    // The same order in each version's list, whatever order the walk found them in.
-    const all = (versions.get(rest(e.url)) ?? []).sort((a, b) => others.indexOf(a.lang) - others.indexOf(b.lang));
-    const original = all.find((v) => v.lang === languages?.main);
-    const alternates = all.length < 2 ? "" : [
-      ...all.map((v) => link(v.lang, v.url)),
-      ...(original ? [link("x-default", original.url)] : []),
-    ].join("");
-    return `  <url><loc>${loc(e.url)}</loc>${lastmod}${alternates}</url>`;
+    return `  <url><loc>${loc(e.url)}</loc>${lastmod}${alternates.get(e.url) ?? ""}</url>`;
   });
-  const xhtml = [...versions.values()].some((all) => all.length > 1) ? ' xmlns:xhtml="http://www.w3.org/1999/xhtml"' : "";
+  const xhtml = alternates.size ? ' xmlns:xhtml="http://www.w3.org/1999/xhtml"' : "";
   return `<?xml version="1.0" encoding="UTF-8"?>\n`
     + `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"${xhtml}>\n${urls.join("\n")}\n</urlset>\n`;
+}
+
+// The alternates each address names, as markup: the same list for every version
+// of a page, the default's first and the languages in their order.
+function alternatesOf(entries: PageRef[], languages: Languages, loc: (url: string) => string): Map<string, string> {
+  const link = (hreflang: string, url: string) =>
+    `<xhtml:link rel="alternate" hreflang="${escapeHtml(hreflang)}" href="${loc(url)}"/>`;
+
+  const versions = new Map<string, { lang: string; url: string }[]>();
+  for (const { url } of entries) {
+    const { lang, key } = splitLanguage(languages, url.slice(1));   // "/about.html" and "/cy/about.html" are both about.html
+    const same = versions.get(key);
+    if (same) same.push({ lang, url }); else versions.set(key, [{ lang, url }]);
+  }
+  const out = new Map<string, string>();
+  for (const all of versions.values()) {
+    if (all.length < 2) continue;
+    all.sort((a, b) => languages.others.indexOf(a.lang) - languages.others.indexOf(b.lang));   // the default is -1: first
+    const original = all.find((v) => v.lang === languages.main);
+    const links = [...all.map((v) => link(v.lang, v.url)), ...(original ? [link("x-default", original.url)] : [])].join("");
+    for (const { url } of all) out.set(url, links);
+  }
+  return out;
 }

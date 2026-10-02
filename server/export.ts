@@ -21,13 +21,14 @@ import { ORIGIN, STATIC_PATH, IS_S3, BUCKET, BUCKET_PREFIX, APP_PATH } from "./c
 import { createPageStorage, createStaticStorage, type Storage } from "./storage";
 import { parsePage, pageHtml, itemPage } from "./page";
 import { buildSite, searchFiles, searchFileList, entriesIn, type Entry } from "./search";
-import { languagesOf, splitLanguage, translation } from "./languages";
+import { languagesOf, splitLanguage, translated } from "./languages";
 import { translationStandings } from "./translations";
 import { COLLECTION_FILE, collectionProblems, loadCollection } from "./collection";
 import { canonicalPath, escapeHtml } from "./utils";
 import { Links } from "./links";
 import { hidden } from "./listed";
-import { yes } from "./markdown";
+import { yes, folderOf } from "./markdown";
+import { joinKey } from "./slugs";
 import { BASE_FILES, ROOT_FILES, baseFile } from "./base";
 import { sitemapXml } from "./sitemap";
 import { feedXml, FEED_FILE } from "./feed";
@@ -249,27 +250,18 @@ export async function exportSite(o: {
         // said differently: it is written with the default's, below, whether
         // the language has one or not.
         if (at.lang !== languages.main && await pages.exists(at.key)) continue;
-        const folder = key.slice(0, Math.max(key.length - COLLECTION_FILE.length - 1, 0));
-        problems.push(...await collectionProblems(pages, folder));
-        const collection = (await loadCollection(pages, folder))!;
-        // No each: page, no item pages: the data is shown only by its overviews.
-        for (const item of collection.each ? collection.items : []) {
-          const { html } = await pageHtml(itemPage({ collection, item }), { origin, editHref: "", item: { collection, item } });
-          page(outPath(item.key), html);
-          for (const alias of item.aliases) moved.push({ from: alias, to: item.href });
-        }
         // The default's collection is every language's: each item has a page
         // under each language's folder, its own words where it has them and the
         // default's, with the note, where it hasn't.
-        if (at.lang === languages.main) {
-          for (const lang of others) {
-            const inLang = [lang, folder].filter(Boolean).join("/");
-            problems.push(...await collectionProblems(pages, inLang));
-            const translated = (await loadCollection(pages, inLang))!;
-            for (const item of translated.each ? translated.items : []) {
-              const { html } = await pageHtml(itemPage({ collection: translated, item }), { origin, editHref: "", item: { collection: translated, item } });
-              page(outPath(item.key), html);
-            }
+        const folder = folderOf(key);
+        for (const inFolder of [folder, ...(at.lang === languages.main ? others.map((lang) => joinKey(lang, folder)) : [])]) {
+          problems.push(...await collectionProblems(pages, inFolder));
+          const collection = (await loadCollection(pages, inFolder))!;
+          // No each: page, no item pages: the data is shown only by its overviews.
+          for (const item of collection.each ? collection.items : []) {
+            const { html } = await pageHtml(itemPage({ collection, item }), { origin, editHref: "", item: { collection, item } });
+            page(outPath(item.key), html);
+            for (const alias of item.aliases) moved.push({ from: alias, to: item.href });   // a language's items have none
           }
         }
         continue;
@@ -285,9 +277,9 @@ export async function exportSite(o: {
       // default's, as the served one does: so the default's page is written
       // under each language's folder, with the note, wherever the language has
       // no page (or only a draft). The language's 404 is one of them.
-      if (others.length && splitLanguage(languages, key).lang === languages.main) {
+      if (splitLanguage(languages, key).lang === languages.main) {
         for (const lang of others) {
-          if ((await translation(pages, lang, key))?.kind !== "fallback") continue;
+          if (await translated(pages, lang, key)) continue;
           page(outPath(`${lang}/${key}`), (await pageHtml(parsed, { origin, editHref: "", fallbackFor: lang })).html);
         }
       }
@@ -382,9 +374,9 @@ export async function exportSite(o: {
     // pages written in it: the default's is what is left of the walk.
     const { entries: all, pages: listed } = await buildSite(pages, "", undefined, others);
     const entries = entriesIn(all, others, "");
-    for (const [lang, of] of [["", entries] as const, ...others.map((lang) => [lang, entriesIn(all, others, lang)] as const)]) {
-      for (const [path, body] of searchFileList(searchFiles(of))) {
-        write(lang ? `${lang}/${path}` : path, body);
+    for (const lang of ["", ...others]) {
+      for (const [path, body] of searchFileList(searchFiles(lang ? entriesIn(all, others, lang) : entries))) {
+        write(joinKey(lang, path), body);
         count.files++;
       }
     }

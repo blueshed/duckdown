@@ -4,7 +4,8 @@ import { Icon } from "./Icon";
 import { api, apiJson, urlPath } from "../api";
 import { speak } from "../notice";
 import { collection, closeCollection, collectionChanged, reloadBrowser, shortName } from "../store";
-import { languageName, refreshTranslations, SAYS } from "../translations";
+import { languageName, refreshTranslations, isBehind, SAYS } from "../translations";
+import { judge, type Standing } from "../../standing";
 import type { TranslationView, ItemView } from "../../collection";
 
 // A collection in a language: the default's items beside the words the
@@ -24,9 +25,9 @@ type Raw = Record<string, unknown> & { items?: Record<string, Entry>; groups?: R
 
 export function CollectionTranslation() {
   const { folder, lang } = collection.peek()!;
-  const base = folder === lang ? "" : folder.slice(lang!.length + 1);
+  const base = folder.slice(lang!.length + 1);   // the default's folder: "" for the language's own
   const view = signal<TranslationView | null>(null);
-  const raw = signal<Raw>({});
+  let raw: Raw = {};                              // the file as it was written: only edits change it, and `edits` says so
   const edits = signal(0);          // bumped by each edit, so the standings follow what is typed
   const dirty = signal(false);
   const trouble = signal("");
@@ -49,31 +50,33 @@ export function CollectionTranslation() {
         return;
       }
     }
+    raw = file;
     batch(() => {
       view.set(found);
-      raw.set(file);
       trouble.set("");
       dirty.set(false);
     });
   };
   load();
 
-  const entry = (slug: string): Entry => raw.peek().items?.[slug] ?? {};
+  const entry = (slug: string): Entry => raw.items?.[slug] ?? {};
+  // Words of an item, not only the record of what they were made from.
+  const hasWords = (mine: Entry) => Object.keys(mine).some((k) => k !== "translated-from");
   const touch = () => batch(() => { edits.update((n) => n + 1); dirty.set(true); });
 
   // One field of one item. The first words of an item stamp it with what it is now.
   const setWord = (item: ItemView, field: string, value: string) => {
-    const items = (raw.peek().items ??= {});
+    const items = (raw.items ??= {});
     const mine = (items[item.slug] ??= {});
-    const first = !Object.keys(mine).some((k) => k !== "translated-from");
+    const first = !hasWords(mine);
     if (value) mine[field] = value; else delete mine[field];
     if (first && value) mine["translated-from"] = item.hash;
-    if (!Object.keys(mine).some((k) => k !== "translated-from")) delete items[item.slug];
+    if (!hasWords(mine)) delete items[item.slug];
     touch();
   };
 
   const setGroup = (group: string, value: string) => {
-    const groups = (raw.peek().groups ??= {});
+    const groups = (raw.groups ??= {});
     if (value) groups[group] = value; else delete groups[group];
     touch();
   };
@@ -83,16 +86,15 @@ export function CollectionTranslation() {
     touch();
   };
 
-  const standing = (item: ItemView): ItemView["standing"] => {
+  // What the person has typed so far, so the standing follows it before it is saved.
+  const standing = (item: ItemView): Standing => {
     edits.get();
     const mine = entry(item.slug);
-    if (!Object.keys(mine).some((k) => k !== "translated-from")) return "missing";
-    if (!mine["translated-from"]) return "unchecked";
-    return mine["translated-from"] === item.hash ? "fresh" : "stale";
+    return hasWords(mine) ? judge(mine["translated-from"], item.hash) : "missing";
   };
 
   const save = async (): Promise<boolean> => {
-    const res = await api(`save ${name.peek()}`, fileUrl(), { method: "PUT", body: `${JSON.stringify(raw.peek(), null, 2)}\n` });
+    const res = await api(`save ${name.peek()}`, fileUrl(), { method: "PUT", body: `${JSON.stringify(raw, null, 2)}\n` });
     if (!res.ok) return false;
     dirty.set(false);
     collectionChanged();
@@ -142,7 +144,7 @@ export function CollectionTranslation() {
                     <div class="item-field">
                       <label for={id}>{g$.map((g) => g.label)}</label>
                       <input id={id} class="item-input" data-group={g$.peek().name} lang={lang}
-                        value={raw.peek().groups?.[g$.peek().name] ?? ""} onchange={(e: Event) => setGroup(g$.peek().name, (e.target as HTMLInputElement).value)} />
+                        value={raw.groups?.[g$.peek().name] ?? ""} onchange={(e: Event) => setGroup(g$.peek().name, (e.target as HTMLInputElement).value)} />
                     </div>
                   );
                 })}
@@ -155,7 +157,7 @@ export function CollectionTranslation() {
                     {when(() => !!i$.get().thumb, () => <img class="thumb" src={i$.map((i) => i.thumb)} alt="" />)}
                     <strong class="item-title">{i$.map((i) => i.fields.title || i.slug)}</strong>
                     <span class="translation-state">{computed(() => SAYS[standing(i$.get())])}</span>
-                    {when(() => ["stale", "unchecked"].includes(standing(i$.get())), () => (
+                    {when(() => isBehind(standing(i$.get())), () => (
                       <button type="button" class="up-to-date" onclick={() => upToDate(i$.peek())}
                         title="You have read what changed, and the words here say the same">
                         <Icon name="refresh-cw" size={12} /> Up to date

@@ -672,8 +672,7 @@ for a fallback, from `counterparts()` — never with one language), and `{{descr
 writes the `hreflang` alternates (written versions only, with an origin).
 `templates/<name>.<lang>.html` comes before `<name>.html` for a layout
 (`<layout>.cy`, `<layout>`, `site.cy`, `site`: the layout is kept before the
-language) and for an include; the template cache key and `chrome` in `pageHtml()` carry
-the language.
+language) and for an include; `chrome` in `pageHtml()` carries the language.
 
 **What is per language.** The nav, `{{pages}}` and `{{sitemap}}` (`nav.ts`; each cache
 is kept under `lang NUL key`): the default's shape — its folders, its `order:` — over

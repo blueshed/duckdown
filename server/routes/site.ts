@@ -51,6 +51,14 @@ export const handleSite = siteHandler(ORIGIN);
 
 const HTML = "text/html; charset=utf-8";
 
+// A page as a reader or an editor is given it. Signed in, it carries an edit
+// link a reader's copy doesn't: never kept, and never shared. Otherwise it is
+// cached like a static file.
+const pageResponse = (req: Request, html: string, signedIn: boolean) =>
+  signedIn
+    ? new Response(html, { headers: { "Content-Type": HTML, "Cache-Control": "private, no-cache" } })
+    : conditional(req, html, { "Content-Type": HTML, "Cache-Control": CACHE });
+
 // The content folder is read at every request but only seeded at startup, so
 // one that is deleted or moved while the server runs turns every page into a
 // 404 with nothing said, and /health still answers. Say so, once per
@@ -73,9 +81,9 @@ export function noticeMissingRoot(exists: (path: string) => boolean = existsSync
 // translated — a reader should know why this one is in English.
 const notFound = async (req: Request, lang = "") => {
   noticeMissingRoot();
-  const answer = lang
-    ? await translation(pages, lang, NOT_FOUND)
-    : await pages.exists(NOT_FOUND) ? { kind: "translated", key: NOT_FOUND } : null;
+  let answer: { kind: string; key: string } | null = null;
+  if (lang) answer = await translation(pages, lang, NOT_FOUND);
+  else if (await pages.exists(NOT_FOUND)) answer = { kind: "translated", key: NOT_FOUND };
   if (!answer) return new Response("Not Found", { status: 404 });
   const { html } = await pageHtml(parsePage(answer.key, await pages.read(answer.key)), {
     origin: siteOrigin(req), editHref: "", fallbackFor: answer.kind === "fallback" ? lang : undefined,
@@ -109,8 +117,7 @@ const collected = async (req: Request, name: string, decoded: string, lang = "")
       editHref: user ? `/edit?path=${encodeURIComponent(collectionPath(found.collection.folder))}` : "",
       item: found,
     });
-    if (user) return new Response(html, { headers: { "Content-Type": HTML, "Cache-Control": "private, no-cache" } });
-    return conditional(req, html, { "Content-Type": HTML, "Cache-Control": CACHE });
+    return pageResponse(req, html, !!user);
   }
 
   // An address a page or an item used to live at, compared decoded: a legacy
@@ -140,8 +147,7 @@ const languagePage = async (req: Request, lang: string, rest: string, name: stri
     editHref: user ? `/edit?path=${encodeURIComponent(answer.key)}` : "",
     fallbackFor: answer.kind === "fallback" ? lang : undefined,
   });
-  if (user) return new Response(html, { headers: { "Content-Type": HTML, "Cache-Control": "private, no-cache" } });
-  return conditional(req, html, { "Content-Type": HTML, "Cache-Control": CACHE });
+  return pageResponse(req, html, !!user);
 };
 
 const renderPage = async (req: Request) => {
@@ -182,8 +188,5 @@ const renderPage = async (req: Request) => {
     editHref: user ? `/edit?path=${encodeURIComponent(key)}` : "",
   });
 
-  // Signed in, the page carries an edit link a reader's copy doesn't: never
-  // kept, and never shared. Otherwise it is cached like a static file.
-  if (user) return new Response(html, { headers: { "Content-Type": HTML, "Cache-Control": "private, no-cache" } });
-  return conditional(req, html, { "Content-Type": HTML, "Cache-Control": CACHE });
+  return pageResponse(req, html, !!user);
 };

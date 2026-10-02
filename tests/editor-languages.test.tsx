@@ -10,7 +10,7 @@ import {
   translations, languages, languageOf, collectionLanguage, previewShown,
 } from "../server/edit/store";
 import {
-  refreshTranslations, languageName, marksFor, barFor, translate, openTranslation, markUpToDate, SAYS,
+  refreshTranslations, languageName, marksFor, folderMarks, barFor, translate, openTranslation, markUpToDate, SAYS,
 } from "../server/edit/translations";
 import { Browser } from "../server/edit/components/Browser";
 import { Editor } from "../server/edit/components/Editor";
@@ -154,10 +154,10 @@ describe("translations, as the editor knows them", () => {
     expect(marksFor("cy/lleol.md")).toEqual([]);                   // nothing to be behind
     expect(marksFor("cy/nowhere.md")).toEqual([]);
     // A folder counts what is out of date inside it, from either tree.
-    expect(marksFor("blog", true)).toEqual([{ kind: "stale", text: "↻ 1", title: "1 translation(s) out of date in here" }]);
-    expect(marksFor("cy/blog", true)[0]!.text).toBe("↻ 1");
-    expect(marksFor("cy", true)[0]!.text).toMatch(/^↻ \d+$/);       // every one of the language's
-    expect(marksFor("guide", true)).toEqual([]);
+    expect(folderMarks("blog")).toEqual([{ kind: "stale", text: "↻ 1", title: "1 translation(s) out of date in here" }]);
+    expect(folderMarks("cy/blog")[0]!.text).toBe("↻ 1");
+    expect(folderMarks("cy")[0]!.text).toMatch(/^↻ \d+$/);       // every one of the language's
+    expect(folderMarks("guide")).toEqual([]);
   });
 
   test("the bar says what the open page has: each language for an original, where it stands for a translation", async () => {

@@ -59,3 +59,9 @@ export function aliasKey(path: string): string {
 // An item's address: its folder, its slug, and the slash that makes it a
 // folder with an index.
 export const itemHref = (folder: string, slug: string) => `/${folder ? `${folder}/` : ""}${slug}/`;
+
+// A key from its parts, the empty ones left out: where a folder is in a language
+// (joinKey("cy", "works") is "cy/works", joinKey("cy", "") is "cy") and what is in
+// a folder (joinKey("", "a.md") is "a.md"). Pure, like the rest of this module,
+// because the editor builds the same keys the server does.
+export const joinKey = (...parts: string[]) => parts.filter(Boolean).join("/");

@@ -135,8 +135,11 @@ const site = (pages: Storage, debug: boolean): Promise<Built> => built(pages, ""
 // addresses that move are the whole site's — but a reader searches in one:
 // the default's entries are those outside the language folders, a language's
 // are those under its own, so what a Welsh reader finds is Welsh.
-export const entriesIn = (entries: Entry[], others: string[], lang: string): Entry[] =>
-  entries.filter((e) => (others.find((other) => e.url.startsWith(`/${other}/`)) ?? "") === lang);
+export function entriesIn(entries: Entry[], others: string[], lang: string): Entry[] {
+  if (!others.length) return entries;   // one language: the walk is the index
+  const folders = others.map((other) => `/${other}/`);
+  return entries.filter((e) => (folders.find((folder) => e.url.startsWith(folder))?.slice(1, -1) ?? "") === lang);
+}
 
 export async function searchIndex(pages: Storage, debug = DEBUG, lang = ""): Promise<Entry[]> {
   const { entries } = await site(pages, debug);

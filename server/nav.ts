@@ -5,34 +5,33 @@ import { escapeHtml, canonicalPath, dateHtml } from "./utils";
 import { unlisted, pageKey, readable } from "./listed";
 import { kept } from "./kept";
 import { languagesOf, translation, treeOf } from "./languages";
+import { joinKey } from "./slugs";
 
 // What the site knows about itself: its nav, and each folder's list of pages,
 // kept until a page changes (kept.ts).
 //
 // Each is the site's in a language: the default's when `lang` is empty (and
 // then another language's folders are not in it), another's when it names one
-// (see the language's tree, below). A kept build has one key, so a language's
-// is named by it: a folder, or "" for the whole site, after `lang` and a NUL,
-// which no folder's name can hold.
-const keyed = (lang: string, key: string) => lang ? `${lang}\0${key}` : key;
-const unkey = (key: string): [string, string] => key.includes("\0") ? key.split("\0", 2) as [string, string] : ["", key];
+// (see the language's tree, below). The nav and the sitemap are kept by
+// language; a folder's listing by its language and its name, after a NUL, which
+// no folder's name can hold.
+const nav = kept(async (pages, lang, debug) =>
+  lang ? languageNav(pages, lang) : buildNav(pages, "", (await languagesOf(pages, debug)).others));
 
-const nav = kept(async (pages, key, debug) => {
-  const [lang] = unkey(key);
-  return lang ? languageNav(pages, lang) : buildNav(pages, "", (await languagesOf(pages, debug)).others);
-});
 const listings = kept((pages, key) => {
-  const [lang, folder] = unkey(key);
-  return buildListing(pages, folder, lang);
+  const at = key.indexOf("\0");
+  return at < 0 ? buildListing(pages, key, "") : buildListing(pages, key.slice(at + 1), key.slice(0, at));
 });
 
-export const siteNav = (pages: Storage, debug = DEBUG, lang = ""): Promise<string> => nav(pages, keyed(lang, ""), debug);
+export const siteNav = (pages: Storage, debug = DEBUG, lang = ""): Promise<string> => nav(pages, lang, debug);
 
 // A folder's pages, for {{pages}} in its index.
 export const folderListing = (pages: Storage, folder: string, debug = DEBUG, lang = ""): Promise<string> =>
-  listings(pages, keyed(lang, folder), debug);
+  listings(pages, lang ? `${lang}\0${folder}` : folder, debug);
 
 export type Listed = { key: string; href: string; title: string; date: string; description: string };
+
+const byDateThenTitle = (a: Listed, b: Listed) => b.date.localeCompare(a.date) || a.title.localeCompare(b.title);
 
 // A folder's pages, newest first by date:, then by title: what listed.ts says
 // is a page, less the folder's own index. The feed (feed.ts) is made from
@@ -54,7 +53,7 @@ export async function folderEntries(pages: Storage, folder: string, lang = ""): 
       description: meta.description?.[0] ?? "",
     });
   }
-  return entries.sort((a, b) => b.date.localeCompare(a.date) || a.title.localeCompare(b.title));
+  return entries.sort(byDateThenTitle);
 }
 
 // A language's folder: its pages as that language's site has them, which is
@@ -66,7 +65,7 @@ export async function folderEntries(pages: Storage, folder: string, lang = ""): 
 async function languageEntries(pages: Storage, folder: string, lang: string): Promise<Listed[]> {
   const entries: Listed[] = [];
   for (const name of (await treeOf(pages, lang, folder)).files) {
-    const key = folder ? `${folder}/${name}` : name;
+    const key = joinKey(folder, name);
     if (!pageKey(key) || name === "index.md") continue;
     const answer = await translation(pages, lang, key);
     if (!answer) continue;
@@ -83,7 +82,7 @@ async function languageEntries(pages: Storage, folder: string, lang: string): Pr
       description: meta.description?.[0] ?? "",
     });
   }
-  return entries.sort((a, b) => b.date.localeCompare(a.date) || a.title.localeCompare(b.title));
+  return entries.sort(byDateThenTitle);
 }
 
 // A language's folders in order: the order is the default's (it is the same in
@@ -94,7 +93,12 @@ const languageOrder = (pages: Storage, lang: string) => async (folder: { path: s
   return own !== Infinity ? own : folderOrder(pages, `${lang}/${folder.path}`);
 };
 
-const joined = (folder: string, name: string) => folder ? `${folder}/${name}` : name;
+// A language's folders inside a folder (named in the default's tree), as the
+// nav and the sitemap walk them.
+async function languageFolders(pages: Storage, lang: string, folder: string) {
+  const { folders } = await treeOf(pages, lang, folder);
+  return sortFolders(pages, folders.map((name) => ({ name, path: joinKey(folder, name) })), languageOrder(pages, lang));
+}
 
 // The nav of a language: the same walk as the default's — an entry for each
 // folder's index, folders in order — over what answers in the language, and
@@ -103,7 +107,7 @@ const joined = (folder: string, name: string) => folder ? `${folder}/${name}` : 
 // the default's name, and a translator who gives one gives the language's.
 async function languageNav(pages: Storage, lang: string, folder = ""): Promise<string> {
   const items: string[] = [];
-  const key = joined(folder, "index.md");
+  const key = joinKey(folder, "index.md");
   const answer = await translation(pages, lang, key);
   if (answer) {
     // translation() has left out a draft and an each: page already.
@@ -111,8 +115,7 @@ async function languageNav(pages: Storage, lang: string, folder = ""): Promise<s
     const title = meta.nav?.[0] || meta.title?.[0];
     if (title) items.push(`<li><a href="${encodeURI(canonicalPath(`${lang}/${key}`))}">${escapeHtml(title)}</a></li>`);
   }
-  const folders = (await treeOf(pages, lang, folder)).folders.map((name) => ({ name, path: joined(folder, name) }));
-  for (const sub of await sortFolders(pages, folders, languageOrder(pages, lang))) {
+  for (const sub of await languageFolders(pages, lang, folder)) {
     const inside = await languageNav(pages, lang, sub.path);
     if (inside) items.push(inside);
   }
@@ -150,7 +153,7 @@ async function answering(pages: Storage, lang: string, key: string): Promise<Rec
 // the default's top-level folders that aren't part of it: the languages'.
 async function buildSiteMap(pages: Storage, folder: string, lang: string, skip: string[]): Promise<string> {
   const items: string[] = [];
-  const at = (key: string) => lang ? `${lang}/${key}` : key;   // where a page is in this site's own address
+  const at = (key: string) => joinKey(lang, key);   // where a page is in this site's own address
   // The site's front door is the first thing in the list; a folder's index is
   // the label of the folder, below.
   if (!folder) {
@@ -163,9 +166,9 @@ async function buildSiteMap(pages: Storage, folder: string, lang: string, skip: 
   }
   // Follows the nav's own order, so the two agree on which folder comes first.
   const folders = lang
-    ? (await treeOf(pages, lang, folder)).folders.map((name) => ({ name, path: joined(folder, name) }))
-    : (await pages.list(folder)).folders.filter((f) => !unlisted(f.name) && !(folder === "" && skip.includes(f.name)));
-  for (const sub of await sortFolders(pages, folders, lang ? languageOrder(pages, lang) : undefined)) {
+    ? await languageFolders(pages, lang, folder)
+    : await sortFolders(pages, (await pages.list(folder)).folders.filter((f) => !unlisted(f.name) && !(folder === "" && skip.includes(f.name))));
+  for (const sub of folders) {
     const path = sub.path;
     const inside = await buildSiteMap(pages, path, lang, skip);
     if (!inside) continue;
@@ -177,13 +180,11 @@ async function buildSiteMap(pages: Storage, folder: string, lang: string, skip: 
   return items.length ? `<ul class="sitemap">\n${items.join("\n")}\n</ul>` : "";
 }
 
-const map = kept(async (pages, key, debug) => {
-  const [lang] = unkey(key);
-  return buildSiteMap(pages, "", lang, lang ? [] : (await languagesOf(pages, debug)).others);
-});
+const map = kept(async (pages, lang, debug) =>
+  buildSiteMap(pages, "", lang, lang ? [] : (await languagesOf(pages, debug)).others));
 
 // Every page, nested by folder, for {{sitemap}}. Kept like the nav.
-export const siteMap = (pages: Storage, debug = DEBUG, lang = ""): Promise<string> => map(pages, keyed(lang, ""), debug);
+export const siteMap = (pages: Storage, debug = DEBUG, lang = ""): Promise<string> => map(pages, lang, debug);
 
 // The nav is one string for every page, so mark it per page: the page's own
 // link gets aria-current="page"; failing that, the nearest folder it sits in

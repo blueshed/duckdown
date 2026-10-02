@@ -5,8 +5,11 @@ import { describe, test, expect, beforeEach, spyOn } from "bun:test";
 import type { Storage, Listing } from "../server/storage";
 import { parseFrontMatter } from "../server/markdown";
 import { siteChanged } from "../server/kept";
+import { translationStandings } from "../server/translations";
+import { judge } from "../server/standing";
+import { joinKey } from "../server/slugs";
 import {
-  DEFAULT, UNTRANSLATED, languagesOf, languageAt, splitLanguage, sourceHash, translation, standing,
+  DEFAULT, UNTRANSLATED, languagesOf, languageAt, splitLanguage, sourceHash, translation, translated,
   counterparts, untranslatedNote, languageName, translationRows, translationDraft, stamped, newLanguage, type Counterpart, type Row,
 } from "../server/languages";
 
@@ -36,6 +39,10 @@ function memory(files: Record<string, string>): Storage {
 // What the site knows about its languages is kept until a page changes, and
 // the cache is the site's, not a storage's: each test starts it again.
 beforeEach(() => siteChanged());
+
+// Where a translation stands, as the rows say it (a page with neither is missing).
+const standing = async (pages: Storage, lang: string, key: string) =>
+  (await translationRows(pages, true)).find((r) => r.lang === lang && r.key === key)?.standing ?? "missing";
 
 const WELSH = { "index.md": "title: Home\n\nHello", "cy/index.md": "lang: cy\ntitle: Hafan\nuntranslated: Nid yw wedi'i chyfieithu eto." };
 
@@ -198,6 +205,14 @@ describe("translation", () => {
   test("a page neither language has is nothing, never a nearest match", async () => {
     const pages = memory(files());
     expect(await translation(pages, "cy", "nowhere.md")).toBeNull();
+  });
+
+  test("whether the language has a page of its own for a reader is `translated`, and for the editor with drafts", async () => {
+    const pages = memory({ ...files(), "cy/contact.md": "draft: true\n\nCysylltu" });
+    expect(await translated(pages, "cy", "about.md")).toBe(true);
+    expect(await translated(pages, "cy", "contact.md")).toBe(false);
+    expect(await translated(pages, "cy", "contact.md", true)).toBe(true);
+    expect(await translated(pages, "cy", "nowhere.md")).toBe(false);
   });
 
   test("only a language of the site answers: not the default, not a folder, not a name nobody gave", async () => {
@@ -415,14 +430,28 @@ describe("translationRows", () => {
     expect(await translationRows(memory({ "index.md": "Hi", "about.md": "About" }), true)).toEqual([]);
   });
 
+  test("reads each original once, however many languages translate it, and each translation once", async () => {
+    const files = { ...SITE, "fr/contact.md": "title: Contact\n\nÉcrivez", "fr/index.md": "lang: fr\n\nBonjour" };
+    const pages = memory(files);
+    const reads: string[] = [];
+    const counting: Storage = { ...pages, read: (key) => (reads.push(key), pages.read(key)) };
+    await translationRows(counting, true);
+    for (const key of ["about.md", "contact.md", "cy/about.md", "cy/contact.md", "fr/about.md", "fr/contact.md"]) {
+      expect([key, reads.filter((r) => r === key).length]).toEqual([key, 1]);
+    }
+    expect(reads.filter((r) => r === "contact.md")).toHaveLength(1);   // translated into two, read once
+  });
+});
+
+describe("translationStandings", () => {
   test("is kept until the site changes", async () => {
     const files: Record<string, string> = { ...WELSH, "about.md": "title: About\n\nUs" };
     const pages = memory(files);
-    const first = await translationRows(pages);
-    expect(await translationRows(pages)).toBe(first);
+    const first = await translationStandings(pages);
+    expect(await translationStandings(pages)).toBe(first);
     files["cy/about.md"] = "title: Amdanom\n\nNi";
     siteChanged();
-    expect((await translationRows(pages)).find((r) => r.key === "about.md")!.standing).toBe("unchecked");
+    expect((await translationStandings(pages)).find((r) => r.key === "about.md")!.standing).toBe("unchecked");
   });
 });
 
@@ -481,5 +510,25 @@ describe("newLanguage", () => {
     expect(newLanguage(languages, "Welsh")).toBe(false);
     expect(newLanguage(languages, "")).toBe(false);
     expect(newLanguage(languages, "../x")).toBe(false);
+  });
+});
+
+describe("judge", () => {
+  test("a translation made from the source as it is is fresh, however its hash is typed; one made from another is stale; one that says nothing is unchecked", () => {
+    expect(judge("3f9a1c2e", "3f9a1c2e")).toBe("fresh");
+    expect(judge("3F9A1C2E", "3f9a1c2e")).toBe("fresh");
+    expect(judge("00000000", "3f9a1c2e")).toBe("stale");
+    expect(judge(undefined, "3f9a1c2e")).toBe("unchecked");
+    expect(judge("", "3f9a1c2e")).toBe("unchecked");
+  });
+});
+
+describe("joinKey", () => {
+  test("joins the parts that are there", () => {
+    expect(joinKey("cy", "works")).toBe("cy/works");
+    expect(joinKey("cy", "")).toBe("cy");
+    expect(joinKey("", "a.md")).toBe("a.md");
+    expect(joinKey("", "")).toBe("");
+    expect(joinKey("cy", "works", "item.md")).toBe("cy/works/item.md");
   });
 });

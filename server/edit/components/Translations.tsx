@@ -2,19 +2,20 @@ import { createElement, signal, computed, effect, list, when } from "@blueshed/r
 import { Icon } from "./Icon";
 import { Drawer } from "./Drawer";
 import {
-  translations, languages, refreshTranslations, languageName, translate, openTranslation, markUpToDate, barFor, SAYS,
+  refreshTranslations, languageName, translate, begin, markUpToDate, barFor, isBehind, isWanted, SAYS, SYMBOL,
 } from "../translations";
 import {
-  browserRevision, resourceRevision, collectionRevision, filePath, loadFile, openCollection,
-  drawer, toggleDrawer, closeDrawer,
+  translations, languages, browserRevision, resourceRevision, collectionRevision, filePath, loadFile, openCollection,
+  drawer, toggleDrawer, closeDrawer, COLLECTION_FILE,
 } from "../store";
-import type { Row } from "../../languages";
+import { joinKey } from "../../slugs";
+import type { Standing } from "../../standing";
 
 // A site in more than one language, in the editor (translations.ts): the
 // header's button and its badge, the bar over the open page, and the drawer
 // that lists what wants attention across the site.
 
-const words = (standing: Row["standing"], draft: boolean) => `${SAYS[standing]}${draft ? " · draft" : ""}`;
+const words = (standing: Standing, draft: boolean) => `${SAYS[standing]}${draft ? " · draft" : ""}`;
 
 // How many translations have fallen behind: what the button says, since it is
 // the thing to look at before the next Publish.
@@ -53,7 +54,7 @@ export function TranslationBar() {
     const b = bar.get();
     return b?.kind === "translation" ? b : null;
   });
-  const original = computed(() => (bar.get() as { key?: string } | null)?.key ?? "");
+  const original = computed(() => bar.get()?.key ?? "");
 
   return when(bar, () => (
     <div class="translation-bar" role="group" aria-label="Translations of this page">
@@ -65,10 +66,7 @@ export function TranslationBar() {
               <span class="translation-state">{e$.map((e) => words(e.standing, e.draft))}</span>
               <button type="button"
                 aria-label={e$.map((e) => `${e.standing === "missing" ? "Translate into" : "Open the"} ${languageName(e.lang)}${e.standing === "missing" ? "" : " translation"}`)}
-                onclick={() => {
-                  const e = e$.peek();
-                  return e.standing === "missing" ? translate(e.lang, original.peek()) : openTranslation(e.lang, original.peek());
-                }}>
+                onclick={() => begin(e$.peek().lang, original.peek(), e$.peek().standing)}>
                 {e$.map((e) => (e.standing === "missing" ? "Translate" : "Open"))}
               </button>
             </li>
@@ -82,7 +80,7 @@ export function TranslationBar() {
           {when(() => translation.get()?.standing !== "own", () => (
             <button type="button" onclick={() => loadFile(translation.peek()!.key)}>Open original</button>
           ))}
-          {when(() => ["stale", "unchecked"].includes(translation.get()?.standing ?? ""), () => (
+          {when(() => isBehind(translation.get()?.standing ?? "own"), () => (
             <button type="button" onclick={markUpToDate}
               title="You have read what changed, and this says the same">
               <Icon name="refresh-cw" size={12} /> Mark up to date
@@ -97,21 +95,22 @@ export function TranslationBar() {
 // What wants attention, by language: out of date first, then what can't be
 // checked, then what nobody has begun — every page and every item of a
 // collection, each a way to the thing itself. A draft is being worked on, and
-// is nobody's problem yet. It stops at a hundred a
-// language: past that the list is no use as a list.
-const ORDER = { stale: 0, unchecked: 1, missing: 2 } as const;
+// is nobody's problem yet. It stops at a hundred a language: past that the
+// list is no use as a list.
+const ORDER = Object.keys(SYMBOL);
 const LIMIT = 100;
-type Entry = { key: string; standing: Row["standing"]; draft: boolean };
+const collator = new Intl.Collator();
+type Entry = { key: string; standing: Standing; draft: boolean };
 
 const wanted = (lang: string): { entries: Entry[]; more: number } => {
   const all = (translations.get()?.rows ?? [])
-    .filter((r) => r.lang === lang && !r.draft && r.standing in ORDER)
-    .sort((a, b) => ORDER[a.standing as keyof typeof ORDER] - ORDER[b.standing as keyof typeof ORDER] || a.key.localeCompare(b.key));
+    .filter((r) => r.lang === lang && !r.draft && isWanted(r.standing))
+    .sort((a, b) => ORDER.indexOf(a.standing) - ORDER.indexOf(b.standing) || collator.compare(a.key, b.key));
   return { entries: all.slice(0, LIMIT), more: Math.max(all.length - LIMIT, 0) };
 };
 
 // An item's row is named for the collection: "works/collection.json#first-light".
-const ITEM = "collection.json#";
+const ITEM = `${COLLECTION_FILE}#`;
 const itemOf = (key: string) => {
   const at = key.indexOf(ITEM);
   return at < 0 ? null : { folder: key.slice(0, Math.max(at - 1, 0)), slug: key.slice(at + ITEM.length) };
@@ -121,11 +120,11 @@ const labelOf = (key: string) => {
   return item ? `${item.slug}${item.folder ? ` (${item.folder})` : ""}` : key;
 };
 
+// An item opens its words; a page is opened, or begun when nobody has.
 async function go(lang: string, entry: Entry): Promise<void> {
   const item = itemOf(entry.key);
-  if (item) return void openCollection([lang, item.folder].filter(Boolean).join("/"), lang);
-  if (entry.standing === "missing") return void await translate(lang, entry.key);
-  await openTranslation(lang, entry.key);
+  if (item) openCollection(joinKey(lang, item.folder), lang);
+  else await begin(lang, entry.key, entry.standing);
 }
 
 export function TranslationsDrawer() {

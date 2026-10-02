@@ -7,6 +7,7 @@ import { fillCollections, fillItem, itemMeta, itemBody, itemCounterparts, type I
 import { escapeHtml, outsideCode, canonicalPath, dateHtml } from "./utils";
 import { sitePicture } from "./icons";
 import { withWidths } from "./widths";
+import { joinKey } from "./slugs";
 import { languagesOf, splitLanguage, counterparts, untranslatedNote, languageName, type Counterpart } from "./languages";
 
 const site = createStorage();
@@ -71,7 +72,7 @@ async function firstTemplate(names: string[], draft?: DraftTemplate): Promise<{ 
 // a string because a string replacement reads $$, $& and $' in the page as
 // patterns — "$$5" would publish as "$5".
 function fill(html: string, name: string, value: () => string): string {
-  return html.replace(new RegExp(`\\{\\{${name}\\}\\}`, "g"), value);
+  return html.includes(`{{${name}}}`) ? html.replace(new RegExp(`\\{\\{${name}\\}\\}`, "g"), value) : html;
 }
 
 // {{include name}} pulls templates/name.html into a template — the seed's
@@ -182,7 +183,8 @@ export type PageOptions = {
 function languageList(found: Counterpart[], current: string): string {
   if (found.length < 2) return "";
   const items = found.map((c) => {
-    const href = escapeHtml(encodeURI(c.kind === "fallback" ? languageAddress(c.lang, c.key) : canonicalPath(c.key)));
+    // A translation is at its own address; a fallback is the default's page under the language's folder.
+    const href = escapeHtml(encodeURI(canonicalPath(c.kind === "fallback" ? `${c.lang}/${c.key}` : c.key)));
     const attrs = [`href="${href}"`, `hreflang="${escapeHtml(c.lang)}"`, `lang="${escapeHtml(c.lang)}"`];
     if (c.kind === "fallback") attrs.push('class="untranslated"');
     if (c.lang === current) attrs.push('aria-current="true"');
@@ -190,13 +192,6 @@ function languageList(found: Counterpart[], current: string): string {
   });
   return `<ul class="languages">\n${items.join("\n")}\n</ul>`;
 }
-
-// Where a page answers in a language that has no translation of it: the
-// language's folder, then the page's own address.
-const languageAddress = (lang: string, key: string) => `/${lang}${canonicalPath(key)}`;
-
-// Where a language's site begins: "/" for the default's, "/cy/" for the rest.
-const rootOf = (lang: string, main: string) => lang === main ? "/" : `/${lang}/`;
 
 // What a search engine is told about the other versions of a page: each
 // that is really written in its language (not a fallback, which is the same
@@ -225,9 +220,9 @@ export async function pageHtml(page: Page, o: PageOptions): Promise<{ html: stri
   // on a page that is where it should be; they part for a fallback, which is
   // the default's page standing in the language's site.
   const languages = await languagesOf(pages);
-  const folder = splitLanguage(languages, page.key).lang;
-  const written = meta.lang?.[0] || folder;
-  const stands = o.fallbackFor ?? folder;
+  const { lang: home, key: tree } = splitLanguage(languages, page.key);   // the language its file is in, and its key in the default's tree
+  const written = meta.lang?.[0] || home;
+  const stands = o.fallbackFor ?? home;
   // The language's site, when it isn't the default's: its template files, its
   // nav, its listings. Empty for the default's, which is every page of a site
   // with no other.
@@ -237,7 +232,7 @@ export async function pageHtml(page: Page, o: PageOptions): Promise<{ html: stri
   const nav = markCurrent(await siteNav(pages, undefined, chrome), o.fallbackFor ? `${o.fallbackFor}/${file}` : file);
   // The folder this page is in, named in the default's tree, which is how a
   // language's listings are asked for.
-  const inFolder = folderOf(splitLanguage(languages, page.key).key.replace(/\.md$/, ""));
+  const inFolder = folderOf(tree);
 
   // {{pages}} in a page lists the pages beside it (a blog index writes itself),
   // except in code, where it stays as written so a page can document the tag.
@@ -256,7 +251,7 @@ export async function pageHtml(page: Page, o: PageOptions): Promise<{ html: stri
   // in the default's tree here, and is in the language's folder to be read.
   const named = meta.collection?.[0]?.replace(/^\/+|\/+$/g, "");
   const collection = {
-    pages, folder: [chrome, named ?? inFolder].filter(Boolean).join("/"), context: o.item,
+    pages, folder: joinKey(chrome, named ?? inFolder), context: o.item,
     template: (name: string) => itemTemplate(name, o.draft),
   };
   body = await fillCollections(body, collection);
@@ -303,7 +298,7 @@ export async function pageHtml(page: Page, o: PageOptions): Promise<{ html: stri
     ["lang", () => escapeHtml(written)],
     // Where the reader's language begins, for a link home or a search that
     // stays in it: "/" or "/cy/".
-    ["root", () => rootOf(stands, languages.main)],
+    ["root", () => chrome ? `/${chrome}/` : "/"],
     ["languages", () => languageList(found, stands)],
     // The page's description, and the card a link to it shows when shared:
     // Open Graph, which most places that unfurl a link read. Addresses in it

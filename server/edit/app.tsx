@@ -69,8 +69,8 @@ middle.appendChild(when(opening, () => <div class="loading-line" role="progressb
 // as they were, hidden, and come back when you look at now again.
 middle.appendChild(when(seen, () => <PastPane />));
 middle.appendChild(when(hasFile, () => <Editor />));
-middle.appendChild(when(() => collection.get() !== null && !collection.get()!.lang, () => <CollectionPane />));
-middle.appendChild(when(() => !!collection.get()?.lang, () => <CollectionTranslation />));
+// (openCollection takes one away before it builds the other, so a pane is built for its collection.)
+middle.appendChild(when(collection, () => collection.peek()!.lang ? <CollectionTranslation /> : <CollectionPane />));
 middle.appendChild(when(resource, () => <ResourcePane />));
 middle.appendChild(when(nothingOpen, () =>
   <div class="panel panel-editor"><div class="placeholder">select a page or a resource</div></div>));

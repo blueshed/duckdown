@@ -149,11 +149,14 @@ async function offerCollection(fp: string): Promise<void> {
   // collection's words that are there to edit.
   const lang = await collectionLanguage(own);
   if (lang) return openCollection(own, lang);
-  // Asked of the folder's listing, not the file: a folder without one is the
-  // usual case, and a 404 for it is red in every browser's console.
-  const listing = await apiJson<Listing>(`list /${own}`, folderUrl(own));
-  if (listing?.files.some((f) => f.name === COLLECTION_FILE)) openCollection(own);
+  if (await hasCollection(own)) openCollection(own);
 }
+
+// Whether a folder holds a collection.json: asked of its listing, not of the
+// file — a folder without one is the usual case, and a 404 for it is red in
+// every browser's console.
+const hasCollection = async (folder: string) =>
+  !!(await apiJson<Listing>(`list /${folder}`, folderUrl(folder)))?.files.some((f) => f.name === COLLECTION_FILE);
 
 // The language whose words a folder's collection is, when the folder is a
 // language's and the default's folder has a collection: the language's own
@@ -166,9 +169,8 @@ export async function collectionLanguage(folder: string): Promise<string | undef
   if (translations.peek() === null) await refreshTranslations();
   const lang = languageOf(folder);
   if (!lang) return undefined;
-  const base = folder === lang ? "" : folder.slice(lang.length + 1);
-  const listing = await apiJson<Listing>(`list /${base}`, folderUrl(base));
-  return listing?.files.some((f) => f.name === COLLECTION_FILE) ? lang : undefined;
+  const base = folder.slice(lang.length + 1);   // the default's folder: "" for the language's own
+  return await hasCollection(base) ? lang : undefined;
 }
 
 // Transient: a resource is open for as long as you are working on it, and the

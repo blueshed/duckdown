@@ -1,7 +1,7 @@
 import type { BunRequest } from "bun";
 import { requireAuth } from "../auth";
 import { createPageStorage } from "../storage";
-import { languagesOf, splitLanguage, translationDraft, stamped, newLanguage } from "../languages";
+import { languagesOf, splitLanguage, translationDraft, stamped, newLanguage, type Languages } from "../languages";
 import { translationStandings } from "../translations";
 import { translationView } from "../collection";
 import { parseFrontMatter } from "../markdown";
@@ -23,6 +23,10 @@ const pages = createPageStorage();
 // the editor writes: that is what keeps the history, and drops what the site
 // knows about itself.
 const refused = (message: string, status = 400) => new Response(message, { status });
+
+// A refusal for a language the site doesn't have, or nothing.
+const unknownLanguage = (languages: Languages, lang: string) =>
+  languages.others.includes(lang) ? null : refused(`${lang} isn't a language of this site`);
 
 // A page of the default's tree the editor may translate: a page, found, and
 // not what is a language's, or hidden, or one of the collection's each: pages.
@@ -49,9 +53,8 @@ export const handleTranslations = {
       const key = params.get("key") ?? "";
       // Another language is a folder that says so: the home page translated
       // into a code the site hasn't got is how one is added.
-      if (!languages.others.includes(lang) && !(key === "index.md" && newLanguage(languages, lang))) {
-        return refused(`${lang} isn't a language of this site`);
-      }
+      const unknown = key === "index.md" && newLanguage(languages, lang) ? null : unknownLanguage(languages, lang);
+      if (unknown) return unknown;
       const found = await source(key);
       if (found instanceof Response) return found;
       if (await pages.exists(`${lang}/${key}`)) return refused(`${lang}/${key} already exists`, 412);
@@ -60,7 +63,8 @@ export const handleTranslations = {
 
     if (params.has("items")) {
       const lang = params.get("items")!;
-      if (!languages.others.includes(lang)) return refused(`${lang} isn't a language of this site`);
+      const unknown = unknownLanguage(languages, lang);
+      if (unknown) return unknown;
       const view = await translationView(pages, params.get("folder") ?? "", lang);
       return view ? Response.json(view) : refused("There is no collection there to translate", 404);
     }
@@ -74,7 +78,8 @@ export const handleTranslations = {
     const params = new URL(req.url).searchParams;
     const lang = params.get("stamp");
     if (lang === null) return refused("Nothing to do", 404);
-    if (!(await languagesOf(pages)).others.includes(lang)) return refused(`${lang} isn't a language of this site`);
+    const unknown = unknownLanguage(await languagesOf(pages), lang);
+    if (unknown) return unknown;
     const found = await source(params.get("key") ?? "");
     if (found instanceof Response) return found;
     return new Response(stamped(await req.text(), found), { headers: { "Content-Type": "text/plain; charset=utf-8" } });
