@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.18.1 — 2026-10-02
 
 What water, the first site in two languages, found, and the small ones that
 waited. Nothing a site has to do; what a site may notice is said.
