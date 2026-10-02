@@ -14,6 +14,7 @@ import {
   saveResource, deleteResource, createResource,
   collection, openCollection, closeCollection, createCollection, leftDrawer, opening, previewShown, togglePreview,
 } from "../server/edit/store";
+import { refreshTranslations } from "../server/edit/translations";
 import { Icon } from "../server/edit/components/Icon";
 import { Notice } from "../server/edit/components/Notice";
 import { ConfirmDialog } from "../server/edit/components/ConfirmDialog";
@@ -1134,6 +1135,11 @@ describe("Help", () => {
     expect(helpFirst({ ...none, resource: { section: "templates", path: "site.html" } })).toEqual(["template"]);
     expect(helpFirst({ ...none, resource: { section: "static", path: "theme.css" } })).toEqual(["look"]);
     expect(helpFirst({ ...none, file: "theme.css", text: ":root {}" })).toEqual(["look"]);
+    // In a language's folder, the topic on another language comes with it.
+    expect(helpFirst({ ...none, file: "cy/about.md", text: "title: Amdanom", language: true })).toEqual(["languages", "page", "top"]);
+    expect(helpFirst({ ...none, file: "cy/works/item.md", text: "each: true\n\nx", language: true })).toEqual(["each", "languages", "collection"]);
+    expect(helpFirst({ ...none, collection: true, language: true })).toEqual(["languages", "collection"]);
+    expect(helpFirst({ ...none, language: true })).toEqual(["editor"]);
     const sections = ["page", "top", "extras", "look"].map((id) => ({ id, title: id, html: "" }));
     expect(helpOrder(sections, ["look", "top"]).map((x) => x.id)).toEqual(["look", "top", "page", "extras"]);
   });
@@ -1149,9 +1155,9 @@ describe("Help", () => {
     expect(drawer.get()).toBe("help");
     expect(help.getAttribute("aria-expanded")).toBe("true");
     const sections = () => [...host.querySelectorAll(".help-section")] as HTMLDetailsElement[];
-    await waitFor(() => sections().length === 8);
+    await waitFor(() => sections().length === 9);
     expect(sections()[0]!.dataset.help).toBe("each");
-    expect(sections().map((d) => d.open)).toEqual([true, false, false, false, false, false, false, false]);
+    expect(sections().map((d) => d.open)).toEqual([true, false, false, false, false, false, false, false, false]);
     expect(sections()[0]!.querySelector("summary")!.textContent).toBe("The page every work gets");
     // Open an ordinary page with Help showing: it reorders for that.
     editorContent.set("title: News\n\n# News");
@@ -2903,6 +2909,20 @@ describe("the app", () => {
     await openResource({ section: "templates", path: "post.html" });
     expect(app.querySelector(".panel-collection")).toBeNull();
     closeResource();
+
+    // In a language's folder, where the default has the collection, the pane is
+    // its words in that language; another collection takes its place.
+    await fetch("/edit/pages/cy/index.md", { method: "PUT", body: "lang: cy\ntitle: Hafan\n\nCroeso" });
+    await refreshTranslations();
+    openCollection("cy/gallery", "cy");
+    await waitFor(() => app.querySelector(".column-middle .translation-pane") !== null);
+    expect(app.querySelector(".panel-collection .pane-name")!.textContent).toBe("cy/gallery/collection.json");
+    openCollection("gallery");
+    await waitFor(() => app.querySelector(".translation-pane") === null && app.querySelector(".panel-collection") !== null);
+    expect(app.querySelector(".panel-collection .pane-name")!.textContent).toBe("gallery/collection.json");
+    closeCollection();
+    await fetch("/edit/pages/cy/index.md", { method: "DELETE" });
+    await refreshTranslations();
 
     // The past takes the tree's place, and its version stands in front of
     // the panes and the preview, which wait behind it rather than go.

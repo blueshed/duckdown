@@ -5,6 +5,7 @@ import { COLLECTION_FILE, aliasKey, loadCollection, itemBody, itemMeta } from ".
 import { canonicalPath } from "./utils";
 import { kept } from "./kept";
 import { unlisted, pageKey, readable } from "./listed";
+import { languagesOf } from "./languages";
 
 // The site's own page for a miss: a page, but not one to search for, list or map.
 
@@ -67,13 +68,14 @@ function sections(html: string): { id: string; heading: string; body: string }[]
 // Every page a reader could reach, in the order they were found. Drafts are
 // left out — they are 404 to everyone but the editor, and a search result
 // leading to a 404 is worse than no result — and so is the 404 page.
-export async function buildSite(pages: Storage, prefix = "", debug = DEBUG): Promise<Built> {
+export async function buildSite(pages: Storage, prefix = "", debug = DEBUG, others?: string[]): Promise<Built> {
+  others ??= (await languagesOf(pages, debug)).others;   // once, for the whole walk
   const { files, folders } = await pages.list(prefix);
   const out: Built = { entries: [], pages: [], aliases: [] };
 
   for (const f of files) {
     const key = f.path;
-    if (!pageKey(key) || unlisted(f.name)) continue;
+    if (!pageKey(key, others) || unlisted(f.name)) continue;
     const { content, meta } = renderMarkdown(await pages.read(key), key.replace(/\.md$/, ""));
     // An each: page is found by its collection, below, and is its items.
     if (!readable(meta)) continue;
@@ -100,7 +102,9 @@ export async function buildSite(pages: Storage, prefix = "", debug = DEBUG): Pro
   // hand — and its address is in the sitemap for the same reason.
   if (files.some((f) => f.name === COLLECTION_FILE)) {
     const collection = await loadCollection(pages, prefix, debug);
-    for (const item of collection?.each ? collection.items : []) {
+    // A language's search holds what is written in the language: an item with
+    // no words of its own yet is the default's, shown there with a note.
+    for (const item of (collection?.each ? collection.items : []).filter((item) => !item.untranslated)) {
       const context = { collection: collection!, item };
       const meta = itemMeta(context);
       out.pages.push({ url: item.href, date: "" });
@@ -114,7 +118,7 @@ export async function buildSite(pages: Storage, prefix = "", debug = DEBUG): Pro
 
   for (const folder of folders.sort((a, b) => a.name.localeCompare(b.name))) {
     if (unlisted(folder.name)) continue;
-    const inside = await buildSite(pages, folder.path, debug);
+    const inside = await buildSite(pages, folder.path, debug, others);
     out.entries.push(...inside.entries);
     out.pages.push(...inside.pages);
     out.aliases.push(...inside.aliases);
@@ -127,7 +131,17 @@ export async function buildSite(pages: Storage, prefix = "", debug = DEBUG): Pro
 const built = kept((pages, _, debug) => buildSite(pages, "", debug));
 const site = (pages: Storage, debug: boolean): Promise<Built> => built(pages, "", debug);
 
-export const searchIndex = async (pages: Storage, debug = DEBUG): Promise<Entry[]> => (await site(pages, debug)).entries;
+// The walk takes in every language — one pass, and the sitemap and the
+// addresses that move are the whole site's — but a reader searches in one:
+// the default's entries are those outside the language folders, a language's
+// are those under its own, so what a Welsh reader finds is Welsh.
+export const entriesIn = (entries: Entry[], others: string[], lang: string): Entry[] =>
+  entries.filter((e) => (others.find((other) => e.url.startsWith(`/${other}/`)) ?? "") === lang);
+
+export async function searchIndex(pages: Storage, debug = DEBUG, lang = ""): Promise<Entry[]> {
+  const { entries } = await site(pages, debug);
+  return entriesIn(entries, (await languagesOf(pages, debug)).others, lang);
+}
 export const pageList = async (pages: Storage, debug = DEBUG): Promise<PageRef[]> => (await site(pages, debug)).pages;
 
 // Every old address that moves, through aliasKey(): what a link may still say.
@@ -263,7 +277,8 @@ export function* searchFileList(files: SearchFiles): Generator<[string, string]>
   for (let n = 0; n < files.pages.length; n++) yield [`search/pages/${n}.json`, JSON.stringify(files.pages[n])];
 }
 
-// Kept with the index they are cut from, and dropped with it.
-const parts = kept(async (pages, _, debug) => searchFiles((await site(pages, debug)).entries));
-export const searchParts = (pages: Storage, debug = DEBUG): Promise<SearchFiles> => parts(pages, "", debug);
+// Kept with the index they are cut from, and dropped with it: one set per
+// language, named by it ("" for the default's).
+const parts = kept(async (pages, lang, debug) => searchFiles(await searchIndex(pages, debug, lang)));
+export const searchParts = (pages: Storage, debug = DEBUG, lang = ""): Promise<SearchFiles> => parts(pages, lang, debug);
 

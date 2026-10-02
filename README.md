@@ -94,6 +94,12 @@ same code, so you can change your mind.
 - **Collections**: a gallery or catalogue kept as data in one file, with a page
   per item and as many overviews as you like, all written once in markdown —
   and edited as works in the editor, not as JSON
+- **Another language**: a folder per language (`pages/cy/` translates
+  `pages/`), written by people — duckdown never translates. A page not yet
+  translated is shown in the original with a note; a translation records what
+  it was made from, so the editor and `bun run export` say when the page has
+  since changed. A switcher, `hreflang`, a search, navigation and sitemap for
+  each language, and a collection's words per language
 - Navigation generated from `index.md` files, and folder listings that keep themselves
 - JWT authentication
 - A view log that counts readers without identifying them — no IP, no user
@@ -134,6 +140,7 @@ below your page.
 │   ├── storage.ts       # Local / S3 storage
 │   ├── auth.ts          # JWT auth
 │   ├── markdown.ts      # Front-matter + Bun.markdown
+│   ├── languages.ts     # A site in more than one language: what answers, what is stale
 │   ├── page.ts          # A page, rendered: markdown in its template
 │   ├── log.ts           # The view log (counts, never identifies)
 │   ├── init.ts          # The scaffold both ways in share

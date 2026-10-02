@@ -3,11 +3,12 @@ import { describe, test, expect, spyOn } from "bun:test";
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "fs";
 import { basename, join } from "path";
 import { RUN, SITE } from "./helpers";
-import { exportSite, outPath, aliasFile, main, lands, swapIn } from "../server/export";
+import { exportSite, outPath, aliasFile, main, lands, swapIn, checkSite } from "../server/export";
+import { sourceHash } from "../server/languages";
 import { Links } from "../server/links";
 import { LocalStorage, createPageStorage } from "../server/storage";
 import { siteChanged } from "../server/kept";
-import { searchIndex, type Entry } from "../server/search";
+import { searchIndex, pageList, type Entry } from "../server/search";
 
 const out = (name: string) => join(RUN, `export-${name}`);
 const read = (dir: string, path: string) => readFileSync(join(dir, path), "utf8");
@@ -503,6 +504,264 @@ describe("what a published site needs beside its pages", () => {
     expect(work).toContain('<meta property="og:title"');
     expect(work).not.toContain("og:url");
     expect(work).not.toContain("og:image");
+    rmSync(dir, { recursive: true, force: true });
+  });
+});
+
+describe("a site in more than one language, exported", () => {
+  // One index per language, under its own folder, of the pages written in it:
+  // the files a Welsh page's search box asks for (search.js, data-root).
+  test("each language's search is files of its own, and the site's is of the pages not in a language's folder", async () => {
+    const made = ["cy/index.md", "cy/about.md", "cy/404.md", "cy/draft.md"].map((file) => join(SITE, "pages", file));
+    mkdirSync(join(SITE, "pages", "cy"), { recursive: true });
+    writeFileSync(made[0]!, "lang: cy\ntitle: Hafan\n\nCroeso i'r wefan\n");
+    writeFileSync(made[1]!, "title: Amdanom\n\n## Tim\n\nPedwar o bobl\n");
+    writeFileSync(made[2]!, "title: Ddim yma\n\nWedi mynd\n");
+    writeFileSync(made[3]!, "title: Drafft\ndraft: true\n\nNid eto\n");
+    siteChanged();
+    const dir = out("languages");
+    const welsh = (path: string) => JSON.parse(read(dir, path));
+    try {
+      await exportSite({ out: dir, origin: "https://example.com", say: quiet });
+
+      const main = indexIn(dir);
+      expect(main.length).toBeGreaterThan(0);
+      expect(main.some((e) => e.url.startsWith("/cy/"))).toBe(false);
+      expect(main.some((e) => e.url === "/about.html" || e.url === "/guide/pages.html")).toBe(true);
+      expect(welsh("search/words/cr.json")).not.toHaveProperty("croeso");   // none of it is the site's
+      // And the whole one, for a search.js from before the parts, is the same.
+      expect(read(dir, "search.json")).toBe(JSON.stringify(main));
+
+      const entries: Entry[] = [];
+      for (let n = 0; existsSync(join(dir, "cy", "search", "pages", `${n}.json`)); n++) entries.push(...welsh(`cy/search/pages/${n}.json`));
+      expect(entries.map((e) => e.url).sort()).toEqual(["/cy/", "/cy/about.html", "/cy/about.html#tim"].sort());   // no draft, no 404
+      expect(welsh("cy/search/index.json").words).toContain("cr");
+      expect(welsh("cy/search/words/cr.json")).toHaveProperty("croeso");
+      expect(welsh("cy/search/index.json").version).not.toBe(welsh("search/index.json").version);
+
+      // Its pages are pages of the site, and its sitemap's addresses are every language's.
+      expect(existsSync(join(dir, "cy/about.html"))).toBe(true);
+      const sitemap = read(dir, "sitemap.xml");
+      expect(sitemap).toContain("<loc>https://example.com/cy/about.html</loc>");
+      expect(sitemap).toContain("<loc>https://example.com/guide/pages.html</loc>");
+      expect(sitemap).not.toContain("404.html");
+      expect(sitemap).not.toContain("draft");
+      // A page in two languages names both, and the one with no home to compare with names none.
+      expect(sitemap).toContain('<xhtml:link rel="alternate" hreflang="cy" href="https://example.com/cy/"/>');
+      expect(sitemap).toContain('<xhtml:link rel="alternate" hreflang="x-default" href="https://example.com/"/>');
+      expect(sitemap).toContain("<loc>https://example.com/cy/about.html</loc></url>");
+    } finally {
+      rmSync(join(SITE, "pages", "cy"), { recursive: true, force: true });
+      rmSync(dir, { recursive: true, force: true });
+      siteChanged();
+    }
+  });
+});
+
+// A site with Welsh beside it, as the editor leaves one: some translated (one
+// kept up to date, one left behind, one that doesn't say), one begun, one only
+// Welsh has. Written into the scratch site and taken away after.
+async function withWelsh(run: (dir: string, said: string[]) => Promise<void>, name: string, extra: Record<string, string> = {}) {
+  const pages = join(SITE, "pages");
+  const fresh = sourceHash(readFileSync(join(pages, "guide", "pages.md"), "utf8"));
+  const files: Record<string, string> = {
+    "cy/index.md": "lang: cy\ntitle: Hafan\nuntranslated: Nid yw'r dudalen hon wedi'i chyfieithu eto.\n\nCroeso\n",
+    "cy/guide/pages.md": `title: Ysgrifennu tudalennau\ntranslated-from: ${fresh}\n\nTudalen wedi'i chyfieithu\n`,       // fresh
+    "cy/guide/images.md": "title: Delweddau\ntranslated-from: 00000000\n\nDelweddau\n",                                  // behind
+    "cy/guide/themes.md": "title: Themâu\n\nThemâu\n",                                                                   // doesn't say
+    "cy/guide/collections.md": "title: Casgliadau\ndraft: true\ntranslated-from: 00000000\n\nCasgliadau\n",             // begun
+    "cy/lleol.md": "title: Lleol\n\nDim ond yma\n",                                                                      // Welsh only
+    ...extra,
+  };
+  for (const [file, body] of Object.entries(files)) {
+    mkdirSync(join(pages, file, ".."), { recursive: true });
+    writeFileSync(join(pages, file), body);
+  }
+  siteChanged();
+  const dir = out(name);
+  const said: string[] = [];
+  try {
+    await run(dir, said);
+  } finally {
+    rmSync(join(pages, "cy"), { recursive: true, force: true });
+    rmSync(dir, { recursive: true, force: true });
+    siteChanged();
+  }
+}
+
+describe("a site in more than one language, exported: the pages", () => {
+  test("a page not translated is written under the language, with its note: the default's page standing in", async () => {
+    await withWelsh(async (dir, said) => {
+      await exportSite({ out: dir, origin: "https://example.com", say: (l) => said.push(l) });
+
+      // Translated: its own page, in Welsh.
+      const pages = read(dir, "cy/guide/pages.html");
+      expect(pages).toContain("Tudalen wedi'i chyfieithu");
+      expect(pages).not.toContain('<p class="untranslated"');
+
+      // Not: the default's, at the language's address, with the note in the language's words.
+      const sitemap = read(dir, "cy/sitemap.html");
+      expect(sitemap).toContain('<p class="untranslated" lang="cy" role="note">Nid yw\'r dudalen hon wedi\'i chyfieithu eto.</p>');
+      expect(sitemap).toContain('<html lang="en">');
+      expect(sitemap).toContain('<link rel="canonical" href="https://example.com/sitemap.html">');   // the default's address: one page to a search engine
+      expect(sitemap).toContain('<a href="/cy/guide/">');                                             // the language's nav, so a reader stays in it
+      expect(existsSync(join(dir, "cy/blog/index.html"))).toBe(true);
+      expect(read(dir, "cy/blog/index.html")).toContain('href="/cy/blog/a-post-with-its-own-layout.html"');   // {{pages}} in the language
+      expect(existsSync(join(dir, "cy/blog/a-post-with-its-own-layout.html"))).toBe(true);
+
+      // Begun, but not published: the default's is what a reader gets, as the served site gives.
+      const begun = read(dir, "cy/guide/collections.html");
+      expect(begun).toContain('<p class="untranslated"');
+      expect(begun).not.toContain("Casgliadau");
+
+      // Written only in Welsh: a page like any other.
+      expect(read(dir, "cy/lleol.html")).toContain("Dim ond yma");
+      expect(read(dir, "cy/index.html")).toContain("Croeso");
+      // And the default's are as they were: no note, no language's folder in the nav.
+      expect(read(dir, "guide/pages.html")).not.toContain('<p class="untranslated"');
+      expect(read(dir, "guide/pages.html").match(/<nav><ul class="nav">[\s\S]*?<\/nav>/)![0]).not.toContain('href="/cy/');
+    }, "fallbacks");
+  });
+
+  test("the language's miss is written too: its own 404 page, or the default's with the note", async () => {
+    await withWelsh(async (dir) => {
+      await exportSite({ out: dir, origin: "https://example.com", say: quiet });
+      expect(read(dir, "cy/404.html")).toContain('<p class="untranslated" lang="cy"');
+      expect(read(dir, "cy/404.html")).toContain("There is nothing at that address");
+      expect(read(dir, "404.html")).not.toContain('<p class="untranslated"');
+    }, "miss-fallback");
+
+    await withWelsh(async (dir) => {
+      await exportSite({ out: dir, origin: "https://example.com", say: quiet });
+      expect(read(dir, "cy/404.html")).toContain("Wedi mynd");
+      expect(read(dir, "cy/404.html")).not.toContain('<p class="untranslated"');
+    }, "miss-own", { "cy/404.md": "title: Ddim yma\n\nWedi mynd\n" });
+  });
+
+  test("every page of the default's is in the export in Welsh too, translated or standing in: the same addresses answer", async () => {
+    await withWelsh(async (dir) => {
+      await exportSite({ out: dir, origin: "https://example.com", say: quiet });
+      for (const { url } of await pageList(createPageStorage(), true)) {
+        if (url.startsWith("/cy/")) continue;
+        expect([url, existsSync(join(dir, "cy", url.endsWith("/") ? `${url}index.html` : url))]).toEqual([url, true]);
+      }
+    }, "every-page");
+  });
+});
+
+describe("a site in more than one language, exported: a collection", () => {
+  const gallery = JSON.stringify({
+    items: {
+      "first-light": { title: "Golau cyntaf", caption: "Inc ar bapur", "translated-from": "00000000" },   // behind
+    },
+    groups: { paintings: "Paentiadau" },
+  });
+
+  test("each item is a page under the language: its own words where it has them, the default's with the note where it hasn't", async () => {
+    await withWelsh(async (dir, said) => {
+      const count = await exportSite({ out: dir, origin: "https://example.com", say: (l) => said.push(l) });
+      const own = read(dir, "cy/gallery/first-light/index.html");
+      expect(own).toContain("<title>Golau cyntaf</title>");
+      expect(own).not.toContain('<p class="untranslated"');
+      expect(own).toContain('<link rel="alternate" hreflang="cy" href="https://example.com/cy/gallery/first-light/">');
+      const standing = read(dir, "cy/gallery/second-wind/index.html");
+      expect(standing).toContain("<title>Second Wind</title>");
+      expect(standing).toContain('<p class="untranslated" lang="cy" role="note">');
+      expect(existsSync(join(dir, "cy/gallery/study-in-green/index.html"))).toBe(true);
+      expect(existsSync(join(dir, "gallery/second-wind/index.html"))).toBe(true);        // and the default's, as before
+      expect(read(dir, "cy/gallery/index.html")).toContain('href="/cy/gallery/second-wind/"');   // the overview is the language's
+      expect(existsSync(join(dir, "cy/gallery/item.html"))).toBe(false);                 // an each: page is not a page
+      expect(existsSync(join(dir, "cy/gallery/collection.html"))).toBe(false);
+      expect(count.problems).toBe(0);
+      // Its words are behind the default's: said, and counted.
+      expect(said).toContain("translation: cy/gallery/collection.json#first-light is out of date: gallery/collection.json#first-light has changed since it was translated");
+      // The ones with no words of the language's are counted with the pages that have none.
+      expect(said.some((l) => /^note: cy: \d+ page\(s\) and item\(s\)/.test(l))).toBe(true);
+    }, "items", { "cy/gallery/collection.json": gallery });
+  });
+
+  test("a language's items are in its search, where they are written in it, and in the sitemap with their other versions", async () => {
+    await withWelsh(async (dir) => {
+      await exportSite({ out: dir, origin: "https://example.com", say: quiet });
+      const entries: Entry[] = [];
+      for (let n = 0; existsSync(join(dir, "cy", "search", "pages", `${n}.json`)); n++) entries.push(...JSON.parse(read(dir, `cy/search/pages/${n}.json`)));
+      expect(entries.some((e) => e.url === "/cy/gallery/first-light/" && e.title === "Golau cyntaf")).toBe(true);
+      expect(entries.some((e) => e.url === "/cy/gallery/second-wind/")).toBe(false);
+      expect(indexIn(dir).some((e) => e.url === "/gallery/second-wind/")).toBe(true);
+      const sitemap = read(dir, "sitemap.xml");
+      expect(sitemap).toContain('<xhtml:link rel="alternate" hreflang="cy" href="https://example.com/cy/gallery/first-light/"/>');
+      expect(sitemap).not.toContain("https://example.com/cy/gallery/second-wind/");
+    }, "items-search", { "cy/gallery/collection.json": gallery });
+  });
+
+  test("a collection the language has of its own, where the default has none, is written once, as any is", async () => {
+    await withWelsh(async (dir) => {
+      await exportSite({ out: dir, origin: "https://example.com", say: quiet });
+      expect(read(dir, "cy/lleol/dim-ond-yma/index.html")).toContain("<title>Dim ond yma</title>");
+      expect(existsSync(join(dir, "cy/cy"))).toBe(false);       // not a translation of itself
+      expect(existsSync(join(dir, "fr"))).toBe(false);          // there is no French here
+    }, "own-collection", {
+      "cy/lleol/collection.json": JSON.stringify({ fields: [{ name: "title" }], groups: [{ name: "g", items: [{ title: "Dim ond yma" }] }] }),
+      "cy/lleol/item.md": "each: true\n\n<p>{{item-title}}</p>",
+    });
+  });
+
+  test("a problem with the language's file is a collection problem, said by the export", async () => {
+    await withWelsh(async (dir, said) => {
+      const count = await exportSite({ out: dir, origin: "https://example.com", say: (l) => said.push(l) });
+      expect(said.some((l) => l.startsWith('collection: cy/gallery/collection.json: "nosuch" isn\'t an item of gallery/collection.json'))).toBe(true);
+      expect(count.problems).toBeGreaterThan(0);
+    }, "items-problem", { "cy/gallery/collection.json": JSON.stringify({ items: { nosuch: { title: "x" } } }) });
+  });
+});
+
+describe("a site in more than one language, exported: what is out of date", () => {
+  test("says which translations have fallen behind, and what can't be checked, and how much is not translated", async () => {
+    await withWelsh(async (dir, said) => {
+      const count = await exportSite({ out: dir, origin: "https://example.com", say: (l) => said.push(l) });
+      expect(said).toContain("translation: cy/guide/images.md is out of date: guide/images.md has changed since it was translated");
+      expect(said).toContain("note: cy/guide/themes.md doesn't say what it was made from (translated-from:), so it can't be checked");
+      // Kept up to date, begun, and a page of the language's own: nothing to say.
+      expect(said.filter((l) => l.startsWith("translation: "))).toHaveLength(1);
+      expect(said.some((l) => l.includes("guide/pages.md") || l.includes("collections.md") || l.includes("lleol"))).toBe(false);
+      expect(said.some((l) => /^note: cy: \d+ page\(s\) and item\(s\) not translated yet, shown in the default language with a note$/.test(l))).toBe(true);
+      expect(count.stale).toBe(1);
+    }, "stale");
+  });
+
+  test("--strict fails on a translation that is behind, and leaves dist/ as it was; one that can't be checked doesn't", async () => {
+    await withWelsh(async (dir) => {
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(join(dir, "kept.html"), "the last good site");
+      await expect(exportSite({ out: dir, origin: "https://example.com", strict: true, say: quiet }))
+        .rejects.toThrow("0 broken link(s) and 0 collection problem(s) and 1 translation(s) out of date, and --strict is on.");
+      expect(read(dir, "kept.html")).toBe("the last good site");
+    }, "strict");
+
+    await withWelsh(async (dir, said) => {
+      writeFileSync(join(SITE, "pages", "cy", "guide", "images.md"), `title: Delweddau\ntranslated-from: ${sourceHash(readFileSync(join(SITE, "pages", "guide", "images.md"), "utf8"))}\n\nDelweddau\n`);
+      siteChanged();
+      const count = await exportSite({ out: dir, origin: "https://example.com", strict: true, say: (l) => said.push(l) });
+      expect(count.stale).toBe(0);
+      expect(said.some((l) => l.startsWith("translation: "))).toBe(false);
+      expect(said.some((l) => l.includes("themes.md"))).toBe(true);   // unchecked: said, not failed
+    }, "strict-ok");
+  });
+
+  test("the check before a publish finds them too, as problems with what is being published", async () => {
+    await withWelsh(async () => {
+      const found = await checkSite();
+      expect(found).toContain("translation: cy/guide/images.md is out of date: guide/images.md has changed since it was translated");
+      expect(found.some((l) => l.includes("themes.md"))).toBe(false);   // a note, not a problem
+    }, "check");
+  });
+
+  test("a site with no other language says nothing of translation", async () => {
+    const dir = out("no-languages");
+    const said: string[] = [];
+    const count = await exportSite({ out: dir, origin: "https://example.com", say: (l) => said.push(l) });
+    expect(count.stale).toBe(0);
+    expect(said.some((l) => l.startsWith("translation: ") || l.startsWith("note: "))).toBe(false);
     rmSync(dir, { recursive: true, force: true });
   });
 });

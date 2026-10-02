@@ -1,10 +1,11 @@
 import type { Storage } from "./storage";
 import { DEBUG } from "./config";
 import { escapeHtml, outsideCode } from "./utils";
-import { parseFrontMatter, renderMarkdown } from "./markdown";
+import { parseFrontMatter, renderMarkdown, yes } from "./markdown";
 import { type Images, DEFAULT_IMAGES, ownImages, imageUrl, thumbName } from "./images";
-import { SLUG, slugify, unique, slugger, itemHref } from "./slugs";
+import { SLUG, slugify, unique, slugger, itemHref, aliasKey } from "./slugs";
 import { kept } from "./kept";
+import { languagesOf, splitLanguage, keysUnder, type Counterpart, type Row, type Standing } from "./languages";
 
 export { SLUG, slugify, aliasKey } from "./slugs";
 
@@ -69,6 +70,7 @@ export type Item = {
   fields: Record<string, string>;   // everything the item says, raw
   aliases: string[];                // addresses it used to answer at
   group: Group;                     // the innermost group it sits in
+  untranslated?: boolean;           // in a language's collection: it has no translation yet, and says the default's
 };
 
 export type Collection = {
@@ -82,6 +84,7 @@ export type Collection = {
   items: Item[];                    // flat, in order: the prev/next chain
   bySlug: Map<string, Item>;
   problems: string[];               // what was wrong with the file itself
+  lang?: string;                    // the language it is shown in, when it isn't the default's (below)
 };
 
 export type ItemContext = { collection: Collection; item: Item };
@@ -280,7 +283,7 @@ export function parseCollection(folder: string, source: string): Collection {
 // Kept like the nav and the search index (kept.ts): collection.json is
 // written through the pages route like any page. What was said about the
 // files starts again with them.
-const loaded = kept((pages, folder) => read(pages, folder), () => warned.clear());
+const loaded = kept((pages, folder, debug) => read(pages, folder, debug), () => warned.clear());
 
 // Said once, not per request: a warning repeated on every page view is noise.
 const warned = new Set<string>();
@@ -321,7 +324,18 @@ async function eachPageIn(pages: Storage, collection: Collection): Promise<EachP
   return { key: first.key, meta: first.meta, content: renderMarkdown(first.source, first.key.replace(/\.md$/, "")).content };
 }
 
-async function read(pages: Storage, folder: string): Promise<Collection | null> {
+async function read(pages: Storage, folder: string, debug: boolean): Promise<Collection | null> {
+  // A collection under a language's folder, where the default has the
+  // collection, is that collection in the language: its items are the
+  // default's, and the folder's collection.json says only what is said
+  // differently (below). Where the default has none, it is a collection of
+  // the language's own, and is read like any.
+  const languages = await languagesOf(pages, debug);
+  const { lang, key: source } = splitLanguage(languages, collectionPath(folder));
+  if (lang !== languages.main) {
+    const base = await loadCollection(pages, source.slice(0, Math.max(source.length - COLLECTION_FILE.length - 1, 0)), debug);
+    if (base) return inLanguage(pages, base, lang, folder);
+  }
   const key = collectionPath(folder);
   if (!await pages.exists(key)) return null;
   const collection = parseCollection(folder, await pages.read(key));
@@ -349,6 +363,238 @@ export async function itemAt(pages: Storage, name: string, debug = DEBUG): Promi
   const collection = await loadCollection(pages, folder, debug);
   const item = collection?.each ? collection.bySlug.get(slug) : undefined;
   return collection && item ? { collection, item } : null;
+}
+
+// --- In more than one language -----------------------------------------
+
+// What a translator reads in an item: its text and long fields, in the order
+// the collection declares them (a picture and a number are the same in every
+// language). A translation records this as it was (`translated-from`), as a
+// page's does (languages.ts), so one whose item has changed says so.
+export function itemHash(collection: Collection, item: Item): string {
+  const read = collection.fields
+    .filter((f) => f.kind === "text" || f.kind === "long")
+    .map((f) => [f.name, (item.fields[f.name] ?? "").replace(/\r\n?/g, "\n").trim()]);
+  return new Bun.CryptoHasher("sha256").update(JSON.stringify(read)).digest("hex").slice(0, 8);
+}
+
+// What a language's collection.json says: pages/cy/works/collection.json beside
+// pages/works/collection.json holds only the words, by the item's slug,
+//
+//   { "items": { "first-light": { "title": "Golau cyntaf", "caption": "…",
+//                                 "translated-from": "9f3a1c2e" } },
+//     "groups": { "Early work": "Gwaith cynnar" },
+//     "labels": { "year": { "1961": "Blynyddoedd cynnar" } } }
+//
+// An item keeps its slug and its address, translated or not; a slug it used to
+// have (the last part of an alias) finds it as well, so retitling an item
+// doesn't orphan its translation. Only text and long fields can be translated: the picture, a
+// year and the rest are the default's.
+type Said = { fields: Record<string, string>; from?: string };
+type Translations = { items: Map<Item, Said>; groups: Record<string, string>; labels: Record<string, Record<string, string>>; problems: string[] };
+
+function translationsIn(base: Collection, file: string, source: string | null): Translations {
+  const out: Translations = { items: new Map(), groups: {}, labels: {}, problems: [] };
+  if (source === null) return out;
+  let raw: Raw;
+  try {
+    const parsed: unknown = JSON.parse(source);
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+      out.problems.push(`${file}: not an object`);
+      return out;
+    }
+    raw = parsed as Raw;
+  } catch (e) {
+    out.problems.push(`${file}: ${(e as Error).message}`);
+    return out;
+  }
+  const items = typeof raw.items === "object" && raw.items !== null && !Array.isArray(raw.items) ? raw.items as Raw : {};
+  for (const [key, entry] of Object.entries(items)) {
+    const item = base.bySlug.get(key)
+      ?? base.items.find((i) => i.aliases.some((alias) => aliasKey(alias).split("/").pop() === key));
+    if (!item) {
+      out.problems.push(`${file}: "${key}" isn't an item of ${collectionPath(base.folder)}`);
+      continue;
+    }
+    if (typeof entry !== "object" || entry === null || Array.isArray(entry)) {
+      out.problems.push(`${file}: "${key}" should be { "title": …, "translated-from": … }`);
+      continue;
+    }
+    const said: Said = { fields: {} };
+    for (const [name, value] of Object.entries(entry as Raw)) {
+      if (name === "translated-from") {
+        said.from = text(value)?.toLowerCase();
+        continue;
+      }
+      const field = base.fields.find((f) => f.name === name);
+      if (!field || (field.kind !== "text" && field.kind !== "long")) {
+        out.problems.push(`${file}: "${key}" says "${name}", which isn't a text field of ${collectionPath(base.folder)} — only text and long fields are translated`);
+        continue;
+      }
+      const words = text(value);
+      if (words) said.fields[name] = words;
+    }
+    out.items.set(item, said);
+  }
+  if (typeof raw.groups === "object" && raw.groups !== null && !Array.isArray(raw.groups)) {
+    for (const [name, label] of Object.entries(raw.groups as Raw)) {
+      const words = text(label);
+      if (words) out.groups[name] = words;
+    }
+  }
+  out.labels = labelsOf(raw.labels);
+  return out;
+}
+
+// Whether an item is translated: it has words of its own in the language.
+const isTranslated = (said: Said | undefined) => !!said && Object.keys(said.fields).length > 0;
+
+// Where a translation of an item stands against the item as it is now.
+function standingOf(base: Collection, item: Item, said: Said | undefined): Standing {
+  if (!isTranslated(said)) return "missing";
+  if (!said!.from) return "unchecked";
+  return said!.from === itemHash(base, item) ? "fresh" : "stale";
+}
+
+// The default's collection as a language shows it: the same groups, in the
+// same order, with the same pictures, each item's words the language's where it
+// has them and the default's where it hasn't (and said so: `untranslated`). It
+// lives at the language's address — /cy/works/first-light/ — so its prev and
+// next, its overviews and its pages all stay in the language. The each: page is
+// the language's own when it has written one.
+async function inLanguage(pages: Storage, base: Collection, lang: string, folder: string): Promise<Collection> {
+  const file = collectionPath(folder);
+  const said = translationsIn(base, file, await pages.exists(file) ? await pages.read(file) : null);
+
+  const items = new Map<Item, Item>();
+  const cloneGroup = (group: Group): Group => {
+    const copy: Group = { ...group, label: said.groups[group.name] ?? group.label, items: [], groups: [] };
+    for (const item of group.items) {
+      const words = said.items.get(item);
+      const fields = { ...item.fields, ...words?.fields };
+      const clone: Item = {
+        ...item,
+        href: itemHref(folder, item.slug),
+        key: `${folder ? `${folder}/` : ""}${item.slug}/index.md`,
+        title: fields.title ?? "",
+        caption: fields.caption ?? "",
+        fields,
+        aliases: [],                                // an address a page used to have is the default's, and still moves there
+        group: copy,
+        untranslated: !isTranslated(words),
+      };
+      items.set(item, clone);
+      copy.items.push(clone);
+    }
+    copy.groups = group.groups.map(cloneGroup);
+    return copy;
+  };
+  const groups = base.groups.map(cloneGroup);
+  const flat = base.items.map((item) => items.get(item)!);
+
+  const labels: Collection["labels"] = { ...base.labels };
+  for (const [field, values] of Object.entries(said.labels)) labels[field] = { ...base.labels[field], ...values };
+
+  // The each: page the language has written, when it has (and it isn't a draft).
+  let each = base.each;
+  const own = base.each ? `${lang}/${base.each.key}` : "";
+  if (own && await pages.exists(own)) {
+    const source = await pages.read(own);
+    const { meta } = parseFrontMatter(source);
+    if (meta.each && !yes(meta.draft)) each = { key: own, meta, content: renderMarkdown(source, own.replace(/\.md$/, "")).content };
+  }
+
+  const collection: Collection = {
+    ...base, folder, each, labels, groups, items: flat, lang,
+    bySlug: new Map(flat.map((item) => [item.slug, item])),
+    problems: said.problems,
+  };
+  for (const problem of collection.problems) console.error(problem);
+  return collection;
+}
+
+// Where every item of every collection stands, in each language: the rows the
+// editor and the export read beside the pages' (languages.ts). A row is named
+// "works/collection.json#first-light".
+export async function collectionRows(pages: Storage, debug = DEBUG): Promise<Row[]> {
+  const { others } = await languagesOf(pages, debug);
+  if (!others.length) return [];
+  const rows: Row[] = [];
+  for (const key of await keysUnder(pages, "", others, (name) => name === COLLECTION_FILE)) {
+    const base = await loadCollection(pages, key.slice(0, Math.max(key.length - COLLECTION_FILE.length - 1, 0)), debug);
+    if (!base) continue;
+    for (const lang of others) {
+      const file = `${lang}/${key}`;
+      const said = translationsIn(base, file, await pages.exists(file) ? await pages.read(file) : null).items;
+      for (const item of base.items) {
+        rows.push({ lang, key: `${key}#${item.slug}`, standing: standingOf(base, item, said.get(item)), draft: false });
+      }
+    }
+  }
+  return rows;
+}
+
+// What the editor's translation pane shows of a collection in a language: the
+// default's items beside what the language has said of each, how each stands,
+// and the hash a translation records when someone says it is up to date.
+export type ItemView = {
+  slug: string;
+  thumb: string;
+  fields: Record<string, string>;   // the default's words, by field
+  said: Record<string, string>;     // the language's, where it has any
+  from: string;                     // what it says it was made from
+  hash: string;                     // what the item is now
+  standing: Standing;
+};
+export type TranslationView = {
+  file: string;                     // where the language's words are written: cy/works/collection.json
+  fields: Field[];                  // the text and long fields: what can be translated
+  groups: { name: string; label: string; said: string }[];
+  items: ItemView[];
+};
+
+export async function translationView(pages: Storage, folder: string, lang: string, debug = DEBUG): Promise<TranslationView | null> {
+  const base = await loadCollection(pages, folder, debug);
+  if (!base) return null;
+  const file = collectionPath([lang, folder].filter(Boolean).join("/"));
+  const said = translationsIn(base, file, await pages.exists(file) ? await pages.read(file) : null);
+  const groups: TranslationView["groups"] = [];
+  const walk = (list: Group[]) => list.forEach((g) => { groups.push({ name: g.name, label: g.label, said: said.groups[g.name] ?? "" }); walk(g.groups); });
+  walk(base.groups);
+  return {
+    file,
+    fields: base.fields.filter((f) => f.kind === "text" || f.kind === "long"),
+    groups,
+    items: base.items.map((item) => {
+      const words = said.items.get(item);
+      return {
+        slug: item.slug, thumb: item.thumb, fields: item.fields, said: words?.fields ?? {}, from: words?.from ?? "",
+        hash: itemHash(base, item), standing: standingOf(base, item, words),
+      };
+    }),
+  };
+}
+
+// Where else an item is, for the language switcher and the hreflang links
+// (languages.ts has the pages'): the same item in every language, translated
+// where it has words in it, and the default's standing in where it has none.
+export async function itemCounterparts(pages: Storage, { collection, item }: ItemContext): Promise<Counterpart[]> {
+  const languages = await languagesOf(pages);
+  // A collection of a language's own, in its folder where the default has none,
+  // is in no other.
+  if (!collection.lang && splitLanguage(languages, collectionPath(collection.folder)).lang !== languages.main) return [];
+  const here = collection.lang ?? languages.main;
+  const folder = collection.lang ? collection.folder.slice(collection.lang.length + 1) : collection.folder;
+  const base = collection.lang ? await loadCollection(pages, folder) : collection;
+  const original = base?.bySlug.get(item.slug);
+  if (!base?.each || !original) return [];
+  const found: Counterpart[] = [{ lang: languages.main, kind: "translated", key: original.key }];
+  for (const lang of languages.others) {
+    const there = lang === here ? collection : await loadCollection(pages, `${lang}/${folder}`.replace(/^\/|\/$/g, ""));
+    const clone = there?.bySlug.get(item.slug);
+    if (clone) found.push({ lang, kind: clone.untranslated ? "fallback" : "translated", key: clone.untranslated ? original.key : clone.key });
+  }
+  return found;
 }
 
 // --- Where an item collides with a page --------------------------------

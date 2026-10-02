@@ -1,10 +1,10 @@
 import { createElement, signal, computed, effect } from "@blueshed/railroad";
 import { apiJson } from "../api";
 import { Drawer } from "./Drawer";
-import { closeDrawer, filePath, editorContent, resource, collection } from "../store";
+import { closeDrawer, filePath, editorContent, resource, collection, languageOf } from "../store";
 
 // Help (routes/help.ts): short pages about writing a page, the site's extras,
-// collections, templates, the look and the editor itself — written for the
+// collections, other languages, templates, the look and the editor itself — written for the
 // person editing, examples first. What fits what is open comes first, and
 // open; the rest follow, folded. It follows you: open something else with
 // Help showing and it reorders.
@@ -18,14 +18,15 @@ const EACH = /^each\s*:/m;
 // The topics that fit what is open, most fitting first.
 export function helpFirst(open: {
   file: string | null; text: string; resource: { section: string; path: string } | null; collection: boolean;
+  language?: boolean;   // what is open is a language's: a translation, or a collection's words
 }): string[] {
   if (open.resource?.section === "templates") return ["template"];
   if (open.resource?.path.endsWith(".css") || open.file?.endsWith(".css")) return ["look"];
   // The page you are writing wins over the collection open below it.
   const top = open.file?.endsWith(".md") ? open.text.split(/\n\s*\n/, 1)[0] ?? "" : "";
-  if (EACH.test(top)) return ["each", "collection"];
-  if (open.collection) return ["collection", "each"];
-  if (open.file?.endsWith(".md")) return ["page", "top", "extras"];
+  if (EACH.test(top)) return open.language ? ["each", "languages", "collection"] : ["each", "collection"];
+  if (open.collection) return open.language ? ["languages", "collection"] : ["collection", "each"];
+  if (open.file?.endsWith(".md")) return open.language ? ["languages", "page", "top"] : ["page", "top", "extras"];
   return ["editor"];
 }
 
@@ -43,6 +44,7 @@ export function HelpDrawer() {
     text: editorContent.get(),
     resource: resource.get(),
     collection: collection.get() !== null,
+    language: (filePath.get() !== null && languageOf(filePath.get()!) !== null) || !!collection.get()?.lang,
   })).map((s) => s.id).join(" "));
 
   // Built afresh when the order changes, so what fits is first and open.

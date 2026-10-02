@@ -19,16 +19,18 @@ let asked: string[] = [];
 // answering from `index` as the served site and the export both would, and
 // noting each address it asks for. `hold` keeps a file's answer back until
 // the promise it names settles.
-function start(index: Entry[], hold: Record<string, Promise<unknown>> = {}) {
+// A site in another language has its index under its folder: `root` is where,
+// and the form says so (data-root), as the template writes it from {{root}}.
+function start(index: Entry[], hold: Record<string, Promise<unknown>> = {}, attrs = "", root = "") {
   const files = searchFiles(index);
   asked = [];
   globalThis.fetch = (async (url: string) => {
     asked.push(url);
     await hold[url];
-    const body = searchFile(files, url);
+    const body = root && !url.startsWith(root) ? null : searchFile(files, root ? url.slice(root.length - 1) : url);
     return body === null ? new Response("Not Found", { status: 404 }) : new Response(body);
   }) as unknown as typeof fetch;
-  document.body.innerHTML = `<form class="search" role="search">
+  document.body.innerHTML = `<form class="search" role="search"${attrs}>
     <button type="button" class="search-toggle" aria-expanded="false"></button>
     <div class="search-panel"><input type="search"><div class="search-results"></div></div>
   </form><p id="elsewhere">page</p>`;
@@ -327,6 +329,49 @@ describe("search.js, fetching what a search needs", () => {
     globalThis.fetch = (async (url: string) =>
       new Response(url === "/search/pages/7.json" ? "[]" : searchFile(files, url))) as unknown as typeof fetch;
     expect(hrefs(await search("train"))).toEqual(["/p30.html#s:~:text=train"]);
+  });
+});
+
+describe("search.js, in a language", () => {
+  const index = [entry({ url: "/cy/about.html", title: "Amdanom", text: "Amdanom ni, a'n gwaith" })];
+
+  test("asks its language's index when the template says where it is, and nothing at the top", async () => {
+    start(index, {}, ' data-root="/cy/"', "/cy/");
+    const [link] = await search("amdanom");
+    expect(link!.getAttribute("href")).toBe("/cy/about.html#:~:text=Amdanom%20ni%2C%20a'n%20gwaith");
+    expect(asked).toEqual(["/cy/search/index.json", "/cy/search/words/am.json", "/cy/search/pages/0.json"]);
+  });
+
+  test("a root without its closing slash is the same", async () => {
+    start(index, {}, ' data-root="/cy"', "/cy/");
+    await search("amdanom");
+    expect(asked[0]).toBe("/cy/search/index.json");
+  });
+
+  test("without one it asks the site's own, as it always did", async () => {
+    start([entry({ url: "/about.html", title: "About", text: "about us" })]);
+    await search("about");
+    expect(asked).toEqual(["/search/index.json", "/search/words/ab.json", "/search/pages/0.json"]);
+  });
+
+  test("says what the template says when nothing matches, and 'Nothing matches' when it says nothing", async () => {
+    start(index, {}, ' data-root="/cy/" data-none="Dim canlyniad ar gyfer"', "/cy/");
+    type("xyzzy");
+    const results = form.querySelector(".search-results")!;
+    await waitFor(() => results.querySelector(".search-none"));
+    expect(results.querySelector(".search-none")!.textContent).toBe("Dim canlyniad ar gyfer “xyzzy”.");
+
+    start(index);
+    type("xyzzy");
+    await waitFor(() => form.querySelector(".search-none"));
+    expect(form.querySelector(".search-none")!.textContent).toBe("Nothing matches “xyzzy”.");
+  });
+
+  test("a phrase with markup in it is text, not markup", async () => {
+    start(index, {}, ' data-none="Dim &lt;b&gt;"');
+    type("xyzzy");
+    await waitFor(() => form.querySelector(".search-none"));
+    expect(form.querySelector(".search-none b")).toBeNull();
   });
 });
 

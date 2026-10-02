@@ -18,6 +18,7 @@ import { handlePublish } from "./routes/publish";
 import { handleCollectionFiles } from "./routes/collection";
 import { handleStatic } from "./routes/static";
 import { handleSearch, handleSearchFile } from "./routes/search";
+import { handleTranslations } from "./routes/translations";
 import { handleSitemap } from "./routes/sitemap";
 import { handleSite } from "./routes/site";
 import { handleError } from "./routes/error";
@@ -65,11 +66,15 @@ export const server = Bun.serve({
     "/edit/site-icon": handleSiteIcon,         // the tab and home-screen icon, made in the editor
     "/edit/help": handleHelp,                  // the Help drawer's pages, shipped with duckdown
     "/edit/publish": handlePublish,            // this copy and where it is published: status, publish, pull
+    "/edit/translations": handleTranslations,  // where each page and item stands in each language; what a translation starts as
     "/edit/collection/*": handleCollectionFiles,   // a collection's pictures, and what's wrong with it
     "/search.json": handleSearch,              // the whole index, for a search.js from before the parts
     "/search/index.json": handleSearchFile,    // the index in parts: which shards of words there are,
     "/search/words/:file": handleSearchFile,   // a shard: the words starting with two letters, and where,
     "/search/pages/:file": handleSearchFile,   // and a page's entries, for a result shown
+    "/:lang/search/index.json": handleSearchFile,    // a language's own, the same three files under its address
+    "/:lang/search/words/:file": handleSearchFile,
+    "/:lang/search/pages/:file": handleSearchFile,
     "/sitemap.xml": handleSitemap,
     "/static/*": handleStatic,
   }, siteFor(), extensions)),

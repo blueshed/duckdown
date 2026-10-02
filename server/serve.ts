@@ -88,7 +88,14 @@ async function route(req: Request, dir: string, origin: string): Promise<{ res: 
     return { res: new Response(null, { status: MOVED, headers: { Location: `${url.pathname}/${url.search}` } }), html: false };
   }
 
-  const missing = await file(dir, "404.html");
+  // A miss under a language's folder is answered in it, as the served site
+  // does: the export writes a 404.html in each (its own, or the default's with
+  // the note). A language is told by the one thing only it has, an index of its
+  // own to search; a folder with a 404.html of its own and no such index is
+  // still just a folder.
+  const folder = path.split("/")[1] ?? "";
+  const inLanguage = folder && await file(dir, `${folder}/search/index.json`) ? await file(dir, `${folder}/404.html`) : null;
+  const missing = inLanguage ?? await file(dir, "404.html");
   return {
     res: missing
       ? new Response(missing.body, { status: 404, headers: { "Content-Type": "text/html; charset=utf-8" } })
@@ -99,7 +106,7 @@ async function route(req: Request, dir: string, origin: string): Promise<{ res: 
 
 // The three shapes of a search part (search.ts): a page of the site's own
 // under search/ is a page, and is logged and cached as one.
-const SEARCH_PART = /^search\/(index\.json|(words|pages)\/[^/]+\.json)$/;
+const SEARCH_PART = /^(?!static\/)(?:[^/]+\/)?search\/(index\.json|(words|pages)\/[^/]+\.json)$/;
 
 // One line per page view, as the served site prints: what was read and how
 // much, and nothing that identifies a reader. `bun run views` reads these.

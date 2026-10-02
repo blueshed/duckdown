@@ -14,6 +14,9 @@ const files: Record<string, string> = {
   "search.json": "[]",
   "search/index.json": '{"version":"1","words":[]}',
   "search/tips.html": "<h1>tips</h1>",   // a page of the site's own, not a part
+  "cy/search/index.json": '{"version":"2","words":[]}',   // a language's own index (cy/search/…)
+  "cy/search/words/am.json": "{}",
+  "static/search/index.json": "{}",                       // a site's own file under static/, not a part
 };
 for (const [path, body] of Object.entries(files)) {
   mkdirSync(join(dist, path, ".."), { recursive: true });
@@ -60,6 +63,18 @@ describe("serveDist", () => {
     expect((await ask("/search.json")).res.headers.get("cache-control")).toBe("public, max-age=300");
   });
 
+  test("a language's own parts are asked about every time too; a file of the site's own under static/ is cached as one", async () => {
+    for (const path of ["/cy/search/index.json", "/cy/search/words/am.json"]) {
+      const { res, logged } = await ask(path);
+      expect(res.headers.get("cache-control")).toBe("no-cache");
+      expect(res.headers.get("etag")).toMatch(/^"\w+"$/);
+      expect(logged).toEqual([]);   // a part is a file a page pulls in, not a page read
+    }
+    const { res } = await ask("/static/search/index.json");
+    expect(res.headers.get("cache-control")).toBe("public, max-age=300");
+    expect(res.headers.get("etag")).toBeNull();
+  });
+
   // After review: asked about every time, and never told "unchanged", a
   // reader fetched every part again at each search.
   test("and one that hasn't changed is a 304, as the served site's are", async () => {
@@ -84,6 +99,28 @@ describe("serveDist", () => {
     expect(await res.text()).toBe("<h1>tips</h1>");
     expect(res.headers.get("cache-control")).toBe("public, max-age=300");
     expect(logged).toEqual([["/search/tips.html", 200]]);
+  });
+
+  test("a miss under a language is answered in it, as the served site does; anywhere else it is the site's", async () => {
+    const site = join(RUN, "dist-served-languages");
+    for (const [path, body] of Object.entries({
+      "404.html": "<h1>not found</h1>",
+      "cy/404.html": "<h1>ddim yma</h1>",
+      "cy/search/index.json": "{}",                     // a language has an index of its own to search
+      "other/404.html": "<h1>a folder's own page</h1>", // a folder with a 404.html and no such index is a folder
+      "fr/search/index.json": "{}",                     // a language with no 404 of its own
+    })) {
+      mkdirSync(join(site, path, ".."), { recursive: true });
+      writeFileSync(join(site, path), body);
+    }
+    for (const path of ["/cy/nowhere", "/cy/a/b/c.html", "/cy/nowhere.html"]) {
+      const { res } = await ask(path, site);
+      expect([path, res.status, await res.text()]).toEqual([path, 404, "<h1>ddim yma</h1>"]);
+    }
+    for (const path of ["/nowhere", "/other/nowhere", "/blog/nowhere", "/fr/nowhere", "/static/nope.css"]) {
+      const { res } = await ask(path, site);
+      expect([path, res.status, await res.text()]).toEqual([path, 404, "<h1>not found</h1>"]);
+    }
   });
 
   test("a path with a NUL is a 400, as one that won't decode is", async () => {

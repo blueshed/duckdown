@@ -6,15 +6,16 @@
 4. [Markdown](#markdown) — headings and contents lists, callouts, wiki links, images, raw HTML
 5. [Navigation](#navigation)
 6. [Collections](#collections) — a folder of items written once, in collection.json
-7. [Styling](#styling) — the variables, dark mode, one page, a kind of page
-8. [The site template](#the-site-template)
-9. [Static files and images](#static-files-and-images)
-10. [Users](#users)
-11. [The editor](#the-editor)
-12. [Search](#search)
-13. [Publishing](#publishing)
-14. [Upgrading duckdown](#upgrading-duckdown)
-15. [Troubleshooting](#troubleshooting)
+7. [Languages](#languages) — a site in more than one, translated by people
+8. [Styling](#styling) — the variables, dark mode, one page, a kind of page
+9. [The site template](#the-site-template)
+10. [Static files and images](#static-files-and-images)
+11. [Users](#users)
+12. [The editor](#the-editor)
+13. [Search](#search)
+14. [Publishing](#publishing)
+15. [Upgrading duckdown](#upgrading-duckdown)
+16. [Troubleshooting](#troubleshooting)
 
 ## The content folder
 
@@ -83,6 +84,9 @@ it shares, so never hard-link anything from outside the site into it.
 | `each` | This page is the page every item of a collection gets, not a page of its own: `each: true` in a folder that has a `collection.json` (see Collections) |
 | `feed` | In a folder's `index.md` only: `feed: true` gives the folder an Atom feed at `/<folder>/feed.xml` of its dated pages — see [A feed](#a-feed) |
 | `collection` | The collection a bare `{{items}}` or `{{groups}}` on this page means, when it isn't the page's own folder's: `collection: gallery` |
+| `lang` | On a top-level folder's `index.md`, equal to the folder's name (`pages/cy/index.md` says `lang: cy`): the folder is a language, and `pages/cy/about.md` translates `pages/about.md`. On the root `index.md`: the site's default language (`en` when it says nothing). On any other page: that page's own language only |
+| `translated-from` | On a translation: the hash of the page it was translated from (title, description and words) when it was written, which says when it needs retranslating. The editor writes it; a translation without one is "unchecked" |
+| `untranslated` | On a language's `index.md`: the sentence, in that language, that tells a reader a page is not yet translated |
 
 - A plain block may hold **only those keys**, or one starting `x-` (your own). At the first line that isn't one, the block ends and everything from there is content — so prose opening `Update: closed on Monday` keeps its first line, and a mistyped key appears on the page instead of vanishing.
 - For other keys, fence the block and put anything in it:
@@ -567,6 +571,189 @@ reaches it:
 ```
 
 
+## Languages
+
+A site can be in more than one language. **People translate; duckdown never
+does.** What it does is serve the right page, tell a reader (and a search
+engine) which languages a page is in, show the original with a note where there
+is no translation yet, and tell the editor which translations have fallen
+behind their pages.
+
+### The convention
+
+A language is a top-level folder named for it, whose `index.md` says so:
+
+```
+pages/
+  index.md              lang: en            (the default; en when it says nothing)
+  about.md              /about.html
+  blog/index.md
+  cy/
+    index.md            lang: cy            (this folder is a language)
+    about.md            /cy/about.html      (the translation of about.md)
+    blog/index.md       /cy/blog/
+```
+
+- `pages/cy/about.md` is the translation of `pages/about.md`: the **same path
+  under the language's folder** is the whole link between them. Nothing names
+  the original.
+- The folder's name is the language's code (`cy`, `fr`, `pt-br`) and its
+  `index.md` says `lang:` the same. A folder that doesn't is a folder like any
+  other, so a site that says nothing of language is as it always was; a page
+  elsewhere saying `lang: fr` is only that page's own language (a quotation, a
+  notice) and starts nothing.
+- The root's own `lang:` is the default language. A site written in Welsh
+  with an English translation says `lang: cy` there and has `pages/en/`.
+- Everything a page has is the language's own: its navigation, its
+  `{{pages}}` and `{{sitemap}}`, its search, its 404 (`cy/404.md`), its feed
+  (`cy/blog/index.md` with `feed: true` is `/cy/blog/feed.xml`) and its
+  collections.
+
+Three front-matter keys:
+
+| Key | Where | Meaning |
+|-----|-------|---------|
+| `lang` | A language's `index.md`, equal to the folder's name | The folder is a language. On any other page: that page's own language, for `<html lang>` and its dates |
+| `translated-from` | A translation | The hash of the page it was translated from (title, description and words) when it was written. The editor writes it |
+| `untranslated` | A language's `index.md` | The sentence, in that language, readers are shown above a page that isn't translated yet |
+
+### A page not yet translated
+
+A request for `/cy/contact.html` with no `cy/contact.md` (or only a draft of
+one) is answered with the default language's page — status 200, at the Welsh
+address, in the Welsh site's navigation and template — with a note above it:
+
+```html
+<p class="untranslated" lang="cy" role="note">Nid yw'r dudalen hon wedi'i chyfieithu eto.</p>
+```
+
+The words are the language's `untranslated:`; with none, the note is English
+and says so (`lang="en"`). The page is the default's, so its `<html lang>` is
+the default's, its `<link rel="canonical">` (the template's `{{url}}`) is the
+default page's address, and it is not in the language's search, nor in
+`sitemap.xml`, nor named by `hreflang`: to a search engine it is the
+original again. A page nobody can read (a draft, an `each:` page) has no
+fallback, and an address neither language has is a 404 in the language.
+
+`bun run export` writes the same pages as files under each language's folder,
+and a `404.html` in each (`cy/404.html`: its own, or the default's with the
+note), which `serve.ts` answers a miss under `/cy/` with.
+
+### Knowing a translation is behind
+
+`translated-from: 3f9a1c2e` records the original as the translator read it:
+eight hex characters of a hash of its `title:`, its `description:` and its
+words. Not its `order`, `nav`, `draft`, `date`, `layout`, `css`, `aliases` or
+`image`, which are the same in every language and not for retranslating; not
+its line endings or trailing spaces.
+
+| Where it stands | Meaning |
+|-----------------|---------|
+| fresh | `translated-from` is the original as it is now |
+| stale | the original has changed since: **needs retranslating** |
+| unchecked | the translation doesn't say what it was made from |
+| own | there is no original: a page of the language's own |
+| missing | not translated yet (the fallback stands in) |
+
+A draft translation isn't published, so it isn't "behind". `bun run export`
+(and the check before a Publish) says each stale translation —
+`translation: cy/about.md is out of date: about.md has changed since it was
+translated` — and `--strict` (or `DUCKDOWN_STRICT=1`) fails on them, leaving
+`dist/` as it was. Unchecked translations, and how many pages and items are
+not translated yet, are noted and fail nothing. To say a translation is
+caught up, **Mark up to date** in the editor, or put the page's hash in
+`translated-from` yourself (the editor's bar shows what it should be).
+
+### The template
+
+Placeholders (see [The site template](#the-site-template)):
+
+| Placeholder | Becomes |
+|-------------|---------|
+| `{{lang}}` | The page's language, for `<html lang="{{lang}}">`. A page's own `lang:` wins; a fallback page is in the default's |
+| `{{root}}` | Where the language's site begins: `/` or `/cy/` |
+| `{{languages}}` | `<ul class="languages">` linking this page in each language that has it, each named in its own (Cymraeg, English, français), the reader's marked `aria-current="true"`; a link to a page standing in for its translation has `class="untranslated"`. Nothing with only one language, and none on a 404 |
+| `{{description}}` | also writes the `hreflang` alternates (`<link rel="alternate" hreflang="cy" …>` and `x-default`) for a page written in more than one language, when there is an origin |
+
+A template translates its own words by a file of its own: `templates/site.cy.html`
+wears the pages of the Welsh site, `templates/post.cy.html` a `layout: post`
+page, and `{{include topbar}}` reads `templates/topbar.cy.html` there. The
+order is `<layout>.cy.html`, `<layout>.html`, `site.cy.html`, `site.html`: a page
+keeps the layout it asked for before it keeps the language. A language
+with no file of its own wears the default's. In the seed:
+
+```html
+<html lang="{{lang}}">
+  ...
+  <form class="search" role="search" data-root="{{root}}">
+  ...
+  {{languages}}
+```
+
+A site that adds a language adds these to its own templates: its existing
+pages are unchanged until it does, and search stays in the default's index.
+Dates (`{{date}}`, `{{pages}}`) are written the way the page's language writes
+them (`2 Hydref 2026`); English is as it always was. Site CSS styles
+`p.untranslated` and `ul.languages`.
+
+### Search, the sitemap, feeds
+
+- Each language has its own search index, `/cy/search/index.json`,
+  `…/words/<xy>.json` and `…/pages/<n>.json`, of the pages written in it: a
+  Welsh reader finds Welsh. `search.js` finds its own through
+  `data-root="{{root}}"` on the form, and says what `data-none` says when
+  nothing matches (`data-none="Dim canlyniad ar gyfer"`). Exported under `cy/`.
+- `sitemap.xml` is one file with every language's pages, each naming its other
+  versions with `xhtml:link` (and `x-default`).
+- A language's nav, `{{pages}}` and `{{sitemap}}` are the default's shape (its
+  folders, their `order:`) over what answers in the language: a translated
+  folder shows the language's label, one not translated shows the default's.
+
+### Collections
+
+A collection written once serves every language. `pages/cy/works/collection.json`
+beside `pages/works/collection.json` holds only the words, by each item's slug:
+
+```json
+{
+  "items": {
+    "first-light": { "title": "Golau cyntaf", "caption": "Inc ar bapur", "translated-from": "9f3a1c2e" }
+  },
+  "groups": { "Early work": "Gwaith cynnar" },
+  "labels": { "year": { "1961": "Blynyddoedd cynnar" } }
+}
+```
+
+- Every item is at `/cy/works/<slug>/`, translated or not: an item with no
+  words of its own is the default's, with the note. An item keeps its slug (a
+  translated title doesn't change an address); a slug it used to have (an
+  `aliases` address) finds its translation too.
+- Only `text` and `long` fields are translated; the picture, a number and the
+  rest are the default's. A field left out is the default's.
+- `translated-from` per item is a hash of the item's text and long fields,
+  tracked as a page's is. `groups` (by group name) and `labels` are not tracked.
+- The language's `each:` page is `pages/cy/works/item.md` when it has written
+  one (the words around each work), else the default's. Its overviews are the
+  language's: `{{items}}` in a Welsh page is its titles, its headings and its addresses.
+- A language's own collection, where the default has none at that folder, is a
+  collection like any, in the language's folder.
+- Only translated items are in a language's search; every item is in the export.
+
+### In the editor
+
+The header's **Translations** opens a drawer: what is out of date, can't be
+checked or isn't translated yet, by language (pages and the items of every
+collection), each a way to the thing, and **Add a language**, which makes
+`cy/index.md` as a draft. The tree marks a page whose translation is behind
+(`cy ↻`) or missing (`cy –`), a translation that is behind (`↻ out of date`) or
+a draft, and a folder how many in it are out of date. Above an open page, a bar
+lists each language to **Translate** (make `cy/about.md` from `about.md`, as a
+draft saying what it was made from, without its `aliases`) or **Open**; above a
+translation it says where it stands, goes to the original, and **Mark up to
+date**. A collection's page in a language's folder opens the **words**: each
+item's original above a box for the language's, saved as the language's
+`collection.json`.
+
 ## Styling
 
 ### The stylesheet
@@ -647,7 +834,10 @@ In the editor, a stylesheet opens from **Resources → css** in a pane below wha
 | `{{title}}` | The page's `title`, else `duckie` |
 | `{{description}}` | The page's `description` as `<meta name="description">` and `og:description`, and the card a shared link shows: `og:title`, `og:type` (`article` for a page with a `date:`, else `website`), `og:url`, and with an `image:` (or an item's picture, or else the site's card or icon) `og:image` and `twitter:card` — the site's own with its size, and every picture with `og:image:alt` (the site's by the front page's title, a page's own by its title). The URL and the picture are absolute, so an export without `DUCKDOWN_ORIGIN` leaves them out. A template that writes its own `og:` tags will have them twice: take its own out |
 | `{{url}}` | The page's one canonical address — use it as `<link rel="canonical" href="{{url}}">` |
-| `{{date}}` | The page's `date` as a `<time>`, written out (`21 September 2026`), or nothing |
+| `{{date}}` | The page's `date` as a `<time>`, written out (`21 September 2026`; in the page's language when it isn't English), or nothing |
+| `{{lang}}` | The page's language: `<html lang="{{lang}}">`. `en` unless the site says otherwise ([Languages](#languages)) |
+| `{{root}}` | Where the language's site begins: `/`, or `/cy/` in the Welsh one |
+| `{{languages}}` | A list linking the page in each language it is in, or nothing on a site with one ([Languages](#languages)) |
 | `{{nav}}` | The navigation (above), or nothing |
 | `{{feed}}` | `<link rel="alternate" type="application/atom+xml">` for the feed of the folder the page is in, or nothing when that folder has none |
 | `{{css}}` | `<link>` for the page's `css:`, or nothing |
@@ -660,11 +850,11 @@ A page can pass values to its template with `x-` keys: a template with `<img src
 
 `{{include name}}` pulls `templates/name.html` into a template — the seed's own top bar (the nav and the search form) is `templates/site.html` saying `{{include topbar}}` rather than every template pasting the markup in. It's resolved once, before everything else is filled, so what it pulls in can use `{{nav}}`, a page's `{{x-anything}}`, and the rest; what it pulls in is not itself scanned for another `{{include}}` — a template can print the tag in a code span to document it without duckdown expanding it there. A name that isn't a plain word, or names a file that isn't there, fills as nothing. In the editor, an unsaved `templates/name.html` shows in the preview of any page whose template includes it, the same as it would if the page wore it directly.
 
-A page's `layout:` chooses the template (`layout: post` → `templates/post.html`), falling back to `site.html`; the name must be a plain word. Values go in escaped, and a `$` in a page is safe. Without a template, duckdown uses a bare built-in one (title and content only).
+A page's `layout:` chooses the template (`layout: post` → `templates/post.html`), falling back to `site.html`; the name must be a plain word. In another language the template's own file for it comes first (`post.cy.html`, then `post.html`, then `site.cy.html`, then `site.html`), and so does an include's (`topbar.cy.html`). Values go in escaped, and a `$` in a page is safe. Without a template, duckdown uses a bare built-in one (title and content only).
 
 ```html
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{lang}}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -682,7 +872,7 @@ A page's `layout:` chooses the template (`layout: post` → `templates/post.html
 </html>
 ```
 
-Keep the page's own content in `<main>`, and — when there's a nav before it — the skip link first in `<body>`: the first thing a keyboard reaches, invisible until it has focus, so a reader doesn't tab through the whole nav on every page. `site.css` styles `.skip`. Set `lang` to the language the site is written in.
+Keep the page's own content in `<main>`, and — when there's a nav before it — the skip link first in `<body>`: the first thing a keyboard reaches, invisible until it has focus, so a reader doesn't tab through the whole nav on every page. `site.css` styles `.skip`. Write `lang="{{lang}}"`, which is the language the page is in — `en` unless the site says otherwise (Languages).
 
 ## Static files and images
 
@@ -730,7 +920,7 @@ Keep the page's own content in `<main>`, and — when there's a nav before it �
 - **Preview** (right): what you'd see. With a page open, the page as the site will show it, rendered by the same code — its own template and the stylesheets it links, the navigation, the `{{pages}}` listing, wiki links resolved from the page's folder — sandboxed, so no scripts run. A template open in the pane below is used in place of the saved one when it's the one this page wears, so you watch the page change as you write it; a stylesheet goes straight into the preview's head as you type, after the saved one, so it wins. A link on the page that a reader would follow to nothing — no page, no work, no old address, no file in `static/`, or a draft — is named in the message line (`Links that lead nowhere a reader can go: …`), and the line goes once the link is put right.
 - **With no page open**, whatever you're composing with gets a sample page of its own: for a stylesheet, a bit of everything `site.css` styles; for a template, a sample page put through it, with the site's real navigation. So a template or a stylesheet can be written with nothing else on screen.
 - **On a phone** (below 768px) the columns stack and the preview has none: the header's **Preview** (an eye) lays it over the page, full height, and **Edit** (or Escape) goes back, the page as it was.
-- **Header**: the trail, then *Publish* (when the site publishes from here), *Resources*, *Editors* and *Help* (a cheat sheet for writing and for the editor, the part that fits what is open first) — each a drawer over the preview, one at a time, that leaves the page in view and closes with Escape — *View* (the page on the site), *Logout*.
+- **Header**: the trail, then *Publish* (when the site publishes from here), *Resources*, *Editors*, *Translations* (what is out of date or not translated in each language, and a way to add one — see [Languages](#languages)) and *Help* (a cheat sheet for writing and for the editor, the part that fits what is open first) — each a drawer over the preview, one at a time, that leaves the page in view and closes with Escape — *View* (the page on the site), *Logout*.
 - **Deleting always asks first**, wherever it is — a page, a stylesheet, a template, a work in a collection — and nothing deleted is gone. **Earlier versions** (the clock in every pane's header) is a place rather than a dialog: the versions list where the tree was — *Now*, then what the file was before each sitting of saves, newest first, the last 30 — and the trail says which you're looking at. The middle shows that version read-only, with the lines that differ from now marked, and the preview renders a page as it was, so you see a version before you bring it back. **Restore** puts it back and keeps what it replaces; the ✕, *Now* or a crumb takes you back, and nothing unsaved is lost while you look. **Deleted** (at the top of the page tree, and of each resource list) is the same place for deleted files. They live in the site's `.history/` folder, beside `pages/` and outside everything the site serves or exports — a site kept in git ignores it (`site/.history/`). The collection pane also has **Undo** and **Redo** for its own changes while it is open.
 - **Rename or move** (the folder-arrow in the page's header) gives a page a new name or folder: type its new place (`blog/new-name`; `.md` is added). Unsaved changes are saved first, the old address goes into its `aliases`, and its Earlier versions go with it. It won't move onto a page that exists, a folder's `index.md` or an each: page, or change only a name's case.
 - When writing files directly (not through the editor), no version is kept: that is git's job.
@@ -771,7 +961,11 @@ at 20,000 pages was 68 MB before the first result.
   them (`'` and `’` alike), so `tree-lined` is looked for as `tree` and
   `lined`, `don't` finds `don’t`, and `über` is a word like any other.
 - **Drafts are left out.** A result leading to a 404 is worse than no result.
-  So is the 404 page.
+  So is the 404 page — a language's own too.
+- **A site in more than one language has an index for each**, of the pages
+  written in it, under its own folder (`/cy/search/…`); a page standing in for a
+  translation isn't in it. The form says which is its own: `data-root="{{root}}"`
+  (see [Languages](#languages)).
 - **`title` ranks above a section's heading, which ranks above `description`,
   which ranks above the body**, and every
   word of the query has to appear somewhere. A page with a good `title:` and
@@ -956,6 +1150,10 @@ After a deploy, the site's `/health` says which duckdown it runs
 | `{{items}}` shows nothing | No `collection.json` in that folder (the server log says so) — on a page elsewhere, say `collection: <folder>` — or every item's field is `skip` |
 | The thumbnails aren't links, and every item is "not found" | The collection has no each: page: a page in its folder saying `each: true` |
 | `{{item-year}}` is empty on every item | The field isn't declared, or is spelt differently — the log names it |
+| `/cy/about.html` shows the English page with a note | `pages/cy/about.md` doesn't exist yet, or is still `draft: true`: that is the fallback, working |
+| A Welsh page has an English nav, or no switcher | The page's template doesn't use `{{nav}}` of the language's own file or `{{languages}}`; see [Languages](#languages) — and a folder is a language only when its `index.md` says `lang:` its own name |
+| Search on a Welsh page finds English | The search form has no `data-root="{{root}}"`: add it to the form (the seed's `topbar.html` has it) |
+| `bun run export` says a translation is out of date | Its page has changed since `translated-from` was written: retranslate, then **Mark up to date** in the editor |
 | A `[[wiki link]]` goes to the wrong place | It's relative to the page's folder: start it with `/` to go from the top |
 | Nobody can sign in | `users.json` needs hashes, not passwords; or it's missing (see the server log) |
 | Edits don't show on the running site (duckdown repo) | The site runs from `.dev-site`, not the seed `tests/example` |

@@ -1,5 +1,52 @@
 # Changelog
 
+## Unreleased
+
+- **A site can be in more than one language.** People translate; duckdown never
+  does. A top-level folder whose `index.md` says `lang: cy` (its own name) is a
+  language: `pages/cy/about.md` is the translation of `pages/about.md`, at
+  `/cy/about.html`. The root's `lang:` is the default (`en` when it says
+  nothing). A site with no such folder is exactly as it was.
+  - **A page not yet translated** — missing, or only a draft — is the default's
+    page at the language's address, with a note above it (`untranslated:` on
+    the language's `index.md`, in that language; English when it gives none). It
+    is in the language's navigation and template, names the default page as its
+    canonical address, and is in no search, sitemap or `hreflang`.
+  - **A translation that has fallen behind says so.** `translated-from:` is a
+    hash of the page's title, description and words as the translator read
+    them. The editor marks a stale translation (`cy ↻`) and the header's
+    **Translations** drawer lists what is out of date, can't be checked or
+    isn't translated, for pages and for a collection's items. `bun run export`
+    (and the check before a Publish) says each stale translation; `--strict`
+    fails on them. Unchecked translations and the count not yet translated are
+    noted and fail nothing. In the editor: **Translate** (a draft of `cy/…`
+    from the page, saying what it is made from), **Mark up to date**, **Add a
+    language**.
+  - **Template placeholders**: `{{lang}}` (the page's language), `{{root}}`
+    (`/` or `/cy/`) and `{{languages}}` (a switcher, each language in its own
+    name). `{{description}}` also writes `hreflang` alternates. A template
+    translates its words by a file of its own: `site.cy.html`, `post.cy.html`,
+    and for an include `topbar.cy.html`; a language without one wears the
+    default's. Dates are written in the page's language (English as it was).
+  - **Navigation, `{{pages}}`, `{{sitemap}}`, search, the 404 and feeds are
+    per language.** A language's nav has the default's shape over what answers
+    in it. Each language has its own search index, `/cy/search/…`, of the pages
+    written in it; `sitemap.xml` stays one file and names each page's other
+    versions. `bun run export` writes the fallbacks as files, a `404.html` in
+    each language, and `serve.ts` answers a miss under `/cy/` with it.
+  - **Collections** translate by slug: `pages/cy/works/collection.json` holds
+    only the words (`items`, `groups`, `labels`), each item tracked as a page
+    is. Every item is at `/cy/works/<slug>/`, translated or with a note.
+  - **What a site does itself, to use it**: put `lang="{{lang}}"` in its
+    templates' `<html>`, `{{languages}}` where the switcher goes, and
+    `data-root="{{root}}"` on the search form (the seed's templates have them;
+    without the last, a Welsh page searches the default's index). Add the
+    words for `site.cy.html` if the template has any. `static/search.js` is
+    duckdown's, so a site that never kept a copy has the new one.
+  - Also: `lang`, `translated-from` and `untranslated` are front-matter keys
+    (fence the block to use other keys, as before); `duckdown report` counts
+    `/cy/search/…` as files a page pulls in and not probes.
+
 ## 0.17.2 — 2026-09-29
 
 - **A search shard's file name no longer starts with `_`.** A word starting

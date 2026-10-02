@@ -77,11 +77,12 @@ describe("the report", () => {
       "view / 200 3ms", "view /static/site.css 200 1ms", "view /static/images/a.jpg 200 1ms", "view /search.json 200 1ms",
       "view /favicon.ico 404 1ms", "view /blog/feed.xml 200 1ms",
       "view /search/index.json 200 1ms", "view /search/words/tr.json 200 1ms", "view /search/pages/12.json 200 1ms",
+      "view /cy/search/index.json 200 1ms",   // a language's own
       "view /.well-known/acme-challenge/verify 404 0ms", "view /.well-known/acme-challenge/verify 404 0ms",
     ].map((l) => parseView(l)!), NOW);
     expect(md).toContain("| Views by readers | 1 |");
     expect(md).toContain("| Views by crawlers | 2 |");                  // the certificate authority, twice
-    expect(md).toContain("| Files a page pulled in | 8 |");
+    expect(md).toContain("| Files a page pulled in | 9 |");
     expect(md).toContain("| Page | Views |\n|---|---:|\n| / | 1 |\n");  // no stylesheet among what was read
     expect(md).toContain("| /favicon.ico | 1 |");
     expect(md).toContain("| Not found (404) | 1 |");                    // the favicon, not the certificate checks
@@ -93,9 +94,10 @@ describe("the report", () => {
       "/cgi-bin/luci", "/actuator/health", "/server-status", "/debug/vars", "/credentials", "/Dockerfile", "/env.js",
       "/config.yml", "/backup.sql", "/terraform.tfstate.backup", "/s3.secret", "/app.js", "/appsettings.QA.json", "/settings.py",
       "/id_rsa", "/phpcs.xml", "/storage/logs/laravel.log", "/api", "/api/v1/config", "/@fs/proc/self/environ",
-      "/_ignition/health-check", "/_image", "/search/config.json"]) expect([path, isProbe(path)]).toEqual([path, true]);
+      "/_ignition/health-check", "/_image", "/search/config.json", "/cy/search/config.json"]) expect([path, isProbe(path)]).toEqual([path, true]);
     for (const path of ["/", "/about.html", "/blog/", "/why-i-left-php-behind.html", "/static/site.css", "/static/search.js",
       "/static/data/prices.csv", "/search.json", "/search/index.json", "/search/words/-fc-b.json", "/search/pages/3.json", "/sitemap.xml", "/blog/feed.xml", "/.well-known/security.txt", "/robots.txt",
+      "/cy/search/index.json", "/cy/search/words/-fc-b.json", "/cy/search/pages/3.json",   // a language's own index
       "/favicon.ico", "/feed/", "/llms.txt", "/edit", "/apiary.html", "/blog/api/"]) expect([path, isProbe(path)]).toEqual([path, false]);
   });
 

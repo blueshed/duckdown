@@ -9,6 +9,7 @@
 //
 //   bun run bench                    5,000 pages, 50 folders, 2,000 works
 //   bun run bench 20000 100 5000     larger
+//   bun run bench 5000 50 2000 2     and two other languages, each with half translated (n184)
 //
 // Not part of the suite: it measures, it doesn't check. See n163's note for
 // what it found on 2026-09-25.
@@ -16,10 +17,10 @@ import { mkdtempSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 
-const [N = "5000", F = "50", C = "2000"] = process.argv.slice(2);
+const [N = "5000", F = "50", C = "2000", L = "0"] = process.argv.slice(2);
 const root = mkdtempSync(join(tmpdir(), "duckdown-bench-"));
 const site = join(root, "site");
-await Bun.spawn(["bun", join(import.meta.dir, "make-big.ts"), site, N, F, C], { stdout: "inherit", stderr: "inherit" }).exited;
+await Bun.spawn(["bun", join(import.meta.dir, "make-big.ts"), site, N, F, C, L], { stdout: "inherit", stderr: "inherit" }).exited;
 const run = Bun.spawn(["bun", join(import.meta.dir, "measure.ts"), join(root, "dist")], {
   cwd: root, stdout: "inherit", stderr: "inherit",
   env: { ...process.env, DUCKDOWN_PATH: site, DUCKDOWN_PID: "", DEBUG: "0", DUCKDOWN_BUCKET: "" },

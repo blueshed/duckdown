@@ -3,15 +3,16 @@ import { createPageStorage, createStorage } from "./storage";
 import { renderMarkdown, folderOf } from "./markdown";
 import { siteNav, markCurrent, folderListing, siteMap } from "./nav";
 import { feedLink } from "./feed";
-import { fillCollections, fillItem, itemMeta, itemBody, type ItemContext } from "./collection";
+import { fillCollections, fillItem, itemMeta, itemBody, itemCounterparts, type ItemContext } from "./collection";
 import { escapeHtml, outsideCode, canonicalPath, dateHtml } from "./utils";
 import { sitePicture } from "./icons";
 import { withWidths } from "./widths";
+import { languagesOf, splitLanguage, counterparts, untranslatedNote, languageName, type Counterpart } from "./languages";
 
 const site = createStorage();
 const pages = createPageStorage();
 
-const BARE = '<!DOCTYPE html><html lang="en"><head><title>{{title}}</title></head><body><main>{{content}}</main></body></html>';
+const BARE = '<!DOCTYPE html><html lang="{{lang}}"><head><title>{{title}}</title></head><body><main>{{content}}</main></body></html>';
 
 // A plain word: letters, digits, dash, underscore. `layout:` and `css:` each
 // name a file in a folder a page must not be able to climb out of, and one
@@ -35,16 +36,33 @@ export function pictureUrl(value: string, origin: string): string {
 // disk. It is how the preview shows you a template while you are writing it.
 export type DraftTemplate = { name: string; body: string };
 
+// A file of the site's chrome for a language: templates/site.cy.html wears the
+// pages of the Welsh site in place of templates/site.html, and says in Welsh
+// what the template says in English (a skip link, a search box's label) — the
+// words a page can't carry. The default language's is the plain name (`lang`
+// empty), and a language without its own file wears that one, so a site
+// translates the chrome only when it wants to.
+const inLanguage = (name: string, lang: string) => plainName(lang) ? [`${name}.${lang}.html`, `${name}.html`] : [`${name}.html`];
+
 // `layout: post` picks templates/post.html, else templates/site.html, else a
-// bare one. Says which it settled on, so the editor can tell you when the
+// bare one — in a language, post.cy.html before post.html, then site.cy.html
+// before site.html: a page keeps the layout it asked for before it keeps the
+// language. Says which it settled on, so the editor can tell you when the
 // template you have open is not the one this page is wearing.
-export async function templateFor(layout = "", draft?: DraftTemplate): Promise<{ name: string; body: string }> {
-  for (const name of plainName(layout) ? [`${layout}.html`, "site.html"] : ["site.html"]) {
+export async function templateFor(layout = "", draft?: DraftTemplate, lang = ""): Promise<{ name: string; body: string }> {
+  const names = (plainName(layout) ? [layout, "site"] : ["site"]).flatMap((n) => inLanguage(n, lang));
+  return await firstTemplate(names, draft) ?? { name: "", body: BARE };
+}
+
+// The first of these template files the site has — or is being edited as an
+// unsaved draft, which stands in for the file of its name.
+async function firstTemplate(names: string[], draft?: DraftTemplate): Promise<{ name: string; body: string } | null> {
+  for (const name of names) {
     if (draft?.name === name) return { name, body: draft.body };
     const key = `${TEMPLATES_PATH}${name}`;
     if (await site.exists(key)) return { name, body: await site.read(key) };
   }
-  return { name: "", body: BARE };
+  return null;
 }
 
 // Fill every occurrence of a placeholder: a template may use one more than once
@@ -66,14 +84,13 @@ function fill(html: string, name: string, value: () => string): string {
 // loop. A name that isn't plain, or names a file that isn't there, fills as
 // nothing: a broken include should not take the whole page down, but it
 // should not fail silently either, so it is logged (failures speak).
-async function resolveIncludes(body: string, draft?: DraftTemplate): Promise<{ html: string; includes: string[] }> {
+async function resolveIncludes(body: string, draft?: DraftTemplate, lang = ""): Promise<{ html: string; includes: string[] }> {
   const includes: string[] = [];
   const names = new Set([...body.matchAll(/\{\{include ([^}]*)\}\}/g)].map((m) => m[1]!.trim()));
   if (!names.size) return { html: body, includes };
 
   const resolved = new Map<string, string>();
   for (const name of names) {
-    const file = `${name}.html`;
     if (!plainName(name)) {
       console.error(`{{include ${name}}}: not a plain name — filled as nothing`);
       resolved.set(name, "");
@@ -81,18 +98,14 @@ async function resolveIncludes(body: string, draft?: DraftTemplate): Promise<{ h
     }
     // The same draft mechanism templateFor uses for the page's own template:
     // an unsaved templates/topbar.html shows in the preview of any page whose
-    // template includes it, not only the page wearing it as a layout.
-    if (draft?.name === file) {
-      resolved.set(name, draft.body);
-      includes.push(file);
-      continue;
-    }
-    const key = `${TEMPLATES_PATH}${file}`;
-    if (await site.exists(key)) {
-      resolved.set(name, await site.read(key));
-      includes.push(file);
+    // template includes it, not only the page wearing it as a layout. In a
+    // language the include has its own words first (topbar.cy.html).
+    const found = await firstTemplate(inLanguage(name, lang), draft);
+    if (found) {
+      resolved.set(name, found.body);
+      includes.push(found.name);
     } else {
-      console.error(`{{include ${name}}}: templates/${file} doesn't exist — filled as nothing`);
+      console.error(`{{include ${name}}}: templates/${name}.html doesn't exist — filled as nothing`);
       resolved.set(name, "");
     }
   }
@@ -153,7 +166,50 @@ export type PageOptions = {
   // The page's own address, when it isn't the one its key makes: a page an
   // extension serves (extensions.ts) from a key outside pages/ (n173).
   path?: string;
+  // This page stands in for its translation into this language, which it
+  // doesn't have yet (languages.ts): the default language's page, shown at the
+  // language's address inside the language's site — its nav, its chrome, its
+  // switcher — with a note that says so. It is still the default page's, so its
+  // canonical address and the card it shares are too.
+  fallbackFor?: string;
 };
+
+// The language switcher: a link to this page in every language that has it,
+// each named in its own, the one the reader is in marked. What a reader gets
+// is what is listed, so a link to a fallback says so (`untranslated`) and a
+// link to a language with no page at all isn't there. Nothing when the
+// site has no other language, or this page is in only one.
+function languageList(found: Counterpart[], current: string): string {
+  if (found.length < 2) return "";
+  const items = found.map((c) => {
+    const href = escapeHtml(encodeURI(c.kind === "fallback" ? languageAddress(c.lang, c.key) : canonicalPath(c.key)));
+    const attrs = [`href="${href}"`, `hreflang="${escapeHtml(c.lang)}"`, `lang="${escapeHtml(c.lang)}"`];
+    if (c.kind === "fallback") attrs.push('class="untranslated"');
+    if (c.lang === current) attrs.push('aria-current="true"');
+    return `<li><a ${attrs.join(" ")}>${escapeHtml(languageName(c.lang))}</a></li>`;
+  });
+  return `<ul class="languages">\n${items.join("\n")}\n</ul>`;
+}
+
+// Where a page answers in a language that has no translation of it: the
+// language's folder, then the page's own address.
+const languageAddress = (lang: string, key: string) => `/${lang}${canonicalPath(key)}`;
+
+// Where a language's site begins: "/" for the default's, "/cy/" for the rest.
+const rootOf = (lang: string, main: string) => lang === main ? "/" : `/${lang}/`;
+
+// What a search engine is told about the other versions of a page: each
+// that is really written in its language (not a fallback, which is the same
+// page again), and the default's as the one to use when nobody's language
+// fits. With no origin there are no absolute addresses to give.
+function alternates(found: Counterpart[], main: string, origin: string): string[] {
+  const written = found.filter((c) => c.kind === "translated");
+  if (!origin || written.length < 2) return [];
+  const link = (hreflang: string, key: string) =>
+    `<link rel="alternate" hreflang="${escapeHtml(hreflang)}" href="${escapeHtml(origin + encodeURI(canonicalPath(key)))}">`;
+  const original = written.find((c) => c.lang === main);
+  return [...written.map((c) => link(c.lang, c.key)), ...(original ? [link("x-default", original.key)] : [])];
+}
 
 // The whole document: the page's markdown inside the template it asks for,
 // with everything the site knows about it filled in. The editor's preview goes
@@ -161,15 +217,33 @@ export type PageOptions = {
 export async function pageHtml(page: Page, o: PageOptions): Promise<{ html: string; layout: string; includes: string[] }> {
   const { file, meta } = page;
   const address = o.path ?? canonicalPath(page.key);
-  const nav = markCurrent(await siteNav(pages), file);
   const title = meta.title?.[0] || "duckie";
   const description = meta.description?.[0] ?? "";
+  // Three languages a page can be in at once: the one its file is written in,
+  // the one its words are (a page may say `lang:` of its own — a quotation, a
+  // notice), and the one whose site the reader is in. They are all the same
+  // on a page that is where it should be; they part for a fallback, which is
+  // the default's page standing in the language's site.
+  const languages = await languagesOf(pages);
+  const folder = splitLanguage(languages, page.key).lang;
+  const written = meta.lang?.[0] || folder;
+  const stands = o.fallbackFor ?? folder;
+  // The language's site, when it isn't the default's: its template files, its
+  // nav, its listings. Empty for the default's, which is every page of a site
+  // with no other.
+  const chrome = stands === languages.main ? "" : stands;
+  // The nav marks the page the reader is on, by its address in the site it is
+  // in: a fallback is the default's page under the language's.
+  const nav = markCurrent(await siteNav(pages, undefined, chrome), o.fallbackFor ? `${o.fallbackFor}/${file}` : file);
+  // The folder this page is in, named in the default's tree, which is how a
+  // language's listings are asked for.
+  const inFolder = folderOf(splitLanguage(languages, page.key).key.replace(/\.md$/, ""));
 
   // {{pages}} in a page lists the pages beside it (a blog index writes itself),
   // except in code, where it stays as written so a page can document the tag.
   // {{sitemap}} is the same for the whole site, nested by folder.
   let body = page.content;
-  for (const [tag, list] of [["pages", () => folderListing(pages, folderOf(file))], ["sitemap", () => siteMap(pages)]] as const) {
+  for (const [tag, list] of [["pages", () => folderListing(pages, inFolder, undefined, chrome)], ["sitemap", () => siteMap(pages, undefined, chrome)]] as const) {
     if (!body.includes(`{{${tag}}}`)) continue;
     const html = await list();
     body = outsideCode(body, (part) =>
@@ -178,14 +252,27 @@ export async function pageHtml(page: Page, o: PageOptions): Promise<{ html: stri
   // {{items}} and {{groups}} are the same idea over a collection.json: an
   // overview page writes itself from the data, here or in a template. A bare
   // tag means the collection `collection:` names, else the page's own folder's.
+  // In a language's site the collection is the language's: the folder is named
+  // in the default's tree here, and is in the language's folder to be read.
   const named = meta.collection?.[0]?.replace(/^\/+|\/+$/g, "");
-  const collection = { pages, folder: named ?? folderOf(file), context: o.item, template: (name: string) => itemTemplate(name, o.draft) };
+  const collection = {
+    pages, folder: [chrome, named ?? inFolder].filter(Boolean).join("/"), context: o.item,
+    template: (name: string) => itemTemplate(name, o.draft),
+  };
   body = await fillCollections(body, collection);
+  // A page standing in for its translation says so, first, in the language's
+  // own words and marked as theirs (the page's are in another). So does an item
+  // that has no words of the language's yet.
+  const standingIn = o.fallbackFor ?? (o.item?.item.untranslated ? stands : undefined);
+  if (standingIn) {
+    const note = await untranslatedNote(pages, standingIn);
+    body = `<p class="untranslated" lang="${escapeHtml(note.lang)}" role="note">${escapeHtml(note.text)}</p>\n${body}`;
+  }
 
   const template = o.through === undefined
-    ? await templateFor(meta.layout?.[0], o.draft)
+    ? await templateFor(meta.layout?.[0], o.draft, chrome)
     : { name: "", body: o.through };
-  const { html: withIncludes, includes } = await resolveIncludes(template.body, o.draft);
+  const { html: withIncludes, includes } = await resolveIncludes(template.body, o.draft, chrome);
   // The page's own x- keys, for a template that varies by page (a cover image,
   // a buy link) without a copy per page. Escaped like the title, empty when
   // the page doesn't say, and before {{content}} so page text is never filled.
@@ -203,10 +290,21 @@ export async function pageHtml(page: Page, o: PageOptions): Promise<{ html: stri
   // A page that names no picture of its own shares the site's: its card, else
   // its home-screen icon (icons.ts).
   const shared = !meta.image?.[0] && o.origin && html.includes("{{description}}") ? await sitePicture() : null;
+  // Where else this page is, for the switcher and the hreflang links: asked
+  // only when the site has another language and the template wants them.
+  const found = languages.others.length && (html.includes("{{languages}}") || html.includes("{{description}}"))
+    ? await (o.item ? itemCounterparts(pages, o.item) : counterparts(pages, page.key)) : [];
   for (const [name, value] of [
     ["title", () => escapeHtml(title)],
     ["url", () => escapeHtml(o.origin + address)],
-    ["date", () => dateHtml(meta.date?.[0] ?? "")],
+    ["date", () => dateHtml(meta.date?.[0] ?? "", written)],
+    // The language the page's words are in, for <html lang>: a reader's
+    // screen reader speaks it in that voice.
+    ["lang", () => escapeHtml(written)],
+    // Where the reader's language begins, for a link home or a search that
+    // stays in it: "/" or "/cy/".
+    ["root", () => rootOf(stands, languages.main)],
+    ["languages", () => languageList(found, stands)],
     // The page's description, and the card a link to it shows when shared:
     // Open Graph, which most places that unfurl a link read. Addresses in it
     // are absolute, so without an origin (an export with no DUCKDOWN_ORIGIN)
@@ -222,6 +320,7 @@ export async function pageHtml(page: Page, o: PageOptions): Promise<{ html: stri
         tag("property", "og:title", title),
         tag("property", "og:type", meta.date ? "article" : "website"),
         ...(o.origin ? [tag("property", "og:url", o.origin + encodeURI(address))] : []),
+        ...alternates(found, languages.main, o.origin),
         ...(picture ? [tag("property", "og:image", picture)] : []),
         ...(picture && shared ? [tag("property", "og:image:width", String(shared.width)), tag("property", "og:image:height", String(shared.height))] : []),
         // What the picture is, for a reader who can't see it: the site's own is

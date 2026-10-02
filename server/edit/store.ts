@@ -1,6 +1,7 @@
 import { signal, batch, computed } from "@blueshed/railroad";
 import { api, apiJson, urlPath } from "./api";
 import type { Listing } from "../storage";
+import type { Row } from "../languages";
 import { speak, tell } from "./notice";
 
 // App state as signals
@@ -26,9 +27,9 @@ export function shortName(key: string): string {
   return folderOf(key) === here ? key.slice(here ? here.length + 1 : 0) : key;
 }
 
-// The drawer at the right: Resources, Editors or Publish, one at a time. Each
+// The drawer at the right: Resources, Editors, Help, Translations or Publish, one at a time. Each
 // is chosen from the header and leaves the page in view behind it.
-export type DrawerName = "resources" | "editors" | "publish" | "help";
+export type DrawerName = "resources" | "editors" | "publish" | "help" | "translations";
 export const drawer = signal<DrawerName | null>(null);
 export const showImages = computed(() => drawer.get() === "resources");
 
@@ -79,13 +80,31 @@ export const pageLayout = signal("");
 export const pageIncludes = signal<string[]>([]);
 export const resourceDirty = computed(() => resourceDraft.get() !== resourceSaved.get());
 
+// A site in more than one language (languages.ts): where each page and each
+// item stands in each language, as the server counts it. null until asked.
+// Kept here, with the rest of what the editor knows, because opening a page
+// or a collection depends on which language's folder it is in.
+export type Standings = { main: string; others: string[]; rows: Row[] };
+export const translations = signal<Standings | null>(null);
+export const languages = computed(() => translations.get()?.others ?? []);
+
+export async function refreshTranslations(): Promise<void> {
+  const found = await apiJson<Standings>("check the translations", "/edit/translations");
+  if (found) translations.set(found);
+}
+
+// The language a key is written in, when it is in a language's folder.
+export const languageOf = (key: string): string | null =>
+  languages.peek().find((lang) => key === lang || key.startsWith(`${lang}/`)) ?? null;
+
 // A folder's collection.json, open in the same slot a resource uses: both are
 // the one thing below the page, and two of them in a column leaves no room for
 // either. The signal carries an object, not the folder's name, because the
 // site root's collection lives in a folder called "" and when() swaps on
-// truthiness.
+// truthiness. `lang` is set when the folder is a language's and the default has
+// the collection: what is edited then is the words the language gives it.
 export const COLLECTION_FILE = "collection.json";
-export const collection = signal<{ folder: string } | null>(null);
+export const collection = signal<{ folder: string; lang?: string } | null>(null);
 // Bumped when the pane writes collection.json: the preview renders the
 // overview from it, and nothing else it tracks has changed.
 export const collectionRevision = signal(0);
@@ -97,9 +116,14 @@ export const folderUrl = (folder: string) => `/edit/pages/${folder ? `${urlPath(
 const resourceUrl = (r: Resource) => `/edit/${r.section}/${urlPath(r.path)}`;
 export const collectionKey = (folder: string) => `${folder ? `${folder}/` : ""}${COLLECTION_FILE}`;
 
-export function openCollection(folder: string): void {
+export function openCollection(folder: string, lang?: string): void {
+  // One pane is built for one collection: choosing another while one is open
+  // takes the first away before the second is made, since the panes are built
+  // as they are shown, not told to follow.
+  const open = collection.peek();
+  if (open && (open.folder !== folder || open.lang !== lang)) collection.set(null);
   batch(() => {
-    collection.set({ folder });
+    collection.set({ folder, lang });
     closeResource();      // the slot holds one thing
     closeDrawer();
   });
@@ -121,10 +145,30 @@ async function offerCollection(fp: string): Promise<void> {
   const own = folderOf(fp);
   if (collection.peek() && collection.peek()!.folder !== own) closeCollection();
   if (!fp.endsWith("index.md") || resource.peek() || collection.peek()) return;
+  // In a language's folder, where the default has the collection, it is the
+  // collection's words that are there to edit.
+  const lang = await collectionLanguage(own);
+  if (lang) return openCollection(own, lang);
   // Asked of the folder's listing, not the file: a folder without one is the
   // usual case, and a 404 for it is red in every browser's console.
   const listing = await apiJson<Listing>(`list /${own}`, folderUrl(own));
   if (listing?.files.some((f) => f.name === COLLECTION_FILE)) openCollection(own);
+}
+
+// The language whose words a folder's collection is, when the folder is a
+// language's and the default's folder has a collection: the language's own
+// collection.json says only what is said differently. Without another language
+// nobody is asked.
+export async function collectionLanguage(folder: string): Promise<string | undefined> {
+  // Which folders are languages' is known once it has been asked: a page opened
+  // as the editor starts is offered its collection before anything has asked,
+  // and a language's words must never be edited as a collection of their own.
+  if (translations.peek() === null) await refreshTranslations();
+  const lang = languageOf(folder);
+  if (!lang) return undefined;
+  const base = folder === lang ? "" : folder.slice(lang.length + 1);
+  const listing = await apiJson<Listing>(`list /${base}`, folderUrl(base));
+  return listing?.files.some((f) => f.name === COLLECTION_FILE) ? lang : undefined;
 }
 
 // Transient: a resource is open for as long as you are working on it, and the
@@ -150,7 +194,7 @@ const STARTER = {
   templates: {
     ext: ".html",
     body: `<!DOCTYPE html>
-<html lang="en">
+<html lang="{{lang}}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">

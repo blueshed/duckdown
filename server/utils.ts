@@ -79,12 +79,34 @@ export function canonicalPath(key: string): string {
 // In UTC, because the date it is given has no time in it: new Date("2026-09-21")
 // is UTC midnight, and formatting that in a timezone west of UTC prints the day
 // before — the wrong day, under a datetime= saying the right one.
-const day = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
+const FORMAT: Intl.DateTimeFormatOptions = { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" };
+const day = new Intl.DateTimeFormat("en-GB", FORMAT);
+const days = new Map<string, Intl.DateTimeFormat>();
 
-// A date: as a <time>, written the way a reader expects. A date nobody can
-// parse is shown as it was written rather than as "Invalid Date".
-export function dateHtml(date: string): string {
+// The way a date is written in a language, as its readers write it: "2
+// Hydref 2026". English stays as it always was (en-GB), so a site that says
+// nothing of language is not changed; a tag Intl can't read is said once and
+// written the same way.
+function dayIn(lang: string): Intl.DateTimeFormat {
+  if (!lang || lang === "en") return day;
+  const had = days.get(lang);
+  if (had) return had;
+  let format: Intl.DateTimeFormat;
+  try {
+    format = new Intl.DateTimeFormat(lang, FORMAT);
+  } catch {
+    console.error(`lang: "${lang}" is not a language tag Intl knows — its dates are written as en-GB`);
+    format = day;
+  }
+  days.set(lang, format);
+  return format;
+}
+
+// A date: as a <time>, written the way a reader expects, in `lang` when the
+// page is in one. A date nobody can parse is shown as it was written rather
+// than as "Invalid Date".
+export function dateHtml(date: string, lang = ""): string {
   if (!date) return "";
   const on = new Date(date);
-  return `<time datetime="${escapeHtml(date)}">${isNaN(on.getTime()) ? escapeHtml(date) : day.format(on)}</time>`;
+  return `<time datetime="${escapeHtml(date)}">${isNaN(on.getTime()) ? escapeHtml(date) : dayIn(lang).format(on)}</time>`;
 }

@@ -14,6 +14,12 @@
 // asked about again at each search. (/search.json, the whole index as one
 // file, is still there for a search.js from before this.)
 //
+// A site in more than one language has an index for each, under its own
+// folder (/cy/search/index.json…), of the pages written in it. The search box
+// says which is its own: data-root="{{root}}" on the form, which the template
+// fills with "/" or "/cy/". Without it, it is the site's. The words it says
+// when nothing matches are the template's too (data-none).
+//
 // It is ordinary site code, in static/, and you can edit it: the template
 // includes it, and duckdown's job ends at handing you the index.
 
@@ -45,6 +51,10 @@
   const form = document.querySelector(".search");
   if (!form) return;
 
+  // Where this page's index is: in its language's folder when the template
+  // says so, else at the top, as it always was.
+  const root = (form.dataset.root || "/").replace(/\/?$/, "/");
+  const none = form.dataset.none || "Nothing matches";
   const toggle = form.querySelector(".search-toggle");
   const input = form.querySelector("input");
   const output = form.querySelector(".search-results");
@@ -113,7 +123,7 @@
   let version = null;
   let asking = null;   // one question at a time, however fast the keys come
   function current() {
-    asking ??= load("/search/index.json", { words: [] }, { cache: "no-cache" }).then((index) => {
+    asking ??= load(`${root}search/index.json`, { words: [] }, { cache: "no-cache" }).then((index) => {
       asking = null;
       if (index.version !== version) {
         fetched.clear();
@@ -123,8 +133,8 @@
     });
     return asking;
   }
-  const shard = (shards, key) => (shards.has(key) ? get(`/search/words/${fileOf(key)}.json`, {}) : {});
-  const page = (n) => get(`/search/pages/${n}.json`, []);
+  const shard = (shards, key) => (shards.has(key) ? get(`${root}search/words/${fileOf(key)}.json`, {}) : {});
+  const page = (n) => get(`${root}search/pages/${n}.json`, []);
 
   // Where in a text the query first starts a word, or -1: the snippet and the
   // link start there. Its first word as typed, where the text has it
@@ -220,7 +230,7 @@
     if (!query) return;
 
     if (!results.length) {
-      output.innerHTML = `<p class="search-none">Nothing matches “${query.replace(/[<&]/g, "")}”.</p>`;
+      output.innerHTML = `<p class="search-none">${none.replace(/[<&]/g, "")} “${query.replace(/[<&]/g, "")}”.</p>`;
       return;
     }
     const list = document.createElement("ul");

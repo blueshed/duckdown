@@ -1,6 +1,7 @@
 import { createElement, computed, when } from "@blueshed/railroad";
 import { Icon } from "./Icon";
 import { PublishButton } from "./Publish";
+import { TranslationsButton } from "./Translations";
 import { Trail } from "./Trail";
 import { filePath, drawer, toggleDrawer, previewShown, togglePreview } from "../store";
 import { urlPath } from "../api";
@@ -31,6 +32,7 @@ export function Header() {
       <button onclick={() => toggleDrawer("editors")} aria-expanded={drawer.map((d) => String(d === "editors"))}>
         <Icon name="users" /> <span class="label">Editors</span>
       </button>
+      <TranslationsButton />
       <button onclick={() => toggleDrawer("help")} aria-expanded={drawer.map((d) => String(d === "help"))}>
         <Icon name="circle-help" /> <span class="label">Help</span>
       </button>

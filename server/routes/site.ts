@@ -13,6 +13,7 @@ import { hostAnswer, hostOf, looking } from "../hosts";
 import { existsSync } from "fs";
 import { staticFile, CACHE } from "./static";
 import { feedXml, feedFolder, FEED_FILE } from "../feed";
+import { languagesOf, languageAt, translation } from "../languages";
 
 const pages = createPageStorage();
 
@@ -66,12 +67,18 @@ export function noticeMissingRoot(exists: (path: string) => boolean = existsSync
 }
 
 // The site's own 404 page when it has one (pages/404.md), the same one a
-// published site's host serves from 404.html; a plain line when it doesn't.
-const notFound = async (req: Request) => {
+// published site's host serves from 404.html; a plain line when it doesn't. A
+// miss in a language is answered in it: its own 404.md (pages/cy/404.md), or
+// the default's in the language's site, with the note that it isn't
+// translated — a reader should know why this one is in English.
+const notFound = async (req: Request, lang = "") => {
   noticeMissingRoot();
-  if (!await pages.exists(NOT_FOUND)) return new Response("Not Found", { status: 404 });
-  const { html } = await pageHtml(parsePage(NOT_FOUND, await pages.read(NOT_FOUND)), {
-    origin: siteOrigin(req), editHref: "",
+  const answer = lang
+    ? await translation(pages, lang, NOT_FOUND)
+    : await pages.exists(NOT_FOUND) ? { kind: "translated", key: NOT_FOUND } : null;
+  if (!answer) return new Response("Not Found", { status: 404 });
+  const { html } = await pageHtml(parsePage(answer.key, await pages.read(answer.key)), {
+    origin: siteOrigin(req), editHref: "", fallbackFor: answer.kind === "fallback" ? lang : undefined,
   });
   return new Response(html, { status: 404, headers: { "Content-Type": HTML } });
 };
@@ -86,7 +93,7 @@ const notFound = async (req: Request) => {
 // fell back to an item instead of a 404.
 const INDEX = "/index";
 
-const collected = async (req: Request, name: string, decoded: string) => {
+const collected = async (req: Request, name: string, decoded: string, lang = "") => {
   // An item's address is a folder with an index, so the same three addresses
   // reach it that reach any folder: /works/x, /works/x/ and /works/x/index.html
   // — and the last is the file the export writes, so a published copy and a
@@ -111,7 +118,30 @@ const collected = async (req: Request, name: string, decoded: string) => {
   const moved = await aliasTarget(pages, decoded);
   if (moved) return new Response(null, { status: 301, headers: { Location: encodeURI(moved) } });
 
-  return notFound(req);
+  return notFound(req, lang);
+};
+
+// A page of a language other than the default's (languages.ts): the page
+// written in it, or — when that isn't there, or isn't published — the default
+// language's, at the language's address, with a note saying so. A page is
+// looked for as a file and as a folder's index, like any other, and one really
+// written in the language wins over a fallback however it is named. Anything
+// neither has is what any miss is: an item, a moved address, a 404.
+const languagePage = async (req: Request, lang: string, rest: string, name: string, decoded: string) => {
+  const user = await getUser(req);
+  const sources = rest ? [`${rest}.md`, `${rest}/index.md`] : ["index.md"];
+  const found = await Promise.all(sources.map((source) => translation(pages, lang, source, { drafts: !!user })));
+  const answer = found.find((t) => t?.kind === "translated") ?? found.find(Boolean);
+  if (!answer) return collected(req, name, decoded, lang);
+
+  const page = parsePage(answer.key, await pages.read(answer.key));
+  const { html } = await pageHtml(page, {
+    origin: siteOrigin(req),
+    editHref: user ? `/edit?path=${encodeURIComponent(answer.key)}` : "",
+    fallbackFor: answer.kind === "fallback" ? lang : undefined,
+  });
+  if (user) return new Response(html, { headers: { "Content-Type": HTML, "Cache-Control": "private, no-cache" } });
+  return conditional(req, html, { "Content-Type": HTML, "Cache-Control": CACHE });
 };
 
 const renderPage = async (req: Request) => {
@@ -131,6 +161,8 @@ const renderPage = async (req: Request) => {
     if (xml) return conditional(req, xml, { "Content-Type": "application/atom+xml; charset=utf-8", "Cache-Control": CACHE });
   }
   const name = path.replace(/\.html$/, "").replace(/\/$/, "") || "index";
+  const inLanguage = languageAt(await languagesOf(pages), name);
+  if (inLanguage) return languagePage(req, inLanguage.lang, inLanguage.rest, name, decoded);
   // A page, or the index of the folder of that name: /blog, /blog/ and
   // /blog/index.html all reach pages/blog/index.md.
   const key = await pages.exists(`${name}.md`) ? `${name}.md` : `${name}/index.md`;

@@ -6,6 +6,7 @@ import { Preview } from "./components/Preview";
 import { CssPreview } from "./components/CssPreview";
 import { ResourcePane } from "./components/ResourcePane";
 import { CollectionPane } from "./components/CollectionPane";
+import { CollectionTranslation } from "./components/CollectionTranslation";
 import { TemplatePreview } from "./components/TemplatePreview";
 import { Notice } from "./components/Notice";
 import { Drawers, LeftDrawer } from "./components/Drawers";
@@ -68,7 +69,8 @@ middle.appendChild(when(opening, () => <div class="loading-line" role="progressb
 // as they were, hidden, and come back when you look at now again.
 middle.appendChild(when(seen, () => <PastPane />));
 middle.appendChild(when(hasFile, () => <Editor />));
-middle.appendChild(when(collection, () => <CollectionPane />));
+middle.appendChild(when(() => collection.get() !== null && !collection.get()!.lang, () => <CollectionPane />));
+middle.appendChild(when(() => !!collection.get()?.lang, () => <CollectionTranslation />));
 middle.appendChild(when(resource, () => <ResourcePane />));
 middle.appendChild(when(nothingOpen, () =>
   <div class="panel panel-editor"><div class="placeholder">select a page or a resource</div></div>));

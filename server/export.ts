@@ -20,7 +20,9 @@ import { isAlive } from "./pid";
 import { ORIGIN, STATIC_PATH, IS_S3, BUCKET, BUCKET_PREFIX, APP_PATH } from "./config";
 import { createPageStorage, createStaticStorage, type Storage } from "./storage";
 import { parsePage, pageHtml, itemPage } from "./page";
-import { buildSite, searchFiles, searchFileList, type Entry } from "./search";
+import { buildSite, searchFiles, searchFileList, entriesIn, type Entry } from "./search";
+import { languagesOf, splitLanguage, translation } from "./languages";
+import { translationStandings } from "./translations";
 import { COLLECTION_FILE, collectionProblems, loadCollection } from "./collection";
 import { canonicalPath, escapeHtml } from "./utils";
 import { Links } from "./links";
@@ -30,7 +32,7 @@ import { BASE_FILES, ROOT_FILES, baseFile } from "./base";
 import { sitemapXml } from "./sitemap";
 import { feedXml, FEED_FILE } from "./feed";
 
-export type Exported = { pages: number; drafts: number; files: number; broken: number; problems: number };
+export type Exported = { pages: number; drafts: number; files: number; broken: number; problems: number; stale: number };
 
 // An address that has moved, as a file a static host can serve: it says so to
 // a crawler (canonical) and takes a reader there (meta refresh). There is no
@@ -224,19 +226,29 @@ export async function exportSite(o: {
     made.add(path);
     links.add(path, html);
   };
-  const count: Exported = { pages: 0, drafts: 0, files: 0, broken: 0, problems: 0 };
+  const count: Exported = { pages: 0, drafts: 0, files: 0, broken: 0, problems: 0, stale: 0 };
   const problems: string[] = [];
+  const stale: string[] = [];             // translations whose page has changed since
+  const notes: string[] = [];             // what is worth saying about translations and fails nothing
+  const missing = new Map<string, number>();
   const moved: { from: string; to: string }[] = [];
   const feeds: string[] = [];   // folders whose index says feed: true
   let broken: string[];
   let unmoved: string | null;
 
   try {
+    const languages = await languagesOf(pages, true);   // an export asks the folder it was given, not what was kept
+    const { others } = languages;
     for (const key of await walk(pages)) {
       // A folder's collection is a folder of pages: every item rendered at its
       // own address, through the same pageHtml the site and the preview use. A
       // feature that skipped the export wouldn't be a duckdown feature.
       if (key === COLLECTION_FILE || key.endsWith(`/${COLLECTION_FILE}`)) {
+        const at = splitLanguage(languages, key);
+        // A language's collection.json beside the default's says only what is
+        // said differently: it is written with the default's, below, whether
+        // the language has one or not.
+        if (at.lang !== languages.main && await pages.exists(at.key)) continue;
         const folder = key.slice(0, Math.max(key.length - COLLECTION_FILE.length - 1, 0));
         problems.push(...await collectionProblems(pages, folder));
         const collection = (await loadCollection(pages, folder))!;
@@ -245,6 +257,20 @@ export async function exportSite(o: {
           const { html } = await pageHtml(itemPage({ collection, item }), { origin, editHref: "", item: { collection, item } });
           page(outPath(item.key), html);
           for (const alias of item.aliases) moved.push({ from: alias, to: item.href });
+        }
+        // The default's collection is every language's: each item has a page
+        // under each language's folder, its own words where it has them and the
+        // default's, with the note, where it hasn't.
+        if (at.lang === languages.main) {
+          for (const lang of others) {
+            const inLang = [lang, folder].filter(Boolean).join("/");
+            problems.push(...await collectionProblems(pages, inLang));
+            const translated = (await loadCollection(pages, inLang))!;
+            for (const item of translated.each ? translated.items : []) {
+              const { html } = await pageHtml(itemPage({ collection: translated, item }), { origin, editHref: "", item: { collection: translated, item } });
+              page(outPath(item.key), html);
+            }
+          }
         }
         continue;
       }
@@ -255,6 +281,16 @@ export async function exportSite(o: {
       // No edit link: there is no editor behind a folder of files.
       const { html } = await pageHtml(parsed, { origin, editHref: "" });
       page(outPath(key), html);
+      // A published site can't answer a page "not translated yet" with the
+      // default's, as the served one does: so the default's page is written
+      // under each language's folder, with the note, wherever the language has
+      // no page (or only a draft). The language's 404 is one of them.
+      if (others.length && splitLanguage(languages, key).lang === languages.main) {
+        for (const lang of others) {
+          if ((await translation(pages, lang, key))?.kind !== "fallback") continue;
+          page(outPath(`${lang}/${key}`), (await pageHtml(parsed, { origin, editHref: "", fallbackFor: lang })).html);
+        }
+      }
       for (const alias of parsed.meta.aliases ?? []) moved.push({ from: alias, to: canonicalPath(key) });
       if (yes(parsed.meta.feed) && (key === "index.md" || key.endsWith("/index.md"))) feeds.push(key.slice(0, -"index.md".length));
     }
@@ -265,6 +301,21 @@ export async function exportSite(o: {
         + `. Is DUCKDOWN_PATH set? ${out} was left as it was.`);
     }
     count.pages = made.size;
+
+    // Which translations have fallen behind their pages (and their items): said with the broken
+    // links, and --strict fails on them, since a published page that says what
+    // the default no longer does is a fault. A translation that doesn't say
+    // what it was made from can't be checked, and a page nobody has translated
+    // is shown in English with a note: both are said, neither fails. A draft
+    // translation isn't published, so it isn't behind anything a reader sees.
+    for (const row of await translationStandings(pages, true)) {
+      if (row.draft) continue;
+      if (row.standing === "stale") stale.push(`${row.lang}/${row.key} is out of date: ${row.key} has changed since it was translated`);
+      if (row.standing === "unchecked") notes.push(`${row.lang}/${row.key} doesn't say what it was made from (translated-from:), so it can't be checked`);
+      if (row.standing === "missing") missing.set(row.lang, (missing.get(row.lang) ?? 0) + 1);
+    }
+    for (const [lang, n] of missing) notes.push(`${lang}: ${n} page(s) and item(s) not translated yet, shown in the default language with a note`);
+    count.stale = stale.length;
 
     // Old addresses, as redirect pages. Written under the name the request
     // arrives as once it is decoded, so `/l"etoile-1976` is a folder called
@@ -327,10 +378,15 @@ export async function exportSite(o: {
     // The index the browser searches, in the parts the served site answers
     // with (search.ts): a published site has no server to ask, so the browser
     // fetches the files its search needs and does the matching itself.
-    const { entries, pages: listed } = await buildSite(pages);
-    for (const [path, body] of searchFileList(searchFiles(entries))) {
-      write(path, body);
-      count.files++;
+    // Each language has its own, under its own folder (cy/search/…), of the
+    // pages written in it: the default's is what is left of the walk.
+    const { entries: all, pages: listed } = await buildSite(pages, "", undefined, others);
+    const entries = entriesIn(all, others, "");
+    for (const [lang, of] of [["", entries] as const, ...others.map((lang) => [lang, entriesIn(all, others, lang)] as const)]) {
+      for (const [path, body] of searchFileList(searchFiles(of))) {
+        write(lang ? `${lang}/${path}` : path, body);
+        count.files++;
+      }
     }
     // And the whole index as one file, as before the parts, for a search.js
     // from then: a reader's browser may still hold duckdown's, and a site may
@@ -340,7 +396,7 @@ export async function exportSite(o: {
     count.files++;
     // A sitemap needs absolute addresses, so it needs the origin; so does a feed.
     if (origin) {
-      write("sitemap.xml", sitemapXml(listed, origin));
+      write("sitemap.xml", sitemapXml(listed, origin, languages));
       count.files++;
       for (const folder of feeds) {
         write(`${folder}${FEED_FILE}`, (await feedXml(pages, folder.replace(/\/$/, ""), origin, true))!);
@@ -353,9 +409,9 @@ export async function exportSite(o: {
     broken = links.broken(written);
     // --strict refuses before the swap: a site that fails is not put in
     // dist/'s place, where a server reading it would carry on with it.
-    if (o.strict && (broken.length || problems.length)) {
-      report(broken, problems, say);
-      throw new Error(strictLine(broken, problems));
+    if (o.strict && (broken.length || problems.length || stale.length)) {
+      report(broken, problems, stale, notes, say);
+      throw new Error(strictLine(broken, problems, stale));
     }
     // The whole site is written: it takes dist/'s place.
     unmoved = swapIn(next, out, old, o.rename);
@@ -367,7 +423,7 @@ export async function exportSite(o: {
 
   count.broken = broken.length;
   count.problems = problems.length;
-  report(broken, problems, say);
+  report(broken, problems, stale, notes, say);
 
   say(`${count.pages} page(s) and ${count.files} file(s) written to ${out}/`);
   if (count.drafts) say(`${count.drafts} draft(s) left out.`);
@@ -380,26 +436,30 @@ export async function exportSite(o: {
 }
 
 // Each broken link and, as well as in the log, each collection that can't have
-// the addresses it asks for: the export is where a site owner finds out before
-// a reader.
-function report(broken: string[], problems: string[], say: (line: string) => void): void {
+// the addresses it asks for, and each translation that has fallen behind: the
+// export is where a site owner finds out before a reader.
+function report(broken: string[], problems: string[], stale: string[], notes: string[], say: (line: string) => void): void {
   for (const line of broken) say(`broken link: ${line}`);
   for (const line of problems) say(`collection: ${line}`);
+  for (const line of stale) say(`translation: ${line}`);
+  for (const line of notes) say(`note: ${line}`);
 }
 
-const strictLine = (broken: string[], problems: string[]): string =>
-  `${broken.length} broken link(s) and ${problems.length} collection problem(s), and --strict is on.`;
+const strictLine = (broken: string[], problems: string[], stale: string[]): string =>
+  `${broken.length} broken link(s) and ${problems.length} collection problem(s)`
+  + `${stale.length ? ` and ${stale.length} translation(s) out of date` : ""}, and --strict is on.`;
 
 // What would stop this site publishing cleanly, found the way the export finds
 // it — by doing the whole export, into a folder thrown away after: each broken
-// link, each collection problem, or why there was nothing to export at all.
+// link, each collection problem, each translation out of date, or why there
+// was nothing to export at all.
 // Publishing (remote.ts) asks before every push.
 export async function checkSite(run: typeof exportSite = exportSite): Promise<string[]> {
   const out = mkdtempSync(join(tmpdir(), "duckdown-check-"));
   const said: string[] = [];
   try {
     await run({ out, say: (line) => said.push(line) });
-    return said.filter((line) => line.startsWith("broken link: ") || line.startsWith("collection: "));
+    return said.filter((line) => line.startsWith("broken link: ") || line.startsWith("collection: ") || line.startsWith("translation: "));
   } catch (e) {
     return [(e as Error).message];
   } finally {

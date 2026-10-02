@@ -6,6 +6,9 @@ import { searchIndex } from "../server/search";
 import { siteChanged } from "../server/kept";
 import { parsePage, pageHtml } from "../server/page";
 import { exportSite } from "../server/export";
+import { translationStandings } from "../server/translations";
+import { languagesOf } from "../server/languages";
+import { searchParts } from "../server/search";
 const t = async (what: string, fn: () => Promise<unknown>) => {
   const s = performance.now(); await fn(); const ms = performance.now() - s;
   console.log(`${what.padEnd(46)} ${ms.toFixed(0).padStart(7)} ms`); return ms;
@@ -22,6 +25,19 @@ await t("search index (search.json, sitemap.xml), cold", () => searchIndex(pages
 await t("a page, first render (the rest already kept)", () => render("folder-3/page-7.md"));
 await t("a page, next render", () => render("folder-3/page-8.md"));
 await t("the front page ({{sitemap}}), kept", () => render("index.md"));
+// A site in more than one language (n184): what a first reader of the first language waits for.
+const languages = await languagesOf(pages);
+if (languages.others.length) {
+  const lang = languages.others[0]!;
+  siteChanged();
+  await t(`${lang}: nav, cold`, () => siteNav(pages, undefined, lang));
+  await t(`${lang}: one folder's {{pages}}, cold`, () => folderListing(pages, "folder-3", undefined, lang));
+  await t(`${lang}: {{sitemap}}, cold`, () => siteMap(pages, undefined, lang));
+  await t(`${lang}: search parts, cold`, () => searchParts(pages, undefined, lang));
+  await t("where every translation stands, cold", () => translationStandings(pages));
+  await t(`${lang}: a page that stands in for its translation`, async () => pageHtml(parsePage("folder-3/page-7.md", await pages.read("folder-3/page-7.md")), { origin: "https://example.com", fallbackFor: lang } as any));
+  await t(`${lang}: a translated page`, () => render(`${lang}/folder-3/page-8.md`));
+}
 siteChanged();
 await t("after a save: the next page render", () => render("folder-3/page-9.md"));
 await t("after a save: search index again", () => searchIndex(pages));

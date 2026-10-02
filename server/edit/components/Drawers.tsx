@@ -3,6 +3,7 @@ import { ImageBrowser } from "./ImageBrowser";
 import { EditorsDrawer } from "./Users";
 import { PublishDrawer } from "./Publish";
 import { HelpDrawer } from "./Help";
+import { TranslationsDrawer } from "./Translations";
 import { drawer, leftDrawer } from "../store";
 
 // The drawer at the left, when a pane has put something in it: a chosen
@@ -19,6 +20,7 @@ export function Drawers() {
       {when(() => drawer.get() === "editors", () => <EditorsDrawer />)}
       {when(() => drawer.get() === "publish", () => <PublishDrawer />)}
       {when(() => drawer.get() === "help", () => <HelpDrawer />)}
+      {when(() => drawer.get() === "translations", () => <TranslationsDrawer />)}
     </>
   );
 }

@@ -4,12 +4,27 @@ import { Icon } from "./Icon";
 import { NewDialog, type NewKind } from "./NewDialog";
 import { openDeleted } from "../past";
 import { apiJson } from "../api";
+import { marksFor, type Mark } from "../translations";
 import {
   loadFile, createFile, createCollection, browserRevision, openCollection, reloadBrowser, COLLECTION_FILE,
-  filePath, folder, openFolder, folderOf, folderUrl,
+  filePath, folder, openFolder, folderOf, folderUrl, languageOf, collectionLanguage, translations,
 } from "../store";
 
 export const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name);
+
+// What a site in more than one language needs looked at, on the row it is about:
+// a translation that has fallen behind, one nobody has begun. Said in words and
+// a symbol, never by colour alone, and named for a screen reader.
+function Marks(props: { marks: { get(): Mark[] } }) {
+  return (
+    <span class="marks">
+      {list(props.marks as never, (m: Mark) => m.text, (m$: { get(): Mark; peek(): Mark; map: <T>(f: (m: Mark) => T) => { get(): T } }) => (
+        <span class={m$.map((m) => `mark mark-${m.kind}`)} role="img"
+          aria-label={m$.map((m) => m.title)} title={m$.map((m) => m.title)}>{m$.map((m) => m.text)}</span>
+      ))}
+    </span>
+  );
+}
 
 export function Browser() {
   const files = signal<FileEntry[]>([]);
@@ -41,9 +56,16 @@ export function Browser() {
     folders.set(data.folders.sort(byName));
   };
 
-  // A collection opens as a pane, not as the JSON it is written in.
-  const open = (file: FileEntry) =>
-    file.name === COLLECTION_FILE ? openCollection(folder.peek()) : loadFile(file.path);
+  // A collection opens as a pane, not as the JSON it is written in — in a
+  // language's folder, the pane of the words it gives the default's.
+  const open = (file: FileEntry) => {
+    if (file.name !== COLLECTION_FILE) return loadFile(file.path);
+    const here = folder.peek();
+    // Before the languages are known, nobody can say which folders are theirs.
+    return translations.peek() === null || languageOf(here)
+      ? collectionLanguage(here).then((lang) => openCollection(here, lang))
+      : openCollection(here);
+  };
 
   // Resolves to a message (the name is taken) to keep the dialog open with.
   const onCreate = async (name: string): Promise<string | void> => {
@@ -100,6 +122,7 @@ export function Browser() {
           <li class="folder">
             <button class="row" onclick={() => openFolder(f$.peek().path)}>
               <Icon name="folder" size={12} /> {f$.map((f) => f.name)}
+              <Marks marks={computed(() => marksFor(f$.get().path, true))} />
             </button>
           </li>
         ))}
@@ -109,6 +132,7 @@ export function Browser() {
               aria-current={computed(() => filePath.get() === f$.get().path ? "page" : null)}>
               <Icon name={f$.peek().name === COLLECTION_FILE ? "layout-grid" : "file-text"} size={12} />
               {" "}{f$.map((f) => f.name)}
+              <Marks marks={computed(() => marksFor(f$.get().path))} />
             </button>
           </li>
         ))}

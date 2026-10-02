@@ -4,6 +4,7 @@ import { aliasKey } from "./slugs";
 import { pageList, aliasTargets } from "./search";
 import { BASE_FILES, ROOT_FILES } from "./base";
 import { isFeed } from "./feed";
+import { languagesOf } from "./languages";
 
 // The links a page makes, and whether anything answers them. The export asks
 // of every page it writes, against the files it wrote; the preview asks of
@@ -98,9 +99,13 @@ export async function deadLinks(html: string, from: string, pages: Storage, file
   if (!links.length) return [];
   const answered = new Set((await pageList(pages)).map((p) => (p.url.endsWith("/") ? `${p.url}index.html` : p.url).slice(1)));
   const moved = new Set(await aliasTargets(pages));
+  // A language answers every page of the default's, in its own words or with a
+  // note (languages.ts), so a link into its folder leads where the default's does.
+  const { others } = await languagesOf(pages);
+  const answers = (p: string) => answered.has(p) || others.some((lang) => p.startsWith(`${lang}/`) && answered.has(p.slice(lang.length + 1)));
   const dead = new Set<string>();
   for (const { link, path, file } of links) {
-    if (reaches(file, (p) => answered.has(p)) || moved.has(aliasKey(path))) continue;
+    if (reaches(file, answers) || moved.has(aliasKey(path))) continue;
     if (file === "search.json" || file === "sitemap.xml" || await isFeed(pages, path)) continue;
     if (file.startsWith("static/")) {
       const name = file.slice("static/".length);

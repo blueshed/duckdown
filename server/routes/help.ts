@@ -19,7 +19,7 @@ import { escapeHtml } from "../utils";
 export const HELP_DIR = join(import.meta.dir, "../help");
 
 // Base order; the drawer puts whatever fits what's open first.
-export const HELP_ORDER = ["page", "top", "extras", "collection", "each", "template", "look", "editor"];
+export const HELP_ORDER = ["page", "top", "extras", "collection", "each", "languages", "template", "look", "editor"];
 
 export type HelpSection = { id: string; title: string; html: string };
 

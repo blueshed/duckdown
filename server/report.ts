@@ -36,14 +36,15 @@ export const PROBES = [
   /(^|\/)env[-_.]/i,                                            // env.js, env-config.js, env.txt
   /\.(bak|backup|old|orig|sql|zip|tar|gz|rar|7z|ini|ya?ml|conf|swp|env|properties|secret)$/i,   // configs, backups, secrets
   // Scripts, data, source and keys: a site's own are in static/, and it
-  // serves no source at all. The search index, sitemap.xml and feeds are its own.
-  /^(?!\/static\/)(?!\/search(\.json|\/index\.json|\/(words|pages)\/[^/]+\.json)$).*\.(js|json|ts|rb|py|toml|tfstate|tfvars|key|pem|csv|log|pwd|lock)$/i,
+  // serves no source at all. The search index (a language's too, under its
+  // own folder), sitemap.xml and feeds are its own.
+  /^(?!\/static\/)(?!(\/[a-z0-9-]+)?\/search(\.json|\/index\.json|\/(words|pages)\/[^/]+\.json)$).*\.(js|json|ts|rb|py|toml|tfstate|tfvars|key|pem|csv|log|pwd|lock)$/i,
   /^(?!\/static\/)(?!.*\/(sitemap|feed)\.xml$).*\.xml$/i,
 ];
 // A file a page pulls in — a picture, a stylesheet, the search index, a feed —
 // not a page anyone read: counted apart, and kept out of the views and Most
 // read. (A missing one is still Not found: a 404 favicon is worth knowing.)
-const FILE = /^\/static\/|^\/(favicon\.ico|robots\.txt|apple-touch-icon[^/]*\.png|search\.json|search\/index\.json|search\/(words|pages)\/[^/]+\.json|sitemap\.xml)$|\/feed\.xml$/i;
+const FILE = /^\/static\/|^\/(favicon\.ico|robots\.txt|apple-touch-icon[^/]*\.png|search\.json|([a-z0-9-]+\/)?search\/index\.json|([a-z0-9-]+\/)?search\/(words|pages)\/[^/]+\.json|sitemap\.xml)$|\/feed\.xml$/i;
 
 // A machine that isn't a crawler by its name: a certificate authority checking
 // the site is the site (ACME), which on a domain's first day asks hundreds of

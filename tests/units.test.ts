@@ -653,6 +653,25 @@ describe("utils", () => {
     expect(dateHtml("one day")).toBe('<time datetime="one day">one day</time>'); // as written, not "Invalid Date"
   });
 
+  test("a date is written the way the page's language writes it; English is as it always was", () => {
+    expect(dateHtml("2026-10-02", "cy")).toBe('<time datetime="2026-10-02">2 Hydref 2026</time>');
+    expect(dateHtml("2026-10-02", "fr")).toBe('<time datetime="2026-10-02">2 octobre 2026</time>');
+    expect(dateHtml("2026-10-02", "en")).toBe('<time datetime="2026-10-02">2 October 2026</time>');
+    expect(dateHtml("2026-10-02", "")).toBe('<time datetime="2026-10-02">2 October 2026</time>');
+  });
+
+  test("a language tag Intl can't read is said once, and the date is written as it always was", () => {
+    const said = spyOn(console, "error").mockImplementation(() => {});
+    try {
+      expect(dateHtml("2026-10-02", "not a tag")).toBe('<time datetime="2026-10-02">2 October 2026</time>');
+      expect(dateHtml("2027-01-03", "not a tag")).toBe('<time datetime="2027-01-03">3 January 2027</time>');
+      expect(said).toHaveBeenCalledTimes(1);
+      expect(said.mock.calls[0]![0]).toContain("not a tag");
+    } finally {
+      said.mockRestore();
+    }
+  });
+
   test("one address per page: the shortest one", () => {
     expect(canonicalPath("index.md")).toBe("/");
     expect(canonicalPath("blog/index.md")).toBe("/blog/");
@@ -697,5 +716,53 @@ describe("sitemap", () => {
     expect(xml).toContain("<loc>https://example.com/a%20&amp;%20b/c%20d.html</loc><lastmod>2026-09-21</lastmod>");
     expect(xml).toContain("<loc>https://example.com/soon.html</loc></url>");
     expect(xml).toStartWith('<?xml version="1.0"');
+  });
+
+  test("a page written in more than one language names each, itself among them, and the default's as x-default", async () => {
+    const { sitemapXml } = await import("../server/sitemap");
+    const xml = sitemapXml([
+      { url: "/", date: "" },
+      { url: "/about.html", date: "2026-09-21" },
+      { url: "/contact.html", date: "" },
+      { url: "/cy/", date: "" },
+      { url: "/cy/about.html", date: "" },
+      { url: "/fr/about.html", date: "" },
+      { url: "/cy/lleol.html", date: "" },
+    ], "https://example.com", { main: "en", others: ["cy", "fr"] });
+    const link = (hreflang: string, path: string) => `<xhtml:link rel="alternate" hreflang="${hreflang}" href="https://example.com${path}"/>`;
+    const about = [link("en", "/about.html"), link("cy", "/cy/about.html"), link("fr", "/fr/about.html"), link("x-default", "/about.html")].join("");
+    expect(xml).toContain('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">');
+    // Each version carries the same list; lastmod comes before it.
+    expect(xml).toContain(`<loc>https://example.com/about.html</loc><lastmod>2026-09-21</lastmod>${about}</url>`);
+    expect(xml).toContain(`<loc>https://example.com/cy/about.html</loc>${about}</url>`);
+    expect(xml).toContain(`<loc>https://example.com/fr/about.html</loc>${about}</url>`);
+    // The home pages are versions of each other.
+    const home = [link("en", "/"), link("cy", "/cy/"), link("x-default", "/")].join("");
+    expect(xml).toContain(`<loc>https://example.com/</loc>${home}</url>`);
+    expect(xml).toContain(`<loc>https://example.com/cy/</loc>${home}</url>`);
+    // A page with one version names nothing, and a page of a language's own is that.
+    expect(xml).toContain("<loc>https://example.com/contact.html</loc></url>");
+    expect(xml).toContain("<loc>https://example.com/cy/lleol.html</loc></url>");
+  });
+
+  test("two languages' pages with no default's have no x-default to name", async () => {
+    const { sitemapXml } = await import("../server/sitemap");
+    const xml = sitemapXml([{ url: "/cy/a.html", date: "" }, { url: "/fr/a.html", date: "" }], "https://example.com", { main: "en", others: ["cy", "fr"] });
+    expect(xml).toContain('hreflang="cy" href="https://example.com/cy/a.html"/><xhtml:link rel="alternate" hreflang="fr" href="https://example.com/fr/a.html"/></url>');
+    expect(xml).not.toContain("x-default");
+  });
+
+  test("a site with one language writes the sitemap it always did, however it is asked", async () => {
+    const { sitemapXml } = await import("../server/sitemap");
+    const entries = [{ url: "/", date: "" }, { url: "/cy/about.html", date: "" }, { url: "/about.html", date: "" }];
+    const plain = sitemapXml(entries, "https://example.com");
+    expect(sitemapXml(entries, "https://example.com", { main: "en", others: [] })).toBe(plain);
+    expect(plain).not.toContain("xhtml");
+  });
+
+  test("a language's pages with no other version leave the namespace out too", async () => {
+    const { sitemapXml } = await import("../server/sitemap");
+    const xml = sitemapXml([{ url: "/", date: "" }, { url: "/cy/lleol.html", date: "" }], "https://example.com", { main: "en", others: ["cy"] });
+    expect(xml).not.toContain("xhtml");
   });
 });

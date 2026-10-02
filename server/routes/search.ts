@@ -1,6 +1,9 @@
+import type { BunRequest } from "bun";
 import { createPageStorage } from "../storage";
 import { searchIndex, searchParts, searchFile } from "../search";
+import { languagesOf } from "../languages";
 import { conditional } from "../utils";
+import { handleSite } from "./site";
 
 const pages = createPageStorage();
 
@@ -18,8 +21,15 @@ export const handleSearch = async () =>
 // other by number, and a save can renumber them, so a browser asks each time
 // whether its copy is still the one (a 304 when it is) rather than keeping a
 // word's shard from before the save beside a page from after it.
-export async function handleSearchFile(req: Request): Promise<Response> {
-  const body = searchFile(await searchParts(pages), new URL(req.url).pathname);
+//
+// A language has an index of its own, under its own address: /cy/search/…, the
+// same three files, of the pages written in it. A first segment that is not a
+// language of the site is not ours to answer, and is whatever else it was.
+export async function handleSearchFile(req: BunRequest): Promise<Response> {
+  const lang = (req.params as { lang?: string }).lang ?? "";
+  if (lang && !(await languagesOf(pages)).others.includes(lang)) return handleSite(req);
+  const path = new URL(req.url).pathname;
+  const body = searchFile(await searchParts(pages, undefined, lang), lang ? path.slice(lang.length + 1) : path);
   if (body === null) return new Response("Not Found", { status: 404 });
   return conditional(req, body, { "Content-Type": "application/json;charset=utf-8", "Cache-Control": "no-cache" });
 }

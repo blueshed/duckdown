@@ -439,6 +439,38 @@
     font-weight: 600;
   }
 
+  /* --- Languages --- */
+
+  /* The note a page carries when it stands in for its translation: in the
+     language's words, before the page's own. Drawn from tokens the page
+     already has, so its pairs are the tested ones. */
+  p.untranslated {
+    margin: 0 0 1.25em;
+    padding: 0.6em 1.1em;
+    border-left: 3px solid var(--accent);
+    border-radius: 0 var(--radius) var(--radius) 0;
+    background: var(--surface);
+  }
+
+  /* {{languages}}: the languages in a row, the reader's own in bold and one
+     the page isn't translated into in italic — a state is never colour alone. */
+  ul.languages {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 1rem;
+    margin: 0 0 1rem;
+    padding: 0;
+    list-style: none;
+  }
+
+  ul.languages a[aria-current] {
+    font-weight: 600;
+  }
+
+  ul.languages a.untranslated {
+    font-style: italic;
+  }
+
   /* --- Tables --- */
 
   /* A markdown table wider than the screen scrolls in here (markdown.ts puts

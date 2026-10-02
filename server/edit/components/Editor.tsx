@@ -1,5 +1,6 @@
 import { createElement, signal, computed, effect } from "@blueshed/railroad";
 import { PaneHeader } from "./PaneHeader";
+import { TranslationBar } from "./Translations";
 import { urlPath } from "../api";
 import { filePath, editorContent, saveFile, deleteFile, closeFile, loadFile, moveFile, shortName } from "../store";
 
@@ -34,6 +35,7 @@ export function Editor() {
     <div class="editor-area">
       <PaneHeader icon="file-text" name={fp} shown={shown} dirty={dirty} onsave={save} ondelete={deleteFile} onclose={closeFile}
         url={() => `/edit/pages/${urlPath(fp.peek())}`} onrestored={() => loadFile(fp.peek())} onmove={moveFile} />
+      <TranslationBar />
       <textarea aria-label={computed(() => `Contents of ${fp.get()}`)} value={editorContent} onkeydown={onkeydown} oninput={oninput} />
     </div>
   );

@@ -16,8 +16,11 @@ export const hidden = (name: string) => name.startsWith(".");
 // {{sitemap}}, a feed, search or the sitemap.
 export const unlisted = (name: string) => hidden(name) || name.startsWith("-");
 
-// A key that may be a page: markdown, and not the 404 page.
-export const pageKey = (key: string) => key.endsWith(".md") && key !== NOT_FOUND;
+// A key that may be a page: markdown, and not a 404 page — the site's, or one
+// of a language's (`others` are the site's other languages, languages.ts:
+// cy/404.md answers a miss under /cy/ as 404.md does at the root).
+export const pageKey = (key: string, others: string[] = []) =>
+  key.endsWith(".md") && key !== NOT_FOUND && !others.some((lang) => key === `${lang}/${NOT_FOUND}`);
 
 // A page a reader can open at its own address: not a draft (404 but to the
 // editor), and not an each: page (it is its items, not a page).

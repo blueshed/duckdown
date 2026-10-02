@@ -26,6 +26,10 @@ Bun.serve({
     "/search/index.json":  handleSearchFile, // the index in parts; the browser matches
     "/search/words/:file": handleSearchFile,
     "/search/pages/:file": handleSearchFile,
+    "/:lang/search/index.json": handleSearchFile,   // a language's own, the same three files
+    "/:lang/search/words/:file": handleSearchFile,
+    "/:lang/search/pages/:file": handleSearchFile,
+    "/edit/translations": handleTranslations,      // where each page and item stands in each language
     "/sitemap.xml":      handleSitemap,      // the same index, for crawlers
     "/edit/browse/*":    handleBrowse,
     "/static/*":         handleStatic,
@@ -55,6 +59,7 @@ duckdown/
 │   ├── markdown.ts         # Front-matter parser + Bun.markdown
 │   ├── kept.ts             # kept(): what the site knows about itself, built once; siteChanged() drops it all
 │   ├── listed.ts           # What counts as a page, for every walk: hidden, unlisted (-), pageKey, readable; NOT_FOUND
+│   ├── languages.ts        # A site in more than one language: languagesOf, translation() (translated / fallback / null), sourceHash, standing (fresh / stale / …)
 │   ├── nav.ts              # The site nav, cached until the editor changes a page
 │   ├── pid.ts              # Pid file: written at startup, removed on exit; stopServer()
 │   ├── stop.ts             # bun run stop
@@ -84,6 +89,7 @@ duckdown/
 │   ├── links.ts            # The links a page makes, and which lead nowhere (the export and the preview ask)
 │   ├── utils.ts            # Shared helpers: paths, escaping, dates, a pass outside code
 │   ├── headers.ts          # What an answer says about itself: nosniff on every one; asFile() sandboxes a file handed out as it is
+│   ├── translations.ts     # Where every translation stands, pages and items: translationStandings() (kept)
 │   ├── routes/
 │   │   ├── files.ts        # fileRoutes() — GET/PUT/DELETE over one folder
 │   │   ├── pages.ts        # /edit/pages/* — file CRUD, via fileRoutes
@@ -95,6 +101,7 @@ duckdown/
 │   │   ├── help.ts         # /edit/help — the Help drawer's pages (server/help/), examples paired with what they give
 │   │   ├── site-icon.ts    # /edit/site-icon — the tab and home-screen icon: where they are, and both written from the editor's PNGs
 │   │   ├── publish.ts      # /edit/publish — status, publish (checked), ?pull
+│   │   ├── translations.ts # /edit/translations — the standings, what a translation starts as (?draft), a collection's words (?items), ?stamp
 │   │   ├── collection.ts   # /edit/collection/* — a collection's pictures (upload + thumbnail), and its problems
 │   │   ├── static.ts       # /static/* — site static files
 │   │   ├── search.ts       # /search/… — the index in parts, for the browser; /search.json whole, for a search.js from before them
@@ -106,6 +113,7 @@ duckdown/
 │       ├── app.tsx          # Railroad app root
 │       ├── store.ts         # Signals + actions (shared state): the tree's folder, which drawer is open
 │       ├── past.ts          # Earlier versions and Deleted, as a place: the list, the one looked at, Restore
+│       ├── translations.ts  # Languages in the editor: marks, the bar's data, translate(), markUpToDate(); the state itself is in store.ts
 │       ├── api.ts           # fetch wrapper: failures speak; a 401 goes to /login
 │       ├── notice.ts        # the one line: a failure (speak), news (tell), hush
 │       ├── modal.ts         # every dialog: shown modally, named by its heading, focus given back
@@ -135,6 +143,8 @@ duckdown/
 │           ├── Users.tsx     # The Editors drawer: add, set a password, remove
 │           ├── Help.tsx      # The Help drawer: what fits what's open first (helpFirst), the rest folded
 │           ├── Publish.tsx   # The header's Publish button and drawer: what's waiting, Publish, Pull
+│           ├── Translations.tsx # The header's Translations button, the bar over an open page, and the drawer: what is out of date, Add a language
+│           ├── CollectionTranslation.tsx # A collection's words in a language: the original beside a box, each item's standing
 │           ├── Notice.tsx    # Shows that line (role=alert for a failure, status for news)
 │           └── Icon.tsx      # Lucide icons (lucide-static SVG strings)
 ├── tests/                  # see Testing below
@@ -146,6 +156,12 @@ duckdown/
 │   ├── search.test.ts      # plainText, the index, its cache, its parts, and the aliases from that walk
 │   ├── search-js.test.ts   # The browser half: server/base/search.js in happy-dom, against an index staged by searchFiles()
 │   ├── collection.test.ts  # collection.json: slugs, overviews, aliases, collisions
+│   ├── languages.test.ts   # which folders are languages, what answers at a language's address, whether a translation is stale
+│   ├── site-languages.test.ts # /cy/… over HTTP: translated, fallback with its note, the switcher, hreflang, the chrome per language
+│   ├── nav-languages.test.ts # the nav, {{pages}} and {{sitemap}} of a language: the default's shape, what answers there, its addresses
+│   ├── search-languages.test.ts # what a reader of one language can search: one walk, the index cut by language, no 404 page
+│   ├── collection-languages.test.ts # a collection in a language: the words by slug, each item's standing, its addresses, its counterparts
+│   ├── editor-languages.test.tsx # the editor of a site in more than one language: marks, the bar, the drawer, the words pane
 │   ├── history.test.ts     # History: once a sitting, the limit, what was deleted
 │   ├── users.test.ts       # duckdown user, the password prompt, what a session is checked against
 │   ├── remote.test.ts      # The git kind against real repositories; the publish route; duckdown publish|pull
@@ -162,7 +178,7 @@ duckdown/
 │   ├── serve.test.ts       # serveDist(): traversal, redirects, 404.html, what is logged
 │   ├── setup-script.test.ts # both scaffold modes on scratch folders, and `bun run export` in each
 │   └── compose.yml         # MinIO for manual S3 runs (bun run dev:s3)
-├── bench/                  # bun run bench: a large site made and timed (n163), the export alone and its peak memory, what a first search fetches; measures, doesn't check
+├── bench/                  # bun run bench: a large site made and timed (n163), the export alone and its peak memory, what a first search fetches; a fourth argument adds other languages (n184); measures, doesn't check
 ├── scripts/sites.ts        # bun run sites: every site under ~/Workshop on duckdown, and where each stands (not shipped)
 ├── bunfig.toml             # Test preload + the 100% coverage threshold
 ├── create/                 # `bun create blueshed/duckdown`: calls the scaffold, keeps code and tests
@@ -398,7 +414,7 @@ When a content feature changes (syntax, front matter, themes, navigation, the ed
 
 Styling is templates and stylesheets, and nothing else. `templates/site.html` links `static/site.css` (duckdown's base, everything drawn from CSS variables) and `static/theme.css` (this site's look, saying only what differs). There is no `theme:` key, no class on `<body>`, and no per-folder cascade: every page is styled because the template links the files, so a page can't opt in and can't forget to. Style new things through the variables so `theme.css` reaches them. For one page, `css:` links a stylesheet after the template's own; for a kind of page, `layout:` picks a template that links what that kind needs.
 
-Search happens in the browser. `search.ts` builds one entry per readable page and one per section of it — url (a section's ends `#id`, read out of the rendered HTML so it can't disagree with the page), title, section, description, date, and that section's words — and `searchFiles()` cuts it into parts, the same files served (`/search/…`, `routes/search.ts`) or exported (`dist/search/`): `search/index.json` names the shards, `search/words/<xy>.json` holds every word starting with those two letters and where each is (pairs of numbers: pages on from the last, then section × 4 + where — 3 title, 2 heading, 1 description, 0 text — once per section, at its best there), and `search/pages/<n>.json` is page n's entries, just as the whole index has them. A reader's browser fetches the index, a shard per word of the query, and the pages of the results it shows — each once — so what it downloads follows what it searches (n166: at 20,000 pages the whole index was 68 MB before the first result). A word is a run of `[\p{L}\p{M}\p{N}_]` with an apostrophe (`'` or `’`, read as `'`) allowed inside, cut the same way on both sides (so "tree-lined" is two words, and "über" and "don't" one each); each letter also has a shard of its own holding `x*`, every word it starts at its best place, so a one-letter search is a prefix search as it always was and fetches that one file, and `x`, the one-letter word itself, which is all a letter cut from a longer query word matches ("v-if" is "v" and "if*", not "v*"); anything but a-z and 0-9 in a shard's file name is its code point between dashes (`-fc-b.json`: a leading `_` is a file Jekyll-based hosts won't publish, and a dash can't be in a key); a page has one name (`0.json`, never `00.json`). The link and snippet start where the text has the query's first word as typed ("docker-compose"), else its first part. The parts name each other by number and a save renumbers them, so `index.json` carries a version (a hash of the parts) that search.js asks for at each search, dropping what it kept of another; the served parts are `no-cache` with an ETag, `serve.ts` sends those three shapes (`SEARCH_PART`) `no-cache`, not a page of the site's own under `search/`, with the same ETag (`conditional()`, a hash of the bytes, compared weakly and against a list), told by the file and not the address, and search.js leaves out an entry a page doesn't have. Page numbers that survived a save would need ids other than the walk's order, and a posting list of gaps would grow with them: not done. Nothing on the server searches. `/search.json`, the whole index as one file, is still served and exported, for a `search.js` from before the parts (one a reader's browser kept, or a site's own); it can go once no browser can hold the old one. Drafts are left out, because a result that 404s is worse than no result, and `server/base/search.js` is ordinary site code a site can fork by having its own. It ranks title > heading > description > body, shows at most three sections of a page, and links `url#id:~:text=…` (a text fragment, with `-` encoded), which a browser may honour, ignore, or (some Chromium builds) honour by giving up on the id as well — so `search.js` scrolls to the heading itself on `load` when the reader is still at the top. Every field matches at the start of a word, only the latest keystroke's answer is shown (the results are `aria-busy` while it fetches), and `.search-results` scrolls inside its panel. The sitemap doesn't take its addresses from the sections: `buildSite()` returns the entries and a page list, from one walk and one cache. The index is cached exactly like the nav (`kept.ts`, below). That one walk also collects the aliases — an address a page or an item used to answer at — so `aliasTarget()` costs nothing extra and expires with the index.
+Search happens in the browser. `search.ts` builds one entry per readable page and one per section of it — url (a section's ends `#id`, read out of the rendered HTML so it can't disagree with the page), title, section, description, date, and that section's words — and `searchFiles()` cuts it into parts, the same files served (`/search/…`, `routes/search.ts`) or exported (`dist/search/`): `search/index.json` names the shards, `search/words/<xy>.json` holds every word starting with those two letters and where each is (pairs of numbers: pages on from the last, then section × 4 + where — 3 title, 2 heading, 1 description, 0 text — once per section, at its best there), and `search/pages/<n>.json` is page n's entries, just as the whole index has them. A reader's browser fetches the index, a shard per word of the query, and the pages of the results it shows — each once — so what it downloads follows what it searches (n166: at 20,000 pages the whole index was 68 MB before the first result). A word is a run of `[\p{L}\p{M}\p{N}_]` with an apostrophe (`'` or `’`, read as `'`) allowed inside, cut the same way on both sides (so "tree-lined" is two words, and "über" and "don't" one each); each letter also has a shard of its own holding `x*`, every word it starts at its best place, so a one-letter search is a prefix search as it always was and fetches that one file, and `x`, the one-letter word itself, which is all a letter cut from a longer query word matches ("v-if" is "v" and "if*", not "v*"); anything but a-z and 0-9 in a shard's file name is its code point between dashes (`-fc-b.json`: a leading `_` is a file Jekyll-based hosts won't publish, and a dash can't be in a key); a page has one name (`0.json`, never `00.json`). The link and snippet start where the text has the query's first word as typed ("docker-compose"), else its first part. The parts name each other by number and a save renumbers them, so `index.json` carries a version (a hash of the parts) that search.js asks for at each search, dropping what it kept of another; the served parts are `no-cache` with an ETag, `serve.ts` sends those three shapes (`SEARCH_PART`) `no-cache`, not a page of the site's own under `search/`, with the same ETag (`conditional()`, a hash of the bytes, compared weakly and against a list), told by the file and not the address, and search.js leaves out an entry a page doesn't have. Page numbers that survived a save would need ids other than the walk's order, and a posting list of gaps would grow with them: not done. A language has an index of its own — `/cy/search/…`, the same three kinds of file, of the pages written in it and nothing of another's — cut from the same walk by address (`entriesIn()`), served by `/:lang/search/…` (a first segment that isn't a language of the site is the site's own miss) and exported under `cy/`; `search.js` finds its own through `data-root="{{root}}"` on the form, and says what the form's `data-none` says when nothing matches. Nothing on the server searches. `/search.json`, the whole index as one file, is still served and exported, for a `search.js` from before the parts (one a reader's browser kept, or a site's own); it can go once no browser can hold the old one. Drafts are left out, because a result that 404s is worse than no result, and `server/base/search.js` is ordinary site code a site can fork by having its own. It ranks title > heading > description > body, shows at most three sections of a page, and links `url#id:~:text=…` (a text fragment, with `-` encoded), which a browser may honour, ignore, or (some Chromium builds) honour by giving up on the id as well — so `search.js` scrolls to the heading itself on `load` when the reader is still at the top. Every field matches at the start of a word, only the latest keystroke's answer is shown (the results are `aria-busy` while it fetches), and `.search-results` scrolls inside its panel. The sitemap doesn't take its addresses from the sections: `buildSite()` returns the entries and a page list, from one walk and one cache. The index is cached exactly like the nav (`kept.ts`, below). That one walk also collects the aliases — an address a page or an item used to answer at — so `aliasTarget()` costs nothing extra and expires with the index.
 
 What the site knows about itself lives in `nav.ts`: the nav, each folder's `{{pages}}` listing, and `{{sitemap}}` (the same walk, recursive: `folderEntries()` is what both are made from, so they agree on drafts, `-` folders and order). What counts as a page is decided once, in `listed.ts`, and every walk of `pages/` asks it — the nav, `{{pages}}` and the feed, `{{sitemap}}`, search and `sitemap.xml`, the export: `hidden()` (a `.` name, shown and published nowhere), `unlisted()` (that or a `-` name: served and exported, listed nowhere), `pageKey()` (markdown, not `404.md`) and `readable()` (not a draft, not an each: page). What each walk does with the answer, and in what order, stays its own. In production both are built once and kept (`kept()` in `kept.ts`, which every such cache goes through — the listings, the sitemap, the search index, the collections, the feeds); `siteChanged()` drops them all, and the pages route calls it whenever it writes, deletes, moves or restores, as a pull does — every write goes through the server, and a new write path to pages must call it too. A build that fails isn't kept. With `DEBUG=1` they're built per request instead, so pages written straight to disk (by hand, or by a session using the authoring skill) show up at once.
 
@@ -535,7 +551,7 @@ collection route's picture uploads do, deliberately. The collection pane also
 keeps its own undo stack: every change is a whole new file, so undo writes the
 previous one.
 
-Front matter takes only the keys duckdown reads (`KEYS` in `markdown.ts`) or an `x-` extension, unless the block is fenced with `---`, which takes anything: a page opening "Update: closed Monday" keeps its first line. Add a key there and in the skill's reference together.
+Front matter takes only the keys duckdown reads (`KEYS` in `markdown.ts`; `lang`, `translated-from` and `untranslated` are for [Languages](#languages)) or an `x-` extension, unless the block is fenced with `---`, which takes anything: a page opening "Update: closed Monday" keeps its first line. Add a key there and in the skill's reference together.
 
 The editor is a bento: one trail at the top says where you are (`Trail.tsx`:
 the site, the tree's folder — `folder` in the store, which `loadFile()` moves
@@ -603,6 +619,94 @@ can't go in `pageHtml`.
 A folder is served by its `index.md` (`/blog`, `/blog/`, `/blog/index.html`), and `draft: true` is 404 unless the reader is signed in. `plainName()` guards both `layout:` and `css:`: a page names a file in a folder it must not climb out of.
 
 Paths: storage keys are real names. The server decodes the URL path (`after()`); the editor builds URLs with `urlPath()` (each segment encoded). Never interpolate a name into a URL raw.
+
+## Languages
+
+A site in more than one language (`server/languages.ts`). **People translate;
+duckdown never does**: every rule here is about which page answers, and whether
+its translation still says what its original does.
+
+**The convention.** A top-level folder whose `index.md` says `lang:` equal to its
+own name is a language (`languagesOf()`, kept); the root's `lang:` is the default
+(`en`). `pages/cy/about.md` translates `pages/about.md` at `/cy/about.html`: the
+same path under the folder is the whole link, so nothing names the original. A
+folder that doesn't say so, and a page saying `lang:` anywhere else (its own
+language, for `<html lang>` and its dates), start no language — an existing site
+changes only by writing `lang:` on a folder's index. `splitLanguage()` names a
+key in the default's tree; `languageAt()` an address's language.
+
+**One function decides what answers** — `translation(pages, lang, key, {drafts})`:
+`translated` (the page written in the language), `fallback` (the default's, for a
+missing or draft translation — a draft is the editor's, so `drafts: true` for a
+signed-in user), or `null` (neither is a page a reader can have: a draft, an
+`each:` page). The site route (`languagePage()`), the nav, `{{pages}}`,
+`{{sitemap}}`, the export and the switcher all ask it, so served and exported agree.
+A fallback is never a nearest match.
+
+**A fallback is the default's page standing in** (`PageOptions.fallbackFor`): at the
+language's address, in the language's nav, listings and template, `<html lang>`
+and `{{date}}` those of the words (the default's), its `{{url}}`, canonical and
+card the default page's — so a search engine sees one page — with
+`<p class="untranslated" lang role="note">` first in `{{content}}` (so a template
+older than the feature still shows it), in the language's `untranslated:` words,
+else English marked `lang="en"`. It is left out of the language's search, of
+`sitemap.xml` and of `hreflang`. A miss in a language is answered the same way
+(`cy/404.md`, else the default's with the note); a 404 has no switcher.
+
+**A translation records what it was made from.** `translated-from` is
+`sourceHash()` of the original: 8 hex of SHA-256 over its `title`, `description` and
+body, line endings and trailing spaces normalised before parsing — a CRLF page has
+no front matter to the parser (n182), so the hash must not depend on it — and
+nothing else: `order`, `nav`, `draft`, `date`, `layout`, `css`, `aliases` and `image`
+are the same in every language. `standing()` is `fresh`, `stale`, `unchecked` (no
+record), `own` (no original) or `missing`; `translationRows()` is that for every
+page, `collectionRows()` for every item, and `translationStandings()` both, kept.
+A draft translation is not published, so it is never "behind". `bun run export`
+says each stale one (`translation: …`, which `--strict` fails on, and the check
+before a Publish returns), and notes — failing nothing — an unchecked one and how
+many are not translated yet.
+
+**Placeholders and files.** `{{lang}}`, `{{root}}`, `{{languages}}` (`languageList()`:
+each language named by `Intl.DisplayNames`, `aria-current`, `class="untranslated"`
+for a fallback, from `counterparts()` — never with one language), and `{{description}}`
+writes the `hreflang` alternates (written versions only, with an origin).
+`templates/<name>.<lang>.html` comes before `<name>.html` for a layout
+(`<layout>.cy`, `<layout>`, `site.cy`, `site`: the layout is kept before the
+language) and for an include; the template cache key and `chrome` in `pageHtml()` carry
+the language.
+
+**What is per language.** The nav, `{{pages}}` and `{{sitemap}}` (`nav.ts`; each cache
+is kept under `lang NUL key`): the default's shape — its folders, its `order:` — over
+what answers in the language (`treeOf()` is the union of both trees; the default's
+nav leaves the language folders out; a translation with no `date:` takes its
+original's). Search: one walk, the entries cut by address (`entriesIn()`); the
+sitemap's `xhtml:link`s are found by the address with the folder taken off. `kept()`
+is keyed by language, never by storage.
+
+**Collections.** A collection in a language's folder where the default has the
+collection (`read()` in collection.ts) is the default's, cloned (`inLanguage()`): the
+same groups and pictures at `/cy/works/<slug>/`, each item's text and long fields
+the language's where `pages/cy/works/collection.json` gives them (`items` by slug or
+a slug it used to have, `groups`, `labels`), the default's where not, and
+`untranslated` set (the note, no search entry). Where the default has none, the
+language's file is a collection of its own. `itemHash()` is what an item records;
+`itemCounterparts()` is its switcher. The export writes each language's items beside
+the default's and skips the language's file while walking.
+
+**The editor.** `store.ts` holds `translations` (the standings) and `collection`'s
+`lang`; `translations.ts` marks the tree (`marksFor()`: a row in the default's tree
+names the language behind, one in a language's says it of itself, a folder counts),
+reads the bar (`barFor()`), and does the two things done to a translation: `translate()`
+(the server says what it starts as — the page, a draft, `translated-from`, no
+`aliases`; the home also says `lang:`) and `markUpToDate()`. `/edit/translations`
+(`routes/translations.ts`) only reads, and hands back text to be saved through
+`/edit/pages/` like anything the editor writes, which is what keeps the history and
+drops the caches. The header's Translations drawer lists what wants attention and adds
+a language (translating its home); a collection's page in a language's folder is
+`CollectionTranslation`, which keeps the file as it was written.
+
+**The published server.** `serve.ts` answers a miss under a language's folder with its
+`404.html` — told by the one thing only a language has, an index of its own to search.
 
 ## Two ways in, one scaffold
 

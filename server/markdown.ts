@@ -15,7 +15,7 @@ export interface MarkdownResult {
 // these (or an x- extension of your own), so a page that opens "Update: closed
 // Monday" keeps its first line instead of losing it to metadata. For any other
 // key, fence the block with --- … --- , which takes whatever you put in it.
-const KEYS = ["title", "nav", "toc", "layout", "css", "description", "draft", "date", "order", "aliases", "each", "collection", "feed", "image"];
+const KEYS = ["title", "nav", "toc", "layout", "css", "description", "draft", "date", "order", "aliases", "each", "collection", "feed", "image", "lang", "translated-from", "untranslated"];
 const isKey = (key: string) => KEYS.includes(key) || key.startsWith("x-");
 
 export function parseFrontMatter(source: string): { meta: Record<string, string[]>; body: string } {
@@ -178,19 +178,23 @@ export async function folderOrder(pages: Storage, path: string): Promise<number>
 
 // The nav, {{sitemap}} and any other listing of folders sort them the same
 // way: by folderOrder(), then by name, so a folder without order: still
-// sorts alphabetically among the others without one.
+// sorts alphabetically among the others without one. A language's listing
+// says where the order is to be found (`orderOf`): its folders are the
+// default's and its own, and the order is the default's.
 export async function sortFolders<T extends { name: string; path: string }>(
-  pages: Storage, folders: T[],
+  pages: Storage, folders: T[], orderOf: (folder: T) => Promise<number> = (f) => folderOrder(pages, f.path),
 ): Promise<T[]> {
   const withOrder = await Promise.all(
-    folders.map(async (f) => ({ f, order: await folderOrder(pages, f.path) })),
+    folders.map(async (f) => ({ f, order: await orderOf(f) })),
   );
   withOrder.sort((a, b) => a.order - b.order || a.f.name.localeCompare(b.f.name));
   return withOrder.map((x) => x.f);
 }
 
-// Build nav from index.md files — walks folders looking for nav/title metadata
-export async function buildNav(pages: Storage, prefix = ""): Promise<string> {
+// Build nav from index.md files — walks folders looking for nav/title metadata.
+// `skip` names top-level folders to leave out: another language's, which the
+// site's own nav doesn't list (a language's is built apart, in nav.ts).
+export async function buildNav(pages: Storage, prefix = "", skip: string[] = []): Promise<string> {
   const { folders, files } = await pages.list(prefix);
   const items: string[] = [];
 
@@ -208,7 +212,7 @@ export async function buildNav(pages: Storage, prefix = ""): Promise<string> {
   }
 
   // Recurse into subfolders, ordered
-  for (const folder of await sortFolders(pages, folders.filter((f) => !unlisted(f.name)))) {
+  for (const folder of await sortFolders(pages, folders.filter((f) => !unlisted(f.name) && !(prefix === "" && skip.includes(f.name))))) {
     const sub = await buildNav(pages, folder.path);
     if (sub) items.push(sub);
   }
