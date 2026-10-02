@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.18.0 — 2026-10-02
 
 - **A site can be in more than one language.** People translate; duckdown never
   does. A top-level folder whose `index.md` says `lang: cy` (its own name) is a
