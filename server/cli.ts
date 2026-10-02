@@ -43,9 +43,10 @@ const commands: Record<string, (args: string[]) => Promise<number>> = {
 
 // `--deploy up` (or `--deploy=up`): how the site reaches Railway.
 function deployOf(args: string[]): Deploy {
-  const i = args.findIndex((arg) => arg === "--deploy" || arg.startsWith("--deploy="));
-  if (i < 0) return "github";
-  const value = args[i]!.startsWith("--deploy=") ? args[i]!.slice("--deploy=".length) : args[i + 1];
+  const flat = args.flatMap((arg) => (arg.startsWith("--deploy=") ? ["--deploy", arg.slice("--deploy=".length)] : [arg]));
+  const at = flat.indexOf("--deploy");
+  if (at < 0) return "github";
+  const value = flat[at + 1];
   if (value !== "github" && value !== "up") throw new Error(`--deploy is github (the default) or up (railway up), not ${value ?? "nothing"}`);
   return value;
 }

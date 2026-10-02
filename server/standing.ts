@@ -16,6 +16,12 @@ export type Standing = "fresh" | "stale" | "unchecked" | "own" | "missing";
 export const judge = (made: string | undefined, now: string): "fresh" | "stale" | "unchecked" =>
   !made ? "unchecked" : made.toLowerCase() === now ? "fresh" : "stale";
 
+// The standings that want a person's attention — behind, impossible to check, or
+// not there yet — which the editor marks and `duckdown translations status` lists.
+export const WANTED = ["stale", "unchecked", "missing"] as const;
+export type Wanted = (typeof WANTED)[number];
+export const isWanted = (standing: Standing): standing is Wanted => (WANTED as readonly Standing[]).includes(standing);
+
 // How each standing is said, to a person: in the editor, and by
 // `duckdown translations status`.
 export const SAYS: Record<Standing, string> = {

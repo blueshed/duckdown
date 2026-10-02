@@ -195,6 +195,8 @@ export async function exportSite(o: {
   const pages = o.pages ?? createPageStorage();
   const files = o.files ?? createStaticStorage();
   const say = o.say ?? console.log;
+  // Asked first, so a package.json that gets it wrong fails before the site is written.
+  const answers = o.answers ?? await declaredAnswers();
 
   // Render into a folder beside dist/, a page at a time, and swap it in once
   // the site is whole: a run that fails part-way, or finds nothing to publish
@@ -402,7 +404,7 @@ export async function exportSite(o: {
       say(`${feeds.map((f) => `/${f}${FEED_FILE}`).join(", ")} not written: a feed needs DUCKDOWN_ORIGIN for its addresses.`);
     }
 
-    broken = links.broken(written, o.answers ?? await declaredAnswers());
+    broken = links.broken(written, answers);
     // --strict refuses before the swap: a site that fails is not put in
     // dist/'s place, where a server reading it would carry on with it.
     if (o.strict && (broken.length || problems.length || stale.length)) {

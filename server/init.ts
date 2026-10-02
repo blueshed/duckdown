@@ -43,23 +43,47 @@ export function scripts(vendored: boolean): Record<string, string> {
   };
 }
 
-// .railway/railway.ts for a site Railway builds from a GitHub repository.
-const railwayGithub = (name: string, vendored: boolean) => `import { defineRailway, github, project, service } from "railway/iac";
+// How the published site reaches Railway: a GitHub repository Railway builds
+// from ("github", the default), or `railway up` from this folder ("up"), which
+// is how four of the sites go out — no repository, and the folder as it stands.
+export type Deploy = "github" | "up";
 
-// This repository manages only its own resources in the environment.
+// .railway/railway.ts: one published site, whichever way it gets there. The two
+// differ in where Railway finds the code — a repository to fill in, or none (a
+// deploy is `railway up --service <name>`, which ships this folder as it
+// stands, so the tree must be clean first; written from what daisy and water
+// do) — and so in the region the service runs in.
+const railwayFile = (name: string, vendored: boolean, deploy: Deploy) => {
+  const { build, start } = scripts(vendored);
+  const up = deploy === "up";
+  return `import { defineRailway, ${up ? "" : "github, "}project, service } from "railway/iac";
+${up ? `
+// Amsterdam, for readers in the UK: change it to where yours are.
+const EUROPE = "europe-west4-drams3a";
+` : ""}
+// This repository manages only its own resources in the environment.${up ? ` If the
+// project holds other services, \`railway config plan\` must show them untouched.` : ""}
 export const partial = "${name}";
 
 // A published site: duckdown renders site/ to files at build time and hands
 // them out with its own serve.ts, so the service holds no secret and there is
-// nothing in it to leak. A custom domain is managed by hand, never by this
-// file, and never listed here.
+// nothing in it to leak. ${up ? `The build is --strict: a broken link, a collection
+// problem or a stale translation fails it, and the site already live is left
+// alone. There is no GitHub source: a deploy is
+//
+//   railway up --service ${name}
+//
+// from this folder, from a clean tree. A custom domain is attached by hand,
+// never by this file (or, to keep it from being removed, listed in \`domains\`).` : `A custom domain is managed by hand, never by this
+// file, and never listed here.`}
 export default defineRailway(() => {
   const web = service("${name}", {
-    // Fill in this repository's path on GitHub and the branch that deploys.
+${up ? `    healthcheck: "/health",
+    replicas: { [EUROPE]: 1 },` : `    // Fill in this repository's path on GitHub and the branch that deploys.
     source: github("your-org/${name}", { branch: "main" }),
-    healthcheck: "/health",
-    build: "${scripts(vendored).build}",
-    start: "${scripts(vendored).start}",
+    healthcheck: "/health",`}
+    build: "${build}",
+    start: "${start}",
 
     variables: {
       // Where the pages are. Without it the exporter falls back to a folder
@@ -80,59 +104,7 @@ export default defineRailway(() => {
   return project("${name}", { resources: [web] });
 });
 `;
-
-// .railway/railway.ts for a site that has no repository connected: a deploy is
-// `railway up --service <name>`, which ships this folder as it stands, so the
-// tree must be clean first. Written from what daisy and water do: the same
-// published flavour, with the region, and nothing in it that needs a repository.
-const railwayUp = (name: string, vendored: boolean) => `import { defineRailway, project, service } from "railway/iac";
-
-// Amsterdam, for readers in the UK: change it to where yours are.
-const EUROPE = "europe-west4-drams3a";
-
-// This repository manages only its own resources in the environment. If the
-// project holds other services, \`railway config plan\` must show them untouched.
-export const partial = "${name}";
-
-// A published site: duckdown renders site/ to files at build time and hands
-// them out with its own serve.ts, so the service holds no secret and there is
-// nothing in it to leak. The build is --strict: a broken link, a collection
-// problem or a stale translation fails it, and the site already live is left
-// alone. There is no GitHub source: a deploy is
-//
-//   railway up --service ${name}
-//
-// from this folder, from a clean tree. A custom domain is attached by hand,
-// never by this file (or, to keep it from being removed, listed in \`domains\`).
-export default defineRailway(() => {
-  const web = service("${name}", {
-    healthcheck: "/health",
-    replicas: { [EUROPE]: 1 },
-    build: "${scripts(vendored).build}",
-    start: "${scripts(vendored).start}",
-
-    variables: {
-      // Where the pages are. Without it the exporter falls back to a folder
-      // that doesn't exist here, writes no pages, and the deploy goes green
-      // with every page a 404.
-      DUCKDOWN_PATH: "./site",
-      // What to call the site in each page's canonical link and sitemap.xml:
-      // the exporter has no request to take an origin from. Set it to the
-      // real domain before the first deploy.
-      DUCKDOWN_ORIGIN: "https://example.com",
-      // A line per page view in the logs: what is read and how much, never who.
-      DUCKDOWN_LOG: "1",
-    },
-  });
-
-  return project("${name}", { resources: [web] });
-});
-`;
-
-// How the published site reaches Railway: a GitHub repository Railway builds
-// from ("github", the default), or `railway up` from this folder ("up"), which
-// is how four of the sites go out — no repository, and the folder as it stands.
-export type Deploy = "github" | "up";
+};
 
 export async function scaffold(root: string, o: { vendored: boolean; name?: string; deploy?: Deploy }): Promise<Scaffolded> {
   const name = o.name ?? (root.split("/").pop() || "my-site");
@@ -242,10 +214,10 @@ DUCKDOWN_ORIGIN=
   // healthcheck and the two variables the exporter needs, all in one file a
   // review can see (`railway config plan` / `apply`, the Railway CLI) — not
   // set by hand in the dashboard, and not railway.json, which can't hold
-  // variables. `source` and `DUCKDOWN_ORIGIN` are placeholders: real ones
+  // variables. `source` (where there is one) and `DUCKDOWN_ORIGIN` are placeholders: real ones
   // before the first deploy — the real domain even before it points here,
   // because the service's own railway.app address is served regardless.
-  text(join(".railway", "railway.ts"), (deploy === "up" ? railwayUp : railwayGithub)(name, vendored));
+  text(join(".railway", "railway.ts"), railwayFile(name, vendored, deploy));
 
   // The authoring skill. From this package, so a site's copy is as new as the
   // duckdown it was made with; duckdown upgrade refreshes it.

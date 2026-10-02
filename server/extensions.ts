@@ -77,18 +77,25 @@ export async function withExtensions<T extends object>(own: T, site: Site, exten
   return routes as T & Routes;
 }
 
-// The extensions a site's package.json declares, loaded. None declared, or no
-// package.json (duckdown's own repository), is none. One that won't load
-// stops the server: a site missing its forms would fail quietly.
-export async function loadExtensions(root = process.cwd()): Promise<Extension[]> {
+// What the site's package.json says under "duckdown" for one key: a list of
+// strings that `ok` accepts. None said, or no package.json (duckdown's own
+// repository), is none; anything else is a mistake that stops whoever asked,
+// with `what` it should have been.
+async function declaredList(root: string, key: string, what: string, ok: (value: string) => boolean = () => true): Promise<string[]> {
   const pkg = Bun.file(join(root, "package.json"));
   if (!(await pkg.exists())) return [];
-  const declared: unknown = (await pkg.json()).duckdown?.extensions ?? [];
-  if (!Array.isArray(declared) || !declared.every((name) => typeof name === "string")) {
-    throw new Error(`package.json: "duckdown": { "extensions" } is a list of module names`);
+  const declared: unknown = (await pkg.json()).duckdown?.[key] ?? [];
+  if (!Array.isArray(declared) || !declared.every((value) => typeof value === "string" && ok(value))) {
+    throw new Error(`package.json: "duckdown": { "${key}" } is ${what}`);
   }
+  return declared;
+}
+
+// The extensions a site's package.json declares, loaded. One that won't load
+// stops the server: a site missing its forms would fail quietly.
+export async function loadExtensions(root = process.cwd()): Promise<Extension[]> {
   const extensions: Extension[] = [];
-  for (const name of declared as string[]) {
+  for (const name of await declaredList(root, "extensions", "a list of module names")) {
     let module: { default?: unknown };
     try {
       module = await import(Bun.resolveSync(name, root));
@@ -107,13 +114,8 @@ export async function loadExtensions(root = process.cwd()): Promise<Extension[]>
 export type Answers = (path: string) => boolean;
 
 export async function declaredAnswers(root = process.cwd()): Promise<Answers> {
-  const pkg = Bun.file(join(root, "package.json"));
-  if (!(await pkg.exists())) return () => false;
-  const declared: unknown = (await pkg.json()).duckdown?.answers ?? [];
-  if (!Array.isArray(declared) || !declared.every((address) => typeof address === "string" && address.startsWith("/"))) {
-    throw new Error(`package.json: "duckdown": { "answers" } is a list of addresses that start with /, as a route writes them (/api/*, /forms/:name)`);
-  }
-  const matchers = (declared as string[]).map(routeMatcher);
+  const declared = await declaredList(root, "answers", "a list of addresses that start with /, as a route writes them (/api/*, /forms/:name)", (address) => address.startsWith("/"));
+  const matchers = declared.map(routeMatcher);
   return (path) => matchers.some((matcher) => matcher.test(path));
 }
 

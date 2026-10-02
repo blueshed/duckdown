@@ -2,10 +2,10 @@ import { computed } from "@blueshed/railroad";
 import { api, urlPath } from "./api";
 import { tell } from "./notice";
 import type { Row } from "../languages";
-import { SAYS, type Standing } from "../standing";
+import { SAYS, isWanted, type Standing, type Wanted } from "../standing";
 import { translations, languages, languageOf, refreshTranslations, loadFile, saveFile, editorContent, filePath, reloadBrowser } from "./store";
 
-export { refreshTranslations, SAYS };
+export { refreshTranslations, SAYS, isWanted, type Wanted };
 
 // A site in more than one language, in the editor (languages.ts): where each
 // page and each item of a collection stands in each language, what the tree
@@ -19,10 +19,8 @@ const URL_ = "/edit/translations";
 // have it. A code it hasn't been told is shown as it is.
 export const languageName = (code: string): string => translations.peek()?.names[code] ?? code;
 
-// The standings that want attention, and the symbol each is marked with.
-export const SYMBOL = { stale: "↻", unchecked: "?", missing: "–" } as const;
-export type Wanted = keyof typeof SYMBOL;
-export const isWanted = (standing: Standing): standing is Wanted => standing in SYMBOL;
+// The symbol each standing that wants attention is marked with.
+export const SYMBOL: Record<Wanted, string> = { stale: "↻", unchecked: "?", missing: "–" };
 export const isBehind = (standing: Standing) => standing === "stale" || standing === "unchecked";
 
 // What the tree and the bar ask of the rows, found once per refresh rather than

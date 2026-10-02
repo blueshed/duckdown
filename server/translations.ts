@@ -1,10 +1,10 @@
 import { createPageStorage, type Storage } from "./storage";
 import { DEBUG } from "./config";
-import { kept } from "./kept";
+import { kept, siteChanged } from "./kept";
 import { languagesOf, splitLanguage, keysUnder, sourceHash, stamped, translationRows, type Row } from "./languages";
 import { collectionRows, stampItems, COLLECTION_FILE } from "./collection";
 import { parseFrontMatter, folderOf } from "./markdown";
-import { judge, SAYS, type Standing } from "./standing";
+import { judge, isWanted, SAYS, type Standing } from "./standing";
 
 // Where every translation of the site stands — each page's, and each item of
 // each collection's — for whoever is keeping them up to date: the export lists
@@ -29,6 +29,7 @@ duckdown translations stamp <path>…                say translations were made 
 
 export async function translationsCommand(args: string[], pages: Storage = createPageStorage(), say: (line: string) => void = console.log): Promise<number> {
   const [verb, ...rest] = args;
+  siteChanged();   // what is on disk now, not what an earlier command in this process kept
   if (verb === "status") return status(rest, pages, say);
   if (verb === "stamp" && rest.length) return stamp(rest, pages, say);
   throw new Error(`usage:\n${USAGE}`);
@@ -38,11 +39,11 @@ async function status(args: string[], pages: Storage, say: (line: string) => voi
   const json = args.includes("--json");
   const [lang, ...extra] = args.filter((arg) => arg !== "--json");
   if (extra.length || lang?.startsWith("-")) throw new Error(`usage:\n${USAGE}`);
-  const { others } = await languagesOf(pages, true);
+  const { others } = await languagesOf(pages);
   if (lang && !others.includes(lang)) {
     throw new Error(`${lang} isn't a language of this site${others.length ? ` (${others.join(", ")})` : ", which has one language"}`);
   }
-  const rows = (await translationStandings(pages, true)).filter((row) => !lang || row.lang === lang);
+  const rows = (await translationStandings(pages)).filter((row) => !lang || row.lang === lang);
   if (json) {
     say(JSON.stringify(rows, null, 2));
     return 0;
@@ -58,7 +59,7 @@ async function status(args: string[], pages: Storage, say: (line: string) => voi
       .filter(([, n]) => n);
     say(`${code}: ${counts.map(([standing, n]) => `${n} ${SAYS[standing]}`).join(", ") || "nothing to translate"}`);
     for (const row of [...mine].sort((a, b) => a.key.localeCompare(b.key))) {
-      if (row.standing === "stale" || row.standing === "unchecked" || row.standing === "missing") {
+      if (isWanted(row.standing)) {
         say(`  ${SAYS[row.standing].padEnd(SAYS.missing.length)}  ${code}/${row.key}${row.draft ? " (draft)" : ""}`);
       }
     }
@@ -70,7 +71,7 @@ async function status(args: string[], pages: Storage, say: (line: string) => voi
 // already says it is up to date is not touched, and one with nothing to have
 // been made from (a page of the language's own) is left alone and said.
 async function stamp(paths: string[], pages: Storage, say: (line: string) => void): Promise<number> {
-  const languages = await languagesOf(pages, true);
+  const languages = await languagesOf(pages);
   const stampedPages: string[] = [];
   let stampedItems = 0;
   const notes: string[] = [];
@@ -84,7 +85,7 @@ async function stamp(paths: string[], pages: Storage, say: (line: string) => voi
     const named = path.endsWith(".md") || path.endsWith(COLLECTION_FILE);
     const found = named
       ? (await pages.exists(path) ? [path] : [])
-      : [...await keysUnder(pages, path), ...await keysUnder(pages, path, [], (name) => name === COLLECTION_FILE)];
+      : await keysUnder(pages, path, [], (name) => name.endsWith(".md") || name === COLLECTION_FILE);
     if (!found.length) throw new Error(`${given}: there is nothing there to stamp`);
     for (const file of found) {
       if (file.endsWith(COLLECTION_FILE)) {

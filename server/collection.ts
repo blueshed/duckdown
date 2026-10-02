@@ -463,24 +463,27 @@ const allGroups = (groups: Group[]): Group[] => groups.flatMap((group) => [group
 // Says that every item a language has words for was translated from the item
 // as it is now — what a person who has read what changed says in the editor
 // (`duckdown translations stamp`). The file is read and written as the pane
-// does, whole and otherwise as it was; an item with no words of its own is left
-// as it is, since there is nothing to have been made from anything. How many
-// items were stamped (one that already says it is up to date is not touched),
-// or null where the default has no collection or the language no file for it.
+// does, whole and otherwise as it was. Which items it takes is the standings'
+// own rule (`standingOf()`): one that is behind or can't be checked, so an item
+// with no words of its own is left as it is, and one that already says it is up
+// to date is not touched. How many items were stamped, or null where the
+// default has no collection or the language no file for it.
 export async function stampItems(pages: Storage, folder: string, lang: string): Promise<number | null> {
-  const base = await loadCollection(pages, folder, true);
+  const base = await loadCollection(pages, folder);
   const file = collectionPath(joinKey(lang, folder));
   if (!base || !await pages.exists(file)) return null;
   const problems: string[] = [];
   const raw = rawObject(file, await pages.read(file), problems);
   if (!raw) throw new Error(problems[0]);
+  const said = (await translationsIn(pages, base, file)).items;
   let stamped = 0;
   if (isRaw(raw.items)) {
     for (const [key, entry] of Object.entries(raw.items)) {
       const item = itemFor(base, key);
-      if (!item || !isRaw(entry) || !Object.keys(entry).some((name) => name !== "translated-from")) continue;
+      if (!item || !isRaw(entry)) continue;
       const hash = itemHash(base, item);
-      if (judge(text(entry["translated-from"]) ?? undefined, hash) === "fresh") continue;
+      const standing = standingOf(said.get(item), hash);
+      if (standing !== "stale" && standing !== "unchecked") continue;
       entry["translated-from"] = hash;
       stamped++;
     }
@@ -594,13 +597,10 @@ export type TranslationView = {
 export async function translationView(pages: Storage, folder: string, lang: string, debug = DEBUG): Promise<TranslationView | null> {
   const base = await loadCollection(pages, folder, debug);
   if (!base) return null;
-  const groups: TranslationView["groups"] = [];
-  const walk = (list: Group[]) => list.forEach((g) => { groups.push({ name: g.name, label: g.label }); walk(g.groups); });
-  walk(base.groups);
   return {
     file: collectionPath(joinKey(lang, folder)),
     fields: base.fields.filter(translatable),
-    groups,
+    groups: allGroups(base.groups).map(({ name, label }) => ({ name, label })),
     items: base.items.map((item) => ({ slug: item.slug, thumb: item.thumb, fields: item.fields, hash: itemHash(base, item) })),
   };
 }
@@ -781,34 +781,43 @@ function link(item: Item | null, rel: "prev" | "next"): string {
 // as nothing and the link lands at the top of the overview instead.
 export const SKIP = "skip";
 
+// Whether the collection has a field of that name: one it declares, or one
+// every item answers to.
+const declares = (collection: Collection, field: string) =>
+  BUILT_IN.includes(field) || collection.fields.some((f) => f.name === field);
+
 // A field a page or template asks for that the collection doesn't declare is
 // a typo that would otherwise publish as nothing. Said once, in the log.
 function unknownField(collection: Collection, field: string, where: string): void {
-  if (BUILT_IN.includes(field) || collection.fields.some((f) => f.name === field)) return;
+  if (declares(collection, field)) return;
   warnOnce(`${where}: ${collectionPath(collection.folder)} has no field "${field}"`);
 }
 
-// An item's value as text, unescaped: {{item-<field>}} for anything the item
-// says (empty when unset, like an x- key; the picture field as its URL),
-// {{item-<field>-label}} for the word the collection's `labels` give that value
-// (the value itself when they give none) — so a template can keep a value for a
-// class or a data attribute and show its label, in the language of the page —
-// and {{group}}, the label of the group it sits in.
-const LABEL = "-label";
-export function itemText(name: string, { collection, item }: ItemContext): string {
-  if (name === "group") return item.group.label;
-  let field = name.slice("item-".length);
-  const declared = (f: string) => BUILT_IN.includes(f) || collection.fields.some((x) => x.name === f);
-  const labelled = field.endsWith(LABEL) && !declared(field);   // a field really called "x-label" is a field
-  if (labelled) field = field.slice(0, -LABEL.length);
+// An item's value for a field, as text: empty when unset, like an x- key, and
+// the picture field as its URL.
+function fieldValue(name: string, { collection, item }: ItemContext, field: string): string {
   unknownField(collection, field, `{{${name}}}`);
-  let value: string;
-  if (field === collection.image) value = item.src;
-  else if (field === "thumb") value = item.thumb;
-  else if (field === "href") value = item.href;
-  else value = item.fields[field] ?? "";
-  if (value === SKIP) value = "";
-  return labelled ? collection.labels[field]?.[value] ?? value : value;
+  if (field === collection.image) return item.src;
+  if (field === "thumb") return item.thumb;
+  if (field === "href") return item.href;
+  const value = item.fields[field] ?? "";
+  return value === SKIP ? "" : value;
+}
+
+// An item's value as text, unescaped: {{item-<field>}} for anything the item
+// says, {{item-<field>-label}} for the word the collection's `labels` give that
+// value (the value itself when they give none) — so a template can keep a value
+// for a class or a data attribute and show its label, in the language of the
+// page — and {{group}}, the label of the group it sits in.
+const LABEL = "-label";
+export function itemText(name: string, context: ItemContext): string {
+  if (name === "group") return context.item.group.label;
+  const field = name.slice("item-".length);
+  // A field really called "x-label" is that field.
+  if (!field.endsWith(LABEL) || declares(context.collection, field)) return fieldValue(name, context, field);
+  const labelled = field.slice(0, -LABEL.length);
+  const value = fieldValue(name, context, labelled);
+  return context.collection.labels[labelled]?.[value] ?? value;
 }
 
 // The same, escaped for HTML, plus {{prev}} and {{next}}, which are links.

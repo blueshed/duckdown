@@ -157,6 +157,21 @@ describe("duckdown translations stamp", () => {
     expect(lines).toEqual(["stamped 0 page(s) and 0 item(s)"]);
   });
 
+  test("an entry with no words of a text field is not a translation, whatever else it says (the standings' own rule)", async () => {
+    const quiet = console.error;
+    console.error = () => {};
+    try {
+      const { run, lines, read } = site({ "cy/works/collection.json": json({ items: { third: { year: "1963" }, "first-light": { title: "Golau cyntaf" } } }) });
+      await run("stamp", "cy/works/collection.json");
+      const file = JSON.parse(read("cy/works/collection.json"));
+      expect(file.items.third).toEqual({ year: "1963" });
+      expect(file.items["first-light"]["translated-from"]).toMatch(/^[0-9a-f]{8}$/);
+      expect(lines[0]).toBe("stamped 0 page(s) and 1 item(s)");
+    } finally {
+      console.error = quiet;
+    }
+  });
+
   test("a folder, a language, and a path as the site has it: every translation under it, items too", async () => {
     const { run, lines, read } = site();
     await run("stamp", "pages/cy/guide/");

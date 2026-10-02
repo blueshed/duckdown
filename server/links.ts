@@ -93,10 +93,14 @@ export class Links {
   // what the link may have meant when that is there.
   broken(known: Set<string>, answers?: Answers): string[] {
     const has = (p: string) => known.has(p);
-    const missing = this.distinct.map(({ file }) => reaches(file, has) || answers?.(`/${file}`) ? null : meant(file, has));
+    const missing = this.distinct.map(({ file }) => !reaches(file, has) && !answers?.(`/${file}`));
     const broken: string[] = [];
     for (const [from, links] of this.pages) {
-      for (const n of links) if (missing[n] !== null) broken.push(`${from} -> ${this.distinct[n]!.link}${missing[n]}`);
+      for (const n of links) {
+        if (!missing[n]) continue;
+        const { link, file } = this.distinct[n]!;
+        broken.push(`${from} -> ${link}${meant(file, has)}`);
+      }
     }
     return broken;
   }
