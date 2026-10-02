@@ -122,6 +122,10 @@ If a step fails, leave that site as it was: never force anything. Go on to the n
 - **blueshed/website:** a push to `main` is its deploy, and Peter presses it. Commit the upgrade,
   then stop and say it is ready to push.
 - **blueshed/duckdown-forms:** another session's, linked to duckdown's working copy. Leave it.
+- **water:** being ported onto duckdown by its own session (from 2026-10-02, on v0.18.0), so it is not
+  yet a site: `bun run sites` lists it only once its `package.json` depends on duckdown. Leave it
+  to that session until then; after, upgrade it by its own CLAUDE.md like the others, and leave it
+  to its session while that is still making it.
 
 ## 7. Report
 
