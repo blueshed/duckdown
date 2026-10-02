@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- **A published site's deploy no longer looks like a crash in its logs.** A
+  platform ends the old container with SIGTERM, and `bun run start` reported
+  that as `error: script "start" was terminated by signal SIGTERM`, on every
+  deploy. `serve.ts` now stops listening on SIGTERM or SIGINT, lets requests in
+  flight finish (for at most five seconds), says `stopping on SIGTERM` and exits
+  0. The line `$ bun run …` that the platform's log shows at error level is
+  Bun's own echo on stderr, and stays.
+
 ## 0.18.1 — 2026-10-02
 
 What water, the first site in two languages, found, and the small ones that

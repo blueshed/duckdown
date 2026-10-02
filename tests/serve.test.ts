@@ -3,7 +3,7 @@ import { describe, test, expect } from "bun:test";
 import { mkdirSync, rmSync, symlinkSync, writeFileSync } from "fs";
 import { join } from "path";
 import { RUN } from "./helpers";
-import { serveDist, listen, looking } from "../server/serve";
+import { serveDist, listen, looking, stopOnSignal } from "../server/serve";
 import pkg from "../package.json";
 
 const dist = join(RUN, "dist-served");
@@ -258,6 +258,32 @@ describe("serveDist", () => {
     } finally {
       server.stop(true);
     }
+  });
+
+  // n199: a platform's SIGTERM is a deploy, not a crash: the server stops
+  // listening, lets what is in flight finish (for no longer than the grace) and
+  // leaves with 0, so `bun run start` has no error to report.
+  test("stopOnSignal: SIGTERM and SIGINT stop the server and exit cleanly, after the grace at most", async () => {
+    const handlers: Record<string, () => Promise<void>> = {};
+    const said: string[] = [];
+    const exits: number[] = [];
+    let stopped = 0;
+    const server = { stop: async () => void stopped++ };
+    stopOnSignal(server, 50, (signal, handler) => void (handlers[signal] = handler), (code) => void exits.push(code), (line) => said.push(line));
+    expect(Object.keys(handlers)).toEqual(["SIGTERM", "SIGINT"]);
+    expect(exits).toEqual([]);                                   // nothing until a signal comes
+    await handlers.SIGTERM!();
+    expect([said, stopped, exits]).toEqual([["stopping on SIGTERM"], 1, [0]]);
+    await handlers.SIGINT!();
+    expect([said.at(-1), stopped, exits]).toEqual(["stopping on SIGINT", 2, [0, 0]]);
+
+    // A connection that never closes holds stop() for ever; the grace lets go.
+    const held = { stop: () => new Promise<void>(() => {}) };
+    stopOnSignal(held, 20, (signal, handler) => void (handlers[signal] = handler), (code) => void exits.push(code), () => {});
+    const before = performance.now();
+    await handlers.SIGTERM!();
+    expect(exits.at(-1)).toBe(0);
+    expect(performance.now() - before).toBeGreaterThanOrEqual(15);
   });
 
   // As the served site answers (server.test.ts): no answer lets a browser

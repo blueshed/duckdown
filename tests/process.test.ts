@@ -29,6 +29,37 @@ async function listening(server: Subprocess): Promise<string> {
   }
 }
 
+// n199: the published server, as a platform ends it. In `bun run start` an
+// unhandled SIGTERM was reported as `error: script "start" was terminated by
+// signal SIGTERM`, a crash in every deploy's logs.
+describe("the published server", () => {
+  test("stops cleanly on SIGTERM, and says so", async () => {
+    const dist = join(RUN, "serve-sigterm-dist");
+    await Bun.write(join(dist, "index.html"), "<h1>home</h1>");
+    const server = Bun.spawn(["bun", "run", join(import.meta.dir, "..", "server", "serve.ts")], {
+      env: { ...process.env, SITE_DIR: dist, PORT: "0", DUCKDOWN_PID: "" }, stdout: "pipe", stderr: "pipe",
+    });
+    const reader = (server.stdout as ReadableStream<Uint8Array>).getReader();
+    let output = "";
+    while (!/serving .* on http:\/\/localhost:(\d+)\//.test(output)) {
+      const { value, done } = await reader.read();
+      if (done) throw new Error(`serve.ts exited before listening:\n${output}`);
+      output += new TextDecoder().decode(value);
+    }
+    const base = output.match(/(http:\/\/localhost:\d+)\//)![1]!;
+    expect(await (await fetch(base)).text()).toBe("<h1>home</h1>");
+    server.kill(); // SIGTERM
+    expect(await server.exited).toBe(0);
+    while (!output.includes("stopping on SIGTERM")) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      output += new TextDecoder().decode(value);
+    }
+    expect(output).toContain("stopping on SIGTERM");
+    expect(await new Response(server.stderr).text()).not.toContain("terminated by signal");
+  });
+});
+
 describe("pid file", () => {
   test("a second server refuses while the first really is running", async () => {
     const pidFile = join(RUN, "two-servers.pid");

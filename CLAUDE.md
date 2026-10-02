@@ -81,7 +81,7 @@ duckdown/
 │   ├── cli.ts              # bin `duckdown`: the server, or `duckdown init|user|publish|pull|report|upgrade|images|translations|bucket`; --help
 │   ├── upgrade.ts          # duckdown upgrade [tag]: export, re-pin, install, refresh the skill, export, compare
 │   ├── bucket.ts           # duckdown bucket pull|push [folder]: a served site's bucket to and from a folder
-│   ├── serve.ts            # The published flavour's server: a dist/ folder, and the site's extensions
+│   ├── serve.ts            # The published flavour's server: a dist/ folder, and the site's extensions; stopOnSignal() ends it cleanly on SIGTERM
 │   ├── extensions.ts       # Routes a site adds: declared in its package.json, given its storage and look
 │   ├── hosts.ts            # One site, one address: which names move to DUCKDOWN_ORIGIN, which are noindex
 │   ├── scaffold.ts         # Says so when `bun create` left a half-scaffold

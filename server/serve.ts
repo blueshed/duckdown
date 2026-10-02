@@ -141,5 +141,27 @@ export async function listen(
   return server;
 }
 
+// A platform ends a container with SIGTERM. Left alone the signal kills the
+// process, and `bun run start` reports its child's death as `error: script
+// "start" was terminated by signal SIGTERM`, which reads in the platform's logs
+// as a crash on every deploy (n199). So: stop listening, let the requests in
+// flight finish (but not past `grace`: an idle connection that never closes must
+// not hold a deploy), say so, and leave cleanly.
+export function stopOnSignal(
+  server: { stop(): Promise<void> },
+  grace = 5000,
+  on: (signal: "SIGTERM" | "SIGINT", handler: () => Promise<void>) => unknown = process.on.bind(process),
+  exit: (code: number) => unknown = process.exit.bind(process),
+  say: (line: string) => void = console.log,
+): void {
+  for (const signal of ["SIGTERM", "SIGINT"] as const) {
+    on(signal, async () => {
+      say(`stopping on ${signal}`);
+      await Promise.race([server.stop(), Bun.sleep(grace)]);
+      exit(0);
+    });
+  }
+}
+
 // Only when run, never on import: the tests call serveDist() directly.
-if (import.meta.main) await listen();
+if (import.meta.main) stopOnSignal(await listen());
