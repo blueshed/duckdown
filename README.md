@@ -175,7 +175,7 @@ bun run dev        # Development with HMR
 bun run start      # Production
 bun run stop       # Stop the server started from this folder
 bun run test       # Run tests (100% coverage required)
-bun run check      # TypeScript check
+bun check          # TypeScript check
 bun run export     # Write the whole site to ./dist as plain files (--strict: a broken link fails)
 bun run serve      # Hand out ./dist: the published flavour's server (SITE_DIR, PORT)
 bun run setup      # What bun create runs after cloning

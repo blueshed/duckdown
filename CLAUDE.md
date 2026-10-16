@@ -318,7 +318,7 @@ bun run s3:up      # Start MinIO alone (s3:down stops it, s3:logs follows it)
 bun run serve      # Hand out ./dist: the published flavour's server (SITE_DIR, PORT)
 bun run setup      # What bun create runs after cloning
 bun run test       # Run tests; fails below 100% line/function coverage
-bun run check      # TypeScript check
+bun check          # TypeScript check
 bun run export     # Write the whole site to ./dist as plain files
 bun run bench      # A large site made in a scratch folder and timed (bench/)
 ```
