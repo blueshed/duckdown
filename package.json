@@ -41,7 +41,6 @@
     "s3:logs": "docker compose -f tests/compose.yml logs -f",
     "start": "bun run server/main.ts",
     "stop": "bun run server/stop.ts",
-    "check": "bunx tsc --noEmit",
     "bench": "bun bench/run.ts",
     "sites": "bun scripts/sites.ts",
     "test": "bun test --coverage",

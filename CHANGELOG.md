@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- **`bun check` type checks.** Bun 1.4's built-in (TypeScript 7, all cores)
+  replaces `bunx tsc --noEmit`; the `check` script that shadowed it is gone.
+
 - **A published site's deploy no longer looks like a crash in its logs.** A
   platform ends the old container with SIGTERM, and `bun run start` reported
   that as `error: script "start" was terminated by signal SIGTERM`, on every
