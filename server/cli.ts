@@ -10,11 +10,8 @@
 // with `images`, the narrower widths of pictures already in static/images/, or with
 // `bucket pull|push`, a served site's content between its bucket and a folder.
 
-import { readFileSync } from "fs";
-import { join } from "path";
+import { version } from "../package.json";
 import { scaffold, type Deploy } from "./init";
-
-const VERSION = JSON.parse(readFileSync(join(import.meta.dir, "..", "package.json"), "utf8")).version as string;
 
 export const USAGE = `duckdown                      the server (the editor at /edit)
 duckdown create <name> [--deploy up]   a new site in <name>/, on the newest release of duckdown, committed
@@ -80,7 +77,7 @@ export async function cli(
   // The server takes no arguments, so anything else is a command this version
   // doesn't have — a typo, or one from a newer duckdown — never the server.
   if (argv[0] !== "init") {
-    console.error(`duckdown: ${argv[0]} isn't a command here (duckdown ${VERSION}); duckdown --help lists them`);
+    console.error(`duckdown: ${argv[0]} isn't a command here (duckdown ${version}); duckdown --help lists them`);
     return 1;
   }
   try {
