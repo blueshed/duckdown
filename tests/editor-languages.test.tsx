@@ -425,6 +425,23 @@ describe("the bar over the open page", () => {
     dispose();
   });
 
+  test("Mark up to date saves what was typed, and the page is no longer unsaved", async () => {
+    // It saves through the store, not the editor's own Save, which is what
+    // used to clear the dot: it stayed on over a page that was saved.
+    await welsh();
+    await loadFile("cy/about.md");
+    const { host, dispose } = render(() => <Editor />);
+    const area = host.querySelector("textarea")!;
+    area.value = `${area.value}\nA line more.`;
+    area.dispatchEvent(new Event("input"));
+    expect(host.querySelector(".dot")).not.toBeNull();
+    click(button(host, "Mark up to date")!);
+    await waitFor(() => host.querySelector(".translation-state")!.textContent === "up to date");
+    expect(host.querySelector(".dot")).toBeNull();
+    expect(await read("cy/about.md")).toContain("A line more.");
+    dispose();
+  });
+
   test("a page of the language's own has no original to go to, and nothing to catch up with", async () => {
     await welsh();
     filePath.set("cy/lleol.md");

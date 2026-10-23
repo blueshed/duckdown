@@ -8,6 +8,10 @@ import { speak, tell } from "./notice";
 export const filePath = signal<string | null>(null);
 export const fileContent = signal("");
 export const editorContent = signal("");
+// Unsaved: what the editor holds isn't what was last read or saved. Derived,
+// so whatever writes either (a save, a restore, Mark up to date) can't leave
+// the dot behind.
+export const fileDirty = computed(() => editorContent.get() !== fileContent.get());
 export const browserRevision = signal(0);
 
 // Where you are: the folder the tree is showing. The trail above says it and
@@ -385,7 +389,7 @@ export async function moveFile(to: string): Promise<string | void> {
   const trimmed = to.trim().replace(/^\/+/, "");
   const dest = trimmed.endsWith(".md") ? trimmed : `${trimmed}.md`;
   if (dest === fp) return `It is already ${fp}`;
-  if (editorContent.peek() !== fileContent.peek() && !(await saveFile())) return `Couldn't save ${fp} first`;
+  if (fileDirty.peek() && !(await saveFile())) return `Couldn't save ${fp} first`;
   const res = await api(`move ${fp}`, `${at(fp)}?move=${encodeURIComponent(dest)}`, { method: "POST" }, [400, 412]);
   if (res.status === 412) return `${dest} already exists`;
   if (res.status === 400) return res.text();

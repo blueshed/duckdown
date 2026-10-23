@@ -5,7 +5,7 @@ import { Icon } from "./Icon";
 import { Drawer } from "./Drawer";
 import {
   browserRevision, resourceRevision, collectionRevision, reloadBrowser,
-  filePath, fileContent, editorContent, loadFile,
+  filePath, fileDirty, loadFile,
   drawer, toggleDrawer, closeDrawer,
 } from "../store";
 
@@ -108,7 +108,7 @@ export function PublishDrawer() {
     reloadBrowser();
     // The open page again, if it changed and has nothing unsaved in it.
     const open = filePath.peek();
-    if (open && done.changed.includes(`pages/${open}`) && editorContent.peek() === fileContent.peek()) await loadFile(open);
+    if (open && done.changed.includes(`pages/${open}`) && !fileDirty.peek()) await loadFile(open);
     await refreshPublish();
   };
 
