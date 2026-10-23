@@ -1,6 +1,10 @@
 # Changelog
 
-## Unreleased
+## 0.18.2 — 2026-10-23
+
+A new site in one line, and a published site that stops cleanly. Nothing a
+site has to do: an upgrade changes no page it exports, and the editor's Help
+gains a few lines.
 
 - **`bun check` type checks.** Bun 1.4's built-in (TypeScript 7, all cores)
   replaces `bunx tsc --noEmit`; the `check` script that shadowed it is gone.
