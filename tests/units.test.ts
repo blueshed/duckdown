@@ -1,11 +1,11 @@
 import { describe, test, expect, spyOn } from "bun:test";
 import { mkdirSync, writeFileSync, existsSync, readFileSync, readdirSync, symlinkSync, rmSync } from "fs";
 import { join } from "path";
-import { RUN, SITE } from "./helpers";
+import { RUN, SITE, BASE, signIn } from "./helpers";
 import { readPid, isAlive, claimPidFile, releasePidFile, exitOnSignal, stopServer } from "../server/pid";
 import { configLines, printConfig } from "../server/config";
 import { LocalStorage, S3Storage, storageAt, seedLocalSite } from "../server/storage";
-import { loadSecret, signJwt, verifyJwt, ensureAdmin } from "../server/auth";
+import { loadSecret, signJwt, verifyJwt, ensureAdmin, requireAuth } from "../server/auth";
 import { handleError } from "../server/routes/error";
 import { fromSite, viewLine, logView } from "../server/log";
 import { scaffoldNotice } from "../server/scaffold";
@@ -527,6 +527,15 @@ describe("auth", () => {
     expect(await verifyJwt(good.slice(0, -2) + "AA")).toBeNull(); // signature altered
     expect(await verifyJwt(await signJwt({ sub: "admin", exp: now - 1 }))).toBeNull(); // expired
     expect(await verifyJwt("a.b.c!")).toBeNull(); // not base64
+  });
+
+  test("requireAuth: nothing for someone signed in, else what the routes refuse with", async () => {
+    const ask = (headers: Record<string, string>) => requireAuth(new Request(`${BASE}/edit/pages/a.md`, { headers }) as never);
+    expect(await ask({ cookie: await signIn() })).toBeNull();
+    expect((await ask({}))!.status).toBe(401);
+    const page = (await ask({ accept: "text/html" }))!;
+    expect(page.status).toBe(302);
+    expect(page.headers.get("location")).toBe("/login?next=%2Fedit%2Fpages%2Fa.md");
   });
 
   test("ensureAdmin writes the environment's admin, and only when it changes", async () => {

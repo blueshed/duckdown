@@ -2,7 +2,6 @@ import { createElement, signal, computed, list, when, batch } from "@blueshed/ra
 import { PaneHeader } from "./PaneHeader";
 import { Icon } from "./Icon";
 import { api, apiJson, urlPath } from "../api";
-import { speak } from "../notice";
 import { collection, closeCollection, collectionChanged, reloadBrowser, shortName } from "../store";
 import { languageName, refreshTranslations, isBehind, SAYS } from "../translations";
 import { judge, type Standing } from "../../standing";

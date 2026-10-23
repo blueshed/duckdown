@@ -1,5 +1,5 @@
 import type { BunRequest } from "bun";
-import { requireAuth } from "../auth";
+import { signedIn } from "../auth";
 import { createPageStorage } from "../storage";
 import { languagesOf, splitLanguage, translationDraft, stamped, newLanguage, languageName, type Languages } from "../languages";
 import { translationStandings } from "../translations";
@@ -42,10 +42,8 @@ async function source(key: string): Promise<string | Response> {
   return text;
 }
 
-export const handleTranslations = {
+export const handleTranslations = signedIn({
   async GET(req: BunRequest) {
-    const denied = await requireAuth(req);
-    if (denied) return denied;
     const params = new URL(req.url).searchParams;
     const languages = await languagesOf(pages);
 
@@ -78,8 +76,6 @@ export const handleTranslations = {
   },
 
   async POST(req: BunRequest) {
-    const denied = await requireAuth(req);
-    if (denied) return denied;
     const params = new URL(req.url).searchParams;
     const lang = params.get("stamp");
     if (lang === null) return refused("Nothing to do", 404);
@@ -89,4 +85,4 @@ export const handleTranslations = {
     if (found instanceof Response) return found;
     return new Response(stamped(await req.text(), found), { headers: { "Content-Type": "text/plain; charset=utf-8" } });
   },
-};
+});

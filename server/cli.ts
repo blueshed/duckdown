@@ -1,15 +1,8 @@
 #!/usr/bin/env bun
 
-// `duckdown` — the server, or with `create`, a new site with duckdown installed
-// (bunx github:blueshed/duckdown create my-site), with `init`, the
-// scaffold for a site that has duckdown installed already, or
-// with `user`, who can sign in, with `publish` and `pull`, the remote, with
-// `report`, the view log made into a page for the editors, with `upgrade`,
-// the site moved to another tag of duckdown and its export compared, with
-// `translations`, where each translation stands and one said to be checked,
-// with `images`, the narrower widths of pictures already in static/images/, or with
-// `bucket pull|push`, a served site's content between its bucket and a folder.
+// `duckdown` — the server, or one of the commands USAGE lists.
 
+import { parseArgs } from "util";
 import { version } from "../package.json";
 import { scaffold, type Deploy } from "./init";
 
@@ -32,8 +25,15 @@ const help = async () => {
 
 // Loaded when asked for, not at the top: the server's modules read the
 // environment as they load, and `init` runs where there is no site yet.
-const commands: Record<string, (args: string[]) => Promise<number>> = {
-  create: async (args) => (await import("./create")).createCommand(args[0], { deploy: deployOf(args.slice(1)) }),
+const commands: Record<string, (args: string[], cwd: string) => Promise<number>> = {
+  create: async (args, cwd) => (await import("./create")).createCommand(args[0], { deploy: deployOf(args.slice(1)), cwd }),
+  init: async (args, cwd) => {
+    const { wrote, skipped } = await scaffold(cwd, { vendored: false, deploy: deployOf(args) });
+    for (const path of wrote) console.log(`wrote ${path}`);
+    for (const path of skipped) console.log(`left alone: ${path}`);
+    console.log("\nNext: bun install, then bun run dev, and open http://localhost:8080/edit (admin/admin).");
+    return 0;
+  },
   user: async (args) => (await import("./users")).userCommand(args),
   publish: async (args) => (await import("./remote")).remoteCommand("publish", args),
   pull: async (args) => (await import("./remote")).remoteCommand("pull", args),
@@ -47,12 +47,9 @@ const commands: Record<string, (args: string[]) => Promise<number>> = {
 
 // `--deploy up` (or `--deploy=up`): how the site reaches Railway.
 function deployOf(args: string[]): Deploy {
-  const flat = args.flatMap((arg) => (arg.startsWith("--deploy=") ? ["--deploy", arg.slice("--deploy=".length)] : [arg]));
-  const at = flat.indexOf("--deploy");
-  if (at < 0) return "github";
-  const value = flat[at + 1];
-  if (value !== "github" && value !== "up") throw new Error(`--deploy is github (the default) or up (railway up), not ${value ?? "nothing"}`);
-  return value;
+  const { deploy = "github" } = parseArgs({ args, options: { deploy: { type: "string" } }, strict: false, allowPositionals: true }).values;
+  if (deploy !== "github" && deploy !== "up") throw new Error(`--deploy is github (the default) or up (railway up), not ${typeof deploy === "string" ? deploy : "nothing"}`);
+  return deploy;
 }
 
 export async function cli(
@@ -64,32 +61,20 @@ export async function cli(
   const command = run[argv[0] ?? ""];
   if (command) {
     try {
-      return await command(argv.slice(1));
+      return await command(argv.slice(1), cwd);
     } catch (e) {
       console.error(`duckdown ${argv[0]}: ${(e as Error).message}`);
       return 1;
     }
   }
-  if (argv[0] === undefined) {
-    await start();   // the server keeps the process alive from here
-    return 0;
-  }
   // The server takes no arguments, so anything else is a command this version
   // doesn't have — a typo, or one from a newer duckdown — never the server.
-  if (argv[0] !== "init") {
+  if (argv[0] !== undefined) {
     console.error(`duckdown: ${argv[0]} isn't a command here (duckdown ${version}); duckdown --help lists them`);
     return 1;
   }
-  try {
-    const { wrote, skipped } = await scaffold(cwd, { vendored: false, deploy: deployOf(argv.slice(1)) });
-    for (const path of wrote) console.log(`wrote ${path}`);
-    for (const path of skipped) console.log(`left alone: ${path}`);
-    console.log("\nNext: bun install, then bun run dev, and open http://localhost:8080/edit (admin/admin).");
-    return 0;
-  } catch (e) {
-    console.error(`duckdown init: ${(e as Error).message}`);
-    return 1;
-  }
+  await start();   // the server keeps the process alive from here
+  return 0;
 }
 
 // Only when run, never on import: the tests call cli() directly.

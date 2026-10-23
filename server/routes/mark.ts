@@ -1,5 +1,5 @@
 import type { BunRequest } from "bun";
-import { requireAuth } from "../auth";
+import { signedIn } from "../auth";
 import { parsePage, pageHtml, itemPage, type DraftTemplate } from "../page";
 import { createPageStorage, createStaticStorage } from "../storage";
 import { canonicalPath } from "../utils";
@@ -15,7 +15,7 @@ const files = createStaticStorage();
 
 type MarkRequest = { source: string; draft?: DraftTemplate; through?: string };
 
-export const handleMark = {
+export const handleMark = signedIn({
   // The preview, rendered the way the site renders: the page's markdown inside
   // the template it asks for, with the nav, its stylesheets and the rest
   // filled in. It used to build a shell of its own, which looked close enough
@@ -27,8 +27,6 @@ export const handleMark = {
   // it is the template this page wears; `through` renders in exactly the
   // template given, which is how the editor previews one with no page open.
   async PUT(req: BunRequest) {
-    const denied = await requireAuth(req);
-    if (denied) return denied;
     const path = new URL(req.url).searchParams.get("path") ?? "";
     const { source, draft, through } = (await req.json()) as MarkRequest;
     const page = parsePage(path, source);
@@ -62,4 +60,4 @@ export const handleMark = {
     if (dead.length) problems.push(`Links that lead nowhere a reader can go: ${dead.join(", ")}`);
     return Response.json({ html, layout, includes, meta: page.meta, problems });
   },
-};
+});

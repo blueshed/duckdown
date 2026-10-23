@@ -17,18 +17,15 @@ function crumbsThen(): Crumb[] | null {
   const p = past.get();
   if (!p) return null;
   const s = seen.get();
-  const away = (go: () => void) => () => { leavePast(); go(); };
-  const root: Crumb = { label: "duckie", go: away(() => openFolder("")) };
+  const away = (to: string) => { leavePast(); openFolder(to); };
   if (p.kind === "deleted") {
-    return [root, { label: "Deleted", go: s ? lookAtNow : undefined }, ...(s ? [{ label: s.entry.key }] : [])];
+    return [...folderCrumbs("duckie", "", away), { label: "Deleted", go: s ? lookAtNow : undefined }, ...(s ? [{ label: s.entry.key }] : [])];
   }
   // A page's versions are in its folder; a template's or a stylesheet's are its own.
   const page = p.url.startsWith("/edit/pages/");
   const own = page ? folderOf(p.name) : "";
-  const parts = own ? own.split("/") : [];
   return [
-    root,
-    ...parts.map((part, i) => ({ label: part, go: away(() => openFolder(parts.slice(0, i + 1).join("/"))) })),
+    ...folderCrumbs("duckie", own, away),
     { label: page ? p.name.slice(own ? own.length + 1 : 0) : p.name, go: leavePast },
     { label: s ? s.entry.label : "Earlier versions" },
   ];
@@ -38,9 +35,7 @@ export function crumbsHere(): Crumb[] {
   const then = crumbsThen();
   if (then) return then;
   const here = folder.get();
-  const parts = here ? here.split("/") : [];
-  const out: Crumb[] = [{ label: "duckie", go: () => openFolder("") }];
-  parts.forEach((part, i) => out.push({ label: part, go: () => openFolder(parts.slice(0, i + 1).join("/")) }));
+  const out = folderCrumbs("duckie", here, openFolder);
   const fp = filePath.get();
   if (fp && folderOf(fp) === here) out.push({ label: fp.slice(here ? here.length + 1 : 0) });
   return out;

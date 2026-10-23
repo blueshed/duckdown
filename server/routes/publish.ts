@@ -1,5 +1,5 @@
 import type { BunRequest } from "bun";
-import { requireAuth, getUser } from "../auth";
+import { signedIn } from "../auth";
 import { remoteFrom, publishSite, RemoteRefused, type Remote } from "../remote";
 import { siteChanged } from "../kept";
 
@@ -25,19 +25,14 @@ export function publishRoutes(
     }
   };
 
-  return {
+  return signedIn({
     async GET(req: BunRequest) {
-      const denied = await requireAuth(req);
-      if (denied) return denied;
       if (!remote) return Response.json(null);
       return answer(() => remote.status());
     },
 
-    async POST(req: BunRequest) {
-      const denied = await requireAuth(req);
-      if (denied) return denied;
+    async POST(req: BunRequest, by: string) {
       if (!remote) return none();
-      const by = (await getUser(req))!;
       if (new URL(req.url).searchParams.has("pull")) {
         return answer(async () => {
           const pulled = await remote.pull(by);
@@ -51,7 +46,7 @@ export function publishRoutes(
         message: typeof message === "string" ? message : "", by, checks, strict: strict(),
       }));
     },
-  };
+  });
 }
 
 export const handlePublish = publishRoutes(remoteFrom());

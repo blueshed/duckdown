@@ -1,5 +1,5 @@
 import type { BunRequest } from "bun";
-import { requireAuth } from "../auth";
+import { signedIn } from "../auth";
 import { createStaticStorage, createTemplateStorage, createPageStorage, storageAt } from "../storage";
 import { History, HISTORY_PATH } from "../history";
 import { rootFile } from "../base";
@@ -114,18 +114,14 @@ async function put(name: string, bytes: Uint8Array): Promise<void> {
   await statics.write(name, bytes);
 }
 
-export const handleSiteIcon = {
+export const handleSiteIcon = signedIn({
   async GET(req: BunRequest) {
-    const denied = await requireAuth(req);
-    if (denied) return denied;
     return Response.json(await answer());
   },
 
   // The icons: both or neither — a tab and a home screen showing two
   // different icons is worse than either one old. With ?card, the card.
   async POST(req: BunRequest) {
-    const denied = await requireAuth(req);
-    if (denied) return denied;
     const form = await req.formData();
     const card = new URL(req.url).searchParams.has("card");
     const wanted: [string, "png" | "jpeg", number, number][] = card
@@ -147,8 +143,6 @@ export const handleSiteIcon = {
 
   // ?card only: the icons are never taken away, only replaced.
   async DELETE(req: BunRequest) {
-    const denied = await requireAuth(req);
-    if (denied) return denied;
     if (!new URL(req.url).searchParams.has("card")) return new Response("Only the card can be taken away", { status: 400 });
     if (await statics.exists(CARD.name)) {
       await history.save(CARD.name, await statics.readBytes(CARD.name), true);
@@ -157,4 +151,4 @@ export const handleSiteIcon = {
     siteChanged();
     return Response.json(await answer());
   },
-};
+});

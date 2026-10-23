@@ -1,39 +1,25 @@
-import { createElement, signal, computed, effect } from "@blueshed/railroad";
+import { createElement, computed } from "@blueshed/railroad";
 import { PaneHeader } from "./PaneHeader";
 import { TranslationBar } from "./Translations";
 import { urlPath } from "../api";
-import { filePath, editorContent, saveFile, deleteFile, closeFile, loadFile, moveFile, shortName } from "../store";
+import { filePath, editorContent, fileDirty, saveFile, deleteFile, closeFile, loadFile, moveFile, shortName } from "../store";
 
 export function Editor() {
-  const dirty = signal(false);
   const fp = computed(() => filePath.get() || "");
   const shown = computed(() => shortName(fp.get()));
-
-  const save = async () => {
-    if (await saveFile()) dirty.set(false);
-  };
 
   const onkeydown = (e: KeyboardEvent) => {
     if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
       e.preventDefault();
-      if (dirty.peek()) save();
+      if (fileDirty.peek()) saveFile();
     }
   };
 
-  const oninput = (e: Event) => {
-    editorContent.set((e.target as HTMLTextAreaElement).value);
-    dirty.set(true);
-  };
-
-  // A new file starts clean.
-  effect(() => {
-    filePath.get();
-    dirty.set(false);
-  });
+  const oninput = (e: Event) => editorContent.set((e.target as HTMLTextAreaElement).value);
 
   return (
     <div class="editor-area">
-      <PaneHeader icon="file-text" name={fp} shown={shown} dirty={dirty} onsave={save} ondelete={deleteFile} onclose={closeFile}
+      <PaneHeader icon="file-text" name={fp} shown={shown} dirty={fileDirty} onsave={saveFile} ondelete={deleteFile} onclose={closeFile}
         url={() => `/edit/pages/${urlPath(fp.peek())}`} onrestored={() => loadFile(fp.peek())} onmove={moveFile} />
       <TranslationBar />
       <textarea aria-label={computed(() => `Contents of ${fp.get()}`)} value={editorContent} onkeydown={onkeydown} oninput={oninput} />

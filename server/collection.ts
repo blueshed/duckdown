@@ -129,8 +129,8 @@ const text = (value: unknown): string | null =>
 
 function images(raw: unknown, problems: string[]): Images {
   if (raw === undefined) return ownImages();
-  const said = typeof raw === "string" ? { src: raw } : raw as Raw;
-  if (typeof said !== "object" || said === null || Array.isArray(said)) {
+  const said = typeof raw === "string" ? { src: raw } : raw;
+  if (!isRaw(said)) {
     problems.push(`"images" should be a base URL or an object, not ${JSON.stringify(raw)} — the default is used`);
     return ownImages();
   }
@@ -177,11 +177,11 @@ function fieldsOf(raw: unknown, problems: string[], where: string): Field[] | nu
 
 function labelsOf(raw: unknown): Record<string, Record<string, string>> {
   const out: Record<string, Record<string, string>> = {};
-  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return out;
-  for (const [field, values] of Object.entries(raw as Raw)) {
-    if (typeof values !== "object" || values === null || Array.isArray(values)) continue;
+  if (!isRaw(raw)) return out;
+  for (const [field, values] of Object.entries(raw)) {
+    if (!isRaw(values)) continue;
     const map: Record<string, string> = {};
-    for (const [value, label] of Object.entries(values as Raw)) {
+    for (const [value, label] of Object.entries(values)) {
       const said = text(label);
       if (said !== null) map[value] = said;
     }
@@ -194,9 +194,8 @@ function labelsOf(raw: unknown): Record<string, Record<string, string>> {
 // flattened into the one order prev/next runs in.
 export function parseCollection(folder: string, source: string): Collection {
   const problems: string[] = [];
-  const raw = rawObject(collectionPath(folder), source, problems) ?? {};
-
   const where = collectionPath(folder);
+  const raw = rawObject(where, source, problems) ?? {};
   const picture = images(raw.images, problems);
   const declared = fieldsOf(raw.fields, problems, where);
   const fields = declared ?? PLAIN;
@@ -253,7 +252,7 @@ export function parseCollection(folder: string, source: string): Collection {
     // A slug the file states has to be a slug; one that isn't is said so and
     // cleaned rather than served, because a bad address is the whole bug.
     if (fields.slug !== undefined && !SLUG.test(fields.slug)) {
-      problems.push(`${collectionPath(folder)}: slug "${fields.slug}" isn't [a-z0-9-] — using "${slugify(fields.slug)}"`);
+      problems.push(`${where}: slug "${fields.slug}" isn't [a-z0-9-] — using "${slugify(fields.slug)}"`);
     }
     const slug = slugOf(fields.slug ?? null, title);
     const src = fields[collection.image] ?? "";
@@ -288,7 +287,7 @@ export function parseCollection(folder: string, source: string): Collection {
 // Kept like the nav and the search index (kept.ts): collection.json is
 // written through the pages route like any page. What was said about the
 // files starts again with them.
-const loaded = kept(read, () => warned.clear());
+export const loadCollection = kept(read, () => warned.clear());
 
 // Said once, not per request: a warning repeated on every page view is noise.
 const warned = new Set<string>();
@@ -349,9 +348,6 @@ async function read(pages: Storage, folder: string, debug: boolean): Promise<Col
   for (const problem of collection.problems) console.error(problem);
   return collection;
 }
-
-export const loadCollection = (pages: Storage, folder: string, debug = DEBUG): Promise<Collection | null> =>
-  loaded(pages, folder, debug);
 
 // The item a request names, with the collection it belongs to, or null.
 // `name` is the path with its extension and trailing slash already off
@@ -740,13 +736,9 @@ export function itemsHtml(collection: Collection, by?: string, sort?: string, te
 // item, and the group the item on this page belongs to marked. On a page that
 // is not an item it is the same menu with nothing marked, which is how a home
 // page carries it.
-function groupItems(group: Group): Item[] {
-  return [...group.items, ...group.groups.flatMap(groupItems)];
-}
-
 function groupLinks(groups: Group[], linked: boolean, current?: Group): string {
   const items = groups.map((group) => {
-    const first = linked ? groupItems(group)[0] : undefined;
+    const first = linked ? allGroups([group]).find((g) => g.items.length)?.items[0] : undefined;
     const mark = group === current ? ' aria-current="true"' : "";
     const label = escapeHtml(group.label);
     const link = first ? `<a href="${encodeURI(first.href)}"${mark}>${label}</a>` : `<span${mark}>${label}</span>`;
@@ -891,8 +883,8 @@ export async function fillCollections(
   o: { pages: Storage; folder: string; context?: ItemContext; debug?: boolean; template?: (name: string) => Promise<string | null> },
 ): Promise<string> {
   if (!html.includes("{{")) return html;
-  const parts = html.split(/(<code[^>]*>[\s\S]*?<\/code>)/);
-  const tags = parts.filter((_, i) => i % 2 === 0).flatMap((part) => [...part.matchAll(TAG)]);
+  const tags: RegExpExecArray[] = [];
+  outsideCode(html, (part) => (tags.push(...part.matchAll(TAG)), part));
   if (!tags.length) return html;
 
   const done = new Map<string, string>();
@@ -921,8 +913,7 @@ export async function fillCollections(
     done.set(whole, itemsHtml(collection, options.by, options.sort, template));
   }
 
-  const fill = (part: string) => part
+  return outsideCode(html, (part) => part
     .replace(WRAPPED, (_, whole: string) => done.get(whole) ?? whole)
-    .replace(TAG, (whole) => done.get(whole) ?? whole);
-  return parts.map((part, i) => (i % 2 ? part : fill(part))).join("");
+    .replace(TAG, (whole) => done.get(whole) ?? whole));
 }

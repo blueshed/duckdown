@@ -425,6 +425,23 @@ describe("the bar over the open page", () => {
     dispose();
   });
 
+  test("Mark up to date saves what was typed, and the page is no longer unsaved", async () => {
+    // It saves through the store, not the editor's own Save, which is what
+    // used to clear the dot: it stayed on over a page that was saved.
+    await welsh();
+    await loadFile("cy/about.md");
+    const { host, dispose } = render(() => <Editor />);
+    const area = host.querySelector("textarea")!;
+    area.value = `${area.value}\nA line more.`;
+    area.dispatchEvent(new Event("input"));
+    expect(host.querySelector(".dot")).not.toBeNull();
+    click(button(host, "Mark up to date")!);
+    await waitFor(() => host.querySelector(".translation-state")!.textContent === "up to date");
+    expect(host.querySelector(".dot")).toBeNull();
+    expect(await read("cy/about.md")).toContain("A line more.");
+    dispose();
+  });
+
   test("a page of the language's own has no original to go to, and nothing to catch up with", async () => {
     await welsh();
     filePath.set("cy/lleol.md");
@@ -594,8 +611,11 @@ describe("the Translations drawer", () => {
 });
 
 describe("a collection's words in a language", () => {
-  const pane = () => document.querySelector(".panel-collection")!;
-  const field = (slug: string, name: string) => pane().querySelector(`#tr-${slug}-${name}`) as HTMLInputElement;
+  // The pane this test rendered, never the document's first: editor.test.tsx
+  // leaves the whole app mounted, and where its files run first (Linux lists
+  // them in another order than macOS) that app opens a pane of its own.
+  let pane: Element;
+  const field = (slug: string, name: string) => pane.querySelector(`#tr-${slug}-${name}`) as HTMLInputElement;
   const edit = (el: Element, value: string) => {
     (el as HTMLInputElement).value = value;
     el.dispatchEvent(new Event("change"));
@@ -606,6 +626,7 @@ describe("a collection's words in a language", () => {
     openCollection("cy/gallery", "cy");
     const rendered = render(() => <CollectionTranslation />);
     await waitFor(() => rendered.host.querySelector(".translation-item"));
+    pane = rendered.host;
     return rendered;
   };
 
@@ -697,6 +718,7 @@ describe("a collection's words in a language", () => {
     openCollection("cy/gallery", "cy");
     const { host, dispose } = render(() => <CollectionTranslation />);
     await waitFor(() => host.querySelector(".translation-item"));
+    pane = host;
     expect(items(host).every((i) => i.querySelector(".translation-state")!.textContent === "not translated yet")).toBe(true);
     edit(field("first-light", "title"), "Golau");
     click(button(host, "Save")!);

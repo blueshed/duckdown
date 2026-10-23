@@ -211,11 +211,7 @@ export async function reportCommand(
     throw new Error("No view lines in what was read: pipe in the site's log, and check DUCKDOWN_LOG=1 is set where it runs");
   }
   const today = now.toISOString().slice(0, 10);
-  const days = new Map<string, View[]>();
-  for (const v of views) {
-    const date = dayOf(v.at) ?? today;
-    days.set(date, [...(days.get(date) ?? []), v]);
-  }
+  const days = Map.groupBy(views, (v) => dayOf(v.at) ?? today);
   const months = new Set<string>();
   for (const [date, lines] of [...days].sort(([a], [b]) => a.localeCompare(b))) {
     const key = `${date.slice(0, 7)}/${date}.md`;

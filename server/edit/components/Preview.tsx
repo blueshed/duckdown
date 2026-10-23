@@ -1,5 +1,5 @@
 import { createElement, signal, computed, effect } from "@blueshed/railroad";
-import { apiJson } from "../api";
+import { rendered } from "../api";
 import { editorContent, filePath, pageLayout, pageIncludes, resource, resourceDraft, collectionRevision, opening } from "../store";
 import { speak, hush, notice } from "../notice";
 import { PreviewFrame } from "./PreviewFrame";
@@ -23,12 +23,7 @@ export function Preview() {
   let shown = "";
 
   const update = async (source: string, draft: { name: string; body: string } | undefined) => {
-    const path = encodeURIComponent(filePath.peek() || "");
-    const data = await apiJson<Rendered>("render the preview", `/edit/mark/?path=${path}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ source, draft }),
-    });
+    const data = await rendered<Rendered>("render the preview", filePath.peek() || "", { source, draft });
     if (!data) {
       arriving.set(false);
       return;

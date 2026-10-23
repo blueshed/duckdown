@@ -1,5 +1,5 @@
 import { cpSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "fs";
-import { join, relative } from "path";
+import { join } from "path";
 import { tmpdir } from "os";
 
 // `duckdown upgrade [tag]`, run in a site that has duckdown as a dependency:
@@ -55,12 +55,8 @@ export function changesBetween(changelog: string, from: string, to: string): str
 }
 
 // Every file under `dir`, by its path inside it.
-function files(dir: string, at = dir): string[] {
-  return readdirSync(at).flatMap((name) => {
-    const path = join(at, name);
-    return statSync(path).isDirectory() ? files(dir, path) : [relative(dir, path)];
-  });
-}
+const files = (dir: string) =>
+  readdirSync(dir, { recursive: true, encoding: "utf8" }).filter((path) => statSync(join(dir, path)).isFile());
 
 // What an export writes differently: files it adds, drops, or changes.
 export function compare(before: string, after: string): { same: number; added: string[]; removed: string[]; changed: string[] } {
@@ -82,11 +78,7 @@ export function compare(before: string, after: string): { same: number; added: s
 // notes below the list aren't scrolled away.
 const FOLDED = 5;
 export function folded(paths: string[]): string[] {
-  const byFolder = new Map<string, string[]>();
-  for (const path of paths) {
-    const folder = path.includes("/") ? path.slice(0, path.indexOf("/") + 1) : "";
-    byFolder.set(folder, [...(byFolder.get(folder) ?? []), path]);
-  }
+  const byFolder = Map.groupBy(paths, (path) => path.slice(0, path.indexOf("/") + 1));
   return [...byFolder].flatMap(([folder, list]) =>
     folder && list.length > FOLDED ? [`${folder} (${list.length} files)`] : list);
 }

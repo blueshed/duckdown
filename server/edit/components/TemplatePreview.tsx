@@ -1,5 +1,5 @@
 import { createElement, signal, effect } from "@blueshed/railroad";
-import { apiJson } from "../api";
+import { rendered } from "../api";
 import { resourceDraft } from "../store";
 import { PreviewFrame } from "./PreviewFrame";
 
@@ -33,11 +33,7 @@ export function TemplatePreview() {
   effect(() => {
     const through = resourceDraft.get();
     const timer = setTimeout(async () => {
-      const data = await apiJson<{ html: string }>("render the template", "/edit/mark/?path=index.md", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ source: SAMPLE, through }),
-      });
+      const data = await rendered<{ html: string }>("render the template", "index.md", { source: SAMPLE, through });
       if (data) html.set(data.html);
     }, 300);
     return () => clearTimeout(timer);

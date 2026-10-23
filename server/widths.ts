@@ -4,6 +4,8 @@ import { DEBUG } from "./config";
 import { kept } from "./kept";
 import { WIDTHS, WIDTH_NAME, widthName, imageUrl } from "./images";
 import { hidden } from "./listed";
+import { folderOf } from "./markdown";
+import { joinKey } from "./slugs";
 
 // A picture in static/images/ kept at narrower widths too, so a phone is sent
 // the 960 rather than a 4000-pixel original (n162). They are made when a
@@ -19,11 +21,10 @@ export type Widths = Record<string, { width: number; widths: number[] }>;   // a
 const images = createImageStorage();
 const FORMATS = [".jpg", ".jpeg", ".png", ".webp"];   // what Bun.Image reads and writes; SVG needs none
 
-const folderOf = (key: string) => (key.includes("/") ? key.slice(0, key.lastIndexOf("/")) : "");
-const manifestKey = (folder: string) => (folder ? `${folder}/${MANIFEST}` : MANIFEST);
+const nameOf = (key: string) => key.slice(key.lastIndexOf("/") + 1);
 
 async function manifestOf(store: Storage, folder: string): Promise<Widths> {
-  const key = manifestKey(folder);
+  const key = joinKey(folder, MANIFEST);
   return await store.exists(key) ? JSON.parse(await store.read(key)) as Widths : {};
 }
 
@@ -48,10 +49,10 @@ export async function makeWidths(key: string, bytes: Uint8Array, store: Storage 
   }
   const folder = folderOf(key);
   const manifest = await manifestOf(store, folder);
-  const name = key.slice(folder ? folder.length + 1 : 0);
+  const name = nameOf(key);
   if (made.length) manifest[name] = { width: meta.width, widths: made };
   else delete manifest[name];
-  await store.write(manifestKey(folder), JSON.stringify(manifest, null, 1));
+  await store.write(joinKey(folder, MANIFEST), JSON.stringify(manifest, null, 1));
   return made;
 }
 
@@ -82,7 +83,7 @@ export async function imagesCommand(say: (line: string) => void = console.log, s
 
 // What a page's pictures need to know, per folder, kept like everything else
 // the site knows about itself: an upload calls siteChanged().
-const manifests = kept((store, folder) => manifestOf(store, folder));
+const manifests = kept(manifestOf);
 
 const IMG = /<img\b[^>]*?\bsrc="\/static\/images\/([^"]+)"[^>]*>/g;
 
@@ -96,7 +97,7 @@ export async function withWidths(html: string, store: Storage = images, debug = 
   for (const [, src] of found) {
     const key = decodeURI(src!);
     const folder = folderOf(key);
-    const entry = (await manifests(store, folder, debug))[key.slice(folder ? folder.length + 1 : 0)];
+    const entry = (await manifests(store, folder, debug))[nameOf(key)];
     if (entry) {
       const url = (name: string) => imageUrl("/static/images/", name);
       sets.set(src!, [...entry.widths.map((w) => `${url(widthName(key, w))} ${w}w`), `${url(key)} ${entry.width}w`].join(", "));

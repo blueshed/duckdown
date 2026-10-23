@@ -1,5 +1,5 @@
 import type { BunRequest } from "bun";
-import { requireAuth } from "../auth";
+import { signedIn } from "../auth";
 import { createImageStorage, createPageStorage } from "../storage";
 import { IMAGES_PATH } from "../config";
 import { loadCollection, collectionPath, collectionProblems } from "../collection";
@@ -62,10 +62,8 @@ const folderOf = (req: BunRequest) => after(req, "/edit/collection/").replace(/\
 const missing = (folder: string) =>
   new Response(`There is no ${collectionPath(folder)}`, { status: 404 });
 
-export const handleCollectionFiles = {
+export const handleCollectionFiles = signedIn({
   async GET(req: BunRequest) {
-    const denied = await requireAuth(req);
-    if (denied) return denied;
     const folder = folderOf(req);
     const collection = await loadCollection(pages, folder);
     if (!collection) return missing(folder);
@@ -82,8 +80,6 @@ export const handleCollectionFiles = {
   // place — same name, so collection.json doesn't change and every address the
   // item already has goes on working.
   async POST(req: BunRequest) {
-    const denied = await requireAuth(req);
-    if (denied) return denied;
     const folder = folderOf(req);
     const collection = await loadCollection(pages, folder);
     if (!collection) return missing(folder);
@@ -129,4 +125,4 @@ export const handleCollectionFiles = {
       v: Bun.hash(bytes).toString(36),
     });
   },
-};
+});

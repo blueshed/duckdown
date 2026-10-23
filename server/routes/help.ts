@@ -1,6 +1,6 @@
 import type { BunRequest } from "bun";
 import { join } from "path";
-import { requireAuth } from "../auth";
+import { signedIn } from "../auth";
 import { renderMarkdown } from "../markdown";
 import { DEBUG } from "../config";
 import { escapeHtml } from "../utils";
@@ -61,10 +61,8 @@ export function helpSections(dir = HELP_DIR, debug = DEBUG): Promise<HelpSection
   return kept;
 }
 
-export const handleHelp = {
+export const handleHelp = signedIn({
   async GET(req: BunRequest) {
-    const denied = await requireAuth(req);
-    if (denied) return denied;
     return Response.json({ sections: await helpSections() });
   },
-};
+});

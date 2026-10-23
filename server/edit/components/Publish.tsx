@@ -1,11 +1,11 @@
-import { createElement, signal, computed, effect, list, when } from "@blueshed/railroad";
-import { api } from "../api";
+import { createElement, signal, computed, list, when } from "@blueshed/railroad";
+import { api, asJson } from "../api";
 import { tell } from "../notice";
 import { Icon } from "./Icon";
 import { Drawer } from "./Drawer";
 import {
-  browserRevision, resourceRevision, collectionRevision, reloadBrowser,
-  filePath, fileContent, editorContent, loadFile,
+  afterWrites, reloadBrowser,
+  filePath, fileDirty, loadFile,
   drawer, toggleDrawer, closeDrawer,
 } from "../store";
 
@@ -37,13 +37,7 @@ export async function refreshPublish(): Promise<void> {
 
 export function PublishButton() {
   // Again whenever something is written: a save, a resource, the collection.
-  effect(() => {
-    browserRevision.get();
-    resourceRevision.get();
-    collectionRevision.get();
-    const timer = setTimeout(refreshPublish, 400);
-    return () => clearTimeout(timer);
-  });
+  afterWrites(refreshPublish);
   return (
     <span class="publish">
       {when(() => publishState.get() !== null, () => (
@@ -85,7 +79,7 @@ export function PublishDrawer() {
   const publish = async (e: Event) => {
     e.preventDefault();
     const input = (e.target as HTMLFormElement).elements.namedItem("message") as HTMLInputElement;
-    const done = await run("publish", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: input.value }) }, URL_) as Published | null;
+    const done = await run("publish", asJson("POST", { message: input.value }), URL_) as Published | null;
     if (!done) return;
     input.value = "";
     tell(done.pushed ? `Published: ${done.pushed} commit(s) pushed` : "Nothing to publish");
@@ -108,7 +102,7 @@ export function PublishDrawer() {
     reloadBrowser();
     // The open page again, if it changed and has nothing unsaved in it.
     const open = filePath.peek();
-    if (open && done.changed.includes(`pages/${open}`) && editorContent.peek() === fileContent.peek()) await loadFile(open);
+    if (open && done.changed.includes(`pages/${open}`) && !fileDirty.peek()) await loadFile(open);
     await refreshPublish();
   };
 

@@ -187,7 +187,7 @@ duckdown/
 │   ├── setup-script.test.ts # both scaffold modes on scratch folders, and `bun run export` in each
 │   └── compose.yml         # MinIO for manual S3 runs (bun run dev:s3)
 ├── bench/                  # bun run bench: a large site made and timed (n163), the export alone and its peak memory, what a first search fetches; a fourth argument adds other languages (n184); measures, doesn't check
-├── scripts/sites.ts        # bun run sites: every site under ~/Workshop on duckdown, and where each stands (not shipped)
+├── scripts/sites.ts        # bun run sites: every site in ~/Workshop/websites on duckdown, and where each stands (not shipped)
 ├── bunfig.toml             # Test preload + the 100% coverage threshold
 ├── create/                 # `bun create blueshed/duckdown`: calls the scaffold, keeps code and tests, commits
 ├── package.json
@@ -214,103 +214,25 @@ duckdown/
 - **Auth:** JWT (HS256) via `crypto.subtle`, cookie-based
 - **Icons:** Lucide (`lucide-static` named SVG-string exports, via `<Icon name="..." />`)
 
-## Bun HTML Imports
+## Bun
 
-Bun bundles frontend assets automatically via HTML imports. No manual `Bun.build()` needed.
+`Bun.serve()` routes, and HTML imports: `import homepage from "./edit/index.html"` bundles the `.tsx` and `.css` that file names, with no build step. `development: true` re-bundles each request, with HMR; production caches and minifies.
 
-```ts
-import homepage from "./edit/index.html";
-
-Bun.serve({
-  routes: { "/edit": homepage },
-  development: true, // HMR, source maps, re-bundle on each request
-});
-```
-
-The HTML file references source files directly. Bun handles transpilation and bundling:
-
-```html
-<link rel="stylesheet" href="./styles.css" />
-<script type="module" src="./app.tsx"></script>
-```
-
-### Dev vs Production
-
-- `development: true` — HMR, source maps, no minification, re-bundles per request
-- `development: false` — caches bundles, minifies, adds Cache-Control/ETag headers
-
-## Bun Routes
-
-```ts
-routes: {
-  "/edit": homepage,                    // HTML import (auto-bundled)
-  "/health": new Response("OK"),        // Static response
-  "/api/items": { GET, POST, PUT, DELETE }, // Per-method handlers
-  "/api/items/:id": handler,            // Dynamic params — req.params.id
-  "/files/*": handler,                  // Wildcard (see note below)
-},
-fetch(req) { ... },                     // Catch-all fallback
-```
-
-**Wildcard note (still true as of Bun 1.4.4):** `req.params["*"]` is empty. Parse the URL instead:
-
-```ts
-function after(req: BunRequest, prefix: string): string {
-  return new URL(req.url).pathname.slice(prefix.length);
-}
-```
+**Wildcard routes (still true as of Bun 1.4.4):** `req.params["*"]` is empty, so a `"/files/*"` handler reads its path itself: `after(req, prefix)` in utils.ts.
 
 ## Railroad
 
-Package: `@blueshed/railroad`, from npm (`^0.14.0`). Signals + JSX + routes — real DOM, no virtual DOM.
+`@blueshed/railroad` from npm (`^0.14.0`): signals, JSX (`jsxFactory: createElement`), real DOM, no virtual DOM. It ships two Claude Code skills, copied into `.claude/skills/` and pinned to the installed version: **`railroad`** (the failure modes that bite: use it whenever writing railroad JSX) and **`bun-route`** (HTML routes, and `Bun.WebView` tests). After upgrading railroad, refresh them: `cp -r node_modules/@blueshed/railroad/.claude/skills/* .claude/skills/`.
 
-Railroad ships two Claude Code skills, installed in `.claude/skills/`: **`railroad`** (the checklist of failure modes that actually bite — use it whenever writing railroad JSX) and **`bun-route`** (scaffolding HTML routes, and `Bun.WebView` tests). They're copies, pinned to the installed version: after upgrading railroad, refresh them with `cp -r node_modules/@blueshed/railroad/.claude/skills/* .claude/skills/`. The notes below are the duckdown-specific ones.
+What has bitten duckdown, by the version that changed it:
 
-### TSX Config (tsconfig.json)
-
-```json
-{
-  "compilerOptions": {
-    "jsx": "react",
-    "jsxFactory": "createElement",
-    "jsxFragmentFactory": "Fragment"
-  }
-}
-```
-
-### Components
-
-```tsx
-import { createElement, signal, effect, when, list } from "@blueshed/railroad";
-
-// Components are functions that return DOM nodes
-function Greeting({ name }: { name: string }) {
-  return <div>Hello {name}</div>;
-}
-
-// Reactive state with signals
-const count = signal(0);
-function Counter() {
-  return <button onclick={() => count.update(n => n + 1)}>Count: {count}</button>;
-}
-```
-
-### Key Patterns
-
-- **`signal(value)`** — reactive state, auto-updates DOM when changed
-- **`computed(fn)`** — derived signal from other signals
-- **`effect(fn)`** — side-effect that re-runs when dependencies change, returns dispose
-- **`when(sig, truthy, falsy?)`** — conditional rendering, swaps on truthiness transitions only. Since 0.14 the truthy branch is handed `v$`, a signal of the current value, for a branch that must follow the value while it stays truthy; a branch passed by reference (`when(x, chosenPanel)`) receives it too, so it must take no argument it means otherwise.
-- **`list(sig, keyFn, render)`** — keyed list rendering with DOM diffing. **`render` gets a signal per row, not the item** (railroad 0.11): `row$.map(r => r.name)` for text, `row$.peek()` in handlers. Reading it as the item left the file list empty in 0.0.2's upgrade.
-- **Function children and props** — `{() => expr}` is a reactive text node (0.11 removed `text()`), and since 0.12 a function prop is reactive too (`class={() => …}`), as a signal prop always was. A boolean child renders nothing (0.13): `{flag.map(String)}` to show one.
-- **`batch(fn)`** — group updates into a single flush
-- **`effect(fn)` may return a cleanup**, run before its next run and when it's disposed: the place to clear a timer (Preview's debounce). Only a returned function counts (0.13), and an effect is synchronous.
-- **An effect's run owns what its body creates** (0.12): a `computed`/`.map()`, a `when()`, a component made inside the body is disposed before the next run. Make anything long-lived in the component, outside the effect. Component bodies don't subscribe to what they read (0.13): bind a signal or a function to the DOM rather than reading `.get()` in a body and expecting it to re-run. An effect's writes reach other listeners after its body returns.
-- **Build conditional panels with `when()`**, not by swapping prebuilt nodes: a component made when it's shown starts from the current state (an iframe attached as its `srcdoc` changes can keep the old document).
-
-**`when()` and `list()` render in the `mount()` call** (since 0.12; before, on a microtask). What changes after that — a fetch landing, a signal set in a handler — still arrives later, so the tests' `waitFor` stays the way to wait for it.
-
-Don't wrap signal updates in a bare `catch {}`: a render error inside `.set()` throws back to the caller, and an empty catch hides it.
+- **`list(sig, key, render)` hands `render` a signal per row, not the item** (0.11): `row$.map(r => r.name)` for text, `row$.peek()` in handlers. Read as the item, it left 0.0.2's file list empty.
+- **`when()`'s truthy branch is handed `v$`** (0.14), the current value as a signal; a branch passed by reference (`when(x, chosenPanel)`) receives it too, so it must take no argument it means otherwise. Build a conditional panel with `when()`, not by swapping prebuilt nodes: one made as it is shown starts from the current state (an iframe kept while its `srcdoc` changes can keep the old document).
+- **A function child or prop is reactive** (`{() => expr}`, 0.11; `class={() => …}`, 0.12), and a boolean child renders nothing (0.13): `{flag.map(String)}` to show one.
+- **An effect's run owns what its body creates** (0.12), a `computed`, a `when()`, a component, and disposes it before the next run: make anything long-lived outside it. It may return a cleanup (only a function counts, 0.13), the place to clear a timer; it is synchronous, and its writes reach other listeners after its body returns.
+- **A component body doesn't subscribe to what it reads** (0.13): bind a signal or a function to the DOM rather than reading `.get()` in a body and expecting it to re-run.
+- **`when()` and `list()` render inside `mount()`** (0.12); what changes later (a fetch, a handler's `.set()`) still arrives later, so the tests `waitFor` it.
+- **No bare `catch {}` around `.set()`**: a render error throws back to the caller, and an empty catch hides it.
 
 ## Running
 
@@ -340,7 +262,7 @@ A bucket has no links, so on disk a link is what a bucket would hold once `duckd
 - **A section is the site's own folder.** pages/, static/, static/images/, templates/, reports/ or a history that is a link, or sits under one, is refused whole and said once: taken as its own root, a linked static/ served its target's files, keys and all, to anyone. It lists empty, as a bucket's would, and nothing in it is read or written.
 - **A link to a file anywhere in the site is that file** — pages/ to static/ is fine — listed, read and kept like any other, until a write replaces the link with a file of its own.
 - **Any other link is nothing there**: one out of the site; one to what is read only by its own name (`BY_NAME`: users.json, .history/, reports/), from any storage, the whole site's included, which page.ts reads the templates through; one to a folder, since two can send a walk round forever; one to nothing. It is in no listing and no `keys()`, `follows()` says so once, read, write and remove refuse it as they refuse `..`, and `exists()` answers false. Asked for by name, a link to the site's own folder, or to reports/ or .history/ themselves, lists empty.
-- **A read is of the file that was judged.** `opened()` opens it first, then judges where the file it holds really is: that path must pass, and the file there must be the very one open (device and inode). A link swapped between a check and a read handed over its new target 2,431 times in 2.8 seconds in review; now that read is refused. It is judged before it is opened too, and must be a file: a named pipe is opened only once something writes to it, and a link out to one froze the whole server. It is opened non-blocking, so one swapped in between is refused, not waited on.
+- **A read is of the file that was judged.** `opened()` opens it first, then judges where the file it holds really is: that path must pass, and the file there must be the very one open (device and inode). A link swapped between a check and a read handed over its new target again and again in review; now that read is refused. It is judged before it is opened too, and must be a file: a named pipe is opened only once something writes to it, and a link out to one froze the whole server. It is opened non-blocking, so one swapped in between is refused, not waited on.
 
 And a key, on disk and in a bucket:
 
@@ -396,7 +318,7 @@ a reader: no IP, no user agent, no cookie, no session. Keep it that way. An IP
 is personal data, and the moment one is logged the site needs a lawful basis, a
 privacy notice and a retention policy.
 
-`duckdown report` (`server/report.ts`) reads those lines back — `parseView()` sits beside `viewLine()` in log.ts, so the two can't drift — from a file argument or stdin (a platform's log as it prints it, or JSON lines with `message` and `timestamp`), and writes `reports/<yyyy-mm>/<yyyy-mm-dd>.md` — and that day's counts as `<yyyy-mm-dd>.json` (`countViews()`), from which it makes the month's `index.md` again (`monthMarkdown()`: each day linked, their sums), so the month keeps no count of its own and a day reported twice is never added twice — for each UTC day the lines cover (`dayOf()`, which reads a platform's nanoseconds; an untimed line is today's; a day reported again is replaced) for the editor's Reports tab: readers and crawlers apart, the most read, the 404s, the referring sites — and a scanner's probes counted apart and left out of all of those (`PROBES`, `isProbe()`: dot-files, PHP, other stacks' insides, secrets and configs, scripts, data and source outside `static/`), because scanners pose as browsers and were 925 of blueshed.co.uk's first 993 views. Files a page pulls in (`FILE`: `static/`, the root files, the search index, feeds) are counted apart and kept out of the views and Most read, though a missing one is still Not found; a certificate authority's check (`ACME`) is a crawler's view and not a miss. It is of exactly the lines it was given and keeps no count between runs, so overlapping logs never count twice, and it asks the platform for nothing. It is the one thing duckdown writes in `reports/`, and only when someone runs it; the server never does.
+`duckdown report` (`server/report.ts`) reads those lines back — `parseView()` sits beside `viewLine()` in log.ts, so the two can't drift — from a file argument or stdin (a platform's log as it prints it, or JSON lines with `message` and `timestamp`), and writes `reports/<yyyy-mm>/<yyyy-mm-dd>.md` — and that day's counts as `<yyyy-mm-dd>.json` (`countViews()`), from which it makes the month's `index.md` again (`monthMarkdown()`: each day linked, their sums), so the month keeps no count of its own and a day reported twice is never added twice — for each UTC day the lines cover (`dayOf()`, which reads a platform's nanoseconds; an untimed line is today's; a day reported again is replaced) for the editor's Reports tab: readers and crawlers apart, the most read, the 404s, the referring sites — and a scanner's probes counted apart and left out of all of those (`PROBES`, `isProbe()`: dot-files, PHP, other stacks' insides, secrets and configs, scripts, data and source outside `static/`), because scanners pose as browsers and were most of a new site's first views. Files a page pulls in (`FILE`: `static/`, the root files, the search index, feeds) are counted apart and kept out of the views and Most read, though a missing one is still Not found; a certificate authority's check (`ACME`) is a crawler's view and not a miss. It is of exactly the lines it was given and keeps no count between runs, so overlapping logs never count twice, and it asks the platform for nothing. It is the one thing duckdown writes in `reports/`, and only when someone runs it; the server never does.
 
 ## Failures speak
 
@@ -406,7 +328,7 @@ Nothing fails silently. In the editor, every request goes through `api(what, url
 
 A reader or an editor who uses a keyboard, a screen reader, a larger text size, less motion or High Contrast gets the same site and the same editor. Keep it that way; each of these has a test.
 
-- **Everything is reachable by keyboard.** A tree row is a `<button class="row">`, never an `<li onclick>`; a control that can't be a `<button>` (it holds a file chooser) is `role=button tabindex=0` with Enter and Space (`onpress()` in CollectionPane). Resources' tabs are `role=tab` with the arrows.
+- **Everything is reachable by keyboard.** A tree row is a `<button class="row">`, never an `<li onclick>`; a control that can't be a `<button>` (it holds a file chooser) is `role=button tabindex=0` with Enter and Space (`picturePlace()` in CollectionPane). Resources' tabs are `role=tab` with the arrows.
 - **Every dialog goes through `modal()`** (`edit/modal.ts`): shown modally, named by its heading, and focus goes back to what opened it when the dialog is dropped, not only when it is closed. A modal is for new or delete; a drawer (`Drawer.tsx`) is not a modal — the page stays in reach behind it — so it takes focus as it opens, Escape closes it, and focus goes back the same way.
 - **Everything has a name**: `aria-label` on an icon-only button, a text field, a textarea, an iframe (`title`); a state says itself (`aria-current`, `aria-pressed`, `aria-expanded`, `aria-selected`; the unsaved dot is `role=img`). What changes without a click — the notice, Saved — is said from a live region already in the page.
 - **Sizes are tokens** (`:root` in styles.css): space on a 4px grid, controls 30px, never under 28px (WCAG's minimum is 24), type in rem so the reader's own size setting reaches the editor. A pane's header answers to the pane (`@container pane`), not the window.
@@ -416,312 +338,55 @@ A reader or an editor who uses a keyboard, a screen reader, a larger text size, 
 
 ## Pages: markdown and themes
 
-`renderMarkdown(source, path)` in `markdown.ts` is Bun.markdown (GFM, heading ids and self-links, wiki links) plus three passes over its HTML: callouts (`> [!NOTE]` …), `<x-wikilink>` → `<a>`, and the contents list for `toc: true`. `path` is where the page lives, for relative wiki links: the site passes it, and so does the preview (`PUT /edit/mark/?path=`). Keep new syntax opt-in and readable as plain markdown.
+What a writer can say (front matter, markdown, navigation, collections, templates, search) is the authoring skill's, in `.claude/skills/duckdown/reference.md`, which opens with a contents list. What follows is how it is built, and the rules a change keeps.
 
-When a content feature changes (syntax, front matter, themes, navigation, the editor), update the authoring skill — `.claude/skills/duckdown/` (`SKILL.md`, `reference.md`) — the seed site's guide pages (`tests/example/pages/guide/`) and the editor's Help (`server/help/`) with it: the skill is what a session writing a site's content reads, Help what a person editing reads.
+**When a content feature changes** (syntax, front matter, themes, navigation, the editor), change the skill (`SKILL.md`, `reference.md`), the seed's guide pages (`tests/example/pages/guide/`) and the editor's Help (`server/help/`) with it: the skill is what a session writing a site's content reads, Help what a person editing reads.
 
-Styling is templates and stylesheets, and nothing else. `templates/site.html` links `static/site.css` (duckdown's base, everything drawn from CSS variables) and `static/theme.css` (this site's look, saying only what differs). There is no `theme:` key, no class on `<body>`, and no per-folder cascade: every page is styled because the template links the files, so a page can't opt in and can't forget to. Style new things through the variables so `theme.css` reaches them. For one page, `css:` links a stylesheet after the template's own; for a kind of page, `layout:` picks a template that links what that kind needs.
+**One renderer, three callers.** `page.ts` turns a page into a document: `parsePage()` first, so the site can 404 a `draft:` before the expensive part, then `pageHtml()`, its markdown in the template `layout:` asks for, every value escaped, and every placeholder filled in one pass so nothing filled is read again (n202). The site route, the preview (`routes/mark.ts`) and the export all call it, which is why the preview is a preview and not a likeness. The preview may pass an unsaved template as `draft`, used when it is the one the page wears, and `pageHtml` says which template it settled on. A new placeholder must work in the export too: if it needs a request, it can't go in `pageHtml`. `plainName()` guards `layout:` and `css:`, so a page can't climb out of the folder it names a file in.
 
-Search happens in the browser. `search.ts` builds one entry per readable page and one per section of it — url (a section's ends `#id`, read out of the rendered HTML so it can't disagree with the page), title, section, description, date, and that section's words — and `searchFiles()` cuts it into parts, the same files served (`/search/…`, `routes/search.ts`) or exported (`dist/search/`): `search/index.json` names the shards, `search/words/<xy>.json` holds every word starting with those two letters and where each is (pairs of numbers: pages on from the last, then section × 4 + where — 3 title, 2 heading, 1 description, 0 text — once per section, at its best there), and `search/pages/<n>.json` is page n's entries, just as the whole index has them. A reader's browser fetches the index, a shard per word of the query, and the pages of the results it shows — each once — so what it downloads follows what it searches (n166: at 20,000 pages the whole index was 68 MB before the first result). A word is a run of `[\p{L}\p{M}\p{N}_]` with an apostrophe (`'` or `’`, read as `'`) allowed inside, cut the same way on both sides (so "tree-lined" is two words, and "über" and "don't" one each); each letter also has a shard of its own holding `x*`, every word it starts at its best place, so a one-letter search is a prefix search as it always was and fetches that one file, and `x`, the one-letter word itself, which is all a letter cut from a longer query word matches ("v-if" is "v" and "if*", not "v*"); anything but a-z and 0-9 in a shard's file name is its code point between dashes (`-fc-b.json`: a leading `_` is a file Jekyll-based hosts won't publish, and a dash can't be in a key); a page has one name (`0.json`, never `00.json`). The link and snippet start where the text has the query's first word as typed ("docker-compose"), else its first part. The parts name each other by number and a save renumbers them, so `index.json` carries a version (a hash of the parts) that search.js asks for at each search, dropping what it kept of another; the served parts are `no-cache` with an ETag, `serve.ts` sends those three shapes (`SEARCH_PART`) `no-cache`, not a page of the site's own under `search/`, with the same ETag (`conditional()`, a hash of the bytes, compared weakly and against a list), told by the file and not the address, and search.js leaves out an entry a page doesn't have. Page numbers that survived a save would need ids other than the walk's order, and a posting list of gaps would grow with them: not done. A language has an index of its own — `/cy/search/…`, the same three kinds of file, of the pages written in it and nothing of another's — cut from the same walk by address (`entriesIn()`), served by `/:lang/search/…` (a first segment that isn't a language of the site is the site's own miss) and exported under `cy/`; `search.js` finds its own through `data-root="{{root}}"` on the form, and says what the form's `data-none` says when nothing matches. Nothing on the server searches. `/search.json`, the whole index as one file, is still served and exported, for a `search.js` from before the parts (one a reader's browser kept, or a site's own); it can go once no browser can hold the old one. Drafts are left out, because a result that 404s is worse than no result, and `server/base/search.js` is ordinary site code a site can fork by having its own. It ranks title > heading > description > body, shows at most three sections of a page, and links `url#id:~:text=…` (a text fragment, with `-` encoded), which a browser may honour, ignore, or (some Chromium builds) honour by giving up on the id as well — so `search.js` scrolls to the heading itself on `load` when the reader is still at the top. Every field matches at the start of a word, only the latest keystroke's answer is shown (the results are `aria-busy` while it fetches), and `.search-results` scrolls inside its panel. The sitemap doesn't take its addresses from the sections: `buildSite()` returns the entries and a page list, from one walk and one cache. The index is cached exactly like the nav (`kept.ts`, below). That one walk also collects the aliases — an address a page or an item used to answer at — so `aliasTarget()` costs nothing extra and expires with the index.
+**The export** (export.ts) writes each page at its one canonical address (`/` and `/blog/` as `index.html`, `about.md` as `about.html`), each item of a `collection.json` it meets and a redirect page per alias, then copies `static/`. Drafts are left out rather than hidden, and with no request `{{edit}}` is empty and `{{url}}` takes its origin from `DUCKDOWN_ORIGIN`. It reads through storage, so it exports a folder on disk or a live bucket.
 
-What the site knows about itself lives in `nav.ts`: the nav, each folder's `{{pages}}` listing, and `{{sitemap}}` (the same walk, recursive: `folderEntries()` is what both are made from, so they agree on drafts, `-` folders and order). What counts as a page is decided once, in `listed.ts`, and every walk of `pages/` asks it — the nav, `{{pages}}` and the feed, `{{sitemap}}`, search and `sitemap.xml`, the export: `hidden()` (a `.` name, shown and published nowhere), `unlisted()` (that or a `-` name: served and exported, listed nowhere), `pageKey()` (markdown, not `404.md`) and `readable()` (not a draft, not an each: page). What each walk does with the answer, and in what order, stays its own. In production both are built once and kept (`kept()` in `kept.ts`, which every such cache goes through — the listings, the sitemap, the search index, the collections, the feeds); `siteChanged()` drops them all, and the pages route calls it whenever it writes, deletes, moves or restores, as a pull does — every write goes through the server, and a new write path to pages must call it too. A build that fails isn't kept. With `DEBUG=1` they're built per request instead, so pages written straight to disk (by hand, or by a session using the authoring skill) show up at once.
+**Markdown.** `renderMarkdown(source, path)` (markdown.ts) is Bun.markdown (GFM, heading ids and self-links, wiki links) plus passes over its HTML: callouts, `<x-wikilink>` → `<a>`, the contents list for `toc: true`, and a heading's `{#id}` (`explicitIds()`, n187: Bun keeps only a-z and 0-9 in an id, so a translation states its original's; folding accents instead would move every existing anchor). `path` is where the page lives, for relative wiki links; the preview passes it as `?path=`. Keep new syntax opt-in and readable as plain markdown. Front matter takes only `KEYS` (markdown.ts) or an `x-` key, unless the block is fenced with `---`; add a key there and in `reference.md` together. A CRLF page has its front matter like any (n182), and `addMeta()`/`dropMeta()` write back the endings the page has. `nav:` on a page that is no folder's index does nothing and says so (`navIgnored()` in listed.ts, n190).
 
-`collection.ts` is a folder of pages duckdown writes, and it keeps **data** and
-**presentation** apart, because one collection is shown more than one way.
-The data is `pages/<folder>/collection.json`: declared `fields` (`{name, kind,
-label}`, kinds `text`/`long`/`image`/`number`, one `image` field — the picture)
-and groups (and subgroups) of items; an item key the fields don't declare is a
-problem. The presentation is markdown: the **each: page** in the same folder
-(any `.md` but `index.md` whose front matter says `each: true`) is the page
-every item gets at `/<folder>/<slug>/` — found by `eachPageIn()` when the
-collection loads, rendered once and kept on `Collection.each`, never served,
-listed or searched as a page itself — and any page with `{{items}}` is an
-overview (`collection: <name>` names the collection its bare tags mean). No
-each: page, no item pages: overviews show unlinked thumbnails. A file with no
-`fields` has `PLAIN` ones (`src` the picture, `title`, `caption`), the same
-three the pane adds items as; a `layout` in the data (0.4's item template)
-is a problem that says to write the each: page. It is
-read through the storage layer like everything else, so it works on disk and
-in a bucket, and it is cached exactly like the nav (`kept()`, dropped by the
-pages route's `siteChanged()`, since collection.json and its each: page live
-under `pages/` and are written through that same route; what was said once in
-the log starts again with it). With `DEBUG=1` it is read per request.
+**Styling is templates and stylesheets, and nothing else**: no `theme:` key, no class on `<body>`, no per-folder cascade. The template links `site.css` (the base, everything drawn from CSS variables) and the site's `theme.css`, so a page can't opt in or forget to. Style new things through the variables so a theme reaches them.
 
-Items flow through the same three callers as every page. `itemAt(pages, name)`
-splits an address into a folder and a slug, asks that one collection, and
-answers null for anything it doesn't hold (or when it has no each: page) —
-never a nearest match, which is what served the wrong painting on the site
-this came from. `routes/site.ts` calls it when no `.md` answers (an each: page
-answers as a miss), `export.ts` calls it while walking (a `collection.json` in
-the walk renders every item into `dist/`), and both then go through
-`itemPage()` + `pageHtml()` with the item in `PageOptions.item`: `itemBody()`
-is the each: page's html filled for the item, `itemMeta()` its front matter.
-`search.ts` meets the same file in its own walk and emits an entry and a
-`PageRef` per item, so items are in the search index and `sitemap.xml` for free.
-The preview renders an overview like any page and returns
-`collectionProblems()` beside the html, which is how the editor's Notice hears
-that a slug collides with a page.
+**What counts as a page is decided once**, in `listed.ts` (`hidden()`, `unlisted()`, `pageKey()`, `readable()`), and every walk of `pages/` asks it: the nav, `{{pages}}` and the feed, `{{sitemap}}`, search and `sitemap.xml`, the export. What each walk does with the answer, and in what order, stays its own. `nav.ts` holds the nav, each folder's `{{pages}}` and `{{sitemap}}`, all made from `folderEntries()` so they agree.
 
-`CollectionPane.tsx` edits that file as what it is: groups of works, drawn as
-pictures (a work with no picture field is its title in a box), and the chosen
-one's fields beside them — chosen by position (`Spot`, `firstWork()`), the first
-as the pane opens, a new one as it is added, and the choice follows a work that
-moves. An input per field the file declares (`fields`, as the server parses them: a line
-for text and number — values stay strings, a number may say `skip` — a box for
-long) and the `image` field as the picture; a file with no `fields` gets
-`PLAIN` from the server, and one with no image field adds items as empty rows.
-It keeps the **raw** JSON, not the parsed
-`Collection` — a parsed one has slugs and resolved URLs in it, and writing
-that back would be writing duckdown's reading of the file rather than the file
-— so every key it doesn't show survives a change untouched. Each change
-replaces the model and writes the whole file through `/edit/pages/`, serialised
-through one promise chain, which is the write path that drops all three caches;
-`collectionChanged()` then has the preview render again. The one thing it can't
-do through the folders the editor already has is put a picture where `images`
-says pictures go: `routes/collection.ts` does that (`POST` writes the original
-and a 128px thumbnail named by `thumbName()`, `GET` answers `{fields, images,
-uploads, problems}`), and `server/images.ts` holds `imageUrl()`/`thumbName()` so the
-pane and the renderer resolve the same two URLs. A collection whose `images`
-base is outside `static/images/` is read-only for pictures and says so.
-`LocalStorage.write()` writes beside the file and renames onto it, because a
-pane that writes on every change makes a torn read something you watch happen.
-A committed field edit that moves an item's address (a title is its slug) adds
-the old address to that item's `aliases` — only an address the file had when
-the pane opened it, never one a live item now answers at — and takes off an
-alias that is its address again; the news is told once the write lands. The
-pane works the addresses out with `server/slugs.ts`, the server's own rule.
-"New collection" in the tree (`createCollection()` in store.ts) writes
-`collection.json`, an `item.md` each: page and, if the folder has none, an
-`index.md` with `{{items}}`, each create-only, then opens the index with the
-pane below it.
+**What the site knows about itself is built once**: the listings, the sitemap, the search index, the collections and the feeds each go through `kept()` (kept.ts), and `siteChanged()` drops them all. The pages route calls it on every write, delete, move and restore, as a pull does: every write goes through the server, and a new write path to pages must call it too. A build that fails isn't kept. With `DEBUG=1` they are built per request, so pages written straight to disk (by hand, or by a session using the skill) show at once.
 
-Slugs are addresses, not titles (`server/slugs.ts`, read by the server and
-the pane alike): `slugify()` folds accents and keeps
-`[a-z0-9-]`, `SLUG` is the shape every slug has, duplicates take `-1`/`-2` in
-file order and a title with nothing usable in it takes `item-<n>`. Aliases —
-`aliases` on an item, repeatable front matter on a page — are collected by
-`buildSite()` and matched by `aliasTarget()` on the **decoded** path
-(`decodePath()` runs first), because a legacy address may hold a quote or a
-curly apostrophe; the site answers 301, and the export writes a redirect page
-under the decoded name — or says it can't, when the filesystem refuses that
-name or keeps it under another spelling (`lands()`), rather than crashing or
-publishing an address that won't answer.
+**Search** (what readers get: `reference.md` § Search). `search.ts` builds every entry, and the aliases, in one walk, so `aliasTarget()` costs nothing more and expires with the index; `buildSite()` returns the entries and a page list for the sitemap. `searchFiles()` cuts them into `search/index.json`, `search/words/<xy>.json` and `search/pages/<n>.json`, so a reader fetches what their query needs (n166). A word is a run of `[\p{L}\p{M}\p{N}_]` with an apostrophe inside (`’` read as `'`), cut the same way in `search.js`; each letter also has a shard of its own for `x*` and `x`. In a shard's file name anything but a-z and 0-9 is its code point between dashes (a host built on Jekyll drops a leading `_`), and a page is `0.json`, never `00.json`. A save renumbers the parts, so `index.json` carries a version that `search.js` checks at each search; the parts are `no-cache` with an ETag (`conditional()`), and `serve.ts` sends the three shapes (`SEARCH_PART`) the same way, told by the file, not the address. A language's index is cut from the same walk by address (`entriesIn()`) and served by `/:lang/search/…`. `/search.json`, the whole index, stays for a `search.js` from before the parts. `server/base/search.js` is site code a site can fork. Not done: page ids that survive a save, places as typed arrays.
 
-`{{items}}`, `{{items <collection>}}`, `{{items by=<field>}}` and `{{groups}}`
-are filled by `fillCollections()`, over the page's body (outside `<code>`, like
-`{{pages}}`) and again over the template, before `{{content}}`;
-`{{item-<field>}}` (and `{{item-<field>-label}}`, the word the collection's `labels` give that value, else the value — so a value can stay a class and its label be shown in the language of the page, n188), `{{prev}}`, `{{next}}` and `{{group}}` are filled by
-`fillItem()` in the each: page's body and in the template, and in its `title:`
-and `description:` unescaped (`itemText()`). Markdown percent-encodes braces in
-a link's address, so `fillItem()` fills `%7B%7Bitem-x%7D%7D` too. A field a
-page asks for that isn't declared is said once in the log. `{{items
-template=<name>}}` draws each item with `templates/<name>.html` through that
-same `fillItem()` — the overview's counterpart of the each: page's `layout:`;
-`page.ts` supplies the reader (`itemTemplate()`, which honours an unsaved
-draft), because templates are the site's and `collection.ts` only sees pages. Templates stay flat:
-placeholders and generated HTML, never a loop. `SKIP` ("skip") is the one value
-duckdown reads rather than shows — out of `{{items by=…}}`, and empty in
-`{{item-<field>}}` so a template's `href="…#{{item-index}}"` lands at the top.
+**Collections** (what they are to a writer: `reference.md` § Collections). `collection.ts` keeps the data (`pages/<folder>/collection.json`: `fields`, groups, items) apart from the presentation (markdown: the each: page, overviews), because one collection is shown more than one way. The each: page is found by `eachPageIn()`, rendered once onto `Collection.each`, and never served, listed or searched as a page itself. A file with no `fields` has `PLAIN` ones; a `layout` in the data (0.4's item template) is a problem that says to write the each: page. It is read through storage and cached by `kept()`.
 
-The editor edits three folders, each its own route built by `fileRoutes()`
-(`routes/files.ts`): `pages/`, `templates/` and `static/`. Each is rooted in its
-own folder, so none can reach across them — and `users.json` sits at the site
-root, in none of them, which is why the hashes stay out of the editor. Keep it
-that way when adding a section.
+- **An item is found exactly, or not at all.** `itemAt(pages, name)` asks the one collection the address names and answers null for anything it doesn't hold: never a nearest match, which served the wrong painting on the site this came from. The site route asks it when no `.md` answers (an each: page answers as a miss), the export as it walks, and both render through `itemPage()` + `pageHtml()` with `PageOptions.item` (`itemBody()` the each: page filled for the item, `itemMeta()` its front matter). Search emits an entry and a `PageRef` per item in its own walk, so items are in the index and `sitemap.xml`. The preview returns `collectionProblems()` beside the html.
+- **Placeholders.** `fillCollections()` fills `{{items…}}` and `{{groups}}` outside `<code>`, over the body and again over the template, before `{{content}}`. `fillItem()` fills `{{item-<field>}}` (and `-label`, n188), `{{prev}}`, `{{next}}` and `{{group}}` in the each: page and the template, unescaped in its `title:` and `description:` (`itemText()`), and `%7B%7Bitem-x%7D%7D` too, since markdown encodes braces in a link. `{{items template=<name>}}` reads its template through `page.ts`'s `itemTemplate()`, which honours an unsaved draft. Templates stay flat: placeholders and generated HTML, never a loop. `SKIP` is the one value read rather than shown. A field asked for and not declared is said once in the log.
+- **Slugs are addresses, not titles** (`slugs.ts`, read by the server and the pane alike): `slugify()` folds accents and keeps `[a-z0-9-]`, `SLUG` is every slug's shape, duplicates take `-1`/`-2` in file order, and a title with nothing usable takes `item-<n>`. Aliases are matched by `aliasTarget()` on the decoded path (`decodePath()` first), since an old address may hold a curly apostrophe; the site answers 301, and the export writes a redirect page, or says it can't (`lands()`) rather than publish an address that won't answer.
+- **The pane** (`CollectionPane.tsx`) keeps the **raw** JSON, never the parsed `Collection` (writing that back would write duckdown's reading of the file), so a key it doesn't show survives. The chosen work is chosen by position (`Spot`, `firstWork()`) and follows a work that moves. Each change writes the whole file through `/edit/pages/`, serialised on one promise chain, then `collectionChanged()` has the preview render again; it keeps its own undo stack. A picture goes through `routes/collection.ts` (`POST` an original and a 128px thumbnail), and `images.ts`'s `imageUrl()`/`thumbName()` name both for the pane and the renderer. A field edit that moves an item's address adds the old one to its `aliases`: only one the file had when the pane opened. `LocalStorage.write()` writes beside the file and renames, because a pane that writes on every change makes a torn read something you watch happen. "New collection" (`createCollection()` in store.ts) writes the file, an each: page and an index, each create-only.
 
-Nothing the editor writes is lost. `fileRoutes()` keeps what a save replaces
-and what a delete removes in `.history/<section>/<key>/<time>` (`history.ts`),
-at the site root beside `users.json` — outside every folder the site serves,
-exports or lists, and through the storage layer. A save keeps one only when
-none is newer than `QUIET` (ten minutes), so a sitting of edits — the
-collection pane writes on every change — leaves one version, the file as it
-was before; a delete or a restore always keeps one; `KEEP` (30) per file. The
-same routes answer `?versions`, `?version=<id>`, `?deleted` and
-`POST ?restore=<id>`, and the editor makes them a place (`past.ts`,
-`components/Past.tsx`): Earlier versions (the clock in `PaneHeader`) and Deleted
-(atop the tree and each resource list) put their list where the tree is, grow
-the trail by a crumb, show the one looked at read-only in the middle — a
-version's lines that aren't in the file now marked by `changedLines()`, a
-longest-common-run of lines that gives up past `COMPARE_LIMIT` — and render a
-page as it was in the preview. The present's panes stay mounted behind it,
-hidden by CSS, so nothing unsaved is lost while you look; Restore is one press
-and asks nothing, because what it replaces is kept.
-`POST ?move=<to>` renames, for a section that passes `fileRoutes()` a `Mover`
-(only pages do: templates and stylesheets are named by pages): never onto a
-file that exists or to a change of case alone, the versions follow
-(`History.move()`), and the page as it was is kept at the new name. The pages'
-`movePage()` adds the old address to the page's `aliases` (`addMeta()`/
-`dropMeta()` in markdown.ts edit front matter lines in place), except for a
-draft, and refuses a folder's `index.md` and an each: page; the editor's
-Rename or move (`moveFile()`) saves first and tells the address it kept. A new
-write path that bypasses `fileRoutes()` bypasses the history too — the
-collection route's picture uploads do, deliberately. The collection pane also
-keeps its own undo stack: every change is a whole new file, so undo writes the
-previous one.
+**The editor edits three folders**, each its own route built by `fileRoutes()` (routes/files.ts): `pages/`, `templates/` and `static/`, each rooted in its own folder so none reaches another, and `users.json` in none of them, which is why the hashes stay out of the editor. Keep it that way when adding a section.
 
-Front matter takes only the keys duckdown reads (`KEYS` in `markdown.ts`; `lang`, `translated-from` and `untranslated` are for [Languages](#languages)) or an `x-` extension, unless the block is fenced with `---`, which takes anything: a page opening "Update: closed Monday" keeps its first line. Add a key there and in the skill's reference together. A page with Windows line endings has its front matter like any (a line ends at `\n` or `\r\n`, n182), and `addMeta()`/`dropMeta()` write back the endings the page has. `nav:` on a page that isn't a folder's `index.md` does nothing and says so (`navIgnored()` in listed.ts: the preview's problems, the export's notes, n190).
+**Nothing the editor writes is lost.** `fileRoutes()` keeps what a save replaces and what a delete removes in `.history/<section>/<key>/<time>` (history.ts), at the site root, outside everything served or exported: a save once a sitting (none newer than `QUIET`, ten minutes), a delete or a restore always, `KEEP` (30) a file. The same routes answer `?versions`, `?version=<id>`, `?deleted`, `POST ?restore=<id>`, and, for a section given a `Mover` (only pages), `POST ?move=<to>`: never onto a file that exists or to a change of case alone, its versions following (`History.move()`), the old address added to `aliases` (`movePage()`; not for a draft, refused for an index or an each: page). The editor's Rename or move (`moveFile()`) saves first and tells the address it kept. A write path that bypasses `fileRoutes()` bypasses the history: the collection route's picture uploads do, deliberately.
 
-A heading that ends `{#id}` has that id (`explicitIds()` in markdown.ts, a pass over Bun's headings, n187): Bun makes ids from a-z and 0-9 and drops other letters ("yn ôl" is "yn-l"), so a translation's anchors differ from its original's unless both say the same id. Folding the letters instead would move every existing anchor with an accent in it, so that is not done.
+**The editor's layout.** One trail says where you are (`Trail.tsx`: the site, `folder` in the store, the page), so a pane's header says only what the trail hasn't (`shortName()`); `loadFile()` moves `folder` to the page's own. The three columns are compartments of one tray: walls meet square, only the tray's corners curve, and anything a wall in takes `--radius-cell` (`--radius-tray` less `--wall`) or its corners bulge. The middle column holds the page and one slot beneath it, a resource or a collection. The header's drawers open one at a time (`drawer`), over the preview; a work chosen in the collection pane opens in the left drawer (`leftDrawer`), over the tree, only on a click; the pane passes its ⌘Z/⇧⌘Z in (`Drawer`'s `onkey`), and it goes with the pane. A page on its way says so (`opening`, `aria-busy`, `.loading-line`), and its first render is asked for at once (the 300ms pause is for typing). Below 768px the columns stack, and the preview, still mounted, is laid over them by the header's Preview (`previewShown`, the tray marked `previewing`), the rest `visibility: hidden` so the page keeps its text, caret and scroll. Every preview branch is a `when()` built as it is shown, one at a time. Earlier versions and Deleted are a place (`past.ts`, `Past.tsx`): the list where the tree was, the version read-only with the lines no longer in the file marked (`changedLines()`, which gives up past `COMPARE_LIMIT`), the present's panes mounted behind so nothing unsaved is lost; Restore asks nothing, because what it replaces is kept. Help (`server/help/<topic>.md`, `routes/help.ts`) renders an `example` block twice, through `renderMarkdown()` itself, links reduced to their look, and `Help.tsx` orders the topics by `helpFirst()`.
 
-The editor is a bento: one trail at the top says where you are (`Trail.tsx`:
-the site, the tree's folder — `folder` in the store, which `loadFile()` moves
-to the page's own — and the page), so a pane's header says only a name the
-trail hasn't (`shortName()`). Under it, the three columns are
-compartments cut into one tray: walls meet square, only the tray's corners
-curve (`--wall`, `--radius-tray`, `--radius-cell`), and the preview sits flush.
-Anything a wall in from the tray's corners — a compartment, a drawer — takes
-the tray's radius less the wall (`--radius-cell` is that calc), or the corners
-bulge. The header's Resources, Editors, Help and Publish each open the one drawer
-(`drawer` in the store, `Drawers.tsx`), over the preview, inside the tray; on a
-phone it is a sheet from the foot. Properties come from the other side: a work
-chosen in the collection pane opens in the drawer at the left (`leftDrawer` in
-the store holds how to draw it, `LeftDrawer` shows it), over the tree, the
-same size and shape as the right-hand one, so the preview stays in view while
-the work changes. It opens on a click, never by itself; Escape puts it away
-and the choice stays marked; the pane passes its ⌘Z/⇧⌘Z in (`Drawer`'s
-`onkey`), and it goes with the pane. A page on its way from the tree says so:
-`opening` in the store, the middle column `aria-busy` with a `.loading-line`
-and its contents dimmed, and the preview busy from the click until its frame
-has loaded the new render — which is asked for at once for a page just
-opened (the 300ms pause is for typing). The tree's first row, in any folder
-but the site's, is `..`, up one.
+A folder is served by its `index.md` (`/blog`, `/blog/`, `/blog/index.html`), and `draft: true` is a 404 to anyone not signed in.
 
-Help is the header's fourth drawer. Its pages are `server/help/<topic>.md`,
-written for the person editing (plain words, examples first), shipped with
-duckdown so every site has them. `routes/help.ts` renders them, and a fenced
-block marked `example` comes out twice — what you type, then what readers
-get, through `renderMarkdown()` itself, so the two can't disagree; in the
-result a link is only its look and a picture its words, so nothing in the
-drawer takes the editor away. `Help.tsx` orders them by `helpFirst()`: an
-each: page, then a collection, then a template or stylesheet, then a page,
-else the editor itself — the first open, the rest folded, reordered as what's
-open changes. When a content feature changes, change its Help page with the
-skill and the seed's guide. The editor's two right-hand columns each hold whatever is open. The middle one
-holds the page and, beneath it, either a resource or a folder's collection —
-one slot, so opening either closes the other; each closes, two split the
-column, one fills it. Below 768px the three columns stack, the tree capped and
-scrolling, and the preview has no column: there is no room to show a page
-beside the thing you are changing it with. It stays mounted and rendering,
-hidden, and the header's Preview (`previewShown` in the store, phones only by
-CSS) lays it over the tree and the page, full height — the tray marked
-`previewing`, the preview spanning its rows, the rest `visibility: hidden` in
-theirs, so the page keeps its text, caret and scroll — and Edit or Escape takes
-it away. It is one of the things over the page: showing it closes a drawer,
-opening a drawer puts it away. The preview column shows what you'd see: the page as the site
-renders it, or, with no page open, a sample page for whatever you're composing
-with (sample content for a stylesheet, a sample page put through a template).
-Every branch is a `when()` built as it's shown, and they're mutually exclusive,
-so at most one is an element at a time.
-
-`export.ts` is the third caller of `pageHtml()`, after the site route and the
-preview: it walks `pages/`, renders each page — and each item of any
-`collection.json` it meets, plus a redirect page per alias — and writes it at
-its one canonical address (`/` and `/blog/` as `index.html`, `about.md` as
-`about.html`), then copies `static/`. Drafts are left out rather than hidden,
-`{{edit}}` is empty, and `{{url}}` takes its origin from `DUCKDOWN_ORIGIN`
-because there is no request to read it from. It reads through the storage
-layer, so it exports a folder on disk or a live bucket. A new placeholder or a
-new thing a page can say has to work here too — if it needs a request, it
-can't go in `pageHtml`.
-
-`page.ts` turns a page into a document: its markdown inside the template `layout:` asks for, with the nav, the `{{pages}}` listing, the page's `css:` and the rest filled in, every value escaped. `routes/site.ts` and `routes/mark.ts` both go through it — `parsePage()` first, so the site can 404 a `draft:` before the expensive part, then `pageHtml()`. That is why the editor's preview is a preview and not a likeness: same template, same nav. The preview may pass an unsaved template as `draft`, used in place of the saved one when it is the one the page wears, and `pageHtml` reports which template it settled on.
-
-A folder is served by its `index.md` (`/blog`, `/blog/`, `/blog/index.html`), and `draft: true` is 404 unless the reader is signed in. `plainName()` guards both `layout:` and `css:`: a page names a file in a folder it must not climb out of.
-
-Paths: storage keys are real names. The server decodes the URL path (`after()`); the editor builds URLs with `urlPath()` (each segment encoded). Never interpolate a name into a URL raw.
+**Paths**: storage keys are real names. The server decodes the URL path (`after()`); the editor builds URLs with `urlPath()`, each segment encoded. Never interpolate a name into a URL raw.
 
 ## Languages
 
-A site in more than one language (`server/languages.ts`). **People translate;
-duckdown never does**: every rule here is about which page answers, and whether
-its translation still says what its original does.
+What a writer does (the convention, the note on a page not yet translated, `translated-from`, the switcher, `site.cy.html`, a collection's words) is `reference.md` § Languages. **People translate; duckdown never does**: every rule here is about which page answers, and whether a translation still says what its original does.
 
-**The convention.** A top-level folder whose `index.md` says `lang:` equal to its
-own name is a language (`languagesOf()`, kept); the root's `lang:` is the default
-(`en`). `pages/cy/about.md` translates `pages/about.md` at `/cy/about.html`: the
-same path under the folder is the whole link, so nothing names the original. A
-folder that doesn't say so, and a page saying `lang:` anywhere else (its own
-language, for `<html lang>` and its dates), start no language — an existing site
-changes only by writing `lang:` on a folder's index. `splitLanguage()` names a
-key in the default's tree; `languageAt()` an address's language.
-
-**One function decides what answers** — `translation(pages, lang, key, {drafts})`:
-`translated` (the page written in the language), `fallback` (the default's, for a
-missing or draft translation — a draft is the editor's, so `drafts: true` for a
-signed-in user), or `null` (neither is a page a reader can have: a draft, an
-`each:` page). The site route (`languagePage()`), the nav, `{{pages}}`,
-`{{sitemap}}`, the export and the switcher all ask it, so served and exported agree.
-A fallback is never a nearest match.
-
-**A fallback is the default's page standing in** (`PageOptions.fallbackFor`): at the
-language's address, in the language's nav, listings and template, `<html lang>`
-and `{{date}}` those of the words (the default's), its `{{url}}`, canonical and
-card the default page's — so a search engine sees one page — with
-`<p class="untranslated" lang role="note">` first in `{{content}}` (so a template
-older than the feature still shows it), in the language's `untranslated:` words,
-else English marked `lang="en"`. It is left out of the language's search, of
-`sitemap.xml` and of `hreflang`. A miss in a language is answered the same way
-(`cy/404.md`, else the default's with the note); a 404 has no switcher.
-
-**A translation records what it was made from.** `translated-from` is
-`sourceHash()` of the original: 8 hex of SHA-256 over its `title`, `description` and
-body, line endings and trailing spaces normalised before parsing (the parser reads a CRLF page's front matter, n182, but a page with none keeps its line endings as its body, so the hash must not depend on them) and
-nothing else: `order`, `nav`, `draft`, `date`, `layout`, `css`, `aliases` and `image`
-are the same in every language. `standing()` is `fresh`, `stale`, `unchecked` (no
-record), `own` (no original) or `missing`; `translationRows()` is that for every
-page, `collectionRows()` for every item, and `translationStandings()` both, kept.
-A draft translation is not published, so it is never "behind". `bun run export`
-says each stale one (`translation: …`, which `--strict` fails on, and the check
-before a Publish returns), and notes — failing nothing — an unchecked one and how
-many are not translated yet.
-
-**Placeholders and files.** `{{lang}}`, `{{root}}`, `{{languages}}` (`languageList()`:
-each language named by `Intl.DisplayNames` in the server's runtime, which is also what `/edit/translations` ships as `names` for the editor, whose browser may lack the locale (n185), `aria-current`, `class="untranslated"`
-for a fallback, from `counterparts()` — never with one language), and `{{description}}`
-writes the `hreflang` alternates (written versions only, with an origin).
-`templates/<name>.<lang>.html` comes before `<name>.html` for a layout
-(`<layout>.cy`, `<layout>`, `site.cy`, `site`: the layout is kept before the
-language) and for an include; `chrome` in `pageHtml()` carries the language.
-
-**What is per language.** The nav, `{{pages}}` and `{{sitemap}}` (`nav.ts`; each cache
-is kept under `lang NUL key`): the default's shape — its folders, its `order:` — over
-what answers in the language (`treeOf()` is the union of both trees; the default's
-nav leaves the language folders out; a translation with no `date:` takes its
-original's). Search: one walk, the entries cut by address (`entriesIn()`); the
-sitemap's `xhtml:link`s are found by the address with the folder taken off. `kept()`
-is keyed by language, never by storage.
-
-**Collections.** A collection in a language's folder where the default has the
-collection (`read()` in collection.ts) is the default's, cloned (`inLanguage()`): the
-same groups and pictures at `/cy/works/<slug>/`, each item's text and long fields
-the language's where `pages/cy/works/collection.json` gives them (`items` by slug or
-a slug it used to have, `groups`, `labels`), the default's where not, and
-`untranslated` set (the note, no search entry). Where the default has none, the
-language's file is a collection of its own. `itemHash()` is what an item records;
-`itemCounterparts()` is its switcher. A `groups` key no group has (a group is keyed by
-its `name`, not its `label`) and a `labels` field the collection doesn't declare are
-problems, reported like an unknown item (n186). `stampItems()` records the item hashes
-the way the pane does. The export writes each language's items beside
-the default's and skips the language's file while walking.
-
-**The editor.** `store.ts` holds `translations` (the standings) and `collection`'s
-`lang`; `translations.ts` marks the tree (`marksFor()`: a row in the default's tree
-names the language behind, one in a language's says it of itself, a folder counts),
-reads the bar (`barFor()`), and does the two things done to a translation: `translate()`
-(the server says what it starts as — the page, a draft, `translated-from`, no
-`aliases`; the home also says `lang:`) and `markUpToDate()`. `/edit/translations`
-(`routes/translations.ts`) only reads, and hands back text to be saved through
-`/edit/pages/` like anything the editor writes, which is what keeps the history and
-drops the caches. The header's Translations drawer lists what wants attention and adds
-a language (translating its home); a collection's page in a language's folder is
-`CollectionTranslation`, which keeps the file as it was written.
-
-**From the command line** (`duckdown translations status [lang] [--json]` and `stamp <path>…`, in translations.ts) is the drawer's status and **Mark up to date**, through the storage layer, so a site translated by script needs none of duckdown's modules by their paths (n191, and n161 is where a public surface gets decided). `stamp` leaves what already says it is up to date untouched, takes a page, a collection's words, a folder or a whole language, and writes directly, keeping no history: it is a script's tool, not the editor's.
-
-**Case.** `/CY/about.html` is a 301 to `/cy/about.html` (`languageSpelled()`, in the site route): on a filesystem that doesn't tell cases apart the default's flow would otherwise have answered it as English (n183).
-
-**The published server.** `serve.ts` answers a miss under a language's folder with its
-`404.html` — told by the one thing only a language has, an index of its own to search.
+- **Which folders are languages.** A top-level folder whose `index.md` says `lang:` equal to its own name (`languagesOf()`, kept); the root's `lang:` is the default (`en`). `pages/cy/about.md` translates `pages/about.md` at `/cy/about.html`: the same path is the whole link. An existing site changes only by writing `lang:` on a folder's index. `splitLanguage()` names a key in the default's tree, `languageAt()` an address's language.
+- **One function decides what answers**: `translation(pages, lang, key, {drafts})` is `translated`, `fallback` (the default's, for a missing or draft translation; `drafts: true` for a signed-in user) or `null` (a draft, an each: page). The site route (`languagePage()`), the nav, `{{pages}}`, `{{sitemap}}`, the export and the switcher all ask it, so served and exported agree. A fallback is never a nearest match.
+- **A fallback is the default's page standing in** (`PageOptions.fallbackFor`): at the language's address, in its nav, listings and template, with the words' own `<html lang>` and dates, and the default page's `{{url}}`, canonical and card, so a search engine sees one page. The note (`<p class="untranslated" lang role="note">`, in the language's `untranslated:` words, else English marked `lang="en"`) leads `{{content}}`, so a template older than the feature still shows it. It is left out of the language's search, `sitemap.xml` and `hreflang`. A miss in a language is answered the same way (`cy/404.md`, else the default's with the note), with no switcher.
+- **Staleness.** `sourceHash()` is 8 hex of SHA-256 over `title`, `description` and the body, line endings and trailing spaces normalised first (a page with no front matter keeps its CRLFs as body, n182), and nothing else: `order`, `nav`, `draft`, `date`, `layout`, `css`, `aliases` and `image` are the same in every language. `standing()` (`standing.ts`, which the editor's words pane applies too) is `fresh`, `stale`, `unchecked`, `own` or `missing`; `translationRows()`, `collectionRows()` and `translationStandings()` (kept) collect it. A draft translation is never behind. The export says each stale one (`translation: …`, which `--strict` and the check before a Publish fail on) and notes the unchecked and untranslated.
+- **Per language.** Templates: `<layout>.cy`, `<layout>`, `site.cy`, `site`, the layout kept before the language, and an include the same way; `chrome` in `pageHtml()` carries the language. The nav, `{{pages}}` and `{{sitemap}}` (`nav.ts`) keep the default's shape over what answers in the language (`treeOf()`, the union of both trees), each cached under `lang NUL key`; a translation with no `date:` takes its original's. Search is cut by address (`entriesIn()`), and the sitemap's `xhtml:link`s are found by the address with the folder taken off. `kept()` is keyed by language, never by storage. `languageList()` names each language with `Intl.DisplayNames` in the server's runtime, which `/edit/translations` also ships to the editor as `names`, since a browser may lack the locale (n185); `{{languages}}` comes from `counterparts()` and is empty with one language; `{{description}}` writes the `hreflang` alternates (written versions only, with an origin).
+- **Collections.** One in a language's folder where the default has one is the default's, cloned by `read()` (`inLanguage()`): the same groups and pictures, each item's words the language's where `pages/cy/<folder>/collection.json` gives them (by slug, or a slug it used to have), `untranslated` set where not. Where the default has none, it is a collection of its own. `itemHash()`, `itemCounterparts()` and `stampItems()` are an item's record, switcher and Mark up to date. A `groups` key no group has, or a `labels` field not declared, is a problem (n186). The export writes each language's items and skips the language's file while walking.
+- **The editor.** `store.ts` holds the standings; `translations.ts` marks the tree (`marksFor()`), reads the bar (`barFor()`), and does `translate()` and `markUpToDate()`. `/edit/translations` only reads, and hands back text saved through `/edit/pages/`, which keeps the history and drops the caches. `CollectionTranslation` keeps a collection's words file as it was written.
+- **From the command line**, `duckdown translations status [lang] [--json]` and `stamp <path>…` (translations.ts) are the drawer's status and Mark up to date, through storage, so a script needs none of duckdown's modules by their paths (n191; n161 is where a public surface gets decided). `stamp` writes directly and keeps no history: a script's tool, not the editor's.
+- **Case.** `/CY/about.html` is a 301 to `/cy/about.html` (`languageSpelled()`, n183): a filesystem that doesn't tell cases apart would otherwise answer it in English.
+- **The published server.** `serve.ts` answers a miss under a language's folder with that language's `404.html`, told by the one thing only a language has, a search index of its own.
 
 ## Two ways in, one scaffold
 
@@ -740,7 +405,8 @@ to a tag, never to master. The changelog entry is what each site reads when
 `duckdown images`, restart, change a template in its bucket) is said there.
 
 A release isn't out until the sites run it. `bun run sites` finds every folder
-under `~/Workshop` that depends on duckdown and shows where each stands: its
+in `~/Workshop/websites`, the collection (a site kept elsewhere is a link
+there), that depends on duckdown and shows where each stands: its
 pin, what is installed, its copy of the skill, whether git has the upgrade,
 how Railway's latest deployment got there (`push <commit>`, or `railway up
 <time>`) and whether it holds HEAD (a push is compared by commit, a
@@ -777,11 +443,11 @@ steps differ, and that file is where they're kept:
 - **A card for a shared link.** `{{description}}` writes the Open Graph tags as well as the description — `og:title`, `og:type` (article when dated), `og:url`, and `og:image` plus `twitter:card` when the page says `image:` — so every site that already has `{{description}}` gets them. `pictureUrl()` (page.ts) makes `image:` absolute (a full URL, a site path, or a path under `static/`; never `..`; an escape already made kept), and addresses are left out without an origin. An item's picture is its `image` through `itemMeta()`, unless the each: page names one. A page that names no picture shares the site's (`sitePicture()` in `icons.ts`, kept like the nav): `static/card.jpg` (1200×630, `summary_large_image`), else the home-screen icon (180, `summary`), with `og:image:width`/`height` since their size is known. The editor's Resources → icon makes the card (`cardJpeg()` — filling it when the picture's shape is near the card's, `cardFit()`, else whole on white, and the tab offers the other — and `iconCard()`, on a canvas; `POST`/`DELETE /edit/site-icon?card`, which call `siteChanged()`).
 - **Pictures for smaller screens.** `widths.ts`: a JPEG, PNG or WebP under `static/images/` is also kept at `WIDTHS` (480, 960, 1600; never wider, and only when the copy is smaller in bytes), noted with the original's width in the folder's hidden `.widths.json`; `withWidths()` gives each `<img>` of it a `srcset` and `sizes` (the base's 46rem measure), from a per-folder cache (`kept()`). Made on upload (the images route, the collection route, each calling `siteChanged()`) or by `duckdown images` — which, run against a live bucket from outside, a served site sees only after a restart. The images grid hides the widths (`WIDTH_NAME`).
 - **Bad URLs.** `decodePath()` answers null for a malformed escape; `after()` throws `BadRequest`, which `handleError` answers 400 without a stack. The site route and `serve.ts` answer 400 themselves.
-- **The export's checks.** It writes into `.dist.next-<pid>-…` beside `dist/` (`mkdtemp`, so two exports at once never share a folder), each page as it is rendered, and `swapIn()` puts that in `dist/`'s place (two renames: `dist/` to `.dist.old-<pid>-…`, the new one in; a `dist/` that can't be moved aside, a mount point, is emptied and filled, and it says so) only once the whole site is written: a run that fails part-way, or finds nothing to write (it names where it looked), leaves `dist/` as it was and nothing beside it. If the second rename fails, the old site goes back; if it fails because another export's site got there first, that one is swapped out in turn, up to five times, and then the export says another is running. A run that was stopped leaves its folders; the next export's `tidy()` clears those whose process has gone (`process.kill(pid, 0)`), and first puts a stopped run's `.dist.old-…` back as `dist/` when there is none, and says so (unless another export starting at once got there first), so a crash between the renames never loses the site; a `dist/` gone by the time `swapIn()` moves it (another export's, mid-swap) is nothing to move. `init` writes both names into `.gitignore`. At 20,000 pages a fresh export peaks at 1.0 GB on the bench's site (1.7 when it held every page) and 2.3-2.4 GB on a varied vocabulary (2.0-2.8 before), measured with `bench/export.ts` in a process of its own (n167). `searchFiles()` holds every word's places while it cuts them, 0.2-1.1 GB of that at its peak; it collects every thousand pages, since the words cut from a page are garbage at once and otherwise added 0.6-1.5 GB. Places as typed arrays, not JS arrays, would about halve what it holds: not done. Only each page's links stay, in `Links` (links.ts): each distinct link once and a page as an `Int32Array` of their numbers, because every page carries the whole nav, and as objects its links outweighed its HTML. `Links.broken()` reports each relative link that leads nowhere, and says what it may have meant when the other spelling is a page (`/numbers/` for the flat `numbers.html`, `/blog.html` for a folder: `meant()`, n189); `--strict` or `DUCKDOWN_STRICT=1` fails on them. The preview asks the same of the page being edited as it is written: `links.ts` holds `linksIn()` (what counts as a link, for both) and `deadLinks()`, which checks against the cached index (`pageList()`, `aliasTargets()`), and against `static/` only for the files the page names, and `routes/mark.ts` returns what it finds among `problems`. `Preview.tsx` takes its own line down once the problems are gone. `main()` returns the exit code so the `import.meta.main` line stays one line (coverage counts a multi-line block that a test can't run).
+- **The export's checks.** It writes into `.dist.next-<pid>-…` beside `dist/` (`mkdtemp`, so two exports never share a folder), and `swapIn()` puts that in `dist/`'s place only once the whole site is written: two renames, `dist/` to `.dist.old-<pid>-…` and the new one in (a `dist/` that can't be moved aside, a mount point, is emptied and filled, and it says so). So a run that fails part-way, or finds nothing to write (it names where it looked), leaves `dist/` as it was and nothing beside it. If the second rename fails the old site goes back; one beaten by another export's swap retries up to five times, then says another is running. The next export's `tidy()` clears what a stopped run left (`process.kill(pid, 0)`) and first puts a stopped run's `.dist.old-…` back when there is no `dist/`, so a crash between the renames never loses the site. `init` gitignores both names. What it holds at 20,000 pages is measured with `bench/export.ts` in a process of its own (n167): `searchFiles()` collects every thousand pages, and only each page's links stay, in `Links` (links.ts), each distinct link once and a page as an `Int32Array` of their numbers, because every page carries the whole nav. `Links.broken()` reports each relative link that leads nowhere, and what it may have meant (`meant()`, n189); `--strict` or `DUCKDOWN_STRICT=1` fails on them. The preview asks the same as the page is written: `linksIn()` (what counts as a link, for both) and `deadLinks()`, against the cached index (`pageList()`, `aliasTargets()`) and `static/` for the files the page names, returned among `routes/mark.ts`' `problems`. `main()` returns the exit code so the `import.meta.main` line stays one line (coverage counts a multi-line block that a test can't run).
 
 ## Extensions
 
-A site adds routes of its own (a form, an RSVP) as **extensions** (`extensions.ts`). An extension is a module whose default export takes the `Site` and returns Bun routes, or a promise of them:
+A site adds routes of its own (a form, an RSVP) as **extensions** (`extensions.ts`). Declaring one, `answers`, and whose an address is, as a site's author needs them: `reference.md` § Extensions. An extension is a module whose default export takes the `Site` and returns Bun routes, or a promise of them:
 
 ```ts
 export default (site: Site) => ({
@@ -789,13 +455,13 @@ export default (site: Site) => ({
 });
 ```
 
-- **Declared in the site's `package.json`**, as `"duckdown": { "extensions": ["duckdown-forms", "./extensions/rsvp.ts"] }`, resolved from the folder the server runs in. Never from `site/`: that can be a bucket its editors write to, and what runs on the server changes only by a commit.
-- **Both servers take them.** `main.ts` merges them into its routes; `serve.ts`'s `listen()` serves them beside `dist/`. So a form on a published site is on the site's own host, with its stylesheets, pictures and links. The export writes nothing for them: they need a server.
-- **`Site` is `{ storage, render }`.** `storage` is the site root through the same `Storage` as everything else (disk or a bucket, held to the storage contract). `render(markdown, { key, path })` makes a whole page in the site's template. `key` is where the markdown is kept, and relative wiki links resolve from its folder, so an extension's page links with `[[/page]]`. `path` is the address the page is served at, for its canonical link and `og:url` (`PageOptions.path`, n173).
-- **What they answer is declared for the link checks**: `"duckdown": { "answers": ["/figures.csv", "/api/*"] }`, in a route's own style (`:name` one segment, a last `*` anything), read by `declaredAnswers()`. The export (a build step that never loads them) and the editor's preview would otherwise call a link to such an address broken; with it they treat one as reaching somewhere (`Links.broken(known, answers)`, `deadLinks(…, answers)`). Nothing asks the routes: they exist only in a running server (n194).
-- **A clash stops the server.** `withExtensions()` refuses a route that duckdown or another extension already has. A declared extension that won't load, or has no default export, stops the server too, and says which: a site missing its forms would otherwise fail quietly.
-- **An extension's address is its own, for the methods it answers.** Bun answers every route before `fetch`, which is where the site's pages come in (`handleSite`, `serveDist`), so a page at an address an extension takes — `/`, `/about`, anything `/forms/:name` matches — is never shown, on either server, for the methods the route answers (the export still writes it). A `Response`, a handler, a `Bun.file` or an HTML import answers every method (an HTML import in development answers 405 past GET and HEAD) and lets none through to the page, so the line names it alone; a route of methods answers only those, so a GET to a `{ POST }`-only form still reaches the page there. That is not checked against the pages: they change while the server runs (the editor, a bucket), a check at start would miss every page written since, and what an editor writes must never stop the server. Instead `withExtensions()` says the addresses and their methods as the server starts (`extensions answer /forms/:name (GET, POST), /rsvp: a page at one of those addresses is never shown for the methods it answers`). Give an extension a name of its own: dash's RSVP is `/rsvp`, not `/` (n177).
-- **What an extension collects goes under `reports/`**, which only signed-in editors read and which is never served, exported or seeded. Keep one object per record, since a bucket can't append. On a published site `site/` is the deployed code, so anything written there is lost at the next deploy: it needs a bucket, a volume, or somewhere else.
+- **Resolved from the folder the server runs in, never from `site/`**: that can be a bucket its editors write to, and what runs on the server changes only by a commit.
+- **Both servers take them**: `main.ts` merges them into its routes, and `serve.ts`'s `listen()` serves them beside `dist/`, on the site's own host. The export writes nothing for them: they need a server.
+- **`Site` is `{ storage, render }`**: the site root through the same `Storage` as everything else (disk or a bucket, held to the storage contract), and `render(markdown, { key, path })`, a whole page in the site's template. `key` is where the markdown is kept, for relative wiki links; `path` is the address it is served at, for its canonical link and `og:url` (`PageOptions.path`, n173).
+- **`answers` feed the link checks** (`declaredAnswers()`, then `Links.broken(known, answers)` and `deadLinks(…, answers)`), since nothing can ask routes that exist only in a running server (n194).
+- **A clash stops the server**: `withExtensions()` refuses a route duckdown or another extension has, and a declared extension that won't load, or has no default export, stops it too, saying which. A site missing its forms would otherwise fail quietly.
+- **An address an extension answers is its own, for its methods**: Bun answers routes before `fetch`, where pages come in. A `Response`, a handler, a `Bun.file` or an HTML import answers every method; a route of methods only those. This is not checked against the pages, which change while the server runs, and what an editor writes must never stop the server; instead `withExtensions()` says the addresses and methods as the server starts. Give an extension a name of its own: dash's RSVP is `/rsvp`, not `/` (n177).
+- **What one collects goes under `reports/`**, one object per record, since a bucket can't append. On a published site `site/` is deployed code, so anything written there is lost at the next deploy: it needs a bucket, a volume, or somewhere else.
 - The first is duckdown-forms (`~/Workshop/blueshed/duckdown-forms`): forms reached by a link whose token authorises itself, signed with Ed25519, so a server can check a token but never make one.
 
 ## Testing

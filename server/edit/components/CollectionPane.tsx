@@ -106,7 +106,7 @@ export function itemAddresses(file: RawFile, folder: string): { item: RawItem; h
 // changed, was never an address anyone linked to) and when no item answers at
 // it now (an item wins over an alias, so that alias would be dead). Renaming
 // back takes the alias off again. Answers a line to say for each alias made.
-export function keepAddresses(
+function keepAddresses(
   before: { item: RawItem; href: string }[], file: RawFile, folder: string, published: Set<string>,
 ): string[] {
   const after = itemAddresses(file, folder);
@@ -130,7 +130,7 @@ export function keepAddresses(
   return lines;
 }
 
-export function groupAt(file: RawFile | null, path: Path): RawGroup | null {
+function groupAt(file: RawFile | null, path: Path): RawGroup | null {
   let groups = file?.groups ?? [];
   let group: RawGroup | null = null;
   for (const i of path) {
@@ -142,7 +142,7 @@ export function groupAt(file: RawFile | null, path: Path): RawGroup | null {
 }
 
 // The array a group sits in: its parent's, or the file's own for a top group.
-export function siblingsOf(file: RawFile, path: Path): RawGroup[] {
+function siblingsOf(file: RawFile, path: Path): RawGroup[] {
   const parent = groupAt(file, path.slice(0, -1));
   if (parent) return (parent.groups ??= []);
   return (file.groups ??= []);
@@ -151,14 +151,14 @@ export function siblingsOf(file: RawFile, path: Path): RawGroup[] {
 // Out of its place and into another, which for a move down past a row means
 // after it: splice takes the item out first, so the row you dropped on has
 // already moved up one.
-export function moveWithin<T>(arr: T[], from: number, to: number): void {
+function moveWithin<T>(arr: T[], from: number, to: number): void {
   const held = arr.splice(from, 1);
   arr.splice(Math.max(0, Math.min(to, arr.length)), 0, ...held);
 }
 
 // Steps an open pane can take back. Each is a whole file, so this is a bound
 // on memory rather than on patience: four hundred works is ~100KB a step.
-export const UNDO_LIMIT = 100;
+const UNDO_LIMIT = 100;
 
 // A picture's file name as a starting title: "First Light.jpg" → "First
 // Light". It is a guess, shown in an input, and changed in a second.
@@ -412,21 +412,20 @@ export function CollectionPane() {
     if (up) bust(src, up.v);
   };
 
+  // A picture's address with the version it was last replaced at, so the
+  // browser asks for it again.
+  const busted = (url: string, src: string) => {
+    const v = busts.get()[src];
+    return v ? `${url}?v=${v}` : url;
+  };
   const thumbUrl = (src: string) => {
     if (!src) return "";
     const rule = images.get();
-    const url = imageUrl(rule.thumb, thumbName(src, rule));
-    const v = busts.get()[src];
-    return v ? `${url}?v=${v}` : url;
+    return busted(imageUrl(rule.thumb, thumbName(src, rule)), src);
   };
 
   // The picture itself, for the drawer, where a thumbnail would be a blur.
-  const pictureUrl = (src: string) => {
-    if (!src) return "";
-    const url = imageUrl(images.get().src, src);
-    const v = busts.get()[src];
-    return v ? `${url}?v=${v}` : url;
-  };
+  const pictureUrl = (src: string) => (src ? busted(imageUrl(images.get().src, src), src) : "");
 
   // --- the shape of the file -------------------------------------------
 
@@ -464,12 +463,8 @@ export function CollectionPane() {
 
   const addGroup = (path: Path | null) =>
     change((next) => {
-      const fresh: RawGroup = { name: "New group", items: [] };
-      if (!path) (next.groups ??= []).push(fresh);
-      else {
-        const group = groupAt(next, path);
-        if (group) (group.groups ??= []).push(fresh);
-      }
+      const owner = path ? groupAt(next, path) : next;
+      if (owner) (owner.groups ??= []).push({ name: "New group", items: [] });
     });
 
   // A group shows its label when it has one and its name when it doesn't —
@@ -510,11 +505,19 @@ export function CollectionPane() {
       }} />
   ) as unknown as HTMLInputElement;
 
-  // What a button does with the keyboard, for the two places that can't be a
-  // <button> because the chooser's <input> sits inside them.
-  const onpress = (run: () => void) => (e: KeyboardEvent) => {
-    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); run(); }
-  };
+  // A picture's place that is a button: a click, Enter or Space opens the
+  // chooser inside it, and a picture can be dropped on it. It can't be a
+  // <button>, because the chooser's <input> sits inside it.
+  const picturePlace = (o: { class: string; label: string; title: string; input: HTMLInputElement; onfile: (file: File | undefined) => unknown }, ...children: unknown[]) => (
+    <div class={o.class} role="button" tabindex="0" aria-label={o.label} title={o.title}
+      onclick={() => o.input.click()}
+      onkeydown={(e: KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); o.input.click(); } }}
+      ondragover={(e: DragEvent) => e.preventDefault()}
+      ondrop={(e: DragEvent) => { e.preventDefault(); o.onfile(e.dataTransfer?.files?.[0]); }}>
+      {children}
+      {o.input}
+    </div>
+  );
 
   type Row = { i: number; item: RawItem };
 
@@ -604,21 +607,10 @@ export function CollectionPane() {
           {/* A work begins as its picture — or, in a collection with no
               picture field, as a row of empty fields. The last tile adds one. */}
           <li class="collection-add">
-            {imageField() ? when(uploads, () => (
-              <div class="item-drop" role="button" tabindex="0"
-                aria-label="Add a work: drop a picture here, or choose one"
-                title="Drop a picture here, or choose one"
-                onclick={() => input.click()} onkeydown={onpress(() => input.click())}
-                ondragover={(e: DragEvent) => e.preventDefault()}
-                ondrop={(e: DragEvent) => {
-                  e.preventDefault();
-                  addItem(path, e.dataTransfer?.files?.[0]);
-                }}>
-                <Icon name="image-plus" size={16} />
-                {when(busy, () => <span class="item-title">Adding…</span>)}
-                {input}
-              </div>
-            )) : (
+            {imageField() ? when(uploads, () => picturePlace({
+              class: "item-drop", label: "Add a work: drop a picture here, or choose one", title: "Drop a picture here, or choose one",
+              input, onfile: (file) => addItem(path, file),
+            }, <Icon name="image-plus" size={16} />, when(busy, () => <span class="item-title">Adding…</span>))) : (
               <button class="item-drop" aria-label="Add item" title="Add item" onclick={() => pushItem(path, blank(""))}>
                 <Icon name="plus" size={16} /><span class="visually-hidden">Add item</span>
               </button>
@@ -640,23 +632,10 @@ export function CollectionPane() {
     const at = () => chosen.peek()!;
     return (
       <aside class="collection-chosen" aria-label={chosenItem.map((item) => `The work: ${said(item?.title) || "untitled"}`)}>
-        {image ? (
-          <div class="item-thumb" role="button" tabindex="0"
-            aria-label="Replace this picture (same file name)"
-            title="Replace this picture (same file name)"
-            onclick={() => input.click()}
-            onkeydown={onpress(() => input.click())}
-            ondragover={(e: DragEvent) => e.preventDefault()}
-            ondrop={(e: DragEvent) => {
-              e.preventDefault();
-              swapItem(at().path, at().i, e.dataTransfer?.files?.[0]);
-            }}
-          >
-            <img alt="" src={computed(() => pictureUrl(src.get()))} />
-            <span class="item-swap"><Icon name="refresh-cw" size={12} /></span>
-            {input}
-          </div>
-        ) : null}
+        {image ? picturePlace({
+          class: "item-thumb", label: "Replace this picture (same file name)", title: "Replace this picture (same file name)",
+          input, onfile: (file) => swapItem(at().path, at().i, file),
+        }, <img alt="" src={computed(() => pictureUrl(src.get()))} />, <span class="item-swap"><Icon name="refresh-cw" size={12} /></span>) : null}
         {typed().map(fieldInput)}
         <div class="item-tools">
           {image ? <span class="item-src">{src}</span> : null}

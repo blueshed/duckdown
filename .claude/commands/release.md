@@ -83,7 +83,7 @@ site and say so. Tell them again when their site is done.
 
 ## 6. Each site
 
-`bun run sites` lists every folder under `~/Workshop` whose `package.json` depends on
+`bun run sites` lists every folder in `~/Workshop/websites` (links followed) whose `package.json` depends on
 `github:blueshed/duckdown` (`archive/` skipped), and what each runs live. For each site behind the
 tag, in its own folder, **read its CLAUDE.md and follow its steps**; they differ. In outline:
 

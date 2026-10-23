@@ -1,4 +1,4 @@
-import { signal, batch, computed } from "@blueshed/railroad";
+import { signal, batch, computed, effect } from "@blueshed/railroad";
 import { api, apiJson, urlPath } from "./api";
 import type { Listing } from "../storage";
 import type { Row } from "../languages";
@@ -8,6 +8,10 @@ import { speak, tell } from "./notice";
 export const filePath = signal<string | null>(null);
 export const fileContent = signal("");
 export const editorContent = signal("");
+// Unsaved: what the editor holds isn't what was last read or saved. Derived,
+// so whatever writes either (a save, a restore, Mark up to date) can't leave
+// the dot behind.
+export const fileDirty = computed(() => editorContent.get() !== fileContent.get());
 export const browserRevision = signal(0);
 
 // Where you are: the folder the tree is showing. The trail above says it and
@@ -31,7 +35,6 @@ export function shortName(key: string): string {
 // is chosen from the header and leaves the page in view behind it.
 export type DrawerName = "resources" | "editors" | "publish" | "help" | "translations";
 export const drawer = signal<DrawerName | null>(null);
-export const showImages = computed(() => drawer.get() === "resources");
 
 export function toggleDrawer(name: DrawerName): void {
   drawer.update((open) => (open === name ? null : name));
@@ -108,6 +111,19 @@ export const collection = signal<{ folder: string; lang?: string } | null>(null)
 // Bumped when the pane writes collection.json: the preview renders the
 // overview from it, and nothing else it tracks has changed.
 export const collectionRevision = signal(0);
+
+// `again`, a moment after anything is written (a save, a resource, the
+// collection): for what the header shows of the whole site, Publish's count
+// and the translations'. Called in a component's body, so it goes with it.
+export function afterWrites(again: () => unknown): void {
+  effect(() => {
+    browserRevision.get();
+    resourceRevision.get();
+    collectionRevision.get();
+    const timer = setTimeout(again, 400);
+    return () => clearTimeout(timer);
+  });
+}
 
 const at = (path: string) => `/edit/pages/${urlPath(path)}`;
 // A folder's listing, ending in a slash: without one the server takes a name
@@ -227,15 +243,8 @@ export async function createResource(
 ): Promise<string | void> {
   const { ext, body } = STARTER[section];
   const file = name.endsWith(ext) ? name : `${name}${ext}`;
-  return writeNew(section, file, body.replace("{{name}}", file));
-}
-
-
-async function writeNew(section: Resource["section"], file: string, body: string): Promise<string | void> {
-  const res = await api(`create ${file}`, `/edit/${section}/${urlPath(file)}`,
-    { method: "PUT", headers: { "If-None-Match": "*" }, body }, [412]);
-  if (res.status === 412) return `${file} already exists`;
-  if (!res.ok) return `Couldn't create ${file}`;
+  const refused = refusal(await createOnly(file, `/edit/${section}/${urlPath(file)}`, body.replace("{{name}}", file)), file);
+  if (refused) return refused;
   reloadResources();
   await openResource({ section, path: file });
 }
@@ -298,13 +307,17 @@ export async function loadFile(path: string): Promise<boolean> {
 }
 
 // Create-only: If-None-Match: * has the server refuse (412) rather than
-// replace a file that already exists. Returns a message for the dialog if so.
+// replace a file that already exists. refusal() is what the dialog says when
+// the file wasn't made, or nothing when it was.
+export const createOnly = (path: string, url: string, body: string) =>
+  api(`create ${path}`, url, { method: "PUT", headers: { "If-None-Match": "*" }, body }, [412]);
+const refusal = (res: Response, path: string) =>
+  res.status === 412 ? `${path} already exists` : res.ok ? undefined : `Couldn't create ${path}`;
+
 export async function createFile(path: string, name: string): Promise<string | void> {
   const fp = path.replace(/^\//, "");
-  const body = `title: ${name.replace(/\.md$/, "")}\n\n`;
-  const res = await api(`create ${fp}`, at(fp), { method: "PUT", headers: { "If-None-Match": "*" }, body }, [412]);
-  if (res.status === 412) return `${fp} already exists`;
-  if (!res.ok) return `Couldn't create ${fp}`;
+  const refused = refusal(await createOnly(fp, at(fp), `title: ${name.replace(/\.md$/, "")}\n\n`), fp);
+  if (refused) return refused;
   await loadFile(fp);
   reloadBrowser();
 }
@@ -343,12 +356,10 @@ export async function createCollection(parent: string, name: string): Promise<st
     images: { src: `/static/images/${urlPath(folder)}/` },
     groups: [{ name: own, items: [] }],
   };
-  const create = (path: string, body: string) =>
-    api(`create ${path}`, at(path), { method: "PUT", headers: { "If-None-Match": "*" }, body }, [412]);
+  const create = (path: string, body: string) => createOnly(path, at(path), body);
 
-  const res = await create(key, `${JSON.stringify(data, null, 2)}\n`);
-  if (res.status === 412) return `${key} already exists`;
-  if (!res.ok) return `Couldn't create ${key}`;
+  const refused = refusal(await create(key, `${JSON.stringify(data, null, 2)}\n`), key);
+  if (refused) return refused;
   // Failures speak: without an each: page the works are shown but have no
   // pages, and the one person who can see why is the one who just made it.
   const item = `${folder}/item.md`;
@@ -385,7 +396,7 @@ export async function moveFile(to: string): Promise<string | void> {
   const trimmed = to.trim().replace(/^\/+/, "");
   const dest = trimmed.endsWith(".md") ? trimmed : `${trimmed}.md`;
   if (dest === fp) return `It is already ${fp}`;
-  if (editorContent.peek() !== fileContent.peek() && !(await saveFile())) return `Couldn't save ${fp} first`;
+  if (fileDirty.peek() && !(await saveFile())) return `Couldn't save ${fp} first`;
   const res = await api(`move ${fp}`, `${at(fp)}?move=${encodeURIComponent(dest)}`, { method: "POST" }, [400, 412]);
   if (res.status === 412) return `${dest} already exists`;
   if (res.status === 400) return res.text();
@@ -422,12 +433,4 @@ export function closeFile() {
 
 export function reloadBrowser() {
   browserRevision.update((n) => n + 1);
-}
-
-export function toggleImages() {
-  toggleDrawer("resources");
-}
-
-export function closeImages() {
-  closeDrawer();
 }

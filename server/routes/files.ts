@@ -1,5 +1,5 @@
 import type { BunRequest } from "bun";
-import { requireAuth } from "../auth";
+import { signedIn } from "../auth";
 import { storageAt, type Storage } from "../storage";
 import { History, HISTORY_PATH, plainKey } from "../history";
 import { after } from "../utils";
@@ -62,10 +62,11 @@ export function fileRoutes(
     return Response.json({ ok: true, to, kept: moved.kept });
   };
 
-  return {
+  // A file handed out as it is, sandboxed unless it is something to look at.
+  const asIs = (key: string) => ({ "Content-Type": store.mime(key), ...asFile(store.mime(key)) });
+
+  return signedIn({
     async GET(req: BunRequest) {
-      const denied = await requireAuth(req);
-      if (denied) return denied;
       const key = path(req);
       const q = query(req);
       if (q.has("deleted")) {
@@ -77,12 +78,10 @@ export function fileRoutes(
         if (q.has("versions")) return Response.json(await history.versions(key));
         const body = await history.read(key, q.get("version")!);
         if (!body) return new Response("No such version", { status: 404 });
-        return new Response(Buffer.from(body), { headers: { "Content-Type": store.mime(key), ...asFile(store.mime(key)) } });
+        return new Response(Buffer.from(body), { headers: asIs(key) });
       }
       if (key && (await store.exists(key))) {
-        return new Response(await store.read(key), {
-          headers: { "Content-Type": store.mime(key), ...asFile(store.mime(key)) },
-        });
+        return new Response(await store.read(key), { headers: asIs(key) });
       }
       // A missing file is a 404, not an empty folder listing in its place
       // (which the editor would open as the file's text). Anything with an
@@ -92,8 +91,6 @@ export function fileRoutes(
     },
 
     async PUT(req: BunRequest) {
-      const denied = await requireAuth(req);
-      if (denied) return denied;
       const key = path(req);
       // If-None-Match: * is a create-only write (the editor's New): never
       // replace a file that is already there.
@@ -108,8 +105,6 @@ export function fileRoutes(
     },
 
     async DELETE(req: BunRequest) {
-      const denied = await requireAuth(req);
-      if (denied) return denied;
       const key = path(req);
       if (!(await store.exists(key))) {
         return new Response("Not Found", { status: 404 });
@@ -123,8 +118,6 @@ export function fileRoutes(
     // A version put back. What it replaces is kept first, so a restore is
     // itself something Earlier versions can undo. Or, with ?move=, a rename.
     async POST(req: BunRequest) {
-      const denied = await requireAuth(req);
-      if (denied) return denied;
       const key = path(req);
       const to = query(req).get("move");
       if (to !== null) return move(key, to);
@@ -137,5 +130,5 @@ export function fileRoutes(
       changed();
       return Response.json({ ok: true });
     },
-  };
+  });
 }

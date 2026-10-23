@@ -1,5 +1,33 @@
 # Changelog
 
+## Unreleased
+
+Simpler inside, and four small faults found on the way, each fixed. Nothing a
+site has to do. An upgrade's comparison shows a page changed only where one of
+the first two fixes applies.
+
+- **A title can say `{{nav}}`.** The page's placeholders were filled one after
+  another, so whatever an early one put in was read by the later ones: a page
+  titled "Using {{nav}}" published the whole nav inside its `<title>` and its
+  `og:title`. Now every placeholder is filled in one pass and nothing filled is
+  read again (n202).
+- **`{{sitemap}}` leaves out an index that is an each: page,** as the nav and
+  `{{pages}}` always did: it labelled and linked the folder to it (n204).
+- **The unsaved dot goes when the page is saved,** however it was saved: Mark
+  up to date left it on over a saved page (n203).
+- **New folder among the images stays open when the folder can't be made,**
+  and says why, as New page does; an empty name waits for one.
+- **The suite passes on Linux.** Five of the collection-words tests typed into
+  a pane the editor's own test had left mounted, which runs first where Linux
+  lists the files (n201).
+- **The same code, written once.** One sign-in wrapper for the editor's
+  routes (the session was checked twice for publish and the Editors drawer);
+  one walk for the nav, `{{pages}}` and `{{sitemap}}` in any language; and
+  smaller repeats across the server and the editor. 1,000 tests, 100%
+  coverage, and no module a site imports has lost a name.
+- **`bun run sites` reads `~/Workshop/websites`,** following links, so a site
+  kept elsewhere is in the collection by a link.
+
 ## 0.18.2 — 2026-10-23
 
 A new site in one line, and a published site that stops cleanly. Nothing a

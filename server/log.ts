@@ -1,4 +1,5 @@
 import { LOG_VIEWS } from "./config";
+import { hostOf } from "./hosts";
 
 // Crawlers mostly say so. This is deliberately coarse: it separates the
 // traffic that reads from the traffic that indexes, so a count means
@@ -32,12 +33,11 @@ export function viewLine(path: string, status: number, ms: number, from: string,
 export function logView(req: Request, status: number, startedAt: number, on = LOG_VIEWS): void {
   if (!on) return;
   const url = new URL(req.url);
-  const here = req.headers.get("x-forwarded-host") || req.headers.get("host") || url.host;
   console.log(viewLine(
     url.pathname,
     status,
     performance.now() - startedAt,
-    fromSite(req.headers.get("referer") ?? "", here),
+    fromSite(req.headers.get("referer") ?? "", hostOf(req)),
     req.headers.get("user-agent") ?? "",
   ));
 }

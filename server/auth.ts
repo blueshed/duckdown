@@ -35,22 +35,14 @@ function base64urlDecode(str: string): Uint8Array {
   return Uint8Array.from(binary, (c) => c.charCodeAt(0));
 }
 
-async function hmacKey(): Promise<CryptoKey> {
-  return crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(SECRET),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign", "verify"],
-  );
-}
+// Made once: the secret is read once, as the module loads.
+const KEY = await crypto.subtle.importKey("raw", new TextEncoder().encode(SECRET), { name: "HMAC", hash: "SHA-256" }, false, ["sign", "verify"]);
 
 export async function signJwt(payload: Record<string, unknown>): Promise<string> {
   const header = base64url(new TextEncoder().encode(JSON.stringify({ alg: "HS256", typ: "JWT" })));
   const body = base64url(new TextEncoder().encode(JSON.stringify(payload)));
   const data = `${header}.${body}`;
-  const key = await hmacKey();
-  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(data));
+  const sig = await crypto.subtle.sign("HMAC", KEY, new TextEncoder().encode(data));
   return `${data}.${base64url(new Uint8Array(sig))}`;
 }
 
@@ -61,8 +53,7 @@ export async function verifyJwt(token: string): Promise<Record<string, unknown> 
   try {
     const data = `${parts[0]}.${parts[1]}`;
     const sig = base64urlDecode(parts[2]!);
-    const key = await hmacKey();
-    const valid = await crypto.subtle.verify("HMAC", key, sig.buffer as ArrayBuffer, new TextEncoder().encode(data));
+    const valid = await crypto.subtle.verify("HMAC", KEY, sig.buffer as ArrayBuffer, new TextEncoder().encode(data));
     if (!valid) return null;
 
     const payload = JSON.parse(new TextDecoder().decode(base64urlDecode(parts[1]!)));
@@ -144,11 +135,10 @@ export async function sessionCookie(name: string, hash: string): Promise<string>
   return `${COOKIE_NAME}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${TOKEN_MAX_AGE}`;
 }
 
-export async function requireAuth(req: BunRequest): Promise<Response | null> {
-  const user = await getUser(req);
-  if (user) return null;
-  // A page load goes to the login form and comes back; the editor's fetches
-  // get a 401 to act on (see edit/api.ts), not the login page's HTML.
+// What someone not signed in gets. A page load goes to the login form and
+// comes back; the editor's fetches get a 401 to act on (see edit/api.ts), not
+// the login page's HTML.
+function refused(req: BunRequest): Response {
   if (!req.headers.get("accept")?.includes("text/html")) {
     return new Response("Unauthorized", { status: 401 });
   }
@@ -156,13 +146,27 @@ export async function requireAuth(req: BunRequest): Promise<Response | null> {
   return Response.redirect(`/login?next=${next}`, 302);
 }
 
+export async function requireAuth(req: BunRequest): Promise<Response | null> {
+  return (await getUser(req)) ? null : refused(req);
+}
+
+// A route's methods, each behind the sign-in: someone not signed in gets
+// refused(), and the method is handed who is, so it never asks again.
+type SignedIn = (req: BunRequest, user: string) => Response | Promise<Response>;
+
+export function signedIn<T extends Record<string, SignedIn>>(methods: T): { [K in keyof T]: (req: BunRequest) => Promise<Response> } {
+  return Object.fromEntries(Object.entries(methods).map(([method, handle]) => [method, async (req: BunRequest) => {
+    const user = await getUser(req);
+    return user ? handle(req, user) : refused(req);
+  }])) as { [K in keyof T]: (req: BunRequest) => Promise<Response> };
+}
+
 // --- Login page via HTMLRewriter ---
 
 const loginHtml = await Bun.file(import.meta.dir + "/edit/login.html").text();
 
 function renderLogin(status: number, next: string, error?: string, email?: string): Response {
-  const res = new Response(loginHtml, { headers: { "Content-Type": "text/html" } });
-  const rewritten = new HTMLRewriter()
+  const html = new HTMLRewriter()
     .on("#error", {
       element(el) {
         if (error) {
@@ -182,12 +186,8 @@ function renderLogin(status: number, next: string, error?: string, email?: strin
         el.setAttribute("value", next);
       },
     })
-    .transform(res);
-
-  return new Response(rewritten.body, {
-    status,
-    headers: { "Content-Type": "text/html; charset=utf-8" },
-  });
+    .transform(loginHtml);
+  return new Response(html, { status, headers: { "Content-Type": "text/html; charset=utf-8" } });
 }
 
 // --- Route handlers ---

@@ -1,11 +1,11 @@
-import { createElement, signal, computed, effect, list, when } from "@blueshed/railroad";
+import { createElement, signal, computed, list, when } from "@blueshed/railroad";
 import { Icon } from "./Icon";
 import { Drawer } from "./Drawer";
 import {
   refreshTranslations, languageName, translate, begin, markUpToDate, barFor, isBehind, isWanted, SAYS, SYMBOL,
 } from "../translations";
 import {
-  translations, languages, browserRevision, resourceRevision, collectionRevision, filePath, loadFile, openCollection,
+  translations, languages, afterWrites, filePath, loadFile, openCollection,
   drawer, toggleDrawer, closeDrawer, COLLECTION_FILE,
 } from "../store";
 import { joinKey } from "../../slugs";
@@ -25,13 +25,7 @@ const behind = computed(() => (translations.get()?.rows ?? []).filter((r) => r.s
 // there: a site with one language adds its second from the drawer. It asks the
 // server again whenever something is written, as Publish does.
 export function TranslationsButton() {
-  effect(() => {
-    browserRevision.get();
-    resourceRevision.get();
-    collectionRevision.get();
-    const timer = setTimeout(refreshTranslations, 400);
-    return () => clearTimeout(timer);
-  });
+  afterWrites(refreshTranslations);
   return (
     <button class="translations-button" onclick={() => toggleDrawer("translations")} aria-expanded={drawer.map((d) => String(d === "translations"))}>
       <Icon name="languages" /> <span class="label">Translations</span>
