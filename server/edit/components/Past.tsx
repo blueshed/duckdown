@@ -1,9 +1,9 @@
 import { createElement, computed, effect, list, signal, when } from "@blueshed/railroad";
 import { Icon } from "./Icon";
 import { PreviewFrame } from "./PreviewFrame";
-import { apiJson } from "../api";
+import { rendered } from "../api";
 import {
-  past, entries, seen, look, lookAtNow, leavePast, restoreSeen, sectionOf, type Entry,
+  past, entries, seen, look, lookAtNow, leavePast, restoreSeen, seenIsPage, type Entry,
 } from "../past";
 import { shortName } from "../store";
 
@@ -116,15 +116,9 @@ export function PastPreview() {
   const html = signal("");
   effect(() => {
     const now = seen.get();
-    const p = past.get();
-    if (!now || !p) return;
-    const section = p.kind === "versions" ? sectionOf(p.url) : p.section;
-    if (section !== "pages" || !now.entry.key.endsWith(".md")) return html.set("");
-    apiJson<{ html: string }>("render the earlier version", `/edit/mark/?path=${encodeURIComponent(now.entry.key)}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ source: now.text }),
-    }).then((data) => { if (data && seen.peek() === now) html.set(data.html); });
+    if (!now) return;
+    if (!seenIsPage.get()) return html.set("");
+    rendered<{ html: string }>("render the earlier version", now.entry.key, { source: now.text }).then((data) => { if (data && seen.peek() === now) html.set(data.html); });
   });
   return (
     <div class="past-preview">

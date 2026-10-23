@@ -31,6 +31,10 @@ export async function api(what: string, url: string, init?: RequestInit, allow: 
 // "About%20us.md", a "#" or "?" in a name kept), the slashes kept.
 export const urlPath = (path: string) => path.split("/").map(encodeURIComponent).join("/");
 
+// A request whose body is `data`, as JSON.
+export const asJson = (method: string, data: unknown): RequestInit =>
+  ({ method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
+
 // api() for a JSON answer: the parsed body, or null once the failure has spoken.
 export async function apiJson<T>(what: string, url: string, init?: RequestInit): Promise<T | null> {
   const res = await api(what, url, init);
@@ -42,3 +46,8 @@ export async function apiJson<T>(what: string, url: string, init?: RequestInit):
     return null;
   }
 }
+
+// A page at `path` as the site renders it (/edit/mark/), from markdown that may
+// not be saved: the preview, a template's sample page, an earlier version.
+export const rendered = <T>(what: string, path: string, data: unknown): Promise<T | null> =>
+  apiJson<T>(what, `/edit/mark/?path=${encodeURIComponent(path)}`, asJson("PUT", data));

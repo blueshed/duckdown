@@ -4,7 +4,7 @@ import { Icon } from "./Icon";
 import { byName } from "./Browser";
 import { api, apiJson, urlPath } from "../api";
 import { speak } from "../notice";
-import { closeImages } from "../store";
+import { closeDrawer } from "../store";
 import { modal } from "../modal";
 import { ResourceList } from "./ResourceList";
 import { ReportList } from "./ReportList";
@@ -100,7 +100,7 @@ export function ImageBrowser() {
   };
 
   return (
-    <Drawer icon="layout-template" title="Resources" close="Close resources" onclose={closeImages}>
+    <Drawer icon="layout-template" title="Resources" close="Close resources" onclose={closeDrawer}>
 
       <div class="browser-sections" role="tablist" aria-label="Resources" onkeydown={arrows}>
         {TABS.map(([name, label]) => (

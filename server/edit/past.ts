@@ -32,7 +32,7 @@ export const entries = signal<Entry[] | null>(null);   // null while it is asked
 export const seen = signal<Seen | null>(null);
 
 // The section a file's address is in: /edit/<section>/<key>.
-export const sectionOf = (url: string) => url.split("/")[2] as Section;
+const sectionOf = (url: string) => url.split("/")[2] as Section;
 
 // Where the one being looked at lives, and what it is called.
 const addressOf = (p: Past, entry: Entry) =>
@@ -56,7 +56,7 @@ export function whenKept(id: string): string {
 
 const size = (n: number) => (n < 1024 ? `${n} bytes` : `${(n / 1024).toFixed(1)} KB`);
 
-function enter(to: Past): void {
+function enter(to: Past | null): void {
   batch(() => {
     past.set(to);
     entries.set(null);
@@ -64,28 +64,27 @@ function enter(to: Past): void {
   });
 }
 
-// A file's versions, newest first; the newest is shown straight away, since
-// it is the one you most likely came for.
-export async function openVersions(url: string, name: string, onrestored: () => unknown): Promise<void> {
-  const here: Past = { kind: "versions", url, name, onrestored };
+// Into a past: its list, once it comes (unless another was opened meanwhile),
+// and the first of it shown straight away, the one you most likely came for.
+async function arrive(here: Past, list: () => Promise<Entry[] | undefined>): Promise<void> {
   enter(here);
-  const versions = await apiJson<{ id: string; size: number }[]>(`list the earlier versions of ${name}`, `${url}?versions`);
+  const rows = (await list()) ?? [];
   if (past.peek() !== here) return;
-  const rows = (versions ?? []).map((v) => ({ id: v.id, key: name, label: whenKept(v.id), detail: size(v.size) }));
   entries.set(rows);
   if (rows[0]) await look(rows[0]);
 }
 
+// A file's versions, newest first.
+export const openVersions = (url: string, name: string, onrestored: () => unknown): Promise<void> =>
+  arrive({ kind: "versions", url, name, onrestored }, async () =>
+    (await apiJson<{ id: string; size: number }[]>(`list the earlier versions of ${name}`, `${url}?versions`))
+      ?.map((v) => ({ id: v.id, key: name, label: whenKept(v.id), detail: size(v.size) })));
+
 // What was deleted from one section, each with the last version kept of it.
-export async function openDeleted(section: Section, onrestored: (key: string) => unknown): Promise<void> {
-  const here: Past = { kind: "deleted", section, onrestored };
-  enter(here);
-  const gone = await apiJson<{ key: string; id: string }[]>(`list what was deleted from ${section}`, `/edit/${section}/?deleted`);
-  if (past.peek() !== here) return;
-  const rows = (gone ?? []).map((d) => ({ id: d.id, key: d.key, label: d.key, detail: whenKept(d.id) }));
-  entries.set(rows);
-  if (rows[0]) await look(rows[0]);
-}
+export const openDeleted = (section: Section, onrestored: (key: string) => unknown): Promise<void> =>
+  arrive({ kind: "deleted", section, onrestored }, async () =>
+    (await apiJson<{ key: string; id: string }[]>(`list what was deleted from ${section}`, `/edit/${section}/?deleted`))
+      ?.map((d) => ({ id: d.id, key: d.key, label: d.key, detail: whenKept(d.id) })));
 
 export async function look(entry: Entry): Promise<boolean> {
   const p = past.peek();
@@ -112,11 +111,7 @@ export function lookAtNow(): void {
 }
 
 export function leavePast(): void {
-  batch(() => {
-    past.set(null);
-    entries.set(null);
-    seen.set(null);
-  });
+  enter(null);
 }
 
 export async function restoreSeen(): Promise<boolean> {

@@ -3,9 +3,9 @@ import { api, urlPath } from "./api";
 import { tell } from "./notice";
 import type { Row } from "../languages";
 import { SAYS, isWanted, type Standing, type Wanted } from "../standing";
-import { translations, languages, languageOf, refreshTranslations, loadFile, saveFile, editorContent, filePath, reloadBrowser } from "./store";
+import { translations, languages, languageOf, refreshTranslations, loadFile, saveFile, editorContent, filePath, reloadBrowser, createOnly } from "./store";
 
-export { refreshTranslations, SAYS, isWanted, type Wanted };
+export { refreshTranslations, SAYS, isWanted };
 
 // A site in more than one language, in the editor (languages.ts): where each
 // page and each item of a collection stands in each language, what the tree
@@ -119,8 +119,7 @@ export async function translate(lang: string, key: string): Promise<string | voi
   const begun = res.status !== 412;   // 412: it is there already, and is only opened
   if (begun) {
     if (!res.ok) return `Couldn't start translating ${key}`;
-    const created = await api(`create ${target}`, `/edit/pages/${urlPath(target)}`,
-      { method: "PUT", headers: { "If-None-Match": "*" }, body: await res.text() }, [412]);
+    const created = await createOnly(target, `/edit/pages/${urlPath(target)}`, await res.text());
     if (!created.ok && created.status !== 412) return `Couldn't create ${target}`;
     reloadBrowser();
   }

@@ -106,7 +106,7 @@ export function itemAddresses(file: RawFile, folder: string): { item: RawItem; h
 // changed, was never an address anyone linked to) and when no item answers at
 // it now (an item wins over an alias, so that alias would be dead). Renaming
 // back takes the alias off again. Answers a line to say for each alias made.
-export function keepAddresses(
+function keepAddresses(
   before: { item: RawItem; href: string }[], file: RawFile, folder: string, published: Set<string>,
 ): string[] {
   const after = itemAddresses(file, folder);
@@ -130,7 +130,7 @@ export function keepAddresses(
   return lines;
 }
 
-export function groupAt(file: RawFile | null, path: Path): RawGroup | null {
+function groupAt(file: RawFile | null, path: Path): RawGroup | null {
   let groups = file?.groups ?? [];
   let group: RawGroup | null = null;
   for (const i of path) {
@@ -142,7 +142,7 @@ export function groupAt(file: RawFile | null, path: Path): RawGroup | null {
 }
 
 // The array a group sits in: its parent's, or the file's own for a top group.
-export function siblingsOf(file: RawFile, path: Path): RawGroup[] {
+function siblingsOf(file: RawFile, path: Path): RawGroup[] {
   const parent = groupAt(file, path.slice(0, -1));
   if (parent) return (parent.groups ??= []);
   return (file.groups ??= []);
@@ -151,14 +151,14 @@ export function siblingsOf(file: RawFile, path: Path): RawGroup[] {
 // Out of its place and into another, which for a move down past a row means
 // after it: splice takes the item out first, so the row you dropped on has
 // already moved up one.
-export function moveWithin<T>(arr: T[], from: number, to: number): void {
+function moveWithin<T>(arr: T[], from: number, to: number): void {
   const held = arr.splice(from, 1);
   arr.splice(Math.max(0, Math.min(to, arr.length)), 0, ...held);
 }
 
 // Steps an open pane can take back. Each is a whole file, so this is a bound
 // on memory rather than on patience: four hundred works is ~100KB a step.
-export const UNDO_LIMIT = 100;
+const UNDO_LIMIT = 100;
 
 // A picture's file name as a starting title: "First Light.jpg" → "First
 // Light". It is a guess, shown in an input, and changed in a second.

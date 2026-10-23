@@ -1,5 +1,5 @@
 import { createElement, signal, computed, list, when } from "@blueshed/railroad";
-import { api, apiJson } from "../api";
+import { api, apiJson, asJson } from "../api";
 import { tell } from "../notice";
 import { Icon } from "./Icon";
 import { ConfirmDialog } from "./ConfirmDialog";
@@ -14,7 +14,6 @@ import { closeDrawer } from "../store";
 type Editor = { name: string; env: boolean };
 type Info = { me: string; users: Editor[] };
 
-const JSON_HEADERS = { "Content-Type": "application/json" };
 const EXPLAINED = [400, 403, 404, 409];
 
 export function EditorsDrawer() {
@@ -40,7 +39,7 @@ export function EditorsDrawer() {
     const form = e.target as HTMLFormElement;
     const name = (form.elements.namedItem("name") as HTMLInputElement).value.trim();
     const password = (form.elements.namedItem("password") as HTMLInputElement).value;
-    if (!await change(`add ${name}`, { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ name, password }) })) return;
+    if (!await change(`add ${name}`, asJson("POST", { name, password }))) return;
     form.reset();
     tell(`${name} can sign in`);
     await load();
@@ -51,8 +50,7 @@ export function EditorsDrawer() {
     const form = e.target as HTMLFormElement;
     const password = (form.elements.namedItem("password") as HTMLInputElement).value;
     const current = (form.elements.namedItem("current") as HTMLInputElement | null)?.value;
-    const body = JSON.stringify({ name, password, current });
-    if (!await change(`set ${name}'s password`, { method: "PUT", headers: JSON_HEADERS, body })) return;
+    if (!await change(`set ${name}'s password`, asJson("PUT", { name, password, current }))) return;
     setting.set("");
     tell(name === info.peek()!.me
       ? "Your password changed. Your other sessions have ended; this one carries on."
