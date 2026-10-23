@@ -1,6 +1,6 @@
 import type { Storage } from "./storage";
 import { DEBUG } from "./config";
-import { buildNav, parseFrontMatter, yes, sortFolders, folderOrder } from "./markdown";
+import { parseFrontMatter, sortFolders, folderOrder } from "./markdown";
 import { escapeHtml, canonicalPath, dateHtml } from "./utils";
 import { unlisted, pageKey, readable } from "./listed";
 import { kept } from "./kept";
@@ -16,7 +16,7 @@ import { joinKey } from "./slugs";
 // language; a folder's listing by its language and its name, after a NUL, which
 // no folder's name can hold.
 const nav = kept(async (pages, lang, debug) =>
-  lang ? languageNav(pages, lang) : buildNav(pages, "", (await languagesOf(pages, debug)).others));
+  navOf(pages, lang, lang ? [] : (await languagesOf(pages, debug)).others));
 
 const listings = kept((pages, key) => {
   const at = key.indexOf("\0");
@@ -33,56 +33,21 @@ export type Listed = { key: string; href: string; title: string; date: string; d
 
 const byDateThenTitle = (a: Listed, b: Listed) => b.date.localeCompare(a.date) || a.title.localeCompare(b.title);
 
-// A folder's pages, newest first by date:, then by title: what listed.ts says
-// is a page, less the folder's own index. The feed (feed.ts) is made from
-// these too, so it and {{pages}} agree.
-export async function folderEntries(pages: Storage, folder: string, lang = ""): Promise<Listed[]> {
-  if (lang) return languageEntries(pages, folder, lang);
-  const { files } = await pages.list(folder);
-  const entries: Listed[] = [];
+// The page that answers for `key` in a language's site, the default's when
+// `lang` is empty: the key it is read from, whether it is the language's own
+// words, and its front matter. Null when nothing does: no page, or one no
+// reader can have (listed.ts: a draft, an each: page), which translation()
+// has left out already for a language.
+type Answer = { key: string; kind: string; meta: Record<string, string[]> };
 
-  for (const file of files) {
-    if (!pageKey(file.path) || file.name === "index.md" || unlisted(file.name)) continue;
-    const { meta } = parseFrontMatter(await pages.read(file.path));
-    if (!readable(meta)) continue;
-    entries.push({
-      key: file.path,
-      href: encodeURI(`/${file.path.replace(/\.md$/, ".html")}`),
-      title: meta.title?.[0] ?? file.name.replace(/\.md$/, ""),
-      date: meta.date?.[0] ?? "",
-      description: meta.description?.[0] ?? "",
-    });
-  }
-  return entries.sort(byDateThenTitle);
-}
-
-// A language's folder: its pages as that language's site has them, which is
-// what answers at each address (languages.ts) — the page written in the
-// language, else the default's standing in for it — and so what links there,
-// and what is said of it. A translation says nothing of its date when the
-// default's page already did: a date is the same in every language, and a
-// listing in order must not lose it to a translator who copied only the words.
-async function languageEntries(pages: Storage, folder: string, lang: string): Promise<Listed[]> {
-  const entries: Listed[] = [];
-  for (const name of (await treeOf(pages, lang, folder)).files) {
-    const key = joinKey(folder, name);
-    if (!pageKey(key) || name === "index.md") continue;
+async function answering(pages: Storage, lang: string, key: string): Promise<Answer | null> {
+  if (lang) {
     const answer = await translation(pages, lang, key);
-    if (!answer) continue;
-    const { meta } = parseFrontMatter(await pages.read(answer.key));
-    let date = meta.date?.[0];
-    if (date === undefined && answer.kind === "translated" && await pages.exists(key)) {
-      date = parseFrontMatter(await pages.read(key)).meta.date?.[0];
-    }
-    entries.push({
-      key: answer.key,
-      href: encodeURI(`/${lang}/${key.replace(/\.md$/, ".html")}`),
-      title: meta.title?.[0] ?? name.replace(/\.md$/, ""),
-      date: date ?? "",
-      description: meta.description?.[0] ?? "",
-    });
+    return answer ? { ...answer, meta: parseFrontMatter(await pages.read(answer.key)).meta } : null;
   }
-  return entries.sort(byDateThenTitle);
+  if (!await pages.exists(key)) return null;
+  const { meta } = parseFrontMatter(await pages.read(key));
+  return readable(meta) ? { key, kind: "translated", meta } : null;
 }
 
 // A language's folders in order: the order is the default's (it is the same in
@@ -93,33 +58,70 @@ const languageOrder = (pages: Storage, lang: string) => async (folder: { path: s
   return own !== Infinity ? own : folderOrder(pages, `${lang}/${folder.path}`);
 };
 
-// A language's folders inside a folder (named in the default's tree), as the
-// nav and the sitemap walk them.
-async function languageFolders(pages: Storage, lang: string, folder: string) {
-  const { folders } = await treeOf(pages, lang, folder);
-  return sortFolders(pages, folders.map((name) => ({ name, path: joinKey(folder, name) })), languageOrder(pages, lang));
+// The folders inside a folder, in the order the nav and the sitemap walk them.
+// A language's are both trees' (languages.ts); the default's leave out `skip`
+// at the top, the folders that are other languages.
+async function foldersOf(pages: Storage, lang: string, folder: string, skip: string[]) {
+  if (lang) {
+    const { folders } = await treeOf(pages, lang, folder);
+    return sortFolders(pages, folders.map((name) => ({ name, path: joinKey(folder, name) })), languageOrder(pages, lang));
+  }
+  const { folders } = await pages.list(folder);
+  return sortFolders(pages, folders.filter((f) => !unlisted(f.name) && !(folder === "" && skip.includes(f.name))));
 }
 
-// The nav of a language: the same walk as the default's — an entry for each
-// folder's index, folders in order — over what answers in the language, and
-// pointing into its site (/cy/blog/). The page that answers decides the
-// entry, label and all: a folder whose index isn't translated is there under
-// the default's name, and a translator who gives one gives the language's.
-async function languageNav(pages: Storage, lang: string, folder = ""): Promise<string> {
+// The nav: an entry for each folder's index, folders in order, over what
+// answers in the site, and pointing into it (/cy/blog/ in a language's). The
+// page that answers decides the entry, label and all: a folder whose index
+// isn't translated is there under the default's name.
+async function navOf(pages: Storage, lang: string, skip: string[], folder = ""): Promise<string> {
   const items: string[] = [];
   const key = joinKey(folder, "index.md");
-  const answer = await translation(pages, lang, key);
-  if (answer) {
-    // translation() has left out a draft and an each: page already.
-    const { meta } = parseFrontMatter(await pages.read(answer.key));
-    const title = meta.nav?.[0] || meta.title?.[0];
-    if (title) items.push(`<li><a href="${encodeURI(canonicalPath(`${lang}/${key}`))}">${escapeHtml(title)}</a></li>`);
-  }
-  for (const sub of await languageFolders(pages, lang, folder)) {
-    const inside = await languageNav(pages, lang, sub.path);
+  const index = await answering(pages, lang, key);
+  const title = index && (index.meta.nav?.[0] || index.meta.title?.[0]);
+  if (title) items.push(`<li><a href="${encodeURI(canonicalPath(joinKey(lang, key)))}">${escapeHtml(title)}</a></li>`);
+  for (const sub of await foldersOf(pages, lang, folder, skip)) {
+    const inside = await navOf(pages, lang, skip, sub.path);
     if (inside) items.push(inside);
   }
   return items.join("\n");
+}
+
+// The default's nav, from a folder down; `skip` names top-level folders to
+// leave out (the languages').
+export const buildNav = (pages: Storage, prefix = "", skip: string[] = []): Promise<string> => navOf(pages, "", skip, prefix);
+
+// A folder's pages, newest first by date:, then by title: what listed.ts says
+// is a page, less the folder's own index. The feed (feed.ts) is made from
+// these too, so it and {{pages}} agree. In a language's folder it is what
+// answers at each address there, the language's page or the default's
+// standing in, and a translation that says nothing of its date takes its
+// original's: a date is the same in every language, and a listing in order
+// must not lose it to a translator who copied only the words.
+export async function folderEntries(pages: Storage, folder: string, lang = ""): Promise<Listed[]> {
+  const names = lang
+    ? (await treeOf(pages, lang, folder)).files
+    : (await pages.list(folder)).files.map((f) => f.name).filter((name) => !unlisted(name));
+  const entries: Listed[] = [];
+  for (const name of names) {
+    const key = joinKey(folder, name);
+    if (!pageKey(key) || name === "index.md") continue;
+    const answer = await answering(pages, lang, key);
+    if (!answer) continue;
+    const { meta } = answer;
+    let date = meta.date?.[0];
+    if (date === undefined && lang && answer.kind === "translated" && await pages.exists(key)) {
+      date = parseFrontMatter(await pages.read(key)).meta.date?.[0];
+    }
+    entries.push({
+      key: answer.key,
+      href: encodeURI(`/${joinKey(lang, key).replace(/\.md$/, ".html")}`),
+      title: meta.title?.[0] ?? name.replace(/\.md$/, ""),
+      date: date ?? "",
+      description: meta.description?.[0] ?? "",
+    });
+  }
+  return entries.sort(byDateThenTitle);
 }
 
 // The folder's pages, for {{pages}} in its index.
@@ -135,19 +137,6 @@ async function buildListing(pages: Storage, folder: string, lang: string): Promi
   return `<ul class="pages">\n${items.join("\n")}\n</ul>`;
 }
 
-// The front matter of the page that answers for `key` in a language's site —
-// in the default's, when `lang` is empty — or null when nothing does: no page,
-// or a draft.
-async function answering(pages: Storage, lang: string, key: string): Promise<Record<string, string[]> | null> {
-  if (lang) {
-    const answer = await translation(pages, lang, key);
-    return answer ? parseFrontMatter(await pages.read(answer.key)).meta : null;
-  }
-  if (!await pages.exists(key)) return null;
-  const { meta } = parseFrontMatter(await pages.read(key));
-  return yes(meta.draft) ? null : meta;
-}
-
 // {{pages}} made recursive: every page, each folder under its index's title,
 // in the order {{pages}} uses, and leaving out what it leaves out. `skip` is
 // the default's top-level folders that aren't part of it: the languages'.
@@ -158,22 +147,19 @@ async function buildSiteMap(pages: Storage, folder: string, lang: string, skip: 
   // the label of the folder, below.
   if (!folder) {
     const home = await answering(pages, lang, "index.md");
-    if (home) items.push(`<li><a href="${canonicalPath(at("index.md"))}">${escapeHtml(home.title?.[0] ?? "Home")}</a></li>`);
+    if (home) items.push(`<li><a href="${canonicalPath(at("index.md"))}">${escapeHtml(home.meta.title?.[0] ?? "Home")}</a></li>`);
   }
 
   for (const entry of await folderEntries(pages, folder, lang)) {
     items.push(`<li><a href="${entry.href}">${escapeHtml(entry.title)}</a></li>`);
   }
   // Follows the nav's own order, so the two agree on which folder comes first.
-  const folders = lang
-    ? await languageFolders(pages, lang, folder)
-    : await sortFolders(pages, (await pages.list(folder)).folders.filter((f) => !unlisted(f.name) && !(folder === "" && skip.includes(f.name))));
-  for (const sub of folders) {
+  for (const sub of await foldersOf(pages, lang, folder, skip)) {
     const path = sub.path;
     const inside = await buildSiteMap(pages, path, lang, skip);
     if (!inside) continue;
-    const meta = await answering(pages, lang, `${path}/index.md`);
-    const title = meta ? meta.title?.[0] ?? sub.name : "";
+    const index = await answering(pages, lang, `${path}/index.md`);
+    const title = index ? index.meta.title?.[0] ?? sub.name : "";
     const name = title ? `<a href="${encodeURI(canonicalPath(at(`${path}/index.md`)))}">${escapeHtml(title)}</a>` : escapeHtml(sub.name);
     items.push(`<li>${name}\n${inside}</li>`);
   }

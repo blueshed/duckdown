@@ -212,6 +212,15 @@ describe("siteMap", () => {
     for (const gone of ["Later", "Lost", "Private", "Hidden"]) expect(html).not.toContain(gone);
   });
 
+  test("an index that is an each: page labels its folder no more than the nav does", async () => {
+    // It is what every item is made from, not a page a reader can have: the
+    // nav and {{pages}} left it out, and {{sitemap}} linked the folder to it.
+    const html = await siteMap(memory({ "works/index.md": "title: Works\neach: true\n\nx", "works/one.md": "title: One\n\nx" }), true);
+    expect(html).not.toContain('href="/works/"');
+    expect(html).toContain("<li>works\n");
+    expect(html).toContain('<a href="/works/one.html">One</a>');
+  });
+
   test("a folder with a draft index is listed by its name, and one with nothing to show isn't listed", async () => {
     const html = await siteMap(pages(), true);
     expect(html).toContain("<li>drafty\n");            // named, not linked: its index is a draft

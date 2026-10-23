@@ -1,7 +1,5 @@
 import type { Storage } from "./storage";
 import { DEBUG } from "./config";
-import { canonicalPath, escapeHtml } from "./utils";
-import { unlisted, readable } from "./listed";
 
 // Front-matter parser + Bun.markdown wrapper
 
@@ -209,31 +207,6 @@ export async function sortFolders<T extends { name: string; path: string }>(
   return withOrder.map((x) => x.f);
 }
 
-// Build nav from index.md files — walks folders looking for nav/title metadata.
-// `skip` names top-level folders to leave out: another language's, which the
-// site's own nav doesn't list (a language's is built apart, in nav.ts).
-export async function buildNav(pages: Storage, prefix = "", skip: string[] = []): Promise<string> {
-  const { folders, files } = await pages.list(prefix);
-  const items: string[] = [];
-
-  // Check current folder's index.md for a nav entry
-  for (const f of files) {
-    if (f.name === "index.md") {
-      const raw = await pages.read(f.path);
-      const { meta } = parseFrontMatter(raw);
-      const title = meta.nav?.[0] || meta.title?.[0];
-      if (title && readable(meta)) { // a draft stays out of the nav, and so does an each: page
-        const href = encodeURI(canonicalPath(f.path));
-        items.push(`<li><a href="${href}">${escapeHtml(title)}</a></li>`);
-      }
-    }
-  }
-
-  // Recurse into subfolders, ordered
-  for (const folder of await sortFolders(pages, folders.filter((f) => !unlisted(f.name) && !skip.includes(f.name)))) {
-    const sub = await buildNav(pages, folder.path);
-    if (sub) items.push(sub);
-  }
-
-  return items.length > 0 ? items.join("\n") : "";
-}
+// The nav is built in nav.ts, with a language's; here for whatever imports it
+// from where it used to be.
+export { buildNav } from "./nav";
