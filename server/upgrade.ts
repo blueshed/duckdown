@@ -82,11 +82,7 @@ export function compare(before: string, after: string): { same: number; added: s
 // notes below the list aren't scrolled away.
 const FOLDED = 5;
 export function folded(paths: string[]): string[] {
-  const byFolder = new Map<string, string[]>();
-  for (const path of paths) {
-    const folder = path.includes("/") ? path.slice(0, path.indexOf("/") + 1) : "";
-    byFolder.set(folder, [...(byFolder.get(folder) ?? []), path]);
-  }
+  const byFolder = Map.groupBy(paths, (path) => path.slice(0, path.indexOf("/") + 1));
   return [...byFolder].flatMap(([folder, list]) =>
     folder && list.length > FOLDED ? [`${folder} (${list.length} files)`] : list);
 }

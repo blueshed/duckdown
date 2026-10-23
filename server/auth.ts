@@ -35,22 +35,14 @@ function base64urlDecode(str: string): Uint8Array {
   return Uint8Array.from(binary, (c) => c.charCodeAt(0));
 }
 
-async function hmacKey(): Promise<CryptoKey> {
-  return crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(SECRET),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign", "verify"],
-  );
-}
+// Made once: the secret is read once, as the module loads.
+const KEY = await crypto.subtle.importKey("raw", new TextEncoder().encode(SECRET), { name: "HMAC", hash: "SHA-256" }, false, ["sign", "verify"]);
 
 export async function signJwt(payload: Record<string, unknown>): Promise<string> {
   const header = base64url(new TextEncoder().encode(JSON.stringify({ alg: "HS256", typ: "JWT" })));
   const body = base64url(new TextEncoder().encode(JSON.stringify(payload)));
   const data = `${header}.${body}`;
-  const key = await hmacKey();
-  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(data));
+  const sig = await crypto.subtle.sign("HMAC", KEY, new TextEncoder().encode(data));
   return `${data}.${base64url(new Uint8Array(sig))}`;
 }
 
@@ -61,8 +53,7 @@ export async function verifyJwt(token: string): Promise<Record<string, unknown> 
   try {
     const data = `${parts[0]}.${parts[1]}`;
     const sig = base64urlDecode(parts[2]!);
-    const key = await hmacKey();
-    const valid = await crypto.subtle.verify("HMAC", key, sig.buffer as ArrayBuffer, new TextEncoder().encode(data));
+    const valid = await crypto.subtle.verify("HMAC", KEY, sig.buffer as ArrayBuffer, new TextEncoder().encode(data));
     if (!valid) return null;
 
     const payload = JSON.parse(new TextDecoder().decode(base64urlDecode(parts[1]!)));
@@ -175,8 +166,7 @@ export function signedIn<T extends Record<string, SignedIn>>(methods: T): { [K i
 const loginHtml = await Bun.file(import.meta.dir + "/edit/login.html").text();
 
 function renderLogin(status: number, next: string, error?: string, email?: string): Response {
-  const res = new Response(loginHtml, { headers: { "Content-Type": "text/html" } });
-  const rewritten = new HTMLRewriter()
+  const html = new HTMLRewriter()
     .on("#error", {
       element(el) {
         if (error) {
@@ -196,12 +186,8 @@ function renderLogin(status: number, next: string, error?: string, email?: strin
         el.setAttribute("value", next);
       },
     })
-    .transform(res);
-
-  return new Response(rewritten.body, {
-    status,
-    headers: { "Content-Type": "text/html; charset=utf-8" },
-  });
+    .transform(loginHtml);
+  return new Response(html, { status, headers: { "Content-Type": "text/html; charset=utf-8" } });
 }
 
 // --- Route handlers ---

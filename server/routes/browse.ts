@@ -19,13 +19,14 @@ export const handleBrowse = signedIn({
     const thumb = new URL(req.url).searchParams.get("thumb");
 
     if (path && (await images.exists(path))) {
+      const original = await images.readBytes(path);
       // SVG is vector and already scales cleanly — Bun.Image only decodes
       // raster formats, so it's served as-is rather than resized. So is
       // anything else it can't decode (an .ico, an .xml kept among the
       // pictures): the browser shows it or doesn't, and the list still opens.
       if (thumb && !path.toLowerCase().endsWith(".svg")) {
         const size = Math.min(Math.max(parseInt(thumb, 10) || THUMB_MIN, THUMB_MIN), THUMB_MAX);
-        const bytes = await new Bun.Image(await images.readBytes(path))
+        const bytes = await new Bun.Image(original)
           .resize(size, size, { fit: "inside", withoutEnlargement: true })
           .webp({ quality: 70 })
           .bytes()
@@ -36,7 +37,7 @@ export const handleBrowse = signedIn({
           });
         }
       }
-      return new Response(Buffer.from(await images.readBytes(path)), {
+      return new Response(Buffer.from(original), {
         headers: { "Content-Type": images.mime(path), "Cache-Control": "private, max-age=86400", ...asFile(images.mime(path)) },
       });
     }
@@ -49,8 +50,8 @@ export const handleBrowse = signedIn({
   async PUT(req: BunRequest) {
     const path = after(req, "/edit/browse/");
     if (path) {
-      // Create folder by writing a placeholder, then deleting it
-      // This ensures the directory exists on disk
+      // A new folder is a placeholder written in it, which makes it on disk
+      // and in a bucket alike; a dot name, so nothing lists it.
       const placeholder = `${path}/.gitkeep`;
       await images.write(placeholder, "");
       return Response.json(await images.list(path));

@@ -4,6 +4,7 @@ import { parseFrontMatter, renderMarkdown, yes } from "./markdown";
 import { folderEntries } from "./nav";
 import { canonicalPath, escapeHtml } from "./utils";
 import { kept } from "./kept";
+import { joinKey } from "./slugs";
 
 // A folder that says `feed: true` in its index.md can be followed in a feed
 // reader: /<folder>/feed.xml, an Atom feed of the pages {{pages}} lists there,
@@ -27,7 +28,7 @@ function atomTime(date: string): string | null {
 }
 
 async function buildFeed(pages: Storage, folder: string): Promise<Feed | null> {
-  const index = `${folder ? `${folder}/` : ""}index.md`;
+  const index = joinKey(folder, "index.md");
   if (!await pages.exists(index)) return null;
   const { meta } = parseFrontMatter(await pages.read(index));
   if (!yes(meta.feed) || yes(meta.draft)) return null;
@@ -41,7 +42,7 @@ async function buildFeed(pages: Storage, folder: string): Promise<Feed | null> {
   return { url: canonicalPath(index), title: meta.title?.[0] ?? (folder || "Home"), entries };
 }
 
-const feedOf = kept((pages, folder) => buildFeed(pages, folder));
+const feedOf = kept(buildFeed);
 
 // The folder's feed as Atom, or null when it doesn't have one. The author is
 // the site's host: Atom asks for one, and a site is who writes it.

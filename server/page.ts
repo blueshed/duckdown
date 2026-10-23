@@ -108,10 +108,7 @@ async function resolveIncludes(body: string, draft?: DraftTemplate, lang = ""): 
 // {{items template=tile}}: templates/tile.html, the look of one item in an
 // overview — or the unsaved copy, when that is the template open in the editor.
 async function itemTemplate(name: string, draft?: DraftTemplate): Promise<string | null> {
-  if (!plainName(name)) return null;
-  if (draft?.name === `${name}.html`) return draft.body;
-  const key = `${TEMPLATES_PATH}${name}.html`;
-  return await site.exists(key) ? site.read(key) : null;
+  return plainName(name) ? (await firstTemplate([`${name}.html`], draft))?.body ?? null : null;
 }
 
 export type Page = {

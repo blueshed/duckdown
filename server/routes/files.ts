@@ -62,6 +62,9 @@ export function fileRoutes(
     return Response.json({ ok: true, to, kept: moved.kept });
   };
 
+  // A file handed out as it is, sandboxed unless it is something to look at.
+  const asIs = (key: string) => ({ "Content-Type": store.mime(key), ...asFile(store.mime(key)) });
+
   return signedIn({
     async GET(req: BunRequest) {
       const key = path(req);
@@ -75,12 +78,10 @@ export function fileRoutes(
         if (q.has("versions")) return Response.json(await history.versions(key));
         const body = await history.read(key, q.get("version")!);
         if (!body) return new Response("No such version", { status: 404 });
-        return new Response(Buffer.from(body), { headers: { "Content-Type": store.mime(key), ...asFile(store.mime(key)) } });
+        return new Response(Buffer.from(body), { headers: asIs(key) });
       }
       if (key && (await store.exists(key))) {
-        return new Response(await store.read(key), {
-          headers: { "Content-Type": store.mime(key), ...asFile(store.mime(key)) },
-        });
+        return new Response(await store.read(key), { headers: asIs(key) });
       }
       // A missing file is a 404, not an empty folder listing in its place
       // (which the editor would open as the file's text). Anything with an

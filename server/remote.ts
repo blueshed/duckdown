@@ -73,6 +73,10 @@ async function must(cwd: string, args: string[]): Promise<string> {
   return ran.out;
 }
 
+// What a path in the repository starts with when it is in the site's folder
+// (`under`, "" when the folder is the repository's top).
+const inside = (under: string) => (under ? `${under}/` : "");
+
 // `git status --porcelain -z`: "XY path\0", and a rename's old path after it.
 export function parseStatus(out: string, under: string): Change[] {
   const changes: Change[] = [];
@@ -90,8 +94,7 @@ export function parseStatus(out: string, under: string): Change[] {
       changes.push({ path, state });
     }
   }
-  const cut = under ? `${under}/` : "";
-  return changes.map((c) => ({ ...c, path: c.path.slice(cut.length) }));
+  return changes.map((c) => ({ ...c, path: c.path.slice(inside(under).length) }));
 }
 
 export function gitRemote(contentDir: string, keep = (section: string) => new History(new LocalStorage(join(contentDir, HISTORY_DIR, section)))): Remote {
@@ -109,7 +112,7 @@ export function gitRemote(contentDir: string, keep = (section: string) => new Hi
   // The content folder, and never what stays on this machine.
   const paths = (under: string) => [
     under || ".",
-    ...NEVER.map((n) => `:(exclude)${under ? `${under}/` : ""}${n}`),
+    ...NEVER.map((n) => `:(exclude)${inside(under)}${n}`),
   ];
 
   const upstream = async (root: string) => {
@@ -135,7 +138,7 @@ export function gitRemote(contentDir: string, keep = (section: string) => new Hi
   // exclude it, and the scaffold's .gitignore names two of them.
   const commit = async (root: string, under: string, message: string, by: string) => {
     await must(root, ["add", "-A", "--", under || "."]);
-    await must(root, ["reset", "-q", "--", ...NEVER.map((n) => `${under ? `${under}/` : ""}${n}`)]);
+    await must(root, ["reset", "-q", "--", ...NEVER.map((n) => `${inside(under)}${n}`)]);
     await must(root, ["commit", "-m", message, "-m", `Edited-by: ${by}`, "--", ...paths(under)]);
   };
 
@@ -187,7 +190,7 @@ export function gitRemote(contentDir: string, keep = (section: string) => new Hi
       const conflicts: string[] = [];
       if (merged.code !== 0) {
         const unmerged = (await must(root, ["diff", "--name-only", "--diff-filter=U", "-z"])).split("\0").filter(Boolean);
-        const cut = under ? `${under}/` : "";
+        const cut = inside(under);
         if (!unmerged.length || unmerged.some((p) => !p.startsWith(cut))) {
           await git(root, ["merge", "--abort"]);
           throw new RemoteRefused(`Pulling needs a hand in git: ${(merged.err || merged.out).trim().split("\n")[0]}`);
@@ -209,7 +212,7 @@ export function gitRemote(contentDir: string, keep = (section: string) => new Hi
         await must(root, ["commit", "--no-edit"]);
       }
       const changed = (await must(root, ["diff", "--name-only", "-z", before, "HEAD", "--", ...paths(under)]))
-        .split("\0").filter(Boolean).map((p) => p.slice(under ? under.length + 1 : 0));
+        .split("\0").filter(Boolean).map((p) => p.slice(inside(under).length));
       return { changed, conflicts };
     },
   };

@@ -88,4 +88,5 @@ console.log(`  site: ${server.url}`);
 console.log(`  edit: ${server.url}edit`);
 console.log(`  login: ${server.url}login`);
 // Said last, so it is the thing left on screen.
-if (scaffoldNotice()) console.log(scaffoldNotice());
+const notice = scaffoldNotice();
+if (notice) console.log(notice);
