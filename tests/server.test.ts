@@ -1174,6 +1174,20 @@ describe("folders, the edit link, layouts, drafts and listings", () => {
     expect(html).not.toContain("{{");
   });
 
+  test("what a placeholder is filled with is never filled again: a title can say {{nav}}", async () => {
+    // One placeholder after another, {{title}} was filled first and {{nav}}
+    // then put the whole nav inside <title> and og:title.
+    writeFileSync(join(SITE, "templates", "named.html"),
+      `<html><head><title>{{title}}</title>{{description}}</head><body>{{nav}}{{content}}</body></html>`);
+    await put("braces.md", "title: Using {{nav}}\nlayout: named\n\nWrite `{{date}}` for the date.");
+
+    const html = await (await fetch(`${BASE}/braces.html`)).text();
+    expect(html).toContain("<title>Using {{nav}}</title>");
+    expect(html).toContain('<meta property="og:title" content="Using {{nav}}">');
+    expect(html.match(/<nav>/g)).toHaveLength(1);     // the template's, and only there
+    expect(html).toContain("<code>{{date}}</code>"); // the page's own text, as written
+  });
+
   test("{{pages}} in code stays as written, so a page can document it", async () => {
     await put("docs/index.md", "title: Docs\n\nWrite `{{pages}}`:\n\n```markdown\ntitle: Blog\n\n{{pages}}\n```\n\n{{pages}}");
     await put("docs/one.md", "title: One\n\nOne");

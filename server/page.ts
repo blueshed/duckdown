@@ -66,15 +66,6 @@ async function firstTemplate(names: string[], draft?: DraftTemplate): Promise<{ 
   return null;
 }
 
-// Fill every occurrence of a placeholder: a template may use one more than once
-// (a title belongs in <title> and again in og:title), and String.replace with a
-// string pattern only ever does the first. The value is a function rather than
-// a string because a string replacement reads $$, $& and $' in the page as
-// patterns — "$$5" would publish as "$5".
-function fill(html: string, name: string, value: () => string): string {
-  return html.includes(`{{${name}}}`) ? html.replace(new RegExp(`\\{\\{${name}\\}\\}`, "g"), value) : html;
-}
-
 // {{include name}} pulls templates/name.html into a template — the seed's
 // search form and nav wrapper, shared by site.html and post.html, instead of
 // pasted into each. Resolved once, over the template as chosen, before
@@ -289,24 +280,30 @@ export async function pageHtml(page: Page, o: PageOptions): Promise<{ html: stri
   // only when the site has another language and the template wants them.
   const found = languages.others.length && (html.includes("{{languages}}") || html.includes("{{description}}"))
     ? await (o.item ? itemCounterparts(pages, o.item) : counterparts(pages, page.key)) : [];
-  for (const [name, value] of [
-    ["title", () => escapeHtml(title)],
-    ["url", () => escapeHtml(o.origin + address)],
-    ["date", () => dateHtml(meta.date?.[0] ?? "", written)],
+  // Every placeholder in one pass, so what one is filled with is never read as
+  // another: a title that says {{nav}}, or the page's own text ({{content}}),
+  // stays as written. Each one used is filled everywhere it is (a title is in
+  // <title> and again in og:title), and by a function, never a string, which
+  // String.replace would read $$, $& and $' in as patterns: "$$5" would
+  // publish as "$5".
+  const values: Record<string, () => string> = {
+    title: () => escapeHtml(title),
+    url: () => escapeHtml(o.origin + address),
+    date: () => dateHtml(meta.date?.[0] ?? "", written),
     // The language the page's words are in, for <html lang>: a reader's
     // screen reader speaks it in that voice.
-    ["lang", () => escapeHtml(written)],
+    lang: () => escapeHtml(written),
     // Where the reader's language begins, for a link home or a search that
     // stays in it: "/" or "/cy/".
-    ["root", () => chrome ? `/${chrome}/` : "/"],
-    ["languages", () => languageList(found, stands)],
+    root: () => chrome ? `/${chrome}/` : "/",
+    languages: () => languageList(found, stands),
     // The page's description, and the card a link to it shows when shared:
     // Open Graph, which most places that unfurl a link read. Addresses in it
     // are absolute, so without an origin (an export with no DUCKDOWN_ORIGIN)
     // the URL and the picture are left out rather than written relative. The
     // site's own picture says its size, so a card can be drawn before it loads;
     // an icon is a small card, not a large one.
-    ["description", () => {
+    description: () => {
       const picture = pictureUrl(meta.image?.[0] || shared?.file || "", o.origin);
       const large = !shared || shared.large;
       const tag = (attr: string, name: string, value: string) => `<meta ${attr}="${name}" content="${escapeHtml(value)}">`;
@@ -323,24 +320,22 @@ export async function pageHtml(page: Page, o: PageOptions): Promise<{ html: stri
         ...(picture && (shared ? shared.alt : title) ? [tag("property", "og:image:alt", shared ? shared.alt : title)] : []),
         ...(picture ? [tag("name", "twitter:card", large ? "summary_large_image" : "summary")] : []),
       ].join("\n  ");
-    }],
-    ["nav", () => nav ? `<nav><ul class="nav">${nav}</ul></nav>` : ""],
+    },
+    nav: () => nav ? `<nav><ul class="nav">${nav}</ul></nav>` : "",
     // The feed of the folder this page is in, for a reader's browser to find.
-    ["feed", () => feed],
+    feed: () => feed,
     // A stylesheet this page asked for by name: `css: poster` links
     // /static/poster.css after whatever the template links, so one page can
     // look however it likes without a template of its own. Guarded like
     // `layout`, so a page can't reach out of static/.
-    ["css", () => {
+    css: () => {
       const sheet = meta.css?.[0] ?? "";
       return plainName(sheet) ? `<link rel="stylesheet" href="/static/${sheet}.css">` : "";
-    }],
-    ["edit", () => o.editHref ? `<a class="user-edit" href="${escapeHtml(o.editHref)}">Edit this page</a>` : ""],
-    // Last, so a placeholder written in a page's own text is never filled in.
-    ["content", () => body],
-  ] as const) {
-    html = fill(html, name, value);
-  }
+    },
+    edit: () => o.editHref ? `<a class="user-edit" href="${escapeHtml(o.editHref)}">Edit this page</a>` : "",
+    content: () => body,
+  };
+  html = html.replace(new RegExp(`\\{\\{(${Object.keys(values).join("|")})\\}\\}`, "g"), (_, name: string) => values[name]!());
 
   // What the page wears, for the editor: the template it settled on, and any
   // include that came from a real file, so ResourcePane can say a draft
