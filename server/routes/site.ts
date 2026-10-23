@@ -1,7 +1,7 @@
 import { createPageStorage } from "../storage";
 import { yes } from "../markdown";
 import { getUser } from "../auth";
-import { parsePage, pageHtml, itemPage } from "../page";
+import { parsePage, pageHtml, itemPage, type Page, type PageOptions } from "../page";
 import { logView } from "../log";
 import { decodePath, conditional } from "../utils";
 import { aliasTarget } from "../search";
@@ -52,12 +52,16 @@ export const handleSite = siteHandler(ORIGIN);
 const HTML = "text/html; charset=utf-8";
 
 // A page as a reader or an editor is given it. Signed in, it carries an edit
-// link a reader's copy doesn't: never kept, and never shared. Otherwise it is
-// cached like a static file.
-const pageResponse = (req: Request, html: string, signedIn: boolean) =>
-  signedIn
+// link a reader's copy doesn't, to `edit`, the file it is written in: never
+// kept, and never shared. Otherwise it is cached like a static file.
+const answerPage = async (req: Request, user: string | null, page: Page, edit: string, more: Partial<PageOptions> = {}) => {
+  const { html } = await pageHtml(page, {
+    origin: siteOrigin(req), editHref: user ? `/edit?path=${encodeURIComponent(edit)}` : "", ...more,
+  });
+  return user
     ? new Response(html, { headers: { "Content-Type": HTML, "Cache-Control": "private, no-cache" } })
     : conditional(req, html, { "Content-Type": HTML, "Cache-Control": CACHE });
+};
 
 // The content folder is read at every request but only seeded at startup, so
 // one that is deleted or moved while the server runs turns every page into a
@@ -108,17 +112,9 @@ const collected = async (req: Request, name: string, decoded: string, lang = "")
   // served one answer the same set.
   const found = await itemAt(pages, name)
     ?? (name.endsWith(INDEX) ? await itemAt(pages, name.slice(0, -INDEX.length)) : null);
-  if (found) {
-    const user = await getUser(req);
-    const { html } = await pageHtml(itemPage(found), {
-      origin: siteOrigin(req),
-      // There is no markdown behind an item, so the edit link opens the file
-      // it is written in: the folder's collection.
-      editHref: user ? `/edit?path=${encodeURIComponent(collectionPath(found.collection.folder))}` : "",
-      item: found,
-    });
-    return pageResponse(req, html, !!user);
-  }
+  // There is no markdown behind an item, so the edit link opens the file it
+  // is written in: the folder's collection.
+  if (found) return answerPage(req, await getUser(req), itemPage(found), collectionPath(found.collection.folder), { item: found });
 
   // An address a page or an item used to live at, compared decoded: a legacy
   // slug may hold a quote or a curly apostrophe, which arrives percent-encoded.
@@ -142,12 +138,7 @@ const languagePage = async (req: Request, lang: string, rest: string, name: stri
   if (!answer) return collected(req, name, decoded, lang);
 
   const page = parsePage(answer.key, await pages.read(answer.key));
-  const { html } = await pageHtml(page, {
-    origin: siteOrigin(req),
-    editHref: user ? `/edit?path=${encodeURIComponent(answer.key)}` : "",
-    fallbackFor: answer.kind === "fallback" ? lang : undefined,
-  });
-  return pageResponse(req, html, !!user);
+  return answerPage(req, user, page, answer.key, { fallbackFor: answer.kind === "fallback" ? lang : undefined });
 };
 
 const renderPage = async (req: Request) => {
@@ -187,11 +178,5 @@ const renderPage = async (req: Request) => {
   const user = await getUser(req);
   // A draft is for whoever is signed in to the editor, and nobody else.
   if (yes(page.meta.draft) && !user) return notFound(req);
-
-  const { html } = await pageHtml(page, {
-    origin: siteOrigin(req),
-    editHref: user ? `/edit?path=${encodeURIComponent(key)}` : "",
-  });
-
-  return pageResponse(req, html, !!user);
+  return answerPage(req, user, page, key);
 };
