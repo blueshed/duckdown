@@ -13,6 +13,11 @@
   bunx runs master, and a master whose version isn't a release makes nothing
   and says which line would. `--deploy up` as for `init`. No npm: there the
   name duckdown is someone else's (n200).
+- **A command duckdown doesn't have is an error, not the server.** `duckdown
+  creat foo` started the server, which stopped over `COOKIE_SECRET`, and so
+  did `create` on a tag from before it. Now only a bare `duckdown` is the
+  server; anything else it doesn't know says so, with its version, and points
+  at `duckdown --help`. Tags before this one still start the server.
 - **`bun create blueshed/duckdown` starts clean.** bun create commits the copy
   before it runs `create/setup.ts`, so a new site began with setup's work
   uncommitted; setup now commits it as `Set up <name>`, only when the tree is

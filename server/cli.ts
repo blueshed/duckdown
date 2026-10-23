@@ -10,7 +10,11 @@
 // with `images`, the narrower widths of pictures already in static/images/, or with
 // `bucket pull|push`, a served site's content between its bucket and a folder.
 
+import { readFileSync } from "fs";
+import { join } from "path";
 import { scaffold, type Deploy } from "./init";
+
+const VERSION = JSON.parse(readFileSync(join(import.meta.dir, "..", "package.json"), "utf8")).version as string;
 
 export const USAGE = `duckdown                      the server (the editor at /edit)
 duckdown create <name> [--deploy up]   a new site in <name>/, with this tag of duckdown installed, committed
@@ -69,9 +73,15 @@ export async function cli(
       return 1;
     }
   }
-  if (argv[0] !== "init") {
+  if (argv[0] === undefined) {
     await start();   // the server keeps the process alive from here
     return 0;
+  }
+  // The server takes no arguments, so anything else is a command this version
+  // doesn't have — a typo, or one from a newer duckdown — never the server.
+  if (argv[0] !== "init") {
+    console.error(`duckdown: ${argv[0]} isn't a command here (duckdown ${VERSION}); duckdown --help lists them`);
+    return 1;
   }
   try {
     const { wrote, skipped } = await scaffold(cwd, { vendored: false, deploy: deployOf(argv.slice(1)) });

@@ -439,7 +439,20 @@ describe("duckdown, with no command", () => {
     // starts nothing new; it is the dispatch that is under test.
     expect(await cli([])).toBe(0);
     let started = false;
-    expect(await cli(["serve"], "/", async () => void (started = true))).toBe(0);
+    expect(await cli([], "/", async () => void (started = true))).toBe(0);
     expect(started).toBe(true);
+  });
+
+  test("and with one it doesn't have, says so: never the server", async () => {
+    let started = false;
+    const error = spyOn(console, "error").mockImplementation(() => {});
+    try {
+      expect(await cli(["creat", "foobar"], "/", async () => void (started = true))).toBe(1);
+      expect(String(error.mock.calls[0]![0]))
+        .toBe(`duckdown: creat isn't a command here (duckdown ${json(repo, "package.json").version}); duckdown --help lists them`);
+    } finally {
+      error.mockRestore();
+    }
+    expect(started).toBe(false);
   });
 });
