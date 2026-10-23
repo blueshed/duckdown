@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.18.3 — 2026-10-23
 
 Simpler inside, and four small faults found on the way, each fixed. Nothing a
 site has to do. An upgrade's comparison shows a page changed only where one of
