@@ -677,31 +677,6 @@ button.danger-subtle:hover {
   flex: 1;
 }
 
-/* --- Preview --- */
-
-.preview-content {
-  padding: var(--space-4);
-  line-height: 1.7;
-}
-
-.preview-content h1,
-.preview-content h2,
-.preview-content h3 {
-  margin-top: 1em;
-  margin-bottom: 0.5em;
-}
-
-.preview-content p {
-  margin-bottom: 0.8em;
-}
-
-.preview-content code {
-  background: var(--bg);
-  padding: var(--space-0-5) var(--space-1-5);
-  border-radius: var(--radius-sm);
-  font-size: var(--text-sm);
-}
-
 /* --- Sidebar (Image Browser) --- */
 
 /* The drawer: over the preview, inside the tray, a panel of its own. */
@@ -945,10 +920,6 @@ button.danger-subtle:hover {
 }
 
 /* Earlier versions and Deleted: a list of times (or names), each with Restore. */
-.dialog-history {
-  width: min(440px, calc(100vw - 32px));
-}
-
 .history-list {
   list-style: none;
   margin: 0;
