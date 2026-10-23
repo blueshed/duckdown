@@ -594,8 +594,11 @@ describe("the Translations drawer", () => {
 });
 
 describe("a collection's words in a language", () => {
-  const pane = () => document.querySelector(".panel-collection")!;
-  const field = (slug: string, name: string) => pane().querySelector(`#tr-${slug}-${name}`) as HTMLInputElement;
+  // The pane this test rendered, never the document's first: editor.test.tsx
+  // leaves the whole app mounted, and where its files run first (Linux lists
+  // them in another order than macOS) that app opens a pane of its own.
+  let pane: Element;
+  const field = (slug: string, name: string) => pane.querySelector(`#tr-${slug}-${name}`) as HTMLInputElement;
   const edit = (el: Element, value: string) => {
     (el as HTMLInputElement).value = value;
     el.dispatchEvent(new Event("change"));
@@ -606,6 +609,7 @@ describe("a collection's words in a language", () => {
     openCollection("cy/gallery", "cy");
     const rendered = render(() => <CollectionTranslation />);
     await waitFor(() => rendered.host.querySelector(".translation-item"));
+    pane = rendered.host;
     return rendered;
   };
 
@@ -697,6 +701,7 @@ describe("a collection's words in a language", () => {
     openCollection("cy/gallery", "cy");
     const { host, dispose } = render(() => <CollectionTranslation />);
     await waitFor(() => host.querySelector(".translation-item"));
+    pane = host;
     expect(items(host).every((i) => i.querySelector(".translation-state")!.textContent === "not translated yet")).toBe(true);
     edit(field("first-light", "title"), "Golau");
     click(button(host, "Save")!);
