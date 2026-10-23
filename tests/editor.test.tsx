@@ -1475,9 +1475,10 @@ describe("ImageBrowser", () => {
     await waitFor(() => notice.get());
     expect(notice.get()).toBe("Couldn't copy to the clipboard: the browser refused.");
 
-    // A folder: an empty name makes nothing; a name makes it and opens it
+    // A folder: an empty name makes nothing and waits for one, as every New
+    // dialog does; a name makes it and opens it
     const newFolder = async (name: string) => {
-      click(host.querySelector('[aria-label="New folder"]')!);
+      if (!host.querySelector("dialog")) click(host.querySelector('[aria-label="New folder"]')!);
       const dialog = host.querySelector("dialog")!;
       await waitFor(() => dialog.open);
       if (name) type(dialog.querySelector("input")!, name);
@@ -1485,7 +1486,7 @@ describe("ImageBrowser", () => {
       return dialog;
     };
     await newFolder("");
-    expect(host.querySelector("dialog")).toBeNull();
+    expect(host.querySelector("dialog")?.open).toBe(true);
     await newFolder("My shots");
     // Where you are among the images is a small trail of its own.
     await waitFor(() => trailOf(host.querySelector(".browser-header")!) === "images › My shots");
@@ -1618,6 +1619,7 @@ describe("ImageBrowser", () => {
       await waitFor(() => notice.get());
       expect(notice.get()).toBe("Couldn't create images/nope: 403 read-only");
       expect(trailOf(host.querySelector(".browser-header")!)).toBe("images"); // stayed put
+      await waitFor(() => dialog.querySelector('[role="alert"]')?.textContent === "Couldn't create images/nope"); // and the dialog says so
     } finally {
       restore();
     }

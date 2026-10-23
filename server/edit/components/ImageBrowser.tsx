@@ -5,11 +5,11 @@ import { byName } from "./Browser";
 import { api, apiJson, urlPath } from "../api";
 import { speak } from "../notice";
 import { closeDrawer } from "../store";
-import { modal } from "../modal";
 import { ResourceList } from "./ResourceList";
 import { ReportList } from "./ReportList";
 import { SiteIcon } from "./SiteIcon";
 import { Drawer } from "./Drawer";
+import { NewDialog } from "./NewDialog";
 import { Trail, folderCrumbs } from "./Trail";
 
 type Tab = "images" | "styles" | "templates" | "icon" | "reports";
@@ -24,7 +24,6 @@ export function ImageBrowser() {
   const uploading = signal(false);
   let picker: HTMLInputElement | null = null;   // the hidden file input the Upload button opens
   const showFolderInput = signal(false);
-  const folderName = signal("");
 
   const load = async (folder: string) => {
     path.set(folder);
@@ -52,16 +51,14 @@ export function ImageBrowser() {
     load(path.peek());
   };
 
-  const createFolder = async () => {
-    const name = folderName.peek();
+  // A folder that can't be made leaves the dialog open, saying so.
+  const createFolder = async (name: string) => {
+    const p = path.peek();
+    const newPath = p ? `${p}/${name}` : name;
+    const res = await api(`create images/${newPath}`, `/edit/browse/${urlPath(newPath)}`, { method: "PUT" });
+    if (!res.ok) return `Couldn't create images/${newPath}`;
     showFolderInput.set(false);
-    folderName.set("");
-    if (name) {
-      const p = path.peek();
-      const newPath = p ? `${p}/${name}` : name;
-      const res = await api(`create images/${newPath}`, `/edit/browse/${urlPath(newPath)}`, { method: "PUT" });
-      if (res.ok) load(newPath);
-    }
+    load(newPath);
   };
 
   const imageUrl = computed(() => {
@@ -171,28 +168,7 @@ export function ImageBrowser() {
       </>)}
       </div>
 
-      {when(showFolderInput, () => {
-        const dialog = modal();
-        return (
-          <dialog ref={dialog.ref} class="dialog" aria-labelledby={dialog.title}
-            onclose={() => showFolderInput.set(false)}>
-            <form onsubmit={(e: Event) => { e.preventDefault(); createFolder(); }}>
-              <h3 id={dialog.title}>New folder</h3>
-              <input
-                type="text"
-                aria-label="Folder name"
-                placeholder="folder-name"
-                autofocus
-                oninput={(e: Event) => folderName.set((e.target as HTMLInputElement).value)}
-              />
-              <div class="dialog-actions">
-                <button type="button" onclick={() => { dialog.close(); showFolderInput.set(false); }}>Cancel</button>
-                <button type="submit" class="primary">Create</button>
-              </div>
-            </form>
-          </dialog>
-        );
-      })}
+      {when(showFolderInput, () => <NewDialog kind="folder" oncreate={createFolder} oncancel={() => showFolderInput.set(false)} />)}
     </Drawer>
   );
 }
