@@ -13,7 +13,7 @@ import { tmpdir } from "os";
 // version installed, and is pinned from then on.
 
 const PIN = /^(github:blueshed\/duckdown)(?:#v(\d+\.\d+\.\d+))?$/;
-const REPO = "https://github.com/blueshed/duckdown.git";
+export const REPO = "https://github.com/blueshed/duckdown.git";
 const SKILL = join(".claude", "skills", "duckdown");
 
 // An export without DUCKDOWN_ORIGIN writes no absolute address: no sharing

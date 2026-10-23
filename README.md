@@ -13,40 +13,39 @@ never depends on which you chose.
 **Install it** — the default. duckdown is a dependency; an upgrade is `bunx duckdown upgrade`.
 
 ```sh
-mkdir my-site && cd my-site
-bun init -y
-bun add github:blueshed/duckdown#v0.2.0     # the tag is the version
-bunx duckdown init                          # makes site/, .env, .gitignore, .railway/railway.ts, the skill
-bun install
-bun run dev
+bunx github:blueshed/duckdown#v0.18.1 create my-site    # the tag is the version
+cd my-site && bun run dev
 ```
 
-`bunx duckdown init` never overwrites: a `site/`, a `.env`, a `CLAUDE.md` (or a
-`.claude/CLAUDE.md`) or a script that is already there is left alone, and it
-says what it skipped. `bun run build` is the export with `--strict`: a deploy
+`create` makes `my-site/` (`site/`, `.env`, `.gitignore`, `.railway/railway.ts`,
+the skill), with duckdown pinned to the tag it ran from, installs it and makes
+the first commit (or none, inside a repository already). Without the `#tag`,
+bunx runs master, and a master whose version isn't a release makes nothing and
+says which line would. `bun run build` is the export with `--strict`: a deploy
 that would publish a broken link, a collection problem or a stale translation
 stops instead. A site that goes out by `railway up` rather than from a GitHub
-repository takes `bunx duckdown init --deploy up`, which writes the matching
-`.railway/railway.ts`.
+repository takes `--deploy up`, which writes the matching `.railway/railway.ts`.
 
-`bunx duckdown …` runs duckdown from `node_modules`, so it needs the dependency
-installed. `bun add` does that. In a folder whose `package.json` already names
-duckdown (a fresh clone, or a dependency you wrote by hand), run `bun install`
-first: until then Bun answers `Couldn't find or open the file 'init'`, which is
-Bun's way of saying there is no duckdown here yet, and nothing was written.
+A folder of your own takes duckdown the same way by hand: `bun add
+github:blueshed/duckdown#v0.18.1`, then `bunx duckdown init`, then `bun install`.
+`init` never overwrites: a `site/`, a `.env`, a `CLAUDE.md` (or a
+`.claude/CLAUDE.md`) or a script that is already there is left alone, and it
+says what it skipped. `bunx duckdown …` runs duckdown from `node_modules`, so
+in a folder whose `package.json` already names duckdown (a fresh clone, or a
+dependency you wrote by hand), run `bun install` first: until then Bun answers
+`Couldn't find or open the file 'init'`, which is Bun's way of saying there is
+no duckdown here yet, and nothing was written.
 
 **Create it** — when you want to own the code, or need a different duckdown.
 
 ```sh
 bun create blueshed/duckdown my-site
-cd my-site
-bun run setup     # bun should do this for you; as of Bun 1.4.2 it doesn't
-bun run dev
+cd my-site && bun run dev
 ```
 
-`bun create` prints `$ bun run create/setup.ts` and, on Bun 1.4.2, doesn't run
-it. Until that's fixed upstream, run it yourself — it makes `site/` and `.env`
-the same way `init` does. The code is `./server/` and the tests are `./tests/`,
+`bun create` copies duckdown, commits it, installs, and runs `create/setup.ts`,
+which makes `site/` and `.env` the same way `init` does and commits that too.
+The code is `./server/` and the tests are `./tests/`,
 still held at 100% coverage: yours to change, with the suite that guards them.
 There is no upgrade path — `bun create` strips the history. If you want to own
 the code *and* merge upstream, fork duckdown on GitHub instead.
@@ -55,6 +54,7 @@ the code *and* merge upstream, fork duckdown on GitHub instead.
 |---|---|---|
 | duckdown's code | `node_modules/duckdown/server/` | `./server/` |
 | Scripts run | `node_modules/duckdown/server/main.ts`… | `server/main.ts`… |
+| Made by | `bunx github:blueshed/duckdown#vX.Y.Z create my-site` | `bun create blueshed/duckdown my-site` |
 | Upgrading | `bunx duckdown upgrade [tag]`: re-pins, installs, refreshes the skill, and compares the export before and after | none: it's your code |
 | duckdown's tests | not included | `./tests/`, at 100% |
 | The authoring skill | copied once; `duckdown upgrade` refreshes it | in the clone |
@@ -155,7 +155,8 @@ below your page.
 │   ├── page.ts          # A page, rendered: markdown in its template
 │   ├── log.ts           # The view log (counts, never identifies)
 │   ├── init.ts          # The scaffold both ways in share
-│   ├── cli.ts           # `duckdown` (the server) and `duckdown init`
+│   ├── cli.ts           # `duckdown` (the server), `duckdown create` and `duckdown init`
+│   ├── create.ts        # `duckdown create`: a new site, duckdown installed, committed
 │   ├── serve.ts         # Hands out an exported site, and its extensions
 │   ├── extensions.ts    # Routes a site adds, declared in its package.json
 │   ├── base/            # site.css and search.js, for a site with no copy

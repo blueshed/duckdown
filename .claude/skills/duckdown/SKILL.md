@@ -15,7 +15,7 @@ Duckdown serves a folder of markdown as a website and gives it an editor in the 
 
 It's the folder `DUCKDOWN_PATH` names in `.env`:
 
-- a project made with `bun create blueshed/duckdown`: **`./site`**
+- a project made with `duckdown create`, `duckdown init` or `bun create blueshed/duckdown`: **`./site`**
 - the duckdown repository itself: **`./.dev-site`**, a working copy of the seed site `tests/example`. Write there to change what the running site shows; change `tests/example` only to change what new copies and the tests start from.
 - with `DUCKDOWN_BUCKET` set, the content is in S3: work through the editor, not the filesystem.
 

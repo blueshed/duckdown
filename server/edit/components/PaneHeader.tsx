@@ -22,7 +22,7 @@ export function PaneHeader(props: {
   dirty: { get(): boolean; peek(): boolean };
   onsave: () => unknown;
   ondelete: () => unknown;
-  onclose?: () => void;
+  onclose: () => void;
   url: () => string;              // the open file's /edit/<section>/ address
   onrestored: () => unknown;      // read it again: a version was put back
   onmove?: (to: string) => Promise<string | void>;   // a page renames; a message when it didn't
@@ -84,9 +84,7 @@ export function PaneHeader(props: {
       <button class={saveClass} onclick={save}>
         <Icon name="save" /> <span class="label">{() => flash.get() || "Save"}</span> <kbd>⌘⏎</kbd>
       </button>
-      {props.onclose
-        ? <button class="icon-btn" aria-label="Close" title="Close" onclick={props.onclose}><Icon name="x" /></button>
-        : null}
+      <button class="icon-btn" aria-label="Close" title="Close" onclick={props.onclose}><Icon name="x" /></button>
       {when(confirming, () => (
         <ConfirmDialog
           title={`Delete ${label()}?`}

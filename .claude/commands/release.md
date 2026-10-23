@@ -59,12 +59,14 @@ there, and step 4 tags them.
 
 Parse `version` in `package.json` as `x.y.z` and bump it (`patch` → `x.y.(z+1)`, `minor` →
 `x.(y+1).0`, `major` → `(x+1).0.0`). In `CHANGELOG.md`, replace `## Unreleased` with
-`## X.Y.Z — YYYY-MM-DD`, today's date, as the entries below it read.
+`## X.Y.Z — YYYY-MM-DD`, today's date, as the entries below it read. In `README.md`, every
+`github:blueshed/duckdown#v…` becomes `#vX.Y.Z`: the install line is copied as it is, and a tag
+from before `create` starts a server instead of making a site.
 
 ## 4. Commit, tag, push
 
 ```
-git add package.json CHANGELOG.md
+git add package.json CHANGELOG.md README.md
 git commit -m "0.17.3: search shards no longer start with _"   # X.Y.Z: what it does
 git tag vX.Y.Z
 git push && git push origin vX.Y.Z

@@ -4,9 +4,10 @@
 // and the two are independent: DUCKDOWN_PATH points at the first wherever the
 // second lives. So there are two ways in and one scaffold.
 //
-//   install   bun add github:blueshed/duckdown#<tag>, then `bunx duckdown init`.
-//             The code stays in node_modules/duckdown/server/, and an upgrade
-//             is a tag bump. The documented default. `bunx duckdown …` runs
+//   install   `bunx github:blueshed/duckdown#<tag> create my-site` (create.ts),
+//             or by hand: bun add github:blueshed/duckdown#<tag>, then
+//             `bunx duckdown init`. The code stays in node_modules/duckdown/server/,
+//             and an upgrade is a tag bump. The documented default. `bunx duckdown …` runs
 //             only once the dependency is installed: in a folder whose
 //             package.json names duckdown (a fresh clone, a hand-written
 //             dependency) with no node_modules, Bun says "Couldn't find or

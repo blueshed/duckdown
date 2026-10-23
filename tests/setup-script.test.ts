@@ -1,19 +1,27 @@
 // The two ways in, and the one scaffold behind them. create/setup.ts deletes
 // things, so it only ever runs here on a scratch copy of the repo's shape,
 // never on the repo itself.
-import { describe, test, expect, spyOn } from "bun:test";
-import { mkdirSync, writeFileSync, existsSync, readFileSync, symlinkSync, readdirSync } from "fs";
+import { describe, test, expect, spyOn, beforeAll, afterAll } from "bun:test";
+import { mkdirSync, mkdtempSync, writeFileSync, existsSync, readFileSync, symlinkSync, readdirSync } from "fs";
 import { join } from "path";
 import { RUN } from "./helpers";
 import { setup } from "../create/setup";
 import { cli } from "../server/cli";
+import { commitAll, createCommand } from "../server/create";
+import { gitEnv } from "../server/gitenv";
 import { scripts } from "../server/init";
+import type { Run } from "../server/upgrade";
 
 const repo = join(import.meta.dir, "..");
 const read = (root: string, path: string) => readFileSync(join(root, path), "utf8");
 const json = (root: string, path: string) => JSON.parse(read(root, path));
 const quiet = () => spyOn(console, "log").mockImplementation(() => {});
 const said = (log: ReturnType<typeof quiet>) => log.mock.calls.map((c: unknown[]) => String(c[0])).join("\n");
+function sh(cwd: string, ...args: string[]): string {
+  const ran = Bun.spawnSync(["git", ...args], { cwd, env: gitEnv() });
+  if (ran.exitCode !== 0) throw new Error(`git ${args.join(" ")}: ${ran.stderr.toString()}`);
+  return ran.stdout.toString();
+}
 
 // What `bun run export` does in a scaffolded site, as a real process: duckdown's
 // code is reached the way the site's own scripts reach it.
@@ -107,6 +115,142 @@ describe("create: bun create blueshed/duckdown, and the code is yours", () => {
     }
     expect(read(root, "site/pages/index.md")).toBe("mine");
     expect(read(root, "package.json")).toBe(before);
+  });
+
+  // bun create commits the copy, installs, then runs setup: what setup does is
+  // the site's second commit, so it starts with nothing left to commit.
+  const bunCreated = (name: string) => {
+    const at = join(RUN, name);
+    mkdirSync(at, { recursive: true });
+    clone(at);
+    sh(at, "init", "-q");
+    sh(at, "config", "user.name", "x");
+    sh(at, "config", "user.email", "x@example.com");
+    sh(at, "config", "commit.gpgsign", "false");
+    sh(at, "add", "-A");
+    sh(at, "commit", "-q", "-m", "Initial commit (via bun create)");
+    return at;
+  };
+
+  test("commits what it did, in the repository bun create made", async () => {
+    const at = bunCreated("created-committed");
+    const log = quiet();
+    try {
+      await setup(at);
+      expect(said(log)).toContain("committed: Set up created-committed");
+    } finally {
+      log.mockRestore();
+    }
+    expect(sh(at, "status", "--porcelain")).toBe("");
+    expect(sh(at, "log", "--format=%s")).toBe("Set up created-committed\nInitial commit (via bun create)\n");
+  });
+
+  test("but over changes of someone's own it commits nothing", async () => {
+    const at = bunCreated("created-changed");
+    writeFileSync(join(at, "mine.md"), "not setup's");
+    const log = quiet();
+    try {
+      await setup(at);
+      expect(said(log)).not.toContain("committed");
+    } finally {
+      log.mockRestore();
+    }
+    expect(sh(at, "log", "--format=%s")).toBe("Initial commit (via bun create)\n");
+    expect(sh(at, "status", "--porcelain")).toContain("?? mine.md");
+  });
+});
+
+describe("create: bunx github:blueshed/duckdown#vX create my-site, duckdown installed", () => {
+  const version = json(repo, "package.json").version as string;
+  const tags = `abc\trefs/tags/v0.1.0\ndef\trefs/tags/v${version}\n`;
+  // GitHub and bun install stood in; git is real, in scratch folders, with an
+  // identity of its own rather than whoever runs the suite.
+  const stub = (answers: Record<string, { code: number; out: string }> = {}) => {
+    const calls: string[] = [];
+    const run: Run = async (cmd, cwd) => {
+      calls.push(`${cmd.slice(0, 2).join(" ")} in ${cwd}`);
+      return answers[cmd[1]!] ?? (cmd[1] === "ls-remote" ? { code: 0, out: tags } : { code: 0, out: "" });
+    };
+    return { run, calls };
+  };
+  const global = join(RUN, "gitconfig");
+  writeFileSync(global, "[user]\n\tname = x\n\temail = x@example.com\n[commit]\n\tgpgsign = false\n");
+  const own = { GIT_CONFIG_GLOBAL: process.env.GIT_CONFIG_GLOBAL, GIT_CONFIG_NOSYSTEM: process.env.GIT_CONFIG_NOSYSTEM };
+  beforeAll(() => Object.assign(process.env, { GIT_CONFIG_GLOBAL: global, GIT_CONFIG_NOSYSTEM: "1" }));
+  afterAll(() => {
+    for (const [key, value] of Object.entries(own)) value === undefined ? delete process.env[key] : (process.env[key] = value);
+  });
+  const lines: string[] = [];
+  const say = (line: string) => void lines.push(line);
+
+  test("makes the site pinned to its own tag, installs it, and commits it", async () => {
+    const at = mkdtempSync(join(RUN, "create-"));
+    const { run, calls } = stub();
+    lines.length = 0;
+    expect(await createCommand("my-site", { cwd: at, run, say })).toBe(0);
+    const root = join(at, "my-site");
+    expect(calls).toEqual([`git ls-remote in ${at}`, `bun install in ${root}`]);
+
+    const pkg = json(root, "package.json");
+    expect(pkg).toMatchObject({ name: "my-site", private: true });
+    expect(pkg.dependencies.duckdown).toBe(`github:blueshed/duckdown#v${version}`);   // what upgrade moves
+    expect(pkg.devDependencies.railway).toBe("^3.11.0");
+    expect(pkg.scripts).toMatchObject(scripts(false));
+    expect(read(root, ".railway/railway.ts")).toContain('source: github("your-org/my-site"');
+    expect(read(root, "site/pages/index.md")).toContain("# Welcome to my-site");
+
+    expect(sh(root, "log", "--format=%s")).toBe(`Created my-site with duckdown ${version}\n`);
+    expect(sh(root, "status", "--porcelain")).toBe("");                              // .env and users.json are ignored
+    expect(sh(root, "ls-files")).not.toContain("site/users.json");
+    expect(lines).toContain("wrote my-site/site/");
+    expect(lines).toContain(`committed: Created my-site with duckdown ${version}`);
+    expect(lines.at(-1)).toContain(`my-site is ready, on duckdown v${version}`);
+  });
+
+  test("--deploy up, and inside a repository already it commits nothing", async () => {
+    const at = mkdtempSync(join(RUN, "create-in-repo-"));
+    sh(at, "init", "-q");
+    lines.length = 0;
+    expect(await createCommand("up-site", { deploy: "up", cwd: at, run: stub().run, say })).toBe(0);
+    expect(read(join(at, "up-site"), ".railway/railway.ts")).toContain("railway up --service up-site");
+    expect(existsSync(join(at, "up-site", ".git"))).toBe(false);
+    expect(lines).toContain("inside a git repository already, so nothing is committed");
+  });
+
+  test("refuses before making anything: no name, a name taken, no tags, a version that isn't a release", async () => {
+    const at = mkdtempSync(join(RUN, "create-refused-"));
+    mkdirSync(join(at, "taken"));
+    const make = (name: string | undefined, answers?: Record<string, { code: number; out: string }>) =>
+      createCommand(name, { cwd: at, run: stub(answers).run, say });
+    await expect(make(undefined)).rejects.toThrow("name the site in lower case letters, digits and dashes: duckdown create my-site");
+    await expect(make("My Site")).rejects.toThrow("duckdown create my-site, not My Site");
+    await expect(make("taken")).rejects.toThrow("taken is here already");
+    await expect(make("a", { "ls-remote": { code: 128, out: "fatal: unable to access\n" } })).rejects.toThrow("couldn't read duckdown's tags from GitHub: fatal: unable to access");
+    await expect(make("b", { "ls-remote": { code: 0, out: "abc\trefs/tags/v0.1.0\nabd\trefs/tags/v0.2.0\n" } }))
+      .rejects.toThrow(`this is duckdown ${version}, which isn't a release to pin a site to: name one, as in bunx github:blueshed/duckdown#v0.2.0 create b`);
+    await expect(make("c", { "ls-remote": { code: 0, out: "" } })).rejects.toThrow("#vX.Y.Z create c");
+    expect(readdirSync(at)).toEqual(["taken"]);
+  });
+
+  test("an install that fails says the site is written but not installed", async () => {
+    const at = mkdtempSync(join(RUN, "create-uninstalled-"));
+    await expect(createCommand("d", { cwd: at, run: stub({ install: { code: 1, out: "error: no network\n" } }).run, say }))
+      .rejects.toThrow("bun install failed in d/, which is written but not installed:\nerror: no network");
+    expect(existsSync(join(at, "d", "site"))).toBe(true);
+  });
+
+  test("through the cli, a refusal is an exit code and a line", async () => {
+    const error = spyOn(console, "error").mockImplementation(() => {});
+    try {
+      expect(await cli(["create"])).toBe(1);
+      expect(String(error.mock.calls[0]![0])).toStartWith("duckdown create: name the site");
+    } finally {
+      error.mockRestore();
+    }
+  });
+
+  test("a commit git refuses is said, not thrown", () => {
+    expect(commitAll(mkdtempSync(join(RUN, "not-a-repo-")), "x")).toStartWith("not committed, so commit it yourself: fatal:");
   });
 });
 

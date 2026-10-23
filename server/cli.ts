@@ -1,7 +1,8 @@
 #!/usr/bin/env bun
 
-// `duckdown` — the server, or with `init`, the scaffold for a site that has
-// duckdown installed as a dependency (bun add, then bunx duckdown init), or
+// `duckdown` — the server, or with `create`, a new site with duckdown installed
+// (bunx github:blueshed/duckdown#vX.Y.Z create my-site), with `init`, the
+// scaffold for a site that has duckdown installed already, or
 // with `user`, who can sign in, with `publish` and `pull`, the remote, with
 // `report`, the view log made into a page for the editors, with `upgrade`,
 // the site moved to another tag of duckdown and its export compared, with
@@ -12,6 +13,7 @@
 import { scaffold, type Deploy } from "./init";
 
 export const USAGE = `duckdown                      the server (the editor at /edit)
+duckdown create <name> [--deploy up]   a new site in <name>/, with this tag of duckdown installed, committed
 duckdown init [--deploy up]   the scaffold around duckdown in a new site (up: deployed by railway up, not from GitHub)
 duckdown user <name>          who can sign in: add one, or set a password
 duckdown publish | pull       this copy of the site, to and from its git remote (DUCKDOWN_REMOTE)
@@ -30,6 +32,7 @@ const help = async () => {
 // Loaded when asked for, not at the top: the server's modules read the
 // environment as they load, and `init` runs where there is no site yet.
 const commands: Record<string, (args: string[]) => Promise<number>> = {
+  create: async (args) => (await import("./create")).createCommand(args[0], { deploy: deployOf(args.slice(1)) }),
   user: async (args) => (await import("./users")).userCommand(args),
   publish: async (args) => (await import("./remote")).remoteCommand("publish", args),
   pull: async (args) => (await import("./remote")).remoteCommand("pull", args),

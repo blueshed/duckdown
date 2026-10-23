@@ -4,7 +4,21 @@
 
 - **`bun check` type checks.** Bun 1.4's built-in (TypeScript 7, all cores)
   replaces `bunx tsc --noEmit`; the `check` script that shadowed it is gone.
-
+- **`duckdown create my-site`: a new site in one line, from GitHub alone.**
+  `bunx github:blueshed/duckdown#vX.Y.Z create my-site` makes the folder, the
+  scaffold `init` writes with duckdown pinned to that tag, installs it and
+  makes the first commit (none inside a repository already). It replaces the
+  install way's five lines (mkdir, `bun init`, `bun add`, `init`,
+  `bun install`), which still work in a folder of your own. Without the `#tag`
+  bunx runs master, and a master whose version isn't a release makes nothing
+  and says which line would. `--deploy up` as for `init`. No npm: there the
+  name duckdown is someone else's (n200).
+- **`bun create blueshed/duckdown` starts clean.** bun create commits the copy
+  before it runs `create/setup.ts`, so a new site began with setup's work
+  uncommitted; setup now commits it as `Set up <name>`, only when the tree is
+  as bun create left it. And the README no longer says to run `bun run setup`
+  by hand: Bun 1.4.4 runs it (1.4.2 didn't, and a copy left un-set-up still
+  says so as it starts).
 - **A published site's deploy no longer looks like a crash in its logs.** A
   platform ends the old container with SIGTERM, and `bun run start` reported
   that as `error: script "start" was terminated by signal SIGTERM`, on every
