@@ -160,16 +160,24 @@ describe("create: bun create blueshed/duckdown, and the code is yours", () => {
   });
 });
 
-describe("create: bunx github:blueshed/duckdown#vX create my-site, duckdown installed", () => {
-  const version = json(repo, "package.json").version as string;
-  const tags = `abc\trefs/tags/v0.1.0\ndef\trefs/tags/v${version}\n`;
-  // GitHub and bun install stood in; git is real, in scratch folders, with an
-  // identity of its own rather than whoever runs the suite.
+describe("create: bunx github:blueshed/duckdown create my-site, on the newest release", () => {
+  const tags = "abc\trefs/tags/v0.1.0\nabd\trefs/tags/v0.10.0\nabe\trefs/tags/v0.9.3\n";
+  // GitHub and bun install stood in, and the release's init is this one's, run
+  // in-process; git is real, in scratch folders, with an identity of its own
+  // rather than whoever runs the suite.
   const stub = (answers: Record<string, { code: number; out: string }> = {}) => {
     const calls: string[] = [];
     const run: Run = async (cmd, cwd) => {
-      calls.push(`${cmd.slice(0, 2).join(" ")} in ${cwd}`);
-      return answers[cmd[1]!] ?? (cmd[1] === "ls-remote" ? { code: 0, out: tags } : { code: 0, out: "" });
+      calls.push(`${cmd.join(" ")} in ${cwd}`);
+      if (answers[cmd[1]!]) return answers[cmd[1]!]!;
+      if (cmd[1] === "ls-remote") return { code: 0, out: tags };
+      if (cmd[1] !== "run") return { code: 0, out: "" };
+      const log = quiet();
+      try {
+        return { code: await cli(cmd.slice(3), cwd), out: "" };
+      } finally {
+        log.mockRestore();
+      }
     };
     return { run, calls };
   };
@@ -183,31 +191,36 @@ describe("create: bunx github:blueshed/duckdown#vX create my-site, duckdown inst
   const lines: string[] = [];
   const say = (line: string) => void lines.push(line);
 
-  test("makes the site pinned to its own tag, installs it, and commits it", async () => {
+  test("installs the newest release, runs its init, installs again, and commits", async () => {
     const at = mkdtempSync(join(RUN, "create-"));
     const { run, calls } = stub();
     lines.length = 0;
     expect(await createCommand("my-site", { cwd: at, run, say })).toBe(0);
     const root = join(at, "my-site");
-    expect(calls).toEqual([`git ls-remote in ${at}`, `bun install in ${root}`]);
+    expect(calls).toEqual([
+      `git ls-remote --tags --refs https://github.com/blueshed/duckdown.git in ${at}`,
+      `bun install in ${root}`,
+      `bun run node_modules/duckdown/server/cli.ts init --deploy github in ${root}`,
+      `bun install in ${root}`,
+    ]);
 
     const pkg = json(root, "package.json");
-    expect(pkg).toMatchObject({ name: "my-site", private: true });
-    expect(pkg.dependencies.duckdown).toBe(`github:blueshed/duckdown#v${version}`);   // what upgrade moves
+    expect(pkg).toMatchObject({ name: "my-site", version: "0.0.1", private: true });
+    expect(pkg.dependencies.duckdown).toBe("github:blueshed/duckdown#v0.10.0");   // the newest, by number; what upgrade moves
     expect(pkg.devDependencies.railway).toBe("^3.11.0");
     expect(pkg.scripts).toMatchObject(scripts(false));
     expect(read(root, ".railway/railway.ts")).toContain('source: github("your-org/my-site"');
     expect(read(root, "site/pages/index.md")).toContain("# Welcome to my-site");
 
-    expect(sh(root, "log", "--format=%s")).toBe(`Created my-site with duckdown ${version}\n`);
+    expect(sh(root, "log", "--format=%s")).toBe("Created my-site with duckdown 0.10.0\n");
     expect(sh(root, "status", "--porcelain")).toBe("");                              // .env and users.json are ignored
     expect(sh(root, "ls-files")).not.toContain("site/users.json");
-    expect(lines).toContain("wrote my-site/site/");
-    expect(lines).toContain(`committed: Created my-site with duckdown ${version}`);
-    expect(lines.at(-1)).toContain(`my-site is ready, on duckdown v${version}`);
+    expect(lines[0]).toBe("Creating my-site on duckdown v0.10.0, the newest release...");
+    expect(lines).toContain("committed: Created my-site with duckdown 0.10.0");
+    expect(lines.at(-1)).toContain("my-site is ready, on duckdown v0.10.0");
   });
 
-  test("--deploy up, and inside a repository already it commits nothing", async () => {
+  test("--deploy up reaches init, and inside a repository already it commits nothing", async () => {
     const at = mkdtempSync(join(RUN, "create-in-repo-"));
     sh(at, "init", "-q");
     lines.length = 0;
@@ -217,7 +230,7 @@ describe("create: bunx github:blueshed/duckdown#vX create my-site, duckdown inst
     expect(lines).toContain("inside a git repository already, so nothing is committed");
   });
 
-  test("refuses before making anything: no name, a name taken, no tags, a version that isn't a release", async () => {
+  test("refuses before making anything: no name, a name taken, no tags", async () => {
     const at = mkdtempSync(join(RUN, "create-refused-"));
     mkdirSync(join(at, "taken"));
     const make = (name: string | undefined, answers?: Record<string, { code: number; out: string }>) =>
@@ -225,18 +238,18 @@ describe("create: bunx github:blueshed/duckdown#vX create my-site, duckdown inst
     await expect(make(undefined)).rejects.toThrow("name the site in lower case letters, digits and dashes: duckdown create my-site");
     await expect(make("My Site")).rejects.toThrow("duckdown create my-site, not My Site");
     await expect(make("taken")).rejects.toThrow("taken is here already");
-    await expect(make("a", { "ls-remote": { code: 128, out: "fatal: unable to access\n" } })).rejects.toThrow("couldn't read duckdown's tags from GitHub: fatal: unable to access");
-    await expect(make("b", { "ls-remote": { code: 0, out: "abc\trefs/tags/v0.1.0\nabd\trefs/tags/v0.2.0\n" } }))
-      .rejects.toThrow(`this is duckdown ${version}, which isn't a release to pin a site to: name one, as in bunx github:blueshed/duckdown#v0.2.0 create b`);
-    await expect(make("c", { "ls-remote": { code: 0, out: "" } })).rejects.toThrow("#vX.Y.Z create c");
+    await expect(make("a", { "ls-remote": { code: 128, out: "fatal: unable to access\n" } })).rejects.toThrow("couldn't read duckdown's tags: fatal: unable to access");
+    await expect(make("b", { "ls-remote": { code: 0, out: "" } })).rejects.toThrow("couldn't read duckdown's tags: none found");
     expect(readdirSync(at)).toEqual(["taken"]);
   });
 
-  test("an install that fails says the site is written but not installed", async () => {
-    const at = mkdtempSync(join(RUN, "create-uninstalled-"));
+  test("a step that fails says which, and that the folder is there but not finished", async () => {
+    const at = mkdtempSync(join(RUN, "create-unfinished-"));
     await expect(createCommand("d", { cwd: at, run: stub({ install: { code: 1, out: "error: no network\n" } }).run, say }))
-      .rejects.toThrow("bun install failed in d/, which is written but not installed:\nerror: no network");
-    expect(existsSync(join(at, "d", "site"))).toBe(true);
+      .rejects.toThrow("bun install failed in d/, which is there but not finished:\nerror: no network");
+    await expect(createCommand("e", { cwd: at, run: stub({ run: { code: 1, out: "duckdown init: no\n" } }).run, say }))
+      .rejects.toThrow("duckdown v0.10.0's init failed in e/, which is there but not finished:\nduckdown init: no");
+    expect(json(join(at, "e"), "package.json").dependencies.duckdown).toBe("github:blueshed/duckdown#v0.10.0");
   });
 
   test("through the cli, a refusal is an exit code and a line", async () => {

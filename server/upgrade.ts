@@ -98,7 +98,7 @@ function installed(cwd: string): string | null {
 }
 
 // The newest tag duckdown has published, asked of GitHub.
-async function newest(run: Run, cwd: string): Promise<string> {
+export async function newest(run: Run, cwd: string): Promise<string> {
   const listed = await run(["git", "ls-remote", "--tags", "--refs", REPO], cwd);
   const tag = listed.code === 0 ? latestTag(listed.out) : null;
   if (!tag) throw new Error(`couldn't read duckdown's tags: ${listed.out.trim() || "none found"}`);

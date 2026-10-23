@@ -7,7 +7,7 @@
 // what they need on the day they start changing things. There is no upgrade
 // path: bun create strips the history, so to follow upstream fork duckdown on
 // GitHub instead. To depend on duckdown rather than own it:
-// `bunx github:blueshed/duckdown#vX.Y.Z create my-site`. The scaffold is the
+// `bunx github:blueshed/duckdown create my-site`. The scaffold is the
 // same either way (server/init.ts).
 
 import { realpathSync, rmSync } from "fs";

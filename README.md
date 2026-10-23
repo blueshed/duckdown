@@ -13,21 +13,22 @@ never depends on which you chose.
 **Install it** — the default. duckdown is a dependency; an upgrade is `bunx duckdown upgrade`.
 
 ```sh
-bunx github:blueshed/duckdown#v0.18.1 create my-site    # the tag is the version
+bunx github:blueshed/duckdown create my-site
 cd my-site && bun run dev
 ```
 
-`create` makes `my-site/` (`site/`, `.env`, `.gitignore`, `.railway/railway.ts`,
-the skill), with duckdown pinned to the tag it ran from, installs it and makes
-the first commit (or none, inside a repository already). Without the `#tag`,
-bunx runs master, and a master whose version isn't a release makes nothing and
-says which line would. `bun run build` is the export with `--strict`: a deploy
+`create` makes `my-site/` on the newest release of duckdown: it installs that
+release, runs that release's own `init` (`site/`, `.env`, `.gitignore`,
+`.railway/railway.ts`, the skill), installs again and makes the first commit
+(or none, inside a repository already). The site is pinned to that release
+in `package.json`, which is what `bunx duckdown upgrade` moves. `bun run build` is the export with `--strict`: a deploy
 that would publish a broken link, a collection problem or a stale translation
 stops instead. A site that goes out by `railway up` rather than from a GitHub
 repository takes `--deploy up`, which writes the matching `.railway/railway.ts`.
 
 A folder of your own takes duckdown the same way by hand: `bun add
-github:blueshed/duckdown#v0.18.1`, then `bunx duckdown init`, then `bun install`.
+github:blueshed/duckdown#vX.Y.Z` (a release: duckdown's tags on GitHub), then
+`bunx duckdown init`, then `bun install`.
 `init` never overwrites: a `site/`, a `.env`, a `CLAUDE.md` (or a
 `.claude/CLAUDE.md`) or a script that is already there is left alone, and it
 says what it skipped. `bunx duckdown …` runs duckdown from `node_modules`, so
@@ -54,7 +55,7 @@ the code *and* merge upstream, fork duckdown on GitHub instead.
 |---|---|---|
 | duckdown's code | `node_modules/duckdown/server/` | `./server/` |
 | Scripts run | `node_modules/duckdown/server/main.ts`… | `server/main.ts`… |
-| Made by | `bunx github:blueshed/duckdown#vX.Y.Z create my-site` | `bun create blueshed/duckdown my-site` |
+| Made by | `bunx github:blueshed/duckdown create my-site` | `bun create blueshed/duckdown my-site` |
 | Upgrading | `bunx duckdown upgrade [tag]`: re-pins, installs, refreshes the skill, and compares the export before and after | none: it's your code |
 | duckdown's tests | not included | `./tests/`, at 100% |
 | The authoring skill | copied once; `duckdown upgrade` refreshes it | in the clone |

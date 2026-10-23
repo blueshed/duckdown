@@ -8,13 +8,12 @@ Welcome! Let's create your first duckdown site.
 ## 1. Create your site
 
 ```sh
-bunx github:blueshed/duckdown#vX.Y.Z create my-site
+bunx github:blueshed/duckdown create my-site
 cd my-site
 ```
 
-`X.Y.Z` is a release of duckdown: its tags on GitHub. This gives you a
-ready-to-run project with a `site/` folder for your content, and duckdown
-installed at that release. To own duckdown's code instead,
+This gives you a ready-to-run project with a `site/` folder for your content,
+and the newest release of duckdown installed. To own duckdown's code instead,
 `bun create blueshed/duckdown my-site`.
 
 ## 2. Start the server

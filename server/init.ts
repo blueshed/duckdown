@@ -4,7 +4,8 @@
 // and the two are independent: DUCKDOWN_PATH points at the first wherever the
 // second lives. So there are two ways in and one scaffold.
 //
-//   install   `bunx github:blueshed/duckdown#<tag> create my-site` (create.ts),
+//   install   `bunx github:blueshed/duckdown create my-site` (create.ts, which
+//             installs the newest tag and runs its init),
 //             or by hand: bun add github:blueshed/duckdown#<tag>, then
 //             `bunx duckdown init`. The code stays in node_modules/duckdown/server/,
 //             and an upgrade is a tag bump. The documented default. `bunx duckdown …` runs

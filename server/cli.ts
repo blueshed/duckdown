@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 // `duckdown` — the server, or with `create`, a new site with duckdown installed
-// (bunx github:blueshed/duckdown#vX.Y.Z create my-site), with `init`, the
+// (bunx github:blueshed/duckdown create my-site), with `init`, the
 // scaffold for a site that has duckdown installed already, or
 // with `user`, who can sign in, with `publish` and `pull`, the remote, with
 // `report`, the view log made into a page for the editors, with `upgrade`,
@@ -17,7 +17,7 @@ import { scaffold, type Deploy } from "./init";
 const VERSION = JSON.parse(readFileSync(join(import.meta.dir, "..", "package.json"), "utf8")).version as string;
 
 export const USAGE = `duckdown                      the server (the editor at /edit)
-duckdown create <name> [--deploy up]   a new site in <name>/, with this tag of duckdown installed, committed
+duckdown create <name> [--deploy up]   a new site in <name>/, on the newest release of duckdown, committed
 duckdown init [--deploy up]   the scaffold around duckdown in a new site (up: deployed by railway up, not from GitHub)
 duckdown user <name>          who can sign in: add one, or set a password
 duckdown publish | pull       this copy of the site, to and from its git remote (DUCKDOWN_REMOTE)

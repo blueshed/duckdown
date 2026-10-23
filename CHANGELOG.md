@@ -5,17 +5,18 @@
 - **`bun check` type checks.** Bun 1.4's built-in (TypeScript 7, all cores)
   replaces `bunx tsc --noEmit`; the `check` script that shadowed it is gone.
 - **`duckdown create my-site`: a new site in one line, from GitHub alone.**
-  `bunx github:blueshed/duckdown#vX.Y.Z create my-site` makes the folder, the
-  scaffold `init` writes with duckdown pinned to that tag, installs it and
-  makes the first commit (none inside a repository already). It replaces the
-  install way's five lines (mkdir, `bun init`, `bun add`, `init`,
-  `bun install`), which still work in a folder of your own. Without the `#tag`
-  bunx runs master, and a master whose version isn't a release makes nothing
-  and says which line would. `--deploy up` as for `init`. No npm: there the
-  name duckdown is someone else's (n200).
+  `bunx github:blueshed/duckdown create my-site` asks GitHub for the newest
+  release, installs it in `my-site/`, runs that release's own `init`, installs
+  again and makes the first commit (none inside a repository already). The
+  site is pinned to that release, as `duckdown upgrade` expects. No tag to name
+  and none in the README to keep up: the line runs master, which only starts
+  the newest release. It replaces the install way's five lines (mkdir,
+  `bun init`, `bun add`, `init`, `bun install`), which still work in a folder
+  of your own. `--deploy up` as for `init`. No npm: there the name duckdown is
+  someone else's (n200).
 - **A command duckdown doesn't have is an error, not the server.** `duckdown
   creat foo` started the server, which stopped over `COOKIE_SECRET`, and so
-  did `create` on a tag from before it. Now only a bare `duckdown` is the
+  does `create` named on a tag from before it. Now only a bare `duckdown` is the
   server; anything else it doesn't know says so, with its version, and points
   at `duckdown --help`. Tags before this one still start the server.
 - **`bun create blueshed/duckdown` starts clean.** bun create commits the copy

@@ -1,22 +1,20 @@
-import { existsSync, mkdirSync, readFileSync } from "fs";
+import { existsSync, mkdirSync, writeFileSync } from "fs";
 import { join } from "path";
 import { gitEnv } from "./gitenv";
-import { scaffold, type Deploy } from "./init";
-import { latestTag, REPO, spawnRun, type Run } from "./upgrade";
+import type { Deploy } from "./init";
+import { newest, spawnRun, type Run } from "./upgrade";
 
 // `duckdown create <name>`: a new site with duckdown installed, in one line and
 // from GitHub alone (on npm the name duckdown is someone else's):
 //
-//   bunx github:blueshed/duckdown#v0.18.1 create my-site
+//   bunx github:blueshed/duckdown create my-site
 //
-// What the install way is by hand — a folder, the scaffold with the dependency
-// pinned, bun install — and the site's first commit. The pin is the tag this
-// ran from, read from duckdown's own package.json, so the same line always
-// makes the same site. bunx with no #tag runs master, whose version may not be
-// a tag yet: then nothing is made, and it says which line would work. To own
-// the code instead: bun create blueshed/duckdown my-site (create/setup.ts).
-
-const VERSION = JSON.parse(readFileSync(join(import.meta.dir, "..", "package.json"), "utf8")).version as string;
+// Only a starter: it asks GitHub for the newest release, installs that, and
+// runs that release's own init, so the site is made by the duckdown it runs,
+// whichever duckdown this is — bunx runs master, and any tag since init would
+// do. Then bun install again (init adds the railway package) and the first
+// commit. The site is pinned to that release, as `duckdown upgrade` expects.
+// To own the code instead: bun create blueshed/duckdown my-site (create/setup.ts).
 
 // git in `cwd`, never in a repository the environment names (gitenv.ts).
 export function git(args: string[], cwd: string): { code: number; out: string } {
@@ -43,26 +41,27 @@ export async function createCommand(
   const root = join(cwd, name);
   if (existsSync(root)) throw new Error(`${name} is here already: pick another name, or run duckdown init in it`);
 
-  // The pin must be a tag GitHub has, or bun install fails with the site half made.
-  const listed = await run(["git", "ls-remote", "--tags", "--refs", REPO], cwd);
-  if (listed.code !== 0) throw new Error(`couldn't read duckdown's tags from GitHub: ${listed.out.trim()}`);
-  if (!listed.out.split("\n").some((line) => line.endsWith(`refs/tags/v${VERSION}`))) {
-    throw new Error(`this is duckdown ${VERSION}, which isn't a release to pin a site to: name one, as in bunx github:blueshed/duckdown#v${latestTag(listed.out) ?? "X.Y.Z"} create ${name}`);
-  }
-
+  const tag = await newest(run, cwd);
+  say(`Creating ${name} on duckdown v${tag}, the newest release...`);
   mkdirSync(root);
-  const { wrote } = await scaffold(root, { vendored: false, name, deploy });
-  for (const path of wrote) say(`wrote ${name}/${path}`);
-  const install = await run(["bun", "install"], root);
-  if (install.code !== 0) throw new Error(`bun install failed in ${name}/, which is written but not installed:\n${install.out.trim()}`);
+  writeFileSync(join(root, "package.json"), `${JSON.stringify({
+    name, version: "0.0.1", private: true, dependencies: { duckdown: `github:blueshed/duckdown#v${tag}` },
+  }, null, 2)}\n`);
+  const step = async (what: string, cmd: string[]) => {
+    const done = await run(cmd, root);
+    if (done.code !== 0) throw new Error(`${what} failed in ${name}/, which is there but not finished:\n${done.out.trim()}`);
+  };
+  await step("bun install", ["bun", "install"]);
+  await step(`duckdown v${tag}'s init`, ["bun", "run", join("node_modules", "duckdown", "server", "cli.ts"), "init", "--deploy", deploy]);
+  await step("bun install", ["bun", "install"]);   // init adds railway, for .railway/railway.ts
 
   // Inside a repository already, the site is part of that one: not ours to commit to.
   if (git(["rev-parse", "--is-inside-work-tree"], cwd).code === 0) {
     say("inside a git repository already, so nothing is committed");
   } else {
     git(["init", "-q"], root);
-    say(commitAll(root, `Created ${name} with duckdown ${VERSION}`));
+    say(commitAll(root, `Created ${name} with duckdown ${tag}`));
   }
-  say(`\n${name} is ready, on duckdown v${VERSION}:\n\n  cd ${name}\n  bun run dev       # the editor at http://localhost:8080/edit (admin/admin)\n`);
+  say(`\n${name} is ready, on duckdown v${tag}:\n\n  cd ${name}\n  bun run dev       # the editor at http://localhost:8080/edit (admin/admin)\n`);
   return 0;
 }
