@@ -21,12 +21,12 @@ import { ORIGIN, STATIC_PATH, IS_S3, BUCKET, BUCKET_PREFIX, APP_PATH } from "./c
 import { createPageStorage, createStaticStorage, type Storage } from "./storage";
 import { parsePage, pageHtml, itemPage } from "./page";
 import { buildSite, searchFiles, searchFileList, entriesIn, type Entry } from "./search";
-import { languagesOf, splitLanguage, translated } from "./languages";
+import { keysUnder, languagesOf, splitLanguage, translated } from "./languages";
 import { translationStandings } from "./translations";
 import { COLLECTION_FILE, collectionProblems, loadCollection } from "./collection";
 import { canonicalPath, escapeHtml } from "./utils";
 import { Links } from "./links";
-import { hidden, navIgnored } from "./listed";
+import { navIgnored } from "./listed";
 import { yes, folderOf } from "./markdown";
 import { joinKey } from "./slugs";
 import { BASE_FILES, ROOT_FILES, baseFile } from "./base";
@@ -50,14 +50,7 @@ export function redirectHtml(to: string): string {
 // Every key under a storage, depth first, but hidden ones (listed.ts). Names
 // the site serves but lists nowhere (a leading `-`) are pages all the same, so
 // they go.
-async function walk(store: Storage, prefix = ""): Promise<string[]> {
-  const { files, folders } = await store.list(prefix);
-  const keys = files.filter((f) => !hidden(f.name)).map((f) => f.path);
-  for (const folder of folders.filter((f) => !hidden(f.name))) {
-    keys.push(...await walk(store, folder.path));
-  }
-  return keys;
-}
+const walk = (store: Storage) => keysUnder(store, "", [], () => true);
 
 // Where a page's one address becomes a file: `/` and `/blog/` are folders with
 // an index, and `/about.html` is itself. Nothing is written twice, so the site
