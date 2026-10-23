@@ -1,6 +1,6 @@
 # Duckdown
 
-A markdown CMS built with **Bun 1.4.2** (server) and **Railroad** (UI).
+A markdown CMS built with **Bun 1.4.4** (server) and **Railroad** (UI).
 
 ## Architecture
 
@@ -61,6 +61,7 @@ duckdown/
 │   ├── kept.ts             # kept(): what the site knows about itself, built once; siteChanged() drops it all
 │   ├── listed.ts           # What counts as a page, for every walk: hidden, unlisted (-), pageKey, readable; NOT_FOUND; navIgnored (nav: on a page that is no folder's index)
 │   ├── languages.ts        # A site in more than one language: languagesOf, translation() (translated / fallback / null), sourceHash, standing (fresh / stale / …)
+│   ├── standing.ts         # Where a translation stands against its source: the one pure rule the server and the editor's words pane both apply
 │   ├── nav.ts              # The site nav, cached until the editor changes a page
 │   ├── pid.ts              # Pid file: written at startup, removed on exit; stopServer()
 │   ├── stop.ts             # bun run stop
@@ -72,6 +73,7 @@ duckdown/
 │   ├── collection.ts       # collection.json (the data) + its each: page (the page every item gets)
 │   ├── history.ts          # Earlier versions: what a save replaced, what a delete removed
 │   ├── images.ts           # Where a collection's pictures are, what a thumbnail and a width are called (both ends read it)
+│   ├── icons.ts            # The site's own pictures in static/: the tab and home-screen icons, and the card a shared link shows (sitePicture(), kept)
 │   ├── widths.ts           # A picture kept at narrower widths: made on upload or by duckdown images; a page's <img> gets a srcset
 │   ├── slugs.ts            # An item's slug and address, and how aliases compare (both ends read it)
 │   ├── base.ts             # Where the base files are (server/base/) and the root files
@@ -174,11 +176,14 @@ duckdown/
 │   ├── editor.test.tsx     # The editor's code in happy-dom, against that server
 │   ├── units.test.ts       # pid, config, storage, auth, error handler
 │   ├── s3.test.ts          # S3Storage via Bun's S3 client + fake-s3.ts
+│   ├── fake-s3.ts          # An in-memory S3, path-style, that checks no signatures: what s3, bucket and contract tests talk to
 │   ├── storage-contract.test.ts # The same questions of disk and a bucket, the same answers: path shapes, . names, types, links
 │   ├── markdown.test.ts    # Front-matter, rendering, nav, themes
 │   ├── contrast.test.ts    # WCAG AA for every colour pair, light and dark: the editor, site.css, the seed theme
 │   ├── process.test.ts     # Real subprocesses: pid lock, SIGTERM, seeding
 │   ├── serve.test.ts       # serveDist(): traversal, redirects, 404.html, what is logged
+│   ├── extensions.test.ts  # A site's own routes on both servers: loading, clashes, Site, declared answers
+│   ├── widths.test.ts      # Pictures at narrower widths: made on upload and by duckdown images, offered by srcset
 │   ├── setup-script.test.ts # both scaffold modes on scratch folders, and `bun run export` in each
 │   └── compose.yml         # MinIO for manual S3 runs (bun run dev:s3)
 ├── bench/                  # bun run bench: a large site made and timed (n163), the export alone and its peak memory, what a first search fetches; a fourth argument adds other languages (n184); measures, doesn't check
@@ -201,7 +206,7 @@ duckdown/
 
 ## Stack
 
-- **Runtime/Server:** Bun 1.4.2 (`Bun.serve()`)
+- **Runtime/Server:** Bun 1.4.4 (`Bun.serve()`; `engines` asks for 1.4.0 or later)
 - **UI Framework:** Railroad (`@blueshed/railroad`) — signals, JSX, routes
 - **Bundling:** Bun's built-in HTML imports (no Vite, no Webpack)
 - **Markdown:** `Bun.markdown` (built-in GFM renderer)
@@ -247,7 +252,7 @@ routes: {
 fetch(req) { ... },                     // Catch-all fallback
 ```
 
-**Wildcard note (still true as of Bun 1.4.2):** `req.params["*"]` is empty. Parse the URL instead:
+**Wildcard note (still true as of Bun 1.4.4):** `req.params["*"]` is empty. Parse the URL instead:
 
 ```ts
 function after(req: BunRequest, prefix: string): string {

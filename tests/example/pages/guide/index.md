@@ -37,9 +37,11 @@ You'll see three columns:
 | **Middle** | Whatever you have open. A page; underneath it, a stylesheet or template you're composing with; or just one of those, filling the column |
 | **Right** | What you'd see — the page as the site will render it, or, with no page open, a sample page for whatever you're editing |
 
-**Resources**, in the header, is the other half of the left column: the images,
-stylesheets and templates that don't belong to any one folder. Pick one and it
-opens below your page, so you watch the page change while you edit it.
+**Resources**, in the header, holds what doesn't belong to any one folder: the
+images, stylesheets and templates, the site's icon and the reports. Pick a
+stylesheet or template and it opens below your page, so you watch the page
+change while you edit it. Beside it, **Editors** is who can sign in, **Help**
+is how to write each thing, and **Translations** adds a language.
 
 ## 4. Save your changes
 
@@ -61,3 +63,4 @@ line for it, so a link or bookmark to where it was leads to where it is.
 - [Styling](/guide/themes.html) — templates and stylesheets
 - [Images](/guide/images.html) — add images to your pages
 - [Collections](/guide/collections.html) — a folder of items: the data in one file, and pages that show it
+- [Languages](/guide/languages.html) — the site in another language, translated by people

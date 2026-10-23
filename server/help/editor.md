@@ -20,13 +20,20 @@ takes you back — with everything as you left it, unsaved words included.
 
 - **`..`** at the top of the list goes up a folder; the line at the top of
   the screen (`duckie › news › …`) goes anywhere above.
-- **Resources** holds the pictures, the stylesheets and the templates.
+- **Resources** holds the pictures, the stylesheets and the templates, and
+  **reports**: how many read each page, made from the site's log.
 - **Resources → icon** sets the site's icon: the picture on a browser tab and
   on a phone's home screen. Choose any picture; a square one is best. If a
   template names an icon of its own, the tab says which: that one wins.
   Under it, **Sharing** is the picture a link to the site shows when it's
   shared: choose one, or make it from the icon.
 - **Editors** is who can sign in: add someone, change a password.
+- **Translations** adds a language, and says which pages have changed since
+  they were translated.
+- **Publish**, when the site is published from here, sends your changes out,
+  and **Pull** brings in what was published from elsewhere.
+- **Rename or move**, the folder-arrow in a page's header, gives it a new name
+  or folder; its old address keeps working.
 
 ## When something goes wrong
 

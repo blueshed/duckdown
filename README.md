@@ -93,7 +93,13 @@ same code, so you can change your mind.
 
 - Markdown editor whose preview is the page: the same renderer the site uses,
   so it has your template, your navigation and your stylesheets in it
-- Front-matter metadata (title, nav, toc, layout, css, description, date, draft)
+- Front-matter metadata (title, nav, toc, layout, css, description, date,
+  draft, order, image, aliases, feed, and `x-` keys of a site's own)
+- Nothing the editor writes is lost: what a save replaces and what a delete
+  removes are kept, as **Earlier versions** of a file and **Deleted** beside
+  its list, each a press from coming back
+- A page renamed or moved keeps answering at its old address (a 301), and so
+  does a collection's item whose title changes
 - Contents lists, callouts (`> [!NOTE]`) and `[[wiki links]]` between pages
 - Styling in a few CSS variables: `static/theme.css`, linked by the template, with dark mode
 - **Templates and stylesheets are editable in the browser too**, in a pane
@@ -112,6 +118,13 @@ same code, so you can change your mind.
   since changed. A switcher, `hreflang`, a search, navigation and sitemap for
   each language, and a collection's words per language
 - Navigation generated from `index.md` files, and folder listings that keep themselves
+- An Atom feed for a folder that says `feed: true`, a `sitemap.xml`, a 404 page
+- A card when a link is shared (Open Graph), from a page's `image:` or the
+  site's own, and the site's tab and home-screen icon, both set in the editor
+- Pictures kept at narrower widths too, so a phone downloads the one it needs
+- Help in the editor, a page per topic, each example shown beside what it gives
+- Accessible by default: the editor and the site work by keyboard, with a
+  screen reader, at a larger text size, in High Contrast and with less motion
 - JWT authentication
 - A view log that counts readers without identifying them — no IP, no user
   agent, no cookie
@@ -139,8 +152,11 @@ Three columns at `/edit`:
   stylesheet can be written from nothing.
 
 **Resources**, in the header, holds what doesn't belong to any one folder: the
-images, the stylesheets in `static/`, and the templates. Pick one and it opens
-below your page.
+images, the stylesheets in `static/`, the templates, the site's icon and the
+reports. Pick one and it opens below your page. Beside it, **Editors** is who
+can sign in, **Help** is how to write each thing, **Translations** adds a language and
+says what is behind in each, and **Publish** (with `DUCKDOWN_REMOTE`) sends the
+site out. On a phone the columns stack, and **Preview** shows the page.
 
 ## Project Structure
 

@@ -19,6 +19,11 @@
   as bun create left it. And the README no longer says to run `bun run setup`
   by hand: Bun 1.4.4 runs it (1.4.2 didn't, and a copy left un-set-up still
   says so as it starts).
+- **Help and the docs catch up.** The editor's Help names Translations,
+  Publish, the reports and Rename or move; the guide's first page names the
+  header's drawers and links Languages; the README lists what a site has had
+  for a while (earlier versions, old addresses kept, feeds, sharing cards,
+  narrower pictures, Help, accessibility).
 - **A published site's deploy no longer looks like a crash in its logs.** A
   platform ends the old container with SIGTERM, and `bun run start` reported
   that as `error: script "start" was terminated by signal SIGTERM`, on every
