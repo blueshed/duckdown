@@ -187,7 +187,7 @@ duckdown/
 │   ├── setup-script.test.ts # both scaffold modes on scratch folders, and `bun run export` in each
 │   └── compose.yml         # MinIO for manual S3 runs (bun run dev:s3)
 ├── bench/                  # bun run bench: a large site made and timed (n163), the export alone and its peak memory, what a first search fetches; a fourth argument adds other languages (n184); measures, doesn't check
-├── scripts/sites.ts        # bun run sites: every site under ~/Workshop on duckdown, and where each stands (not shipped)
+├── scripts/sites.ts        # bun run sites: every site in ~/Workshop/websites on duckdown, and where each stands (not shipped)
 ├── bunfig.toml             # Test preload + the 100% coverage threshold
 ├── create/                 # `bun create blueshed/duckdown`: calls the scaffold, keeps code and tests, commits
 ├── package.json
@@ -740,7 +740,8 @@ to a tag, never to master. The changelog entry is what each site reads when
 `duckdown images`, restart, change a template in its bucket) is said there.
 
 A release isn't out until the sites run it. `bun run sites` finds every folder
-under `~/Workshop` that depends on duckdown and shows where each stands: its
+in `~/Workshop/websites`, the collection (a site kept elsewhere is a link
+there), that depends on duckdown and shows where each stands: its
 pin, what is installed, its copy of the skill, whether git has the upgrade,
 how Railway's latest deployment got there (`push <commit>`, or `railway up
 <time>`) and whether it holds HEAD (a push is compared by commit, a

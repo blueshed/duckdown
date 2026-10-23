@@ -9,8 +9,9 @@
 // nothing, and exits 0: what to do about a site that's behind is in that
 // site's own CLAUDE.md. A release is out when every row is on the newest tag.
 //
-// The sites are found, not listed: a folder under root (two levels down,
-// skipping archive/) whose package.json depends on github:blueshed/duckdown,
+// The sites are found, not listed: a folder under root (~/Workshop/websites,
+// the collection; two levels down, skipping archive/, a link to a folder
+// followed) whose package.json depends on github:blueshed/duckdown,
 // or links a working copy of it (file:, shown as linked, never behind). Its
 // address is the DUCKDOWN_ORIGIN its .railway/railway.ts declares first; when
 // that isn't duckdown yet (a domain not moved to Railway, or none set), the
@@ -18,17 +19,20 @@
 // --json` in the site's folder names it (Railway adds a suffix to some, so it
 // can't be guessed), and the row says so.
 
-import { existsSync, readdirSync, readFileSync } from "fs";
+import { existsSync, readdirSync, readFileSync, statSync, type Dirent } from "fs";
 import { homedir } from "os";
 import { join, relative } from "path";
 import { compare, latestTag, spawnRun } from "../server/upgrade";
 
-const ROOT = process.argv[2] ?? join(homedir(), "Workshop");
+const ROOT = process.argv[2] ?? join(homedir(), "Workshop", "websites");
 const REPO = "https://github.com/blueshed/duckdown.git";
 const SKILL = join(".claude", "skills", "duckdown");
 const SKIP = new Set(["node_modules", "archive"]);
 
 type Row = { site: string; pin: string; installed: string; skill: string; git: string; deploy: string; live: string; origin: string; behind: string[] };
+
+// A folder, or a link to one: the collection links the sites kept elsewhere.
+const isFolder = (d: Dirent, path: string) => d.isDirectory() || (d.isSymbolicLink() && !!statSync(path, { throwIfNoEntry: false })?.isDirectory());
 
 function folders(dir: string, depth: number): string[] {
   let entries;
@@ -38,7 +42,7 @@ function folders(dir: string, depth: number): string[] {
     return [];   // a folder we may not read holds no site we look after
   }
   return entries
-    .filter((d) => d.isDirectory() && !d.name.startsWith(".") && !SKIP.has(d.name))
+    .filter((d) => !d.name.startsWith(".") && !SKIP.has(d.name) && isFolder(d, join(dir, d.name)))
     .flatMap((d) => {
       const path = join(dir, d.name);
       return depth > 1 ? [path, ...folders(path, depth - 1)] : [path];
