@@ -120,14 +120,14 @@ If a step fails, leave that site as it was: never force anything. Go on to the n
   asked.
 - **MostlyMovies:** Peter's own, shared with his son Oliver (Dash). Its remote is Oliver's GitHub
   repository, and pushing to it is fine; it deploys by `railway up`, not by the push.
-- **blueshed/website:** a push to `main` is its deploy, and Peter presses it. Commit the upgrade,
-  then stop and say it is ready to push.
+- **blueshed/website:** a push to `main` is its deploy. Commit the upgrade and push it, like
+  the others. If `main` has fallen behind `origin/main`, rebase the upgrade onto it first.
 - **blueshed/duckdown-forms:** another session's, linked to duckdown's working copy. Leave it.
 - **water:** wasteasresource.org, a *published* site on Railway (the `water` service), and the first to use
-  the languages feature (its Welsh is `site/pages/cy/`). Its CLAUDE.md says nothing is committed,
-  pushed or deployed without asking Peter, so for water the upgrade is prepared (`bunx duckdown
-  upgrade X.Y.Z`, read what it compares, `bun run test`) and then **asked about**, not carried
-  through. A push does not deploy it: `bun run deploy` uploads the folder as it stands, so the
+  the languages feature (its Welsh is `site/pages/cy/`). Its upgrade is carried through like any
+  site's (`bunx duckdown upgrade X.Y.Z`, read what it compares, `bun run test`, commit, push,
+  deploy). Its CLAUDE.md's rule about asking Peter is for content, not a release. A push does
+  not deploy it: `bun run deploy` uploads the folder as it stands, so the
   tree must be clean first. The build runs `bun run export --strict`, which fails on a Welsh page
   whose English has changed: that is the site's to retranslate, not a fault in the upgrade. After
   a deploy: `/health` says the version, and `/`, `/cy/`, `/changelog/` and `/api/live` answer 200.
