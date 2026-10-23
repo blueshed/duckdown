@@ -144,16 +144,30 @@ export async function sessionCookie(name: string, hash: string): Promise<string>
   return `${COOKIE_NAME}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${TOKEN_MAX_AGE}`;
 }
 
-export async function requireAuth(req: BunRequest): Promise<Response | null> {
-  const user = await getUser(req);
-  if (user) return null;
-  // A page load goes to the login form and comes back; the editor's fetches
-  // get a 401 to act on (see edit/api.ts), not the login page's HTML.
+// What someone not signed in gets. A page load goes to the login form and
+// comes back; the editor's fetches get a 401 to act on (see edit/api.ts), not
+// the login page's HTML.
+function refused(req: BunRequest): Response {
   if (!req.headers.get("accept")?.includes("text/html")) {
     return new Response("Unauthorized", { status: 401 });
   }
   const next = encodeURIComponent(safeNext(new URL(req.url).pathname));
   return Response.redirect(`/login?next=${next}`, 302);
+}
+
+export async function requireAuth(req: BunRequest): Promise<Response | null> {
+  return (await getUser(req)) ? null : refused(req);
+}
+
+// A route's methods, each behind the sign-in: someone not signed in gets
+// refused(), and the method is handed who is, so it never asks again.
+type SignedIn = (req: BunRequest, user: string) => Response | Promise<Response>;
+
+export function signedIn<T extends Record<string, SignedIn>>(methods: T): { [K in keyof T]: (req: BunRequest) => Promise<Response> } {
+  return Object.fromEntries(Object.entries(methods).map(([method, handle]) => [method, async (req: BunRequest) => {
+    const user = await getUser(req);
+    return user ? handle(req, user) : refused(req);
+  }])) as { [K in keyof T]: (req: BunRequest) => Promise<Response> };
 }
 
 // --- Login page via HTMLRewriter ---

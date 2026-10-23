@@ -1,5 +1,5 @@
 import type { BunRequest } from "bun";
-import { requireAuth, getUser, sessionCookie } from "../auth";
+import { signedIn, sessionCookie } from "../auth";
 import { readUsers, writeUsers, nameProblem, passwordProblem, envAdmin } from "../users";
 
 // /edit/users — who can sign in, for whoever is signed in. Every editor is
@@ -17,21 +17,13 @@ type Body = { name?: unknown; password?: unknown; current?: unknown };
 
 // A write never comes from another site: browsers label each request with
 // Sec-Fetch-Site, so a page elsewhere can't add itself an editor.
-async function editor(req: BunRequest): Promise<Response | string> {
-  const denied = await requireAuth(req);
-  if (denied) return denied;
-  if (req.method !== "GET" && req.headers.get("sec-fetch-site") === "cross-site") {
-    return said(403, "Cross-site change refused");
-  }
-  return (await getUser(req))!;
-}
+const crossSite = (req: BunRequest) =>
+  req.headers.get("sec-fetch-site") === "cross-site" ? said(403, "Cross-site change refused") : null;
 
 const body = async (req: BunRequest): Promise<Body> => req.json().catch(() => ({})) as Promise<Body>;
 
-export const handleUsers = {
-  async GET(req: BunRequest) {
-    const me = await editor(req);
-    if (me instanceof Response) return me;
+export const handleUsers = signedIn({
+  async GET(_req: BunRequest, me: string) {
     const env = envAdmin();
     const users = Object.keys(await readUsers()).sort().map((name) => ({ name, env: name === env }));
     return Response.json({ me, users });
@@ -39,8 +31,8 @@ export const handleUsers = {
 
   // A new editor, with the password they will sign in with.
   async POST(req: BunRequest) {
-    const me = await editor(req);
-    if (me instanceof Response) return me;
+    const refused = crossSite(req);
+    if (refused) return refused;
     const { name, password } = await body(req);
     const problem = nameProblem(name) ?? passwordProblem(password);
     if (problem) return said(400, problem);
@@ -53,9 +45,9 @@ export const handleUsers = {
 
   // A new password: for anyone, or for yourself with the one you have now.
   // Every session its user had ends; yours is signed in again in the answer.
-  async PUT(req: BunRequest) {
-    const me = await editor(req);
-    if (me instanceof Response) return me;
+  async PUT(req: BunRequest, me: string) {
+    const refused = crossSite(req);
+    if (refused) return refused;
     const { name, password, current } = await body(req);
     const problem = passwordProblem(password);
     if (problem) return said(400, problem);
@@ -74,9 +66,9 @@ export const handleUsers = {
   },
 
   // Gone: they can't sign in, and any session they had ends.
-  async DELETE(req: BunRequest) {
-    const me = await editor(req);
-    if (me instanceof Response) return me;
+  async DELETE(req: BunRequest, me: string) {
+    const refused = crossSite(req);
+    if (refused) return refused;
     const name = new URL(req.url).searchParams.get("name") ?? "";
     const users = await readUsers();
     if (!users[name]) return said(404, `No one called ${name} can sign in`);
@@ -86,4 +78,4 @@ export const handleUsers = {
     await writeUsers(users);
     return Response.json({ ok: true });
   },
-};
+});

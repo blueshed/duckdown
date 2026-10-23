@@ -1,5 +1,5 @@
 import type { BunRequest } from "bun";
-import { requireAuth } from "../auth";
+import { signedIn } from "../auth";
 import { createReportStorage } from "../storage";
 import { renderMarkdown } from "../markdown";
 import { plainKey } from "../history";
@@ -20,10 +20,8 @@ const REPORT_POLICY = "script-src 'none'; object-src 'none'; base-uri 'none'; fo
 // listing, and a markdown file is a page of its own, rendered, for a browser
 // tab — the editor lists them under Resources and opens them there. Only a
 // signed-in editor reads them; nothing here is served, exported or seeded.
-export const handleReports = {
+export const handleReports = signedIn({
   async GET(req: BunRequest) {
-    const denied = await requireAuth(req);
-    if (denied) return denied;
     const key = after(req, "/edit/reports/").replace(/\/$/, "");
     if (key && !plainKey(key)) return new Response("Not a report", { status: 400 });
 
@@ -42,7 +40,7 @@ export const handleReports = {
     }
     return Response.json(await reports.list(key));
   },
-};
+});
 
 export function reportPage(key: string, source: string): string {
   const { content, meta } = renderMarkdown(source);

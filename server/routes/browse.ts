@@ -1,5 +1,5 @@
 import type { BunRequest } from "bun";
-import { requireAuth } from "../auth";
+import { signedIn } from "../auth";
 import { createImageStorage } from "../storage";
 import { IMAGES_PATH } from "../config";
 import { after } from "../utils";
@@ -13,10 +13,8 @@ const images = createImageStorage();
 const THUMB_MIN = 16;
 const THUMB_MAX = 256;
 
-export const handleBrowse = {
+export const handleBrowse = signedIn({
   async GET(req: BunRequest) {
-    const denied = await requireAuth(req);
-    if (denied) return denied;
     const path = after(req, "/edit/browse/");
     const thumb = new URL(req.url).searchParams.get("thumb");
 
@@ -49,8 +47,6 @@ export const handleBrowse = {
   },
 
   async PUT(req: BunRequest) {
-    const denied = await requireAuth(req);
-    if (denied) return denied;
     const path = after(req, "/edit/browse/");
     if (path) {
       // Create folder by writing a placeholder, then deleting it
@@ -63,8 +59,6 @@ export const handleBrowse = {
   },
 
   async POST(req: BunRequest) {
-    const denied = await requireAuth(req);
-    if (denied) return denied;
     const path = after(req, "/edit/browse/");
     const formData = await req.formData();
     const results: string[] = [];
@@ -81,4 +75,4 @@ export const handleBrowse = {
     siteChanged();   // a page showing it can now offer the widths
     return Response.json({ result: results });
   },
-};
+});
