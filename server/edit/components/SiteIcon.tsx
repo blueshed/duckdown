@@ -123,23 +123,38 @@ export function SiteIcon() {
 
   apiJson<Icons>("find the site's icon", "/edit/site-icon").then((data) => { if (data) icons.set(data); });
 
-  const choose = async (e: Event) => {
+  // The file a picker was given, and the picker cleared so the same one can be chosen again.
+  const takeFile = (e: Event) => {
     const input = e.target as HTMLInputElement;
     const file = input.files?.[0];
     input.value = "";
-    if (!file) return;
-    busy.set(true);
+    return file;
+  };
+
+  // Files made from a picture, sent to the route while `flag` says so. One the
+  // browser can't read as a picture speaks, naming it. True once it is set.
+  const send = async (flag: { set(on: boolean): void }, what: string, picture: string, url: string, parts: () => Promise<Record<string, Blob>>) => {
+    flag.set(true);
     try {
       const form = new FormData();
-      form.append("apple-touch-icon.png", await squarePng(file, 180, WHITE), "apple-touch-icon.png");
-      form.append("favicon.ico", await squarePng(file, 48), "favicon.ico");
-      const data = await apiJson<Icons>("set the site's icon", "/edit/site-icon", { method: "POST", body: form });
+      for (const [name, blob] of Object.entries(await parts())) form.append(name, blob, name);
+      const data = await apiJson<Icons>(what, url, { method: "POST", body: form });
       if (data) icons.set(data);
+      return !!data;
     } catch (err) {
-      speak(`Couldn't read ${file.name} as a picture: ${(err as Error).message}`);
+      speak(`Couldn't read ${picture} as a picture: ${(err as Error).message}`);
+      return false;
     } finally {
-      busy.set(false);
+      flag.set(false);
     }
+  };
+
+  const choose = (e: Event) => {
+    const file = takeFile(e);
+    if (file) send(busy, "set the site's icon", file.name, "/edit/site-icon", async () => ({
+      "apple-touch-icon.png": await squarePng(file, 180, WHITE),
+      "favicon.ico": await squarePng(file, 48),
+    }));
   };
 
   // The card: made from a picture chosen, or from the icon; or taken away.
@@ -149,25 +164,10 @@ export function SiteIcon() {
   // it can be made again the other way without choosing it again.
   const picked = signal<{ file: File; fit: Fit } | null>(null);
   const sendCard = async (what: string, make: () => Promise<Blob>, made: () => void = () => picked.set(null)) => {
-    carding.set(true);
-    try {
-      const form = new FormData();
-      form.append("card.jpg", await make(), "card.jpg");
-      const data = await apiJson<Icons>("set the site's sharing card", "/edit/site-icon?card", { method: "POST", body: form });
-      if (data) {
-        icons.set(data);
-        made();
-      }
-    } catch (err) {
-      speak(`Couldn't read ${what} as a picture: ${(err as Error).message}`);
-    } finally {
-      carding.set(false);
-    }
+    if (await send(carding, "set the site's sharing card", what, "/edit/site-icon?card", async () => ({ "card.jpg": await make() }))) made();
   };
   const chooseCard = (e: Event) => {
-    const input = e.target as HTMLInputElement;
-    const file = input.files?.[0];
-    input.value = "";
+    const file = takeFile(e);
     if (file) fromPicture(file);
   };
   const fromPicture = (file: File, fit?: Fit) => {
