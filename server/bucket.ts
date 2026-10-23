@@ -17,11 +17,11 @@
 
 import { resolve } from "path";
 import { History, HISTORY_PATH } from "./history";
-import { LocalStorage, S3Storage } from "./storage";
-import { PAGE_PATH, REPORTS_PATH, USERS_PATH } from "./config";
+import { LocalStorage, S3Storage, byName } from "./storage";
+import { PAGE_PATH } from "./config";
 
 const INDEX = `${PAGE_PATH}index.md`;
-export const stays = (key: string) => key === USERS_PATH || key.startsWith(HISTORY_PATH) || key.startsWith(REPORTS_PATH);
+export const stays = (key: string) => !!byName(key);
 const junk = (key: string) => key.split("/").at(-1) === ".DS_Store";
 const same = (a: Uint8Array, b: Uint8Array) => Buffer.from(a).equals(Buffer.from(b));
 

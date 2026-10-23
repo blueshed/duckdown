@@ -1,5 +1,5 @@
 import { cpSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "fs";
-import { join, relative } from "path";
+import { join } from "path";
 import { tmpdir } from "os";
 
 // `duckdown upgrade [tag]`, run in a site that has duckdown as a dependency:
@@ -55,12 +55,8 @@ export function changesBetween(changelog: string, from: string, to: string): str
 }
 
 // Every file under `dir`, by its path inside it.
-function files(dir: string, at = dir): string[] {
-  return readdirSync(at).flatMap((name) => {
-    const path = join(at, name);
-    return statSync(path).isDirectory() ? files(dir, path) : [relative(dir, path)];
-  });
-}
+const files = (dir: string) =>
+  readdirSync(dir, { recursive: true, encoding: "utf8" }).filter((path) => statSync(join(dir, path)).isFile());
 
 // What an export writes differently: files it adds, drops, or changes.
 export function compare(before: string, after: string): { same: number; added: string[]; removed: string[]; changed: string[] } {

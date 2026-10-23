@@ -2,6 +2,7 @@
 
 // `duckdown` — the server, or one of the commands USAGE lists.
 
+import { parseArgs } from "util";
 import { version } from "../package.json";
 import { scaffold, type Deploy } from "./init";
 
@@ -46,12 +47,9 @@ const commands: Record<string, (args: string[], cwd: string) => Promise<number>>
 
 // `--deploy up` (or `--deploy=up`): how the site reaches Railway.
 function deployOf(args: string[]): Deploy {
-  const flat = args.flatMap((arg) => (arg.startsWith("--deploy=") ? ["--deploy", arg.slice("--deploy=".length)] : [arg]));
-  const at = flat.indexOf("--deploy");
-  if (at < 0) return "github";
-  const value = flat[at + 1];
-  if (value !== "github" && value !== "up") throw new Error(`--deploy is github (the default) or up (railway up), not ${value ?? "nothing"}`);
-  return value;
+  const { deploy = "github" } = parseArgs({ args, options: { deploy: { type: "string" } }, strict: false, allowPositionals: true }).values;
+  if (deploy !== "github" && deploy !== "up") throw new Error(`--deploy is github (the default) or up (railway up), not ${typeof deploy === "string" ? deploy : "nothing"}`);
+  return deploy;
 }
 
 export async function cli(

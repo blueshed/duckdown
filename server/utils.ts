@@ -81,26 +81,31 @@ export function canonicalPath(key: string): string {
 // before — the wrong day, under a datetime= saying the right one.
 const FORMAT: Intl.DateTimeFormatOptions = { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" };
 const day = new Intl.DateTimeFormat("en-GB", FORMAT);
-const days = new Map<string, Intl.DateTimeFormat>();
+
+// What Intl makes for a language tag, made once a tag. A tag Intl can't read
+// is said once, as `refused` puts it, and given `fallback`.
+export function perTag<T>(make: (tag: string) => T, fallback: (tag: string) => T, refused: (tag: string) => string): (tag: string) => T {
+  const made = new Map<string, T>();
+  return (tag) => {
+    if (!made.has(tag)) {
+      try {
+        made.set(tag, make(tag));
+      } catch {
+        console.error(refused(tag));
+        made.set(tag, fallback(tag));
+      }
+    }
+    return made.get(tag)!;
+  };
+}
 
 // The way a date is written in a language, as its readers write it: "2
 // Hydref 2026". English stays as it always was (en-GB), so a site that says
-// nothing of language is not changed; a tag Intl can't read is said once and
-// written the same way.
-function dayIn(lang: string): Intl.DateTimeFormat {
-  if (!lang || lang === "en") return day;
-  const had = days.get(lang);
-  if (had) return had;
-  let format: Intl.DateTimeFormat;
-  try {
-    format = new Intl.DateTimeFormat(lang, FORMAT);
-  } catch {
-    console.error(`lang: "${lang}" is not a language tag Intl knows — its dates are written as en-GB`);
-    format = day;
-  }
-  days.set(lang, format);
-  return format;
-}
+// nothing of language is not changed; a tag Intl can't read is written the
+// same way.
+const days = perTag((lang) => new Intl.DateTimeFormat(lang, FORMAT), () => day,
+  (lang) => `lang: "${lang}" is not a language tag Intl knows — its dates are written as en-GB`);
+const dayIn = (lang: string) => (!lang || lang === "en" ? day : days(lang));
 
 // A date: as a <time>, written the way a reader expects, in `lang` when the
 // page is in one. A date nobody can parse is shown as it was written rather

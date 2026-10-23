@@ -2,7 +2,7 @@ import { gitEnv } from "./gitenv";
 import { realpathSync } from "fs";
 import { join, relative, sep } from "path";
 import { APP_PATH, IS_S3, REMOTE } from "./config";
-import { LocalStorage } from "./storage";
+import { BY_NAME, LocalStorage } from "./storage";
 import { History, HISTORY_PATH } from "./history";
 import { checkSite } from "./export";
 
@@ -44,7 +44,7 @@ export class RemoteRefused extends Error {
   }
 }
 
-export const NEVER = ["users.json", HISTORY_DIR, "reports"];
+export const NEVER = BY_NAME.map((name) => name.replace(/\/$/, ""));
 
 // The remote DUCKDOWN_REMOTE names, or null when it names none — then nothing
 // changes, and the editor offers no Publish.

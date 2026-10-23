@@ -90,8 +90,8 @@ function real(path: string): string {
 // users' hashes, the history, the reports — the three `duckdown bucket` leaves
 // where they are. Each is read by its own name or not at all: a folder's
 // files, and the folder itself, which a link to it would list.
-const BY_NAME = [USERS_PATH, HISTORY_PATH, REPORTS_PATH];
-const byName = (key: string) => BY_NAME.find((name) => key === name.replace(/\/$/, "") || (name.endsWith("/") && key.startsWith(name)));
+export const BY_NAME = [USERS_PATH, HISTORY_PATH, REPORTS_PATH];
+export const byName = (key: string) => BY_NAME.find((name) => key === name.replace(/\/$/, "") || (name.endsWith("/") && key.startsWith(name)));
 
 // A link left out, or a section refused, said once each rather than at every
 // walk of the site (n172).

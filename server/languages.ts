@@ -4,6 +4,7 @@ import { unlisted, hidden, readable, NOT_FOUND } from "./listed";
 import { kept } from "./kept";
 import { joinKey } from "./slugs";
 import { judge, type Standing } from "./standing";
+import { perTag } from "./utils";
 
 export type { Standing };
 
@@ -174,21 +175,8 @@ export async function untranslatedNote(pages: Storage, lang: string): Promise<{ 
 // A language by its own name — Cymraeg, English, français — which is how a
 // reader looks for it, and which the platform knows, so there is no table here
 // to keep. A code Intl can't name is shown as itself, and said once.
-const autonyms = new Map<string, string>();
-
-export function languageName(code: string): string {
-  const had = autonyms.get(code);
-  if (had) return had;
-  let name: string;
-  try {
-    name = new Intl.DisplayNames([code], { type: "language" }).of(code) ?? code;
-  } catch {
-    console.error(`lang: "${code}" is not a language tag Intl knows — the switcher shows it as it is`);
-    name = code;
-  }
-  autonyms.set(code, name);
-  return name;
-}
+export const languageName = perTag((code) => new Intl.DisplayNames([code], { type: "language" }).of(code) ?? code, (code) => code,
+  (code) => `lang: "${code}" is not a language tag Intl knows — the switcher shows it as it is`);
 
 // What is in a folder of a language's site: the names of the pages and folders
 // of the default tree there and of the tree written in the language, each name
