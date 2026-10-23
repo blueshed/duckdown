@@ -14,8 +14,10 @@
 12. [The editor](#the-editor)
 13. [Search](#search)
 14. [Publishing](#publishing)
-15. [Upgrading duckdown](#upgrading-duckdown)
-16. [Troubleshooting](#troubleshooting)
+15. [Extensions](#extensions) — routes a site adds: a form, an RSVP
+16. [Upgrading duckdown](#upgrading-duckdown)
+17. [Troubleshooting](#troubleshooting)
+18. [Three sizes of override](#three-sizes-of-override)
 
 ## The content folder
 
