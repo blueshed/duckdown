@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.18.4 — 2026-10-27
+
+A served site rides out a bucket that drops connections. Nothing a site has
+to do, and an upgrade changes no page it exports.
+
+- **A dropped connection to the bucket is tried again.** For ten minutes on
+  27 Oct, Railway's storage dropped connections from vashti's service, and
+  since one page reads a dozen files, every page was a 500 and a save failed.
+  Every bucket call that loses its connection (`ConnectionClosed`,
+  `ECONNRESET`) is now made again after 50, 200 and 800 ms before it fails;
+  an answer the bucket gave, such as a missing key, is never asked twice
+  (n206).
+
 ## 0.18.3 — 2026-10-23
 
 Simpler inside, and four small faults found on the way, each fixed. Nothing a

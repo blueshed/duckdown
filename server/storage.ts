@@ -284,13 +284,36 @@ export class LocalStorage implements Storage {
 
 // --- S3 ---
 
+// A bucket drops a connection now and then, and many at once when it is in
+// trouble: Railway's did for ten minutes on 27 Oct 2026, and since one page
+// reads a dozen files, one dropped read was a 500 for the whole page (n206).
+// A call that loses its connection is made again, after a pause that grows;
+// an answer the bucket gave (a missing key, a refusal) is never asked twice.
+// Every call here is safe to repeat: a read, a list, a PUT of the same bytes,
+// a DELETE.
+export const PAUSES = [50, 200, 800];
+const DROPPED = new Set(["ConnectionClosed", "ECONNRESET"]);
+
+export async function again<T>(call: () => Promise<T>, pauses = PAUSES): Promise<T> {
+  for (const pause of pauses) {
+    try {
+      return await call();
+    } catch (e) {
+      if (!DROPPED.has((e as { code?: string })?.code ?? "")) throw e;
+    }
+    await Bun.sleep(pause);
+  }
+  return call();
+}
+
 export class S3Storage implements Storage {
   private client: InstanceType<typeof S3Client>;
   private prefix: string;
 
   // Credentials default to Bun's own S3_* / AWS_* environment (read at startup).
   constructor(bucket: string, prefix: string, endpoint: string, region: string,
-    credentials: { accessKeyId?: string; secretAccessKey?: string } = {}) {
+    credentials: { accessKeyId?: string; secretAccessKey?: string } = {},
+    private pauses = PAUSES) {
     this.prefix = prefix;
     this.client = new S3Client({
       bucket,
@@ -304,13 +327,17 @@ export class S3Storage implements Storage {
     return this.prefix + path.replace(/^\//, "");
   }
 
+  private again<T>(call: () => Promise<T>): Promise<T> {
+    return again(call, this.pauses);
+  }
+
   async list(prefix: string): Promise<Listing> {
     // "news" or "news/": the editor asks for a folder with its slash (so
     // "v1.2" isn't taken for a file), and "news//" is a prefix nothing has —
     // which emptied every folder of vashti's bucket in the tree.
     const folder = prefix.replace(/\/+$/, "");
     const fullPrefix = this.key(folder ? `${folder}/` : "");
-    const result = await this.client.list({ prefix: fullPrefix, delimiter: "/" });
+    const result = await this.again(() => this.client.list({ prefix: fullPrefix, delimiter: "/" }));
 
     // With a delimiter, deeper keys come back as commonPrefixes; what to skip
     // is a folder marker (an object named exactly the prefix) and a . name.
@@ -342,25 +369,25 @@ export class S3Storage implements Storage {
   }
 
   async read(key: string): Promise<string> {
-    return this.client.file(this.key(key)).text();
+    return this.again(() => this.client.file(this.key(key)).text());
   }
 
   async readBytes(key: string): Promise<Uint8Array> {
-    return this.client.file(this.key(key)).bytes();
+    return this.again(() => this.client.file(this.key(key)).bytes());
   }
 
   // A folder is a prefix something is under, or a folder marker.
   async write(key: string, body: string | Uint8Array): Promise<void> {
-    if (folderKey(key) || (await this.client.list({ prefix: `${this.key(key)}/`, maxKeys: 1 })).contents?.length) throw notAFile(key);
-    await this.client.write(this.key(key), body);
+    if (folderKey(key) || (await this.again(() => this.client.list({ prefix: `${this.key(key)}/`, maxKeys: 1 }))).contents?.length) throw notAFile(key);
+    await this.again(() => this.client.write(this.key(key), body));
   }
 
   async remove(key: string): Promise<void> {
-    await this.client.delete(this.key(key));
+    await this.again(() => this.client.delete(this.key(key)));
   }
 
   async exists(key: string): Promise<boolean> {
-    return this.client.exists(this.key(key));
+    return this.again(() => this.client.exists(this.key(key)));
   }
 
   mime(key: string): string {
@@ -373,7 +400,7 @@ export class S3Storage implements Storage {
     const found: string[] = [];
     let continuationToken: string | undefined;
     do {
-      const page = await this.client.list({ prefix: this.prefix, continuationToken });
+      const page = await this.again(() => this.client.list({ prefix: this.prefix, continuationToken }));
       for (const obj of page.contents ?? []) if (!obj.key.endsWith("/")) found.push(obj.key.slice(this.prefix.length));
       continuationToken = page.isTruncated ? page.nextContinuationToken : undefined;
     } while (continuationToken);

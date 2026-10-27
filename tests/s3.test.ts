@@ -1,6 +1,7 @@
 import { describe, test, expect, afterAll, spyOn } from "bun:test";
 import { join } from "path";
-import { S3Storage, seedBucketSite } from "../server/storage";
+import net from "net";
+import { S3Storage, seedBucketSite, again } from "../server/storage";
 import { fakeS3 } from "./fake-s3";
 
 const s3 = fakeS3();
@@ -93,5 +94,71 @@ describe("seeding a bucket", () => {
     const before = s3.objects.size;
     expect(await seedBucketSite(seed, store(), true)).toBe(0);
     expect(s3.objects.size).toBe(before);
+  });
+});
+
+// In front of the fake bucket: the next `drops` requests are read and their
+// connection closed unanswered, as Railway's bucket did (n206); the rest pass
+// through. By request, not by connection: Bun keeps connections for the whole
+// process, whichever client opened them.
+function dropping(to: string) {
+  const { hostname, port } = new URL(to);
+  const proxy = { drops: 0, endpoint: "", stop: () => server.close() };
+  const server = net.createServer((client) => {
+    const upstream = net.connect(Number(port), hostname);
+    const close = () => { client.destroy(); upstream.destroy(); };
+    client.on("data", (chunk) => {
+      if (proxy.drops > 0) { proxy.drops--; close(); }
+      else upstream.write(chunk);
+    });
+    upstream.pipe(client);
+    client.on("error", close).on("close", close);
+    upstream.on("error", close).on("close", close);
+  }).listen(0, "127.0.0.1");
+  proxy.endpoint = `http://127.0.0.1:${(server.address() as net.AddressInfo).port}`;
+  return proxy;
+}
+
+describe("a dropped connection", () => {
+  const proxy = dropping(s3.endpoint);
+  afterAll(() => proxy.stop());
+  const kept = new S3Storage("bucket", "dropped/", proxy.endpoint, "us-east-1",
+    { accessKeyId: "test", secretAccessKey: "test" }, [1, 1, 1]);
+  const store = () => kept;
+
+  test("is made again, for every call", async () => {
+    proxy.drops = 3;
+    await store().write("a.md", "kept");
+    for (const call of [
+      (s: S3Storage) => s.read("a.md"),
+      (s: S3Storage) => s.readBytes("a.md"),
+      (s: S3Storage) => s.exists("a.md"),
+      (s: S3Storage) => s.list(""),
+      (s: S3Storage) => s.keys(),
+    ]) {
+      proxy.drops = 3;
+      await call(store());
+      expect(proxy.drops).toBe(0);
+    }
+    expect(await store().read("a.md")).toBe("kept");
+    proxy.drops = 3;
+    await store().remove("a.md");
+    expect(s3.objects.has("bucket/dropped/a.md")).toBe(false);
+  });
+
+  test("gives up after the last pause, with the bucket's own error", async () => {
+    proxy.drops = 100;   // more than Bun's own retry of a kept connection, and ours
+    const err = await store().read("a.md").catch((e) => e);
+    expect(err.code).toBe("ConnectionClosed");
+    expect(proxy.drops).toBeLessThanOrEqual(96);
+    proxy.drops = 0;
+  });
+
+  test("an answer is never asked twice", async () => {
+    let calls = 0;
+    const missing = Object.assign(new Error("NoSuchKey"), { code: "NoSuchKey" });
+    const err = await again(async () => { calls++; throw missing; }, [1, 1, 1]).catch((e) => e);
+    expect([err, calls]).toEqual([missing, 1]);
+    expect(await again(async () => { if (++calls < 4) throw { code: "ECONNRESET" }; return "ok"; }, [1, 1, 1])).toBe("ok");
   });
 });
