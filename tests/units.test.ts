@@ -9,7 +9,7 @@ import { loadSecret, signJwt, verifyJwt, ensureAdmin, requireAuth } from "../ser
 import { handleError } from "../server/routes/error";
 import { fromSite, viewLine, logView } from "../server/log";
 import { scaffoldNotice } from "../server/scaffold";
-import { dateHtml, canonicalPath, outsideCode, BadRequest } from "../server/utils";
+import { dateHtml, canonicalPath, outsideCode, BadRequest, together } from "../server/utils";
 import { kept, siteChanged } from "../server/kept";
 import type { Storage } from "../server/storage";
 
@@ -654,6 +654,19 @@ describe("scaffold notice", () => {
 });
 
 describe("utils", () => {
+  test("together asks of every item a few at a time, and answers in the items' order (n207)", async () => {
+    let flying = 0, most = 0;
+    const ask = async (n: number) => {
+      most = Math.max(most, ++flying);
+      await Bun.sleep(5 - (n % 5));   // later ones finish first
+      flying--;
+      return n * 2;
+    };
+    expect(await together([...Array(20).keys()], ask, 4)).toEqual([...Array(20).keys()].map((n) => n * 2));
+    expect(most).toBe(4);
+    expect(await together([], ask)).toEqual([]);
+  });
+
   test("a date reads as a reader expects it, on the day it says", () => {
     // Formatted in UTC, so a server west of it doesn't print the day before
     // the one in datetime= — the failure this test exists for.

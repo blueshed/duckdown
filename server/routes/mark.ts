@@ -30,12 +30,9 @@ export const handleMark = signedIn({
     const path = new URL(req.url).searchParams.get("path") ?? "";
     const { source, draft, through } = (await req.json()) as MarkRequest;
     const page = parsePage(path, source);
-    // If this page's folder has a collection, anything wrong with it comes
-    // back here: a slug that collides with a page, or a file that won't parse.
-    // Failures speak, and the editor is where the person who can fix it is.
-    const problems = await collectionProblems(pages, folderOf(path));
+    const later: string[] = [];
     const unused = navIgnored(path, page.meta);
-    if (unused) problems.push(unused);
+    if (unused) later.push(unused);
     // An each: page previews as the page its first item gets, drawn from the
     // unsaved source: what you are writing is every item page at once.
     let shown = page;
@@ -47,12 +44,20 @@ export const handleMark = signedIn({
         item = { collection: { ...collection!, each: { key: path, meta: page.meta, content: page.content } }, item: first };
         shown = itemPage(item);
       } else {
-        problems.push(collection ? "this collection has no items yet" : `there is no collection.json beside ${path}`);
+        later.push(collection ? "this collection has no items yet" : `there is no collection.json beside ${path}`);
       }
     }
-    // No edit link: the preview shows the page a reader gets, and a link into
-    // the editor from inside the editor helps nobody.
-    const { html, layout, includes } = await pageHtml(shown, { origin: siteOrigin(req), draft, through, item });
+    // If this page's folder has a collection, anything wrong with it comes
+    // back here: a slug that collides with a page, or a file that won't parse.
+    // Failures speak, and the editor is where the person who can fix it is.
+    // Asked alongside the render, which doesn't need it (n207). No edit link:
+    // the preview shows the page a reader gets, and a link into the editor
+    // from inside the editor helps nobody.
+    const [collected, { html, layout, includes }] = await Promise.all([
+      collectionProblems(pages, folderOf(path)),
+      pageHtml(shown, { origin: siteOrigin(req), draft, through, item }),
+    ]);
+    const problems = [...collected, ...later];
     // A link a reader would follow to nothing, said while it is being
     // written rather than by the export later (or by a reader). Only for a
     // page: a template shown through a sample page has no address of its own.

@@ -2,8 +2,8 @@ import type { Storage } from "./storage";
 import { DEBUG } from "./config";
 
 // What the site knows about itself — the nav, each folder's listing, the
-// sitemap, the search index, the collections, the feeds — is built from
-// pages/ and kept until a page changes. In production every write comes
+// sitemap, the search index, the collections, the feeds, the templates — is
+// built from the site's files and kept until one changes. In production every write comes
 // through this server, and whatever writes calls siteChanged(), which drops
 // the lot: one call, so a new write path can't forget one of them. In
 // development (DEBUG=1) each is built per ask instead: pages are often written

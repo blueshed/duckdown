@@ -1,4 +1,4 @@
-import { createPageStorage } from "../storage";
+import { createPageStorage, readIfThere } from "../storage";
 import { yes } from "../markdown";
 import { getUser } from "../auth";
 import { parsePage, pageHtml, itemPage, type Page, type PageOptions } from "../page";
@@ -86,10 +86,14 @@ export function noticeMissingRoot(exists: (path: string) => boolean = existsSync
 const notFound = async (req: Request, lang = "") => {
   noticeMissingRoot();
   let answer: { kind: string; key: string } | null = null;
+  let source: string | null = null;
   if (lang) answer = await translation(pages, lang, NOT_FOUND);
-  else if (await pages.exists(NOT_FOUND)) answer = { kind: "translated", key: NOT_FOUND };
+  else {
+    source = await readIfThere(pages, NOT_FOUND);
+    if (source !== null) answer = { kind: "translated", key: NOT_FOUND };
+  }
   if (!answer) return new Response("Not Found", { status: 404 });
-  const { html } = await pageHtml(parsePage(answer.key, await pages.read(answer.key)), {
+  const { html } = await pageHtml(parsePage(answer.key, source ?? await pages.read(answer.key)), {
     origin: siteOrigin(req), editHref: "", fallbackFor: answer.kind === "fallback" ? lang : undefined,
   });
   return new Response(html, { status: 404, headers: { "Content-Type": HTML } });
@@ -167,10 +171,13 @@ const renderPage = async (req: Request) => {
   if (inLanguage) return languagePage(req, inLanguage.lang, inLanguage.rest, name, decoded);
   // A page, or the index of the folder of that name: /blog, /blog/ and
   // /blog/index.html all reach pages/blog/index.md.
-  const key = await pages.exists(`${name}.md`) ? `${name}.md` : `${name}/index.md`;
-  if (!await pages.exists(key)) return collected(req, name, decoded);
+  // Both asked at once: on a bucket each is a round trip.
+  const [flat, index] = await Promise.all([readIfThere(pages, `${name}.md`), readIfThere(pages, `${name}/index.md`)]);
+  const key = flat !== null ? `${name}.md` : `${name}/index.md`;
+  const source = flat ?? index;
+  if (source === null) return collected(req, name, decoded);
 
-  const page = parsePage(key, await pages.read(key));
+  const page = parsePage(key, source);
   // An each: page is what every item of its collection is made from, not a
   // page of its own: its address is a miss (or an item that happens to share
   // its name).

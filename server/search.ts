@@ -2,7 +2,7 @@ import type { Storage } from "./storage";
 import { DEBUG } from "./config";
 import { renderMarkdown } from "./markdown";
 import { COLLECTION_FILE, aliasKey, loadCollection, itemBody, itemMeta } from "./collection";
-import { canonicalPath } from "./utils";
+import { canonicalPath, together } from "./utils";
 import { kept } from "./kept";
 import { unlisted, pageKey, readable } from "./listed";
 import { languagesOf } from "./languages";
@@ -73,10 +73,17 @@ export async function buildSite(pages: Storage, prefix = "", debug = DEBUG, othe
   const { files, folders } = await pages.list(prefix);
   const out: Built = { entries: [], pages: [], aliases: [] };
 
-  for (const f of files) {
+  // Every page's text and every folder's walk asked for together, then taken
+  // in order: one after another, each was a bucket's round trip (n207).
+  const wanted = files.filter((f) => pageKey(f.path, others) && !unlisted(f.name));
+  const listed = folders.filter((f) => !unlisted(f.name)).sort((a, b) => a.name.localeCompare(b.name));
+  const [sources, insides] = await Promise.all([
+    together(wanted, (f) => pages.read(f.path)),
+    together(listed, (f) => buildSite(pages, f.path, debug, others)),
+  ]);
+  for (const [n, f] of wanted.entries()) {
     const key = f.path;
-    if (!pageKey(key, others) || unlisted(f.name)) continue;
-    const { content, meta } = renderMarkdown(await pages.read(key), key.replace(/\.md$/, ""));
+    const { content, meta } = renderMarkdown(sources[n]!, key.replace(/\.md$/, ""));
     // An each: page is found by its collection, below, and is its items.
     if (!readable(meta)) continue;
     const url = canonicalPath(key);
@@ -116,9 +123,7 @@ export async function buildSite(pages: Storage, prefix = "", debug = DEBUG, othe
     }
   }
 
-  for (const folder of folders.sort((a, b) => a.name.localeCompare(b.name))) {
-    if (unlisted(folder.name)) continue;
-    const inside = await buildSite(pages, folder.path, debug, others);
+  for (const inside of insides) {
     out.entries.push(...inside.entries);
     out.pages.push(...inside.pages);
     out.aliases.push(...inside.aliases);

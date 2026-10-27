@@ -1,4 +1,4 @@
-import { createElement, signal, computed, effect } from "@blueshed/railroad";
+import { createElement, signal, computed, effect, batch } from "@blueshed/railroad";
 import { rendered } from "../api";
 import { editorContent, filePath, pageLayout, pageIncludes, resource, resourceDraft, collectionRevision, opening } from "../store";
 import { speak, hush, notice } from "../notice";
@@ -12,6 +12,12 @@ import { PreviewFrame } from "./PreviewFrame";
 // it is put right, if it is still what the line says.
 type Rendered = { html: string; layout: string; includes: string[]; problems?: string[] };
 
+// How long a render of the page being typed into may take before the
+// preview says it is coming. A quick one says nothing, as before; a slow one
+// (a save drops what the server keeps, and on a bucket the next render took
+// seconds) left the old page standing as if nothing were happening (n207).
+export const SLOW = 400;
+
 export function Preview() {
   const page = signal("");
   let said = "";
@@ -19,17 +25,27 @@ export function Preview() {
   // the frame has loaded what the server rendered for it. Typing re-renders
   // the same page, and says nothing: a line on every keystroke is noise.
   const arriving = signal(false);
-  const busy = computed(() => opening.get() !== null || arriving.get());
+  // A render of the same page that has taken longer than SLOW: on its way too.
+  const slow = signal(false);
+  const busy = computed(() => opening.get() !== null || arriving.get() || slow.get());
+  const arrived = () => batch(() => {
+    arriving.set(false);
+    slow.set(false);
+  });
   let shown = "";
+  let asked = 0;
 
   const update = async (source: string, draft: { name: string; body: string } | undefined) => {
+    const mine = ++asked;
+    const slowly = setTimeout(() => mine === asked && slow.set(true), SLOW);
     const data = await rendered<Rendered>("render the preview", filePath.peek() || "", { source, draft });
+    clearTimeout(slowly);
     if (!data) {
-      arriving.set(false);
+      arrived();
       return;
     }
     // The same document again loads nothing, so there is no load to wait for.
-    if (data.html === page.peek()) arriving.set(false);
+    if (data.html === page.peek()) arrived();
     page.set(data.html);
     pageLayout.set(data.layout);
     pageIncludes.set(data.includes);
@@ -83,5 +99,5 @@ export function Preview() {
     return html.includes("</head>") ? html.replace("</head>", `${css}</head>`) : css + html;
   });
 
-  return <PreviewFrame srcdoc={srcdoc} title="Preview of the page" busy={busy} onload={() => arriving.set(false)} />;
+  return <PreviewFrame srcdoc={srcdoc} title="Preview of the page" busy={busy} onload={arrived} />;
 }

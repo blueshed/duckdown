@@ -1,7 +1,7 @@
 import { describe, test, expect, afterAll, spyOn } from "bun:test";
 import { join } from "path";
 import net from "net";
-import { S3Storage, seedBucketSite, again } from "../server/storage";
+import { S3Storage, seedBucketSite, again, readIfThere } from "../server/storage";
 import { fakeS3 } from "./fake-s3";
 
 const s3 = fakeS3();
@@ -25,6 +25,11 @@ describe("S3Storage", () => {
   test("knows what exists", async () => {
     expect(await store.exists("index.md")).toBe(true);
     expect(await store.exists("nope.md")).toBe(false);
+  });
+
+  test("reads a file or says there is none, in one call (n207)", async () => {
+    expect(await readIfThere(store, "index.md")).toBe("title: Home\n\n");
+    expect(await readIfThere(store, "nope.md")).toBeNull();
   });
 
   test("lists files and folders, skipping a folder marker", async () => {
@@ -151,6 +156,9 @@ describe("a dropped connection", () => {
     const err = await store().read("a.md").catch((e) => e);
     expect(err.code).toBe("ConnectionClosed");
     expect(proxy.drops).toBeLessThanOrEqual(96);
+    // A file that may not be there is no file only when the bucket says so.
+    const lost = await store().readIfThere("a.md").catch((e) => e);
+    expect(lost.code).toBe("ConnectionClosed");
     proxy.drops = 0;
   });
 

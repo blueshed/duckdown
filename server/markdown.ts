@@ -1,4 +1,4 @@
-import type { Storage } from "./storage";
+import { readIfThere, type Storage } from "./storage";
 import { DEBUG } from "./config";
 
 // Front-matter parser + Bun.markdown wrapper
@@ -181,8 +181,9 @@ function withContents(html: string): string {
 // logged once in development, where a content author would see it.
 export async function folderOrder(pages: Storage, path: string): Promise<number> {
   const key = `${path}/index.md`;
-  if (!await pages.exists(key)) return Infinity;
-  const raw = parseFrontMatter(await pages.read(key)).meta.order?.[0];
+  const source = await readIfThere(pages, key);
+  if (source === null) return Infinity;
+  const raw = parseFrontMatter(source).meta.order?.[0];
   if (raw === undefined) return Infinity;
   const n = Number(raw);
   if (!Number.isInteger(n)) {

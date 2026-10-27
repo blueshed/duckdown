@@ -35,11 +35,21 @@ export interface Listing {
 export interface Storage {
   list(prefix: string): Promise<Listing>;
   read(key: string): Promise<string>;
+  // A bucket's: see readIfThere(), below.
+  readIfThere?(key: string): Promise<string | null>;
   readBytes(key: string): Promise<Uint8Array>;
   write(key: string, body: string | Uint8Array): Promise<void>;
   remove(key: string): Promise<void>;
   exists(key: string): Promise<boolean>;
   mime(key: string): string;
+}
+
+// A file's text, or null when there is none. On a bucket that is one call
+// where exists() then read() is two, each a round trip a page waits for
+// (n207); anything else asks the two questions.
+export async function readIfThere(store: Storage, key: string): Promise<string | null> {
+  if (store.readIfThere) return store.readIfThere(key);
+  return (await store.exists(key)) ? store.read(key) : null;
 }
 
 // --- MIME ---
@@ -374,6 +384,13 @@ export class S3Storage implements Storage {
 
   async readBytes(key: string): Promise<Uint8Array> {
     return this.again(() => this.client.file(this.key(key)).bytes());
+  }
+
+  async readIfThere(key: string): Promise<string | null> {
+    return this.read(key).catch((e) => {
+      if ((e as { code?: string })?.code === "NoSuchKey") return null;
+      throw e;
+    });
   }
 
   // A folder is a prefix something is under, or a folder marker.

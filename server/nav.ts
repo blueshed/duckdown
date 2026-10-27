@@ -1,7 +1,7 @@
-import type { Storage } from "./storage";
+import { readIfThere, type Storage } from "./storage";
 import { DEBUG } from "./config";
 import { parseFrontMatter, sortFolders, folderOrder } from "./markdown";
-import { escapeHtml, canonicalPath, dateHtml } from "./utils";
+import { escapeHtml, canonicalPath, dateHtml, together } from "./utils";
 import { unlisted, pageKey, readable } from "./listed";
 import { kept } from "./kept";
 import { languagesOf, translation, treeOf } from "./languages";
@@ -45,8 +45,9 @@ async function answering(pages: Storage, lang: string, key: string): Promise<Ans
     const answer = await translation(pages, lang, key);
     return answer ? { ...answer, meta: parseFrontMatter(await pages.read(answer.key)).meta } : null;
   }
-  if (!await pages.exists(key)) return null;
-  const { meta } = parseFrontMatter(await pages.read(key));
+  const source = await readIfThere(pages, key);
+  if (source === null) return null;
+  const { meta } = parseFrontMatter(source);
   return readable(meta) ? { key, kind: "translated", meta } : null;
 }
 
@@ -77,11 +78,10 @@ async function foldersOf(pages: Storage, lang: string, folder: string, skip: str
 async function navOf(pages: Storage, lang: string, skip: string[], folder = ""): Promise<string> {
   const items: string[] = [];
   const key = joinKey(folder, "index.md");
-  const index = await answering(pages, lang, key);
+  const [index, folders] = await Promise.all([answering(pages, lang, key), foldersOf(pages, lang, folder, skip)]);
   const title = index && (index.meta.nav?.[0] || index.meta.title?.[0]);
   if (title) items.push(`<li><a href="${encodeURI(canonicalPath(joinKey(lang, key)))}">${escapeHtml(title)}</a></li>`);
-  for (const sub of await foldersOf(pages, lang, folder, skip)) {
-    const inside = await navOf(pages, lang, skip, sub.path);
+  for (const inside of await together(folders, (sub) => navOf(pages, lang, skip, sub.path))) {
     if (inside) items.push(inside);
   }
   return items.join("\n");
@@ -102,26 +102,25 @@ export async function folderEntries(pages: Storage, folder: string, lang = ""): 
   const names = lang
     ? (await treeOf(pages, lang, folder)).files
     : (await pages.list(folder)).files.map((f) => f.name).filter((name) => !unlisted(name));
-  const entries: Listed[] = [];
-  for (const name of names) {
+  const listed = names.filter((name) => pageKey(joinKey(folder, name)) && name !== "index.md");
+  const entries = await together(listed, async (name): Promise<Listed | null> => {
     const key = joinKey(folder, name);
-    if (!pageKey(key) || name === "index.md") continue;
     const answer = await answering(pages, lang, key);
-    if (!answer) continue;
+    if (!answer) return null;
     const { meta } = answer;
     let date = meta.date?.[0];
     if (date === undefined && lang && answer.kind === "translated" && await pages.exists(key)) {
       date = parseFrontMatter(await pages.read(key)).meta.date?.[0];
     }
-    entries.push({
+    return {
       key: answer.key,
       href: encodeURI(`/${joinKey(lang, key).replace(/\.md$/, ".html")}`),
       title: meta.title?.[0] ?? name.replace(/\.md$/, ""),
       date: date ?? "",
       description: meta.description?.[0] ?? "",
-    });
-  }
-  return entries.sort(byDateThenTitle);
+    };
+  });
+  return entries.filter((entry) => entry !== null).sort(byDateThenTitle);
 }
 
 // The folder's pages, for {{pages}} in its index.
@@ -150,15 +149,17 @@ async function buildSiteMap(pages: Storage, folder: string, lang: string, skip: 
     if (home) items.push(`<li><a href="${canonicalPath(at("index.md"))}">${escapeHtml(home.meta.title?.[0] ?? "Home")}</a></li>`);
   }
 
-  for (const entry of await folderEntries(pages, folder, lang)) {
+  const [entries, folders] = await Promise.all([folderEntries(pages, folder, lang), foldersOf(pages, lang, folder, skip)]);
+  for (const entry of entries) {
     items.push(`<li><a href="${entry.href}">${escapeHtml(entry.title)}</a></li>`);
   }
   // Follows the nav's own order, so the two agree on which folder comes first.
-  for (const sub of await foldersOf(pages, lang, folder, skip)) {
+  const subs = await together(folders, (sub) =>
+    Promise.all([buildSiteMap(pages, sub.path, lang, skip), answering(pages, lang, `${sub.path}/index.md`)]));
+  for (const [n, sub] of folders.entries()) {
     const path = sub.path;
-    const inside = await buildSiteMap(pages, path, lang, skip);
+    const [inside, index] = subs[n]!;
     if (!inside) continue;
-    const index = await answering(pages, lang, `${path}/index.md`);
     const title = index ? index.meta.title?.[0] ?? sub.name : "";
     const name = title ? `<a href="${encodeURI(canonicalPath(at(`${path}/index.md`)))}">${escapeHtml(title)}</a>` : escapeHtml(sub.name);
     items.push(`<li>${name}\n${inside}</li>`);

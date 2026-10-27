@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.18.5 — 2026-10-27
+
+A served site's pages and the editor's preview are several times faster on a
+bucket, and a slow preview says it is coming. Nothing a site has to do, and
+an upgrade changes no page it exports.
+
+- **Fewer round trips, and those together.** On a bucket every call is a
+  round trip, and nearly every one waited for the last. A file that may not
+  be there is now one read, not a check and then a read; templates are kept
+  between pages, like the nav, and saving one in the editor drops them; the
+  nav, the listings, the sitemap, the search index and the preview's check of
+  a page's links ask for their files together, a few at a time. Against a
+  copy of vashti's site at 40 ms a call: a page view went from 210-300 ms to
+  43 ms, a preview of a long page from 2.2 s to 0.17 s, and the first preview
+  after a save from 4.9 s to 0.7 s (n207).
+- **A slow preview says so.** The line across the top of the preview showed
+  only when another page was opened; a re-render while typing showed
+  nothing, however long it took. Now one that takes longer than 400 ms shows
+  the line, over the last page, until the new one has loaded (n207).
+- **`Storage` may have `readIfThere(key)`,** the file's text or null. A
+  storage of a site's own needn't: `readIfThere(store, key)` asks `exists()`
+  and `read()` of one that hasn't.
+
 ## 0.18.4 — 2026-10-27
 
 A served site rides out a bucket that drops connections. Nothing a site has

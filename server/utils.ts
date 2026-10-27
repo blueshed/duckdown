@@ -115,3 +115,21 @@ export function dateHtml(date: string, lang = ""): string {
   const on = new Date(date);
   return `<time datetime="${escapeHtml(date)}">${isNaN(on.getTime()) ? escapeHtml(date) : dayIn(lang).format(on)}</time>`;
 }
+
+// `ask` of every item, a few at a time, the answers in the items' order. A
+// walk of the site that asked one file after another waited a bucket's round
+// trip for each: a preview took seconds (n207). Not all at once either: a
+// site of thousands of pages would be thousands of calls in flight, and a
+// bucket drops connections when it is pressed.
+export async function together<T, R>(items: readonly T[], ask: (item: T) => Promise<R>, width = 16): Promise<R[]> {
+  const answers: R[] = new Array(items.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      const at = next++;
+      answers[at] = await ask(items[at]!);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(width, items.length) }, worker));
+  return answers;
+}

@@ -986,12 +986,27 @@ describe("site rendering", () => {
   test("falls back to a bare template when templates/site.html is missing", async () => {
     const tmpl = join(SITE, "templates", "site.html");
     renameSync(tmpl, `${tmpl}.away`);
+    siteChanged();   // moved by hand: a template is kept between pages
     try {
       const html = await (await fetch(`${BASE}/index.html`)).text();
       expect(html).toStartWith('<!DOCTYPE html><html lang="en"><head><title>duckdown</title></head><body><main><h1');
     } finally {
       renameSync(`${tmpl}.away`, tmpl);
+      siteChanged();
     }
+  });
+
+  test("a template saved in the editor shows on the next page, though templates are kept between pages", async () => {
+    const tmpl = `${BASE}/edit/templates/site.html`;
+    const before = readFileSync(join(SITE, "templates", "site.html"), "utf-8");
+    await fetch(`${BASE}/index.html`);   // read, and kept
+    try {
+      expect((await fetch(tmpl, authed({ method: "PUT", body: before.replace("<body", "<!-- saved --><body") }))).ok).toBe(true);
+      expect(await (await fetch(`${BASE}/index.html`)).text()).toContain("<!-- saved -->");
+    } finally {
+      await fetch(tmpl, authed({ method: "PUT", body: before }));
+    }
+    expect(await (await fetch(`${BASE}/index.html`)).text()).not.toContain("<!-- saved -->");
   });
 
   test("returns 404 for missing page", async () => {

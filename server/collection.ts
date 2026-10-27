@@ -1,4 +1,4 @@
-import type { Storage } from "./storage";
+import { readIfThere, type Storage } from "./storage";
 import { DEBUG } from "./config";
 import { escapeHtml, outsideCode } from "./utils";
 import { parseFrontMatter, renderMarkdown, yes, folderOf } from "./markdown";
@@ -340,8 +340,9 @@ async function read(pages: Storage, folder: string, debug: boolean): Promise<Col
     if (base) return inLanguage(pages, base, at.lang, folder);
   }
   const key = collectionPath(folder);
-  if (!await pages.exists(key)) return null;
-  const collection = parseCollection(folder, await pages.read(key));
+  const source = await readIfThere(pages, key);
+  if (source === null) return null;
+  const collection = parseCollection(folder, source);
   collection.each = await eachPageIn(pages, collection);
   // Failures speak: a file the site can't read is a folder of missing pages,
   // and the log is where that gets noticed.
@@ -400,8 +401,9 @@ const itemFor = (base: Collection, key: string): Item | undefined =>
 
 async function translationsIn(pages: Storage, base: Collection, file: string): Promise<Translations> {
   const out: Translations = { items: new Map(), groups: {}, labels: {}, problems: [] };
-  if (!await pages.exists(file)) return out;
-  const raw = rawObject(file, await pages.read(file), out.problems);
+  const source = await readIfThere(pages, file);
+  if (source === null) return out;
+  const raw = rawObject(file, source, out.problems);
   if (!raw) return out;
   const items = isRaw(raw.items) ? raw.items : {};
   for (const [key, entry] of Object.entries(items)) {
@@ -536,8 +538,8 @@ async function inLanguage(pages: Storage, base: Collection, lang: string, folder
   let each = base.each;
   if (base.each) {
     const own = `${lang}/${base.each.key}`;
-    if (await pages.exists(own)) {
-      const source = await pages.read(own);
+    const source = await readIfThere(pages, own);
+    if (source !== null) {
       const { meta } = parseFrontMatter(source);
       if (meta.each && !yes(meta.draft)) each = { key: own, meta, content: renderMarkdown(source, own.replace(/\.md$/, "")).content };
     }

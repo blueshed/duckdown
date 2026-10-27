@@ -1,4 +1,4 @@
-import type { Storage } from "./storage";
+import { readIfThere, type Storage } from "./storage";
 import { parseFrontMatter, yes, addMeta, dropMeta } from "./markdown";
 import { unlisted, hidden, readable, NOT_FOUND } from "./listed";
 import { kept } from "./kept";
@@ -29,8 +29,9 @@ const CODE = /^[a-z]{2,3}(-[a-z0-9]{2,8})*$/;
 export type Languages = { main: string; others: string[] };
 
 async function langOf(pages: Storage, key: string): Promise<string | undefined> {
-  if (!await pages.exists(key)) return undefined;
-  return parseFrontMatter(await pages.read(key)).meta.lang?.[0]?.toLowerCase();
+  const source = await readIfThere(pages, key);
+  if (source === null) return undefined;
+  return parseFrontMatter(source).meta.lang?.[0]?.toLowerCase();
 }
 
 // Another language is a folder that says so itself: `lang:` in its index.md
@@ -87,8 +88,10 @@ export function sourceHash(source: string): string {
 const shown = (meta: Record<string, string[]>, drafts: boolean) => drafts ? !meta.each : readable(meta);
 
 // Whether the file is there and is a page as that reader gets it.
-const showable = async (pages: Storage, key: string, drafts: boolean): Promise<boolean> =>
-  await pages.exists(key) && shown(parseFrontMatter(await pages.read(key)).meta, drafts);
+const showable = async (pages: Storage, key: string, drafts: boolean): Promise<boolean> => {
+  const source = await readIfThere(pages, key);
+  return source !== null && shown(parseFrontMatter(source).meta, drafts);
+};
 
 // Whether the language has a page of its own at `key` (named in the default's
 // tree), for a reader — or, with `drafts`, for the editor: the question the
@@ -168,7 +171,8 @@ export const UNTRANSLATED = "This page has not been translated yet.";
 
 export async function untranslatedNote(pages: Storage, lang: string): Promise<{ text: string; lang: string }> {
   const home = `${lang}/index.md`;
-  const said = await pages.exists(home) ? parseFrontMatter(await pages.read(home)).meta.untranslated?.[0] : undefined;
+  const source = await readIfThere(pages, home);
+  const said = source !== null ? parseFrontMatter(source).meta.untranslated?.[0] : undefined;
   return said ? { text: said, lang } : { text: UNTRANSLATED, lang: "en" };
 }
 

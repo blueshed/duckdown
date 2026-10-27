@@ -21,7 +21,7 @@ import { ConfirmDialog } from "../server/edit/components/ConfirmDialog";
 import { NewDialog } from "../server/edit/components/NewDialog";
 import { Browser } from "../server/edit/components/Browser";
 import { Editor } from "../server/edit/components/Editor";
-import { Preview } from "../server/edit/components/Preview";
+import { Preview, SLOW } from "../server/edit/components/Preview";
 import { CssPreview } from "../server/edit/components/CssPreview";
 import { Header } from "../server/edit/components/Header";
 import { Trail, folderCrumbs } from "../server/edit/components/Trail";
@@ -3002,6 +3002,47 @@ describe("Preview, while a page is on its way", () => {
     // A page that can't be opened says so and is no longer on its way.
     await loadFile("nowhere/at-all.md");
     expect(opening.get()).toBeNull();
+    dispose();
+  });
+});
+
+describe("Preview, while the page being typed into is rendered", () => {
+  test("a quick render says nothing; a slow one says it is coming until it has loaded (n207)", async () => {
+    batch(() => {
+      filePath.set("guide/pages.md");
+      editorContent.set("title: Pages\n\n# Pages");
+    });
+    const { host, dispose } = render(() => <Preview />);
+    const panel = () => host.querySelector(".panel-preview")!;
+    const frame = () => host.querySelector("iframe") as HTMLIFrameElement;
+    await waitFor(() => frame().srcdoc.includes("Pages") && panel().getAttribute("aria-busy") === "false");
+    let wait = 0;
+    const restore = intercept(async (url, init) => {
+      if (!url.includes("/edit/mark/")) return signedIn(url, init);
+      await Bun.sleep(wait);
+      const { source } = JSON.parse(String(init!.body)) as { source: string };
+      return Response.json({ html: `<p>${source.slice(source.lastIndexOf("#") + 2).trim()}</p>`, layout: "site.html", includes: [] });
+    });
+    try {
+      // Quick: the typing pause, an answer at once, and never a line.
+      editorContent.set("title: Pages\n\n# Quick");
+      await waitFor(() => frame().srcdoc.includes("Quick"), 1000);
+      expect(panel().querySelector(".loading-line")).toBeNull();
+      // Slow: past SLOW the line is up, and over the last page, not instead of it.
+      wait = SLOW + 400;
+      editorContent.set("title: Pages\n\n# Slow");
+      await waitFor(() => panel().getAttribute("aria-busy") === "true", 300 + SLOW + 300);
+      expect(panel().querySelector(".loading-line")).not.toBeNull();
+      expect(frame().srcdoc).toContain("Quick");
+      await waitFor(() => frame().srcdoc.includes("Slow") && panel().getAttribute("aria-busy") === "false", 1500);
+      expect(panel().querySelector(".loading-line")).toBeNull();
+      // The same page again loads nothing, so it is not waited for.
+      editorContent.set("title: Pages\n\n# Slow ");
+      await waitFor(() => panel().getAttribute("aria-busy") === "true", 300 + SLOW + 300);
+      await waitFor(() => panel().getAttribute("aria-busy") === "false", 1500);
+    } finally {
+      restore();
+    }
     dispose();
   });
 });

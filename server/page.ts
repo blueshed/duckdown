@@ -1,5 +1,6 @@
 import { TEMPLATES_PATH } from "./config";
-import { createPageStorage, createStorage } from "./storage";
+import { createPageStorage, createStorage, readIfThere } from "./storage";
+import { kept } from "./kept";
 import { renderMarkdown, folderOf } from "./markdown";
 import { siteNav, markCurrent, folderListing, siteMap } from "./nav";
 import { feedLink } from "./feed";
@@ -55,13 +56,18 @@ export async function templateFor(layout = "", draft?: DraftTemplate, lang = "")
   return await firstTemplate(names, draft) ?? { name: "", body: BARE };
 }
 
+// A template file's text, or null: kept like the nav (kept.ts), since every
+// page reads two or three and on a bucket each was a round trip (n207). The
+// editor's template routes drop them when one is saved.
+const template = kept((store, key) => readIfThere(store, key));
+
 // The first of these template files the site has — or is being edited as an
 // unsaved draft, which stands in for the file of its name.
 async function firstTemplate(names: string[], draft?: DraftTemplate): Promise<{ name: string; body: string } | null> {
   for (const name of names) {
     if (draft?.name === name) return { name, body: draft.body };
-    const key = `${TEMPLATES_PATH}${name}`;
-    if (await site.exists(key)) return { name, body: await site.read(key) };
+    const body = await template(site, `${TEMPLATES_PATH}${name}`);
+    if (body !== null) return { name, body };
   }
   return null;
 }

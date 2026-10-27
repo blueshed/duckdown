@@ -1,11 +1,12 @@
 import type { Storage } from "./storage";
-import { createImageStorage } from "./storage";
+import { createImageStorage, readIfThere } from "./storage";
 import { DEBUG } from "./config";
 import { kept } from "./kept";
 import { WIDTHS, WIDTH_NAME, widthName, imageUrl } from "./images";
 import { hidden } from "./listed";
 import { folderOf } from "./markdown";
 import { joinKey } from "./slugs";
+import { together } from "./utils";
 
 // A picture in static/images/ kept at narrower widths too, so a phone is sent
 // the 960 rather than a 4000-pixel original (n162). They are made when a
@@ -25,7 +26,8 @@ const nameOf = (key: string) => key.slice(key.lastIndexOf("/") + 1);
 
 async function manifestOf(store: Storage, folder: string): Promise<Widths> {
   const key = joinKey(folder, MANIFEST);
-  return await store.exists(key) ? JSON.parse(await store.read(key)) as Widths : {};
+  const source = await readIfThere(store, key);
+  return source !== null ? JSON.parse(source) as Widths : {};
 }
 
 // Makes a picture's narrower widths beside it and says so in its folder's
@@ -93,11 +95,13 @@ const IMG = /<img\b[^>]*?\bsrc="\/static\/images\/([^"]+)"[^>]*>/g;
 export async function withWidths(html: string, store: Storage = images, debug = DEBUG): Promise<string> {
   const found = [...html.matchAll(IMG)].filter(([tag]) => !/\bsrcset=/.test(tag));
   if (!found.length) return html;
+  // Every folder's manifest at once: one after another, each was a round trip.
+  const folders = [...new Set(found.map(([, src]) => folderOf(decodeURI(src!))))];
+  const read = new Map((await together(folders, (folder) => manifests(store, folder, debug))).map((m, n) => [folders[n]!, m]));
   const sets = new Map<string, string>();
   for (const [, src] of found) {
     const key = decodeURI(src!);
-    const folder = folderOf(key);
-    const entry = (await manifests(store, folder, debug))[nameOf(key)];
+    const entry = read.get(folderOf(key))![nameOf(key)];
     if (entry) {
       const url = (name: string) => imageUrl("/static/images/", name);
       sets.set(src!, [...entry.widths.map((w) => `${url(widthName(key, w))} ${w}w`), `${url(key)} ${entry.width}w`].join(", "));

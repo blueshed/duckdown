@@ -1,4 +1,4 @@
-import { createStaticStorage, createPageStorage } from "./storage";
+import { createStaticStorage, createPageStorage, readIfThere } from "./storage";
 import { parseFrontMatter } from "./markdown";
 import { DEBUG } from "./config";
 import { kept } from "./kept";
@@ -22,8 +22,8 @@ const pages = createPageStorage();
 // What the site's picture is of, for a reader who can't see it: the site,
 // by its front page's title.
 async function siteName(): Promise<string> {
-  if (!await pages.exists("index.md")) return "";
-  return parseFrontMatter(await pages.read("index.md")).meta.title?.[0] ?? "";
+  const source = await readIfThere(pages, "index.md");
+  return source === null ? "" : parseFrontMatter(source).meta.title?.[0] ?? "";
 }
 
 // What a shared link shows when its page names no image: of its own — the
@@ -31,8 +31,9 @@ async function siteName(): Promise<string> {
 // nothing. Kept like everything else the site knows about itself (kept.ts);
 // the icon tab calls siteChanged() when it writes either.
 const found = kept(async (store): Promise<SitePicture | null> => {
-  if (await store.exists(CARD.name)) return { file: CARD.name, width: CARD.width, height: CARD.height, large: true, alt: await siteName() };
-  if (await store.exists(HOME_ICON)) return { file: HOME_ICON, width: ICONS[HOME_ICON], height: ICONS[HOME_ICON], large: false, alt: await siteName() };
+  const [card, icon, alt] = await Promise.all([store.exists(CARD.name), store.exists(HOME_ICON), siteName()]);   // asked together (n207)
+  if (card) return { file: CARD.name, width: CARD.width, height: CARD.height, large: true, alt };
+  if (icon) return { file: HOME_ICON, width: ICONS[HOME_ICON], height: ICONS[HOME_ICON], large: false, alt };
   return null;
 });
 

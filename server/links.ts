@@ -1,5 +1,5 @@
 import type { Storage } from "./storage";
-import { decodePath } from "./utils";
+import { decodePath, together } from "./utils";
 import { aliasKey } from "./slugs";
 import { pageList, aliasTargets } from "./search";
 import { BASE_FILES, ROOT_FILES } from "./base";
@@ -116,22 +116,24 @@ export class Links {
 export async function deadLinks(html: string, from: string, pages: Storage, files: Storage, extensions?: Answers): Promise<string[]> {
   const links = linksIn(html, from.replace(/^\//, "").replace(/(^|\/)$/, "$1index.html"));
   if (!links.length) return [];
-  const answered = new Set((await pageList(pages)).map((p) => (p.url.endsWith("/") ? `${p.url}index.html` : p.url).slice(1)));
-  const moved = new Set(await aliasTargets(pages));
+  const [listed, aliases, languages] = await Promise.all([pageList(pages), aliasTargets(pages), languagesOf(pages)]);
+  const answered = new Set(listed.map((p) => (p.url.endsWith("/") ? `${p.url}index.html` : p.url).slice(1)));
+  const moved = new Set(aliases);
   // A language answers every page of the default's, in its own words or with a
   // note (languages.ts), so a link into its folder leads where the default's does.
-  const languages = await languagesOf(pages);
   const answers = (p: string) => answered.has(p) || answered.has(languageAt(languages, p)?.rest ?? "");
-  const dead = new Set<string>();
-  for (const { link, path, file } of links) {
-    if (reaches(file, answers) || moved.has(aliasKey(path)) || extensions?.(path)) continue;
-    if (file === "search.json" || file === "sitemap.xml" || await isFeed(pages, path)) continue;
+  // Whether a reader following it finds something. Asked of every link
+  // together, not one after another: a page of pictures was a bucket's round
+  // trip a picture, and its preview took seconds (n207).
+  const leads = async ({ path, file }: Link): Promise<boolean> => {
+    if (reaches(file, answers) || moved.has(aliasKey(path)) || extensions?.(path)) return true;
+    if (file === "search.json" || file === "sitemap.xml" || await isFeed(pages, path)) return true;
     if (file.startsWith("static/")) {
       const name = file.slice("static/".length);
-      if (BASE_FILES.includes(name) || await files.exists(name)) continue;
+      if (BASE_FILES.includes(name) || await files.exists(name)) return true;
     }
-    if (ROOT_FILES.includes(file) && await files.exists(file)) continue;
-    dead.add(`${link}${meant(file, answers)}`);
-  }
-  return [...dead];
+    return ROOT_FILES.includes(file) && await files.exists(file);
+  };
+  const found = await together(links, leads);
+  return [...new Set(links.filter((_, n) => !found[n]).map(({ link, file }) => `${link}${meant(file, answers)}`))];
 }
